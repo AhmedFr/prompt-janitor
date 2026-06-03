@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Design & roadmap spec
+    url: https://github.com/AhmedFr/prompt-janitor/blob/main/docs/superpowers/specs/2026-06-04-prompt-janitor-design.md
+    about: Read the full design and phased roadmap before opening an issue.

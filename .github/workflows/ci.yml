@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder checks
+        run: |
+          echo "Skeleton CI is green."
+          echo "The full pipeline (pnpm lint/test, cargo fmt/clippy/test, tauri build smoke)"
+          echo "lands with Phase 0 — see the 'Replace placeholder CI with full pipeline' issue."
