@@ -1,0 +1,166 @@
+/*
+ * Prompt Janitor — shell styles.
+ * A minimal subset of the Cupertino design tokens to make the empty shell feel on-brand.
+ * The full design-token module is ported in Phase 0 · "Port design tokens & base styles".
+ */
+:root {
+  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --content-bg: #ffffff;
+  --sidebar-bg: rgba(245, 245, 247, 0.82);
+  --sep: rgba(0, 0, 0, 0.08);
+
+  --text: #1d1d1f;
+  --text-2: #3c3c43;
+  --text-3: #8a8a8e;
+
+  --blue: #0a84ff;
+  --blue-tint: rgba(10, 132, 255, 0.12);
+  --hover: rgba(0, 0, 0, 0.05);
+
+  --radius: 7px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-system);
+  color: var(--text);
+  background: var(--content-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Window layout ---- */
+.app-window {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar-bg);
+  backdrop-filter: blur(20px);
+  border-right: 0.5px solid var(--sep);
+}
+
+.sidebar__titlebar {
+  height: 38px;
+  flex: 0 0 38px;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 10px;
+}
+
+.sidebar__logo {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.sidebar__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  overflow-y: auto;
+}
+
+.sidebar__item {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.sidebar__item:hover {
+  background: var(--hover);
+}
+
+.sidebar__item--active {
+  background: var(--blue-tint);
+  color: var(--blue);
+  font-weight: 500;
+}
+
+/* ---- Content / screens ---- */
+.app-content {
+  overflow: hidden;
+  background: var(--content-bg);
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.screen__toolbar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  flex: 0 0 52px;
+  padding: 0 20px;
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.screen__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.screen__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-3);
+  text-align: center;
+  padding: 24px;
+}
+
+.screen__empty-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.screen__empty-subtitle {
+  margin: 0;
+  font-size: 13px;
+  max-width: 360px;
+}
