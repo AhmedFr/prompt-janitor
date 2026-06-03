@@ -1,0 +1,4 @@
+# pnpm reads dependency build-script approvals here.
+# esbuild ships its native binary via a postinstall script that Vite needs at build time.
+allowBuilds:
+  esbuild: true
