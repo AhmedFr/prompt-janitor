@@ -152,6 +152,59 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
     })
 }
 
+fn grade_from_db(s: &str) -> Grade {
+    match s {
+        "A" => Grade::A,
+        "B" => Grade::B,
+        "C" => Grade::C,
+        "D" => Grade::D,
+        _ => Grade::F,
+    }
+}
+
+/// A row in the Prompts table.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct FileRow {
+    pub id: String,
+    pub name: String,
+    pub project: String,
+    pub grade: Grade,
+    pub score: u32,
+    pub issue_count: u32,
+    pub modified: Option<String>,
+}
+
+/// All scanned files, best grade first.
+pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, path, kind, project_id, grade, score, issue_count, modified_at
+         FROM files
+         ORDER BY CASE grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
+                  project_id, kind",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            let path: String = r.get(1)?;
+            let kind: String = r.get(2)?;
+            let name = std::path::Path::new(&path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(kind.as_str())
+                .to_string();
+            Ok(FileRow {
+                id: r.get(0)?,
+                name,
+                project: r.get(3)?,
+                grade: grade_from_db(&r.get::<_, String>(4)?),
+                score: r.get::<_, i64>(5)? as u32,
+                issue_count: r.get::<_, i64>(6)? as u32,
+                modified: r.get::<_, Option<String>>(7)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +237,31 @@ mod tests {
         assert!(ov.critical >= 2);
         assert!(!ov.worklist.is_empty());
         assert_eq!(ov.worklist[0].severity, Severity::Hi);
+    }
+
+    #[test]
+    fn list_files_is_sorted_best_grade_first() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("good")).unwrap();
+        std::fs::write(
+            dir.path().join("good/AGENTS.md"),
+            "You are a senior reviewer.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(dir.path().join("bad")).unwrap();
+        std::fs::write(
+            dir.path().join("bad/CLAUDE.md"),
+            "You are an assistant.\nAlways use gpt-4.\nBe concise but thorough.\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let files = list_files(&conn).unwrap();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].grade, Grade::A);
+        assert_eq!(files[0].name, "AGENTS.md");
+        assert!(files[1].issue_count >= 2);
     }
 }

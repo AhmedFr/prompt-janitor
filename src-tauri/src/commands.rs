@@ -98,3 +98,11 @@ pub fn get_scan_folder(db: tauri::State<'_, AppDb>) -> Result<Option<String>, St
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::get_setting(&conn, "scan_folder").map_err(|e| e.to_string())
 }
+
+/// Every scanned file for the Prompts table.
+#[tauri::command]
+#[specta::specta]
+pub fn list_files(db: tauri::State<'_, AppDb>) -> Result<Vec<query::FileRow>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::list_files(&conn).map_err(|e| e.to_string())
+}

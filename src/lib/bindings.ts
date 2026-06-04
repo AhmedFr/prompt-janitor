@@ -19,6 +19,8 @@ export const commands = {
 	setScanFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_scan_folder", { path })),
 	/**  The currently configured scan folder, if any. */
 	getScanFolder: () => typedError<string | null, string>(__TAURI_INVOKE("get_scan_folder")),
+	/**  Every scanned file for the Prompts table. */
+	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 };
 
 /* Types */
@@ -33,6 +35,17 @@ export type AppStatus = {
 	db_path: string,
 	project_count: number,
 	file_count: number,
+};
+
+/**  A row in the Prompts table. */
+export type FileRow = {
+	id: string,
+	name: string,
+	project: string,
+	grade: Grade,
+	score: number,
+	issue_count: number,
+	modified: string | null,
 };
 
 /**  Letter grade. */
