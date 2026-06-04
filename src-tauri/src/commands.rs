@@ -1,6 +1,7 @@
 //! Tauri commands exposed to the frontend. Each is `#[specta::specta]` so
 //! tauri-specta can generate typed TypeScript bindings.
 
+use crate::scan::{run_scan, ScanSummary};
 use crate::store::AppDb;
 
 /// A small status payload proving the typed store ↔ frontend round-trip.
@@ -43,4 +44,32 @@ pub fn get_app_status(db: tauri::State<'_, AppDb>) -> Result<AppStatus, String> 
 #[specta::specta]
 pub fn ping() -> String {
     "pong".to_string()
+}
+
+/// Per-file scan progress, emitted on the `scan-progress` event.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct ScanProgress {
+    pub done: u32,
+    pub total: u32,
+}
+
+/// Scan `path`, grade + persist every prompt file, and return a summary.
+/// Emits `scan-progress` per file and `scan-done` at the end.
+#[tauri::command]
+#[specta::specta]
+pub fn scan_now(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    path: String,
+) -> Result<ScanSummary, String> {
+    use tauri::Emitter;
+
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let root = std::path::PathBuf::from(&path);
+    let summary = run_scan(&conn, &root, |done, total| {
+        let _ = app.emit("scan-progress", ScanProgress { done, total });
+    })
+    .map_err(|e| e.to_string())?;
+    let _ = app.emit("scan-done", &summary);
+    Ok(summary)
 }
