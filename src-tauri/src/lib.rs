@@ -6,6 +6,7 @@
 mod commands;
 pub mod engine;
 mod ipc;
+pub mod rules;
 pub mod scanner;
 mod store;
 

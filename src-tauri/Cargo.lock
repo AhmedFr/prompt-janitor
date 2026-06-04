@@ -2431,6 +2431,7 @@ version = "0.1.0"
 dependencies = [
  "globset",
  "ignore",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",
