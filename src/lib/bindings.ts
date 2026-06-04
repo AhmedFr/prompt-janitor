@@ -27,6 +27,13 @@ export const commands = {
 	setAlert: (key: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_alert", { key, enabled })),
 	/**  Whether an alert is on (defaults to on). */
 	getAlert: (key: string) => typedError<boolean, string>(__TAURI_INVOKE("get_alert", { key })),
+	/**
+	 *  Enable/disable a built-in rule pack ("anthropic", "openai", "karpathy", …).
+	 *  Phase 3 reads `pack_<id>` when grading.
+	 */
+	setPack: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_pack", { id, enabled })),
+	/**  Whether a rule pack is enabled (defaults to on). */
+	getPack: (id: string) => typedError<boolean, string>(__TAURI_INVOKE("get_pack", { id })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
