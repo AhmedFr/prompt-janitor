@@ -39,7 +39,7 @@ export function App() {
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
         {route === "rules" && <Rules />}
-        {route === "settings" && <Settings />}
+        {route === "settings" && <Settings navigate={navigate} />}
       </main>
       {showOnboarding && <Onboarding onDone={finishOnboarding} />}
     </div>

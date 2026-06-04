@@ -1,0 +1,89 @@
+.set-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.set-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.set-tab--on {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.set-tab-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.set-tab--on .set-tab-ico {
+  background: var(--blue-tint);
+}
+
+.set-sec {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 10px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 0.5px solid var(--sep);
+  background: none;
+  text-align: left;
+  font: inherit;
+}
+
+.set-row:last-child {
+  border-bottom: none;
+}
+
+.set-row--btn {
+  cursor: pointer;
+}
+
+.set-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sep-strong);
+}
+
+.set-radio--on {
+  border-color: var(--blue);
+}
+
+.set-radio-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--blue);
+}
