@@ -205,6 +205,92 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
     Ok(rows)
 }
 
+/// One issue in the Detail view.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct IssueDetail {
+    pub line: Option<u32>,
+    pub severity: Severity,
+    pub source: Source,
+    pub title: String,
+    pub why: String,
+    pub fix_from: Option<String>,
+    pub fix_to: Option<String>,
+}
+
+/// Everything the Detail screen needs for one file.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct FileDetail {
+    pub id: String,
+    pub name: String,
+    pub project: String,
+    pub path: String,
+    pub grade: Grade,
+    pub score: u32,
+    pub content: String,
+    pub issues: Vec<IssueDetail>,
+}
+
+/// Load a single file with its current source + issues. `None` if unknown.
+pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Option<FileDetail>> {
+    let row = conn
+        .query_row(
+            "SELECT id, path, kind, project_id, grade, score FROM files WHERE id = ?1",
+            [file_id],
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                    r.get::<_, String>(4)?,
+                    r.get::<_, i64>(5)?,
+                ))
+            },
+        )
+        .optional()?;
+
+    let Some((id, path, kind, project, grade, score)) = row else {
+        return Ok(None);
+    };
+
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(kind.as_str())
+        .to_string();
+
+    let mut stmt = conn.prepare(
+        "SELECT line, severity, source, title, why, fix_from, fix_to FROM issues WHERE file_id = ?1
+         ORDER BY CASE severity WHEN 'hi' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END, COALESCE(line, 1000000)",
+    )?;
+    let issues = stmt
+        .query_map([file_id], |r| {
+            let line: Option<i64> = r.get(0)?;
+            Ok(IssueDetail {
+                line: line.map(|l| l as u32),
+                severity: severity_from_db(&r.get::<_, String>(1)?),
+                source: source_from_db(&r.get::<_, String>(2)?),
+                title: r.get(3)?,
+                why: r.get(4)?,
+                fix_from: r.get(5)?,
+                fix_to: r.get(6)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(Some(FileDetail {
+        id,
+        name,
+        project,
+        path,
+        grade: grade_from_db(&grade),
+        score: score as u32,
+        content,
+        issues,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,5 +349,27 @@ mod tests {
         assert_eq!(files[0].grade, Grade::A);
         assert_eq!(files[0].name, "AGENTS.md");
         assert!(files[1].issue_count >= 2);
+    }
+
+    #[test]
+    fn file_detail_has_content_and_issues() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("CLAUDE.md"),
+            "You are an assistant.\nAlways use gpt-4.\nBe concise but thorough.\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let id = &list_files(&conn).unwrap()[0].id.clone();
+        let detail = get_file_detail(&conn, id).unwrap().unwrap();
+        assert_eq!(detail.name, "CLAUDE.md");
+        assert!(detail.content.contains("gpt-4"));
+        assert!(!detail.issues.is_empty());
+        assert_eq!(detail.issues[0].severity, Severity::Hi);
+
+        assert!(get_file_detail(&conn, "does-not-exist").unwrap().is_none());
     }
 }
