@@ -27,6 +27,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::set_ai_config,
         crate::commands::get_ai_config,
         crate::commands::test_ai_connection,
+        crate::commands::suggest_fix,
         crate::commands::list_files,
         crate::commands::get_file_detail,
         crate::commands::get_scans_digest,

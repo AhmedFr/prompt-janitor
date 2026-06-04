@@ -53,6 +53,11 @@ export const commands = {
 	getAiConfig: () => typedError<AiConfig, string>(__TAURI_INVOKE("get_ai_config")),
 	/**  Verify the configured provider + key with a tiny request. */
 	testAiConnection: () => typedError<string, string>(__TAURI_INVOKE("test_ai_connection")),
+	/**
+	 *  Generate an AI rewrite for one issue of a file (paid). Returns a `from → to`
+	 *  diff via the configured provider, replacing the static suggested fix.
+	 */
+	suggestFix: (fileId: string, issueIndex: number) => typedError<FixSuggestion, string>(__TAURI_INVOKE("suggest_fix", { fileId, issueIndex })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
@@ -127,6 +132,16 @@ export type FileRow = {
 	score: number,
 	issue_count: number,
 	modified: string | null,
+};
+
+/**
+ *  A provider-generated edit for one issue. `from` is an exact slice of the
+ *  file to replace (empty for a pure insertion); `to` is the replacement.
+ */
+export type FixSuggestion = {
+	from: string,
+	to: string,
+	note: string,
 };
 
 /**  Letter grade. */
