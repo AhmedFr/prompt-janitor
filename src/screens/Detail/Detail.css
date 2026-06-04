@@ -33,6 +33,12 @@
   cursor: pointer;
 }
 
+/* Keep the keyboard focus ring inside the source block, not overlapping
+   neighbouring lines. */
+.d-line[role="button"]:focus-visible {
+  outline-offset: -2px;
+}
+
 .d-line--hi {
   background: rgba(255, 59, 48, 0.1);
 }
