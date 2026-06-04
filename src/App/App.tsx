@@ -32,8 +32,11 @@ export function App() {
 
   return (
     <div className="app-window">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <Sidebar active={route} onNavigate={(r) => navigate(r)} onReplay={() => setShowOnboarding(true)} />
-      <main className="app-content">
+      <main id="main-content" className="app-content" tabIndex={-1}>
         {route === "overview" && <Overview navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}

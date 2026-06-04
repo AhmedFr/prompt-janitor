@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScoreRing } from "@/components/ScoreRing";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
@@ -113,11 +113,16 @@ function DetailBody({
   entitled: boolean;
   onReload: () => Promise<void>;
 }) {
-  const lines = detail.content.length ? detail.content.split("\n") : [];
-  const lineIssue = new Map<number, number>();
-  detail.issues.forEach((iss, idx) => {
-    if (iss.line != null && !lineIssue.has(iss.line)) lineIssue.set(iss.line, idx);
-  });
+  // Source lines + the first issue per line — recomputed only when the file
+  // changes, not on every selection/hover render.
+  const { lines, lineIssue } = useMemo(() => {
+    const lines = detail.content.length ? detail.content.split("\n") : [];
+    const lineIssue = new Map<number, number>();
+    detail.issues.forEach((iss, idx) => {
+      if (iss.line != null && !lineIssue.has(iss.line)) lineIssue.set(iss.line, idx);
+    });
+    return { lines, lineIssue };
+  }, [detail]);
   const selected = selectedIndex != null ? detail.issues[selectedIndex] : null;
   const selectedLine = selected?.line ?? null;
 
@@ -154,7 +159,24 @@ function DetailBody({
                   <div
                     key={i}
                     className={cls}
+                    role={issueIdx !== undefined ? "button" : undefined}
+                    tabIndex={issueIdx !== undefined ? 0 : undefined}
+                    aria-label={
+                      issueIdx !== undefined
+                        ? `Line ${lineNum}: ${detail.issues[issueIdx].title}`
+                        : undefined
+                    }
                     onClick={issueIdx !== undefined ? () => onSelect(issueIdx) : undefined}
+                    onKeyDown={
+                      issueIdx !== undefined
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onSelect(issueIdx);
+                            }
+                          }
+                        : undefined
+                    }
                   >
                     <span className="d-ln tnum">{lineNum}</span>
                     <span className="d-ltext">{text || " "}</span>
