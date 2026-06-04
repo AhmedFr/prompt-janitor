@@ -21,6 +21,17 @@ export const commands = {
 	getScanFolder: () => typedError<string | null, string>(__TAURI_INVOKE("get_scan_folder")),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
+	/**  One file's source + issues for the Detail screen. */
+	getFileDetail: (fileId: string) => typedError<{
+	id: string,
+	name: string,
+	project: string,
+	path: string,
+	grade: Grade,
+	score: number,
+	content: string,
+	issues: IssueDetail[],
+} | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
 };
 
 /* Types */
@@ -37,6 +48,18 @@ export type AppStatus = {
 	file_count: number,
 };
 
+/**  Everything the Detail screen needs for one file. */
+export type FileDetail = {
+	id: string,
+	name: string,
+	project: string,
+	path: string,
+	grade: Grade,
+	score: number,
+	content: string,
+	issues: IssueDetail[],
+};
+
 /**  A row in the Prompts table. */
 export type FileRow = {
 	id: string,
@@ -50,6 +73,17 @@ export type FileRow = {
 
 /**  Letter grade. */
 export type Grade = "A" | "B" | "C" | "D" | "F";
+
+/**  One issue in the Detail view. */
+export type IssueDetail = {
+	line: number | null,
+	severity: Severity,
+	source: Source,
+	title: string,
+	why: string,
+	fix_from: string | null,
+	fix_to: string | null,
+};
 
 export type Overview = {
 	has_data: boolean,

@@ -14,6 +14,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::set_scan_folder,
         crate::commands::get_scan_folder,
         crate::commands::list_files,
+        crate::commands::get_file_detail,
     ])
 }
 

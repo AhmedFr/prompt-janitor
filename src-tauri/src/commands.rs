@@ -106,3 +106,14 @@ pub fn list_files(db: tauri::State<'_, AppDb>) -> Result<Vec<query::FileRow>, St
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::list_files(&conn).map_err(|e| e.to_string())
 }
+
+/// One file's source + issues for the Detail screen.
+#[tauri::command]
+#[specta::specta]
+pub fn get_file_detail(
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+) -> Result<Option<query::FileDetail>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_file_detail(&conn, &file_id).map_err(|e| e.to_string())
+}
