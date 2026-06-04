@@ -10,6 +10,7 @@ export type {
   IssueDetail,
   ScansDigest,
   DigestItem,
+  RuleInfo,
   ScanSummary,
   Severity,
   Source,

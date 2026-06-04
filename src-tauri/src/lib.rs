@@ -39,6 +39,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir).ok();
             let db_path = dir.join("prompt-janitor.db");
             let conn = store::open_and_migrate(&db_path).expect("initialize database");
+            query::seed_rules(&conn).ok();
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),

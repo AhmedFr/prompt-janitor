@@ -6,7 +6,6 @@ use std::path::Path;
 use rusqlite::{params, Connection};
 
 use crate::engine::{evaluate, grade_for_score, Grade, Severity};
-use crate::rules::builtin_rules;
 use crate::scanner;
 
 /// Summary of a completed scan, returned to the frontend.
@@ -46,7 +45,7 @@ pub fn run_scan(
 ) -> rusqlite::Result<ScanSummary> {
     let files = scanner::scan_folder(root);
     let total = files.len() as u32;
-    let rules = builtin_rules();
+    let rules = crate::query::active_rules(conn);
     let now = now_epoch();
     let root_str = root.display().to_string();
 

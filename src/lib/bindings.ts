@@ -28,12 +28,16 @@ export const commands = {
 	/**  Whether an alert is on (defaults to on). */
 	getAlert: (key: string) => typedError<boolean, string>(__TAURI_INVOKE("get_alert", { key })),
 	/**
-	 *  Enable/disable a built-in rule pack ("anthropic", "openai", "karpathy", …).
-	 *  Phase 3 reads `pack_<id>` when grading.
+	 *  Enable/disable a built-in rule pack ("anthropic", "openai", "karpathy").
+	 *  Toggles every rule of that source — affects grading on the next scan.
 	 */
 	setPack: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_pack", { id, enabled })),
-	/**  Whether a rule pack is enabled (defaults to on). */
+	/**  Whether every rule of a pack is enabled (defaults to on). */
 	getPack: (id: string) => typedError<boolean, string>(__TAURI_INVOKE("get_pack", { id })),
+	/**  The built-in rules with their enabled state. */
+	listRules: () => typedError<RuleInfo[], string>(__TAURI_INVOKE("list_rules")),
+	/**  Enable/disable a single rule. */
+	setRule: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_rule", { id, enabled })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
@@ -131,6 +135,16 @@ export type Overview = {
 	trend_delta: number,
 	/**  Most recent scan finish time (epoch seconds string). */
 	last_scan: string | null,
+};
+
+/**  A built-in rule with its current enabled state (for the Rules screen). */
+export type RuleInfo = {
+	id: string,
+	title: string,
+	description: string,
+	source: Source,
+	severity: Severity,
+	enabled: boolean,
 };
 
 /**  Summary of a completed scan, returned to the frontend. */

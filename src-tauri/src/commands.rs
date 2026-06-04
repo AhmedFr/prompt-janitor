@@ -156,23 +156,37 @@ pub fn get_alert(db: tauri::State<'_, AppDb>, key: String) -> Result<bool, Strin
     Ok(value.as_deref() != Some("false"))
 }
 
-/// Enable/disable a built-in rule pack ("anthropic", "openai", "karpathy", …).
-/// Phase 3 reads `pack_<id>` when grading.
+/// Enable/disable a built-in rule pack ("anthropic", "openai", "karpathy").
+/// Toggles every rule of that source — affects grading on the next scan.
 #[tauri::command]
 #[specta::specta]
 pub fn set_pack(db: tauri::State<'_, AppDb>, id: String, enabled: bool) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let value = if enabled { "true" } else { "false" };
-    query::set_setting(&conn, &format!("pack_{id}"), value).map_err(|e| e.to_string())
+    query::set_pack(&conn, &id, enabled).map_err(|e| e.to_string())
 }
 
-/// Whether a rule pack is enabled (defaults to on).
+/// Whether every rule of a pack is enabled (defaults to on).
 #[tauri::command]
 #[specta::specta]
 pub fn get_pack(db: tauri::State<'_, AppDb>, id: String) -> Result<bool, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let value = query::get_setting(&conn, &format!("pack_{id}")).map_err(|e| e.to_string())?;
-    Ok(value.as_deref() != Some("false"))
+    query::pack_enabled(&conn, &id).map_err(|e| e.to_string())
+}
+
+/// The built-in rules with their enabled state.
+#[tauri::command]
+#[specta::specta]
+pub fn list_rules(db: tauri::State<'_, AppDb>) -> Result<Vec<query::RuleInfo>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::list_rules(&conn).map_err(|e| e.to_string())
+}
+
+/// Enable/disable a single rule.
+#[tauri::command]
+#[specta::specta]
+pub fn set_rule(db: tauri::State<'_, AppDb>, id: String, enabled: bool) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_rule(&conn, &id, enabled).map_err(|e| e.to_string())
 }
 
 /// Every scanned file for the Prompts table.
