@@ -5,6 +5,8 @@ export interface SidebarProps {
   active: Route;
   /** Navigate to a different route. */
   onNavigate: (route: Route) => void;
+  /** Replay the onboarding wizard. */
+  onReplay?: () => void;
 }
 
 export interface NavItem {

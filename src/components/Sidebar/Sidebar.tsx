@@ -1,7 +1,7 @@
 import type { SidebarProps } from "./Sidebar.types";
 import { NAV_ITEMS } from "./Sidebar.constants";
 
-export function Sidebar({ active, onNavigate }: SidebarProps) {
+export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
   return (
     <aside className="sidebar">
       {/* Drag region; leaves room for the macOS traffic lights (overlay titlebar). */}
@@ -27,6 +27,14 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      {onReplay && (
+        <div className="sidebar__footer">
+          <button type="button" className="sidebar__item" onClick={onReplay}>
+            Replay setup
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
