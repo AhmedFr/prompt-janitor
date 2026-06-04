@@ -25,11 +25,20 @@ const SEVERITIES: [Sev, string][] = [
 ];
 
 export function Rules() {
-  const { rules, loading, toggle, addRule, deleteRule } = useRules();
+  const { rules, loading, toggle, addRule, deleteRule, importPack } = useRules();
   const [pack, setPack] = useState<Pack>("all");
   const [title, setTitle] = useState("");
   const [pattern, setPattern] = useState("");
   const [sev, setSev] = useState<Sev>("mid");
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
+  const doImport = async () => {
+    const n = await importPack();
+    if (n > 0) {
+      setImportMsg(`Imported ${n} rule${n === 1 ? "" : "s"}`);
+      window.setTimeout(() => setImportMsg(null), 4000);
+    }
+  };
 
   const shown = pack === "all" ? rules : rules.filter((r) => r.source === pack);
   const onCount = rules.filter((r) => r.enabled).length;
@@ -45,6 +54,15 @@ export function Rules() {
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Rules &amp; standards</h1>
+        <span className="toolbar-spacer" />
+        {importMsg && (
+          <span className="faint" style={{ fontSize: 12, color: "var(--green)" }}>
+            {importMsg}
+          </span>
+        )}
+        <Button size="sm" onClick={() => void doImport()}>
+          <Icon name="plus" /> Import pack
+        </Button>
       </header>
       <div className="scroll-area">
         <div className="page">

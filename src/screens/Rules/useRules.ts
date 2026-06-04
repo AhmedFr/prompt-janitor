@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { commands, isTauri, type RuleInfo } from "@/lib/ipc";
 
 /** Fetches the built-in rules and toggles them (optimistically + persisted). */
@@ -38,5 +39,16 @@ export function useRules() {
     await commands.deleteCustomRule(id);
   }, []);
 
-  return { rules, loading, toggle, addRule, deleteRule };
+  const importPack = useCallback(async (): Promise<number> => {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "JSON pack", extensions: ["json"] }],
+    });
+    if (typeof path !== "string") return 0;
+    const res = await commands.importPack(path);
+    await refetch();
+    return res.status === "ok" ? res.data : 0;
+  }, [refetch]);
+
+  return { rules, loading, toggle, addRule, deleteRule, importPack };
 }
