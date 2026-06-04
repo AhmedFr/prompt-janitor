@@ -12,6 +12,7 @@ mod scan;
 pub mod scanner;
 mod scheduler;
 mod store;
+mod tray;
 
 use std::sync::Mutex;
 
@@ -41,6 +42,7 @@ pub fn run() {
                 path: db_path.to_string_lossy().into_owned(),
             });
             scheduler::start(app.handle().clone());
+            tray::setup(app)?;
             Ok(())
         })
         .run(tauri::generate_context!())
