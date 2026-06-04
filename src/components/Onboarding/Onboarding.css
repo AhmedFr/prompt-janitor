@@ -87,9 +87,38 @@
 }
 
 .ob-pack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
   padding: 12px 14px;
-  border: 0.5px solid var(--sep);
+  border: 1px solid var(--sep);
   border-radius: var(--r-ctrl);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ob-pack--on {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+}
+
+.ob-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 6px;
+  border: 1.5px solid var(--sep-strong);
+  color: #fff;
+}
+
+.ob-toggle--on {
+  background: var(--blue);
+  border-color: var(--blue);
 }
 
 .ob-freqs {

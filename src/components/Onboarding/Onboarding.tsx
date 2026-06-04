@@ -35,6 +35,9 @@ export function Onboarding({ onDone }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const [folder, setFolder] = useState<string | null>(null);
   const [freq, setFreq] = useState("6h");
+  const [packs, setPacks] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(PACKS.map((p) => [p.id, true])),
+  );
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
 
@@ -50,11 +53,14 @@ export function Onboarding({ onDone }: OnboardingProps) {
     if (typeof dir === "string") setFolder(dir);
   };
 
+  const togglePack = (id: string) => setPacks((prev) => ({ ...prev, [id]: !prev[id] }));
+
   const finish = async () => {
     if (!folder) return;
     setScanning(true);
     await commands.setScanFolder(folder);
     await commands.setSchedule(freq);
+    await Promise.all(PACKS.map((p) => commands.setPack(p.id, packs[p.id])));
     await commands.scanNow(folder);
     onDone();
   };
@@ -127,12 +133,23 @@ export function Onboarding({ onDone }: OnboardingProps) {
             </p>
             <div className="ob-packs">
               {PACKS.map((p) => (
-                <div key={p.id} className="ob-pack">
-                  <div style={{ fontWeight: 600 }}>{p.label}</div>
-                  <div className="faint" style={{ fontSize: 12 }}>
-                    {p.desc}
-                  </div>
-                </div>
+                <button
+                  key={p.id}
+                  type="button"
+                  className={"ob-pack" + (packs[p.id] ? " ob-pack--on" : "")}
+                  aria-pressed={packs[p.id]}
+                  onClick={() => togglePack(p.id)}
+                >
+                  <span className="grow">
+                    <span style={{ display: "block", fontWeight: 600 }}>{p.label}</span>
+                    <span className="faint" style={{ fontSize: 12 }}>
+                      {p.desc}
+                    </span>
+                  </span>
+                  <span className={"ob-toggle" + (packs[p.id] ? " ob-toggle--on" : "")}>
+                    {packs[p.id] && <Icon name="check" size={14} />}
+                  </span>
+                </button>
               ))}
             </div>
           </div>
