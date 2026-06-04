@@ -5,7 +5,7 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 
-use crate::engine::{evaluate, grade_for_score, Grade, Severity};
+use crate::engine::{evaluate, grade_for_score, score_for_issues, Grade, Severity};
 use crate::scanner;
 
 /// Summary of a completed scan, returned to the frontend.
@@ -56,7 +56,10 @@ pub fn run_scan(
     let (mut critical, mut warnings, mut nits) = (0u32, 0u32, 0u32);
 
     for (i, file) in files.iter().enumerate() {
-        let eval = evaluate(&file.content, &rules);
+        let mut issues = evaluate(&file.content, &rules).issues;
+        issues.extend(crate::query::custom_issues(conn, &file.content));
+        let score = score_for_issues(&issues);
+        let grade = grade_for_score(score);
         let project = project_name(Path::new(&file.path));
 
         conn.execute(
@@ -71,13 +74,13 @@ pub fn run_scan(
                 project,
                 file.path,
                 file.kind,
-                eval.grade.letter(),
-                eval.score as i64,
-                eval.issues.len() as i64,
+                grade.letter(),
+                score as i64,
+                issues.len() as i64,
                 file.modified_unix.map(|m| m.to_string()),
             ],
         )?;
-        for issue in &eval.issues {
+        for issue in &issues {
             conn.execute(
                 "INSERT INTO issues(file_id, line, severity, source, title, why, fix_from, fix_to)
                  VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -100,9 +103,9 @@ pub fn run_scan(
         }
         conn.execute(
             "INSERT INTO grade_history(scope, scope_id, score, recorded_at) VALUES('file', ?1, ?2, ?3)",
-            params![file.path, eval.score as i64, now],
+            params![file.path, score as i64, now],
         )?;
-        project_scores.entry(project).or_default().push(eval.score);
+        project_scores.entry(project).or_default().push(score);
         on_progress(i as u32 + 1, total);
     }
 

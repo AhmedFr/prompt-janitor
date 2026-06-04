@@ -21,6 +21,8 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::get_pack,
         crate::commands::list_rules,
         crate::commands::set_rule,
+        crate::commands::add_custom_rule,
+        crate::commands::delete_custom_rule,
         crate::commands::list_files,
         crate::commands::get_file_detail,
         crate::commands::get_scans_digest,

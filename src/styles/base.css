@@ -221,3 +221,37 @@ button {
 .switch.on::after {
   left: 18px;
 }
+
+/* ---- text input ---- */
+.input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 11px;
+  border-radius: var(--r-ctrl);
+  border: 0.5px solid var(--sep-strong);
+  background: #fff;
+  color: var(--text);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+/* ---- bare icon button ---- */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--r-ctrl);
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text);
+}

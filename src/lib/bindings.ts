@@ -38,6 +38,10 @@ export const commands = {
 	listRules: () => typedError<RuleInfo[], string>(__TAURI_INVOKE("list_rules")),
 	/**  Enable/disable a single rule. */
 	setRule: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_rule", { id, enabled })),
+	/**  Add a custom pattern rule (forbidden substring) with a severity. */
+	addCustomRule: (title: string, pattern: string, severity: string) => typedError<null, string>(__TAURI_INVOKE("add_custom_rule", { title, pattern, severity })),
+	/**  Delete a custom rule. */
+	deleteCustomRule: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_custom_rule", { id })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
@@ -137,7 +141,7 @@ export type Overview = {
 	last_scan: string | null,
 };
 
-/**  A built-in rule with its current enabled state (for the Rules screen). */
+/**  A rule (built-in or custom) with its current enabled state. */
 export type RuleInfo = {
 	id: string,
 	title: string,
@@ -145,6 +149,10 @@ export type RuleInfo = {
 	source: Source,
 	severity: Severity,
 	enabled: boolean,
+	/**  True for user-created custom rules (deletable). */
+	custom: boolean,
+	/**  The forbidden substring, for custom pattern rules. */
+	pattern: string | null,
 };
 
 /**  Summary of a completed scan, returned to the frontend. */

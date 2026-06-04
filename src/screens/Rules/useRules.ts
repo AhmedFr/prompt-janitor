@@ -25,5 +25,18 @@ export function useRules() {
     await commands.setRule(id, enabled);
   }, []);
 
-  return { rules, loading, toggle };
+  const addRule = useCallback(
+    async (title: string, pattern: string, severity: string) => {
+      await commands.addCustomRule(title, pattern, severity);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const deleteRule = useCallback(async (id: string) => {
+    setRules((prev) => prev.filter((r) => r.id !== id));
+    await commands.deleteCustomRule(id);
+  }, []);
+
+  return { rules, loading, toggle, addRule, deleteRule };
 }
