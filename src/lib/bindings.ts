@@ -175,6 +175,10 @@ export type WorklistItem = {
 	severity: Severity,
 	source: Source,
 	line: number | null,
+	/**  Containing project (for the "By project" grouping). */
+	project: string,
+	/**  File last-modified epoch string (for the "Newest" grouping). */
+	modified: string | null,
 };
 
 /* Tauri Specta runtime */

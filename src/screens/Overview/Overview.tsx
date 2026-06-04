@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Grade } from "@/components/Grade";
 import { SeverityDot } from "@/components/SeverityDot";
@@ -90,7 +90,29 @@ export function Overview({ navigate }: OverviewProps) {
   );
 }
 
+type SortMode = "crit" | "proj" | "new";
+
+const SORTS: [SortMode, string][] = [
+  ["crit", "Critical first"],
+  ["proj", "By project"],
+  ["new", "Newest"],
+];
+
 function RealOverview({ data, navigate }: { data: OverviewData; navigate: Navigate }) {
+  const [sort, setSort] = useState<SortMode>("crit");
+  const worklist = useMemo(() => {
+    const rank: Record<string, number> = { hi: 0, mid: 1, lo: 2 };
+    const items = [...data.worklist];
+    if (sort === "proj") {
+      items.sort((a, b) => a.project.localeCompare(b.project) || rank[a.severity] - rank[b.severity]);
+    } else if (sort === "new") {
+      items.sort((a, b) => Number(b.modified ?? "0") - Number(a.modified ?? "0"));
+    } else {
+      items.sort((a, b) => rank[a.severity] - rank[b.severity]);
+    }
+    return items;
+  }, [data.worklist, sort]);
+
   return (
     <>
       <Card padded>
@@ -143,15 +165,22 @@ function RealOverview({ data, navigate }: { data: OverviewData; navigate: Naviga
         </div>
       </Card>
 
-      <div className="row between" style={{ margin: "22px 0 12px" }}>
+      <div className="row between wrap" style={{ margin: "22px 0 12px", gap: 10 }}>
         <div className="ov-section">
           Needs attention <span className="faint tnum">· {data.worklist.length}</span>
+        </div>
+        <div className="seg">
+          {SORTS.map(([key, label]) => (
+            <button key={key} className={sort === key ? "on" : ""} onClick={() => setSort(key)}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
       <Card>
         <div className="ov-list">
-          {data.worklist.map((item, i) => (
+          {worklist.map((item, i) => (
             <button key={i} className="ov-row" onClick={() => navigate("detail", item.file_id)}>
               <SeverityDot level={item.severity} />
               <div className="grow">
