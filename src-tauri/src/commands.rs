@@ -54,25 +54,30 @@ pub struct ScanProgress {
     pub total: u32,
 }
 
-/// Scan `path`, grade + persist every prompt file, and return a summary.
-/// Emits `scan-progress` per file and `scan-done` at the end.
-#[tauri::command]
-#[specta::specta]
-pub fn scan_now(
-    app: tauri::AppHandle,
-    db: tauri::State<'_, AppDb>,
-    path: String,
+/// Run a scan of `root`, persist results, and emit `scan-progress`/`scan-done`.
+/// Shared by the `scan_now` command and the background scheduler.
+pub fn scan_and_emit(
+    app: &tauri::AppHandle,
+    root: &std::path::Path,
 ) -> Result<ScanSummary, String> {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
+    let db = app.state::<AppDb>();
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let root = std::path::PathBuf::from(&path);
-    let summary = run_scan(&conn, &root, |done, total| {
+    let summary = run_scan(&conn, root, |done, total| {
         let _ = app.emit("scan-progress", ScanProgress { done, total });
     })
     .map_err(|e| e.to_string())?;
     let _ = app.emit("scan-done", &summary);
     Ok(summary)
+}
+
+/// Scan `path`, grade + persist every prompt file, and return a summary.
+/// Emits `scan-progress` per file and `scan-done` at the end.
+#[tauri::command]
+#[specta::specta]
+pub fn scan_now(app: tauri::AppHandle, path: String) -> Result<ScanSummary, String> {
+    scan_and_emit(&app, &std::path::PathBuf::from(&path))
 }
 
 /// Aggregated data for the Overview screen.
@@ -97,6 +102,24 @@ pub fn set_scan_folder(db: tauri::State<'_, AppDb>, path: String) -> Result<(), 
 pub fn get_scan_folder(db: tauri::State<'_, AppDb>) -> Result<Option<String>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::get_setting(&conn, "scan_folder").map_err(|e| e.to_string())
+}
+
+/// Persist the scan schedule ("1h", "6h", "1d", "save", or "manual").
+#[tauri::command]
+#[specta::specta]
+pub fn set_schedule(db: tauri::State<'_, AppDb>, value: String) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "schedule", &value).map_err(|e| e.to_string())
+}
+
+/// The current scan schedule (defaults to "6h").
+#[tauri::command]
+#[specta::specta]
+pub fn get_schedule(db: tauri::State<'_, AppDb>) -> Result<String, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    Ok(query::get_setting(&conn, "schedule")
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| "6h".to_string()))
 }
 
 /// Every scanned file for the Prompts table.
