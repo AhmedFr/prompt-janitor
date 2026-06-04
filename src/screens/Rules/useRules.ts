@@ -7,6 +7,7 @@ export function useRules() {
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiReady, setAiReady] = useState(false);
+  const [entitled, setEntitled] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!isTauri) {
@@ -22,12 +23,15 @@ export function useRules() {
     void refetch();
   }, [refetch]);
 
-  // Natural-language rules need a provider + key; gate their composer on it.
+  // Natural-language rules need a provider + key AND a paid license; gate the
+  // composer on both.
   useEffect(() => {
     if (!isTauri) return;
-    void commands.getAiConfig().then((r) => {
-      if (r.status === "ok") setAiReady(r.data.provider !== "none" && r.data.has_key);
-    });
+    void (async () => {
+      const [cfg, ent] = await Promise.all([commands.getAiConfig(), commands.getEntitlement()]);
+      if (cfg.status === "ok") setAiReady(cfg.data.provider !== "none" && cfg.data.has_key);
+      if (ent.status === "ok") setEntitled(ent.data.paid);
+    })();
   }, []);
 
   const toggle = useCallback(async (id: string, enabled: boolean) => {
@@ -67,5 +71,5 @@ export function useRules() {
     return res.status === "ok" ? res.data : 0;
   }, [refetch]);
 
-  return { rules, loading, aiReady, toggle, addRule, addNlRule, deleteRule, importPack };
+  return { rules, loading, aiReady, entitled, toggle, addRule, addNlRule, deleteRule, importPack };
 }

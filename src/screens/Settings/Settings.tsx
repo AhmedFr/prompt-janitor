@@ -7,9 +7,10 @@ import { pickAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
 import { AiTab } from "./AiTab";
+import { LicenseTab } from "./LicenseTab";
 import "./Settings.css";
 
-type Tab = "folders" | "schedule" | "alerts" | "rules" | "ai" | "general";
+type Tab = "folders" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general";
 
 const TABS: [Tab, string, IconName][] = [
   ["folders", "Folders", "folder"],
@@ -17,6 +18,7 @@ const TABS: [Tab, string, IconName][] = [
   ["alerts", "Alerts", "bell"],
   ["rules", "Rules", "rules"],
   ["ai", "AI", "sparkles"],
+  ["license", "License", "check"],
   ["general", "General", "settings"],
 ];
 
@@ -164,6 +166,14 @@ export function Settings({ navigate }: SettingsProps) {
               )}
 
               {tab === "ai" && <AiTab ai={s.ai} onSave={s.saveAi} onTest={s.testAi} />}
+
+              {tab === "license" && (
+                <LicenseTab
+                  entitlement={s.entitlement}
+                  onActivate={s.activateLicense}
+                  onRemove={s.removeLicense}
+                />
+              )}
 
               {tab === "general" && (
                 <>

@@ -10,6 +10,7 @@ mod apply;
 mod commands;
 pub mod engine;
 mod ipc;
+mod license;
 mod notify;
 mod query;
 pub mod rules;

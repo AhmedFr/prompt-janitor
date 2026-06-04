@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { commands, isTauri, type AppStatus, type AiConfig } from "@/lib/ipc";
+import { commands, isTauri, type AppStatus, type AiConfig, type Entitlement } from "@/lib/ipc";
 
 /** Loads the persisted settings and exposes setters that persist immediately. */
 export function useSettings() {
@@ -9,6 +9,7 @@ export function useSettings() {
   const [folder, setFolder] = useState<string | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [ai, setAi] = useState<AiConfig | null>(null);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,13 +19,14 @@ export function useSettings() {
         setLoading(false);
         return;
       }
-      const [s, d, r, f, st, a] = await Promise.all([
+      const [s, d, r, f, st, a, e] = await Promise.all([
         commands.getSchedule(),
         commands.getAlert("digest"),
         commands.getAlert("regressions"),
         commands.getScanFolder(),
         commands.getAppStatus(),
         commands.getAiConfig(),
+        commands.getEntitlement(),
       ]);
       if (!active) return;
       if (s.status === "ok") setScheduleState(s.data);
@@ -33,6 +35,7 @@ export function useSettings() {
       if (f.status === "ok") setFolder(f.data);
       if (st.status === "ok") setStatus(st.data);
       if (a.status === "ok") setAi(a.data);
+      if (e.status === "ok") setEntitlement(e.data);
       setLoading(false);
     }
     void load();
@@ -65,6 +68,20 @@ export function useSettings() {
     return res.status === "ok" ? res.data : res.error;
   }, []);
 
+  const activateLicense = useCallback(async (key: string): Promise<string> => {
+    const res = await commands.setLicense(key);
+    if (res.status !== "ok") return res.error;
+    const e = await commands.getEntitlement();
+    if (e.status === "ok") setEntitlement(e.data);
+    return `Activated — ${res.data.plan} plan`;
+  }, []);
+
+  const removeLicense = useCallback(async () => {
+    await commands.clearLicense();
+    const e = await commands.getEntitlement();
+    if (e.status === "ok") setEntitlement(e.data);
+  }, []);
+
   return {
     schedule,
     digest,
@@ -72,6 +89,7 @@ export function useSettings() {
     folder,
     status,
     ai,
+    entitlement,
     loading,
     setSchedule,
     setDigest,
@@ -79,5 +97,7 @@ export function useSettings() {
     setFolder,
     saveAi,
     testAi,
+    activateLicense,
+    removeLicense,
   };
 }
