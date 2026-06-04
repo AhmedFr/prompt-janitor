@@ -1,0 +1,31 @@
+//! Typed IPC wiring. The Builder is the single source of truth for both the
+//! Tauri invoke handler and the generated TypeScript bindings.
+
+use specta_typescript::Typescript;
+use tauri_specta::{collect_commands, Builder};
+
+/// Build the tauri-specta command registry.
+pub fn ipc_builder() -> Builder<tauri::Wry> {
+    Builder::<tauri::Wry>::new().commands(collect_commands![
+        crate::commands::get_app_status,
+        crate::commands::ping,
+    ])
+}
+
+/// Shared TS exporter config (single place to tune formatting later).
+pub fn ts_exporter() -> Typescript {
+    Typescript::default()
+}
+
+#[cfg(test)]
+mod tests {
+    /// Regenerates `src/lib/bindings.ts` headlessly (run via `cargo test`).
+    /// Keeps the frontend types in lockstep with the Rust commands without
+    /// needing to launch the GUI.
+    #[test]
+    fn export_typescript_bindings() {
+        super::ipc_builder()
+            .export(super::ts_exporter(), "../src/lib/bindings.ts")
+            .expect("failed to export TypeScript bindings");
+    }
+}
