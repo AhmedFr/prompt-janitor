@@ -1,0 +1,153 @@
+.ob-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(233, 233, 235, 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.ob-card {
+  width: 560px;
+  max-width: 92vw;
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+  border: 0.5px solid var(--sep);
+  overflow: hidden;
+}
+
+.ob-steps {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 18px 22px 0;
+}
+
+.ob-chip {
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: #fff;
+  color: var(--text-2);
+}
+
+.ob-chip--on {
+  background: var(--blue);
+  color: #fff;
+  border-color: transparent;
+}
+
+.ob-body {
+  padding: 22px;
+}
+
+.ob-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: linear-gradient(160deg, #36a3ff, #0a6fff);
+  margin-bottom: 8px;
+}
+
+.ob-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 6px 0 4px;
+}
+
+.ob-sub {
+  max-width: 400px;
+  margin: 0 0 16px;
+}
+
+.ob-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--group);
+  border-radius: var(--r-ctrl);
+  margin-bottom: 12px;
+  color: var(--blue);
+}
+
+.ob-packs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ob-pack {
+  padding: 12px 14px;
+  border: 0.5px solid var(--sep);
+  border-radius: var(--r-ctrl);
+}
+
+.ob-freqs {
+  display: flex;
+  flex-direction: column;
+}
+
+.ob-freq {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  border-bottom: 0.5px solid var(--sep);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ob-freq:last-child {
+  border-bottom: none;
+}
+
+.ob-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sep-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+}
+
+.ob-freq--on .ob-radio {
+  border-color: var(--blue);
+}
+
+.ob-radio-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.ob-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-top: 0.5px solid var(--sep);
+  background: var(--group);
+}
+
+.ob-scanning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 40px;
+}

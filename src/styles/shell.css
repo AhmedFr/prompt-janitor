@@ -88,6 +88,17 @@
   color: #fff;
 }
 
+.sidebar__footer {
+  margin-top: auto;
+  padding: 8px 10px 0;
+  border-top: 0.5px solid var(--sep);
+}
+
+.sidebar__footer .sidebar__item {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
 /* ---- content + screens ---- */
 .app-content {
   display: flex;
