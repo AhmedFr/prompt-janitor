@@ -27,6 +27,10 @@ pub struct Overview {
     pub nits: u32,
     pub worklist: Vec<WorklistItem>,
     pub trend: Vec<u32>,
+    /// Change across the trend window (latest − earliest).
+    pub trend_delta: i32,
+    /// Most recent scan finish time (epoch seconds string).
+    pub last_scan: Option<String>,
 }
 
 fn severity_from_db(s: &str) -> Severity {
@@ -66,6 +70,9 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Resul
 /// Everything the Overview screen needs.
 pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
     let scan_folder = get_setting(conn, "scan_folder")?;
+    let last_scan = conn.query_row("SELECT MAX(finished_at) FROM scans", [], |r| {
+        r.get::<_, Option<String>>(0)
+    })?;
     let file_count =
         conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get::<_, i64>(0))? as u32;
 
@@ -82,6 +89,8 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
             nits: 0,
             worklist: Vec::new(),
             trend: Vec::new(),
+            trend_delta: 0,
+            last_scan,
         });
     }
 
@@ -137,6 +146,12 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
     trend.reverse();
 
+    let trend_delta = if trend.len() >= 2 {
+        trend[trend.len() - 1] as i32 - trend[0] as i32
+    } else {
+        0
+    };
+
     Ok(Overview {
         has_data: true,
         scan_folder,
@@ -149,6 +164,8 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
         nits,
         worklist,
         trend,
+        trend_delta,
+        last_scan,
     })
 }
 
@@ -228,6 +245,8 @@ pub struct FileDetail {
     pub score: u32,
     pub content: String,
     pub issues: Vec<IssueDetail>,
+    /// Score change since the previous scan of this file, if any.
+    pub delta: Option<i32>,
 }
 
 /// Load a single file with its current source + issues. `None` if unknown.
@@ -279,6 +298,20 @@ pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Opt
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
+    let delta = {
+        let mut hist = conn.prepare(
+            "SELECT score FROM grade_history WHERE scope = 'file' AND scope_id = ?1 ORDER BY id DESC LIMIT 2",
+        )?;
+        let scores: Vec<i64> = hist
+            .query_map([&path], |r| r.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        if scores.len() == 2 {
+            Some((scores[0] - scores[1]) as i32)
+        } else {
+            None
+        }
+    };
+
     Ok(Some(FileDetail {
         id,
         name,
@@ -288,6 +321,7 @@ pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Opt
         score: score as u32,
         content,
         issues,
+        delta,
     }))
 }
 
@@ -371,5 +405,39 @@ mod tests {
         assert_eq!(detail.issues[0].severity, Severity::Hi);
 
         assert!(get_file_detail(&conn, "does-not-exist").unwrap().is_none());
+    }
+
+    #[test]
+    fn trends_track_score_changes_across_scans() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CLAUDE.md");
+
+        // First scan: a poor prompt.
+        std::fs::write(
+            &file,
+            "You are an assistant.\nAlways use gpt-4.\nBe concise but thorough.\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        let before = get_overview(&conn).unwrap();
+
+        // Second scan: the same file, now clean.
+        std::fs::write(
+            &file,
+            "You are a senior reviewer.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        let after = get_overview(&conn).unwrap();
+
+        assert!(after.overall_score > before.overall_score);
+        assert!(after.trend_delta > 0, "trend_delta: {}", after.trend_delta);
+        assert!(after.last_scan.is_some());
+
+        let id = list_files(&conn).unwrap()[0].id.clone();
+        let detail = get_file_detail(&conn, &id).unwrap().unwrap();
+        assert!(detail.delta.unwrap() > 0, "file delta: {:?}", detail.delta);
     }
 }

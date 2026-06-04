@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { isTauri, type Overview as OverviewData } from "@/lib/ipc";
+import { relativeTime } from "@/lib/format";
 import { pickAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useOverview } from "./useOverview";
@@ -53,6 +54,11 @@ export function Overview({ navigate }: OverviewProps) {
         <span className="toolbar-spacer" />
         {data?.has_data && (
           <>
+            {data.last_scan && (
+              <span className="faint" style={{ fontSize: 12 }}>
+                Last scan · {relativeTime(data.last_scan)}
+              </span>
+            )}
             <Button size="sm" onClick={() => void runScan(pickAndScan)} disabled={scanning}>
               <Icon name="folder" /> Change folder…
             </Button>
@@ -107,6 +113,12 @@ function RealOverview({ data, navigate }: { data: OverviewData; navigate: Naviga
             <div style={{ width: 200 }}>
               <div className="row between" style={{ fontSize: 12 }}>
                 <span className="muted">Health trend</span>
+                {data.trend_delta !== 0 && (
+                  <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                    {data.trend_delta > 0 ? "+" : ""}
+                    {data.trend_delta} this week
+                  </span>
+                )}
               </div>
               <div style={{ marginTop: 6 }}>
                 <Sparkline data={data.trend} height={42} />
