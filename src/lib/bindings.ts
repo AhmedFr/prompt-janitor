@@ -31,6 +31,8 @@ export const commands = {
 	score: number,
 	content: string,
 	issues: IssueDetail[],
+	/**  Score change since the previous scan of this file, if any. */
+	delta: number | null,
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
 };
 
@@ -58,6 +60,8 @@ export type FileDetail = {
 	score: number,
 	content: string,
 	issues: IssueDetail[],
+	/**  Score change since the previous scan of this file, if any. */
+	delta: number | null,
 };
 
 /**  A row in the Prompts table. */
@@ -97,6 +101,10 @@ export type Overview = {
 	nits: number,
 	worklist: WorklistItem[],
 	trend: number[],
+	/**  Change across the trend window (latest − earliest). */
+	trend_delta: number,
+	/**  Most recent scan finish time (epoch seconds string). */
+	last_scan: string | null,
 };
 
 /**  Summary of a completed scan, returned to the frontend. */

@@ -131,8 +131,20 @@ function DetailBody({
         </Card>
 
         <div className="d-scorecard">
-          <Card padded style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+          <Card
+            padded
+            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}
+          >
             <ScoreRing score={detail.score} grade={detail.grade} size={120} />
+            {detail.delta != null && detail.delta !== 0 && (
+              <div className="faint" style={{ fontSize: 12 }}>
+                <span style={{ color: detail.delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                  {detail.delta > 0 ? "+" : ""}
+                  {detail.delta}
+                </span>{" "}
+                since last scan
+              </div>
+            )}
           </Card>
           <Card style={{ width: "100%" }}>
             <div className="d-source-hd">
