@@ -7,7 +7,7 @@ import type { ScreenPlaceholderProps } from "./ScreenPlaceholder.types";
 export function ScreenPlaceholder({ title, subtitle }: ScreenPlaceholderProps) {
   return (
     <section className="screen">
-      <header className="screen__toolbar">
+      <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">{title}</h1>
       </header>
       <div className="screen__empty">

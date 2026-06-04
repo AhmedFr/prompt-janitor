@@ -1,0 +1,145 @@
+/* ============================================================
+   Base styles — resets, base typography, shared utilities, and
+   per-screen layout primitives. Interactive component classes
+   (.btn, .card, .grade, …) ship with their components in #3.
+   ============================================================ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--content);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ---- section heading ---- */
+.sec {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 10px;
+}
+
+/* ---- text utilities ---- */
+.muted {
+  color: var(--text-2);
+}
+.faint {
+  color: var(--text-3);
+}
+.mono {
+  font-family: var(--mono);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+.path {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* ---- layout utilities ---- */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+}
+.between {
+  justify-content: space-between;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.divider {
+  height: 0.5px;
+  background: var(--sep);
+  margin: 14px 0;
+}
+.kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: #f0f0f2;
+  border: 0.5px solid var(--sep-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ---- per-screen chrome ---- */
+.toolbar {
+  height: 52px;
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  border-bottom: 0.5px solid var(--sep);
+}
+.toolbar-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.toolbar-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.scroll-area {
+  flex: 1;
+  overflow-y: auto;
+}
+.page {
+  padding: 22px 26px 40px;
+  max-width: 920px;
+}
+.page-wide {
+  padding: 22px 26px 40px;
+}
+
+/* ---- health / progress bar ---- */
+.bar {
+  height: 8px;
+  border-radius: 200px;
+  background: #e6e6ea;
+  overflow: hidden;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 200px;
+  background: linear-gradient(90deg, #36a3ff, #0a84ff);
+}
+.bar.thin {
+  height: 6px;
+}
