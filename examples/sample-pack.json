@@ -1,0 +1,5 @@
+[
+  { "title": "No Slack references", "pattern": "slack", "severity": "mid" },
+  { "title": "No hard-coded secrets", "pattern": "sk-", "severity": "hi" },
+  { "title": "Avoid the filler word \"simply\"", "pattern": "simply", "severity": "lo" }
+]

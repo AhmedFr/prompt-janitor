@@ -212,6 +212,38 @@ pub fn delete_custom_rule(db: tauri::State<'_, AppDb>, id: String) -> Result<(),
     query::delete_custom_rule(&conn, &id).map_err(|e| e.to_string())
 }
 
+/// A rule definition inside an imported pack file.
+#[derive(serde::Deserialize)]
+struct PackRule {
+    title: String,
+    pattern: String,
+    severity: String,
+}
+
+/// Import a JSON pack file — an array of `{title, pattern, severity}` — as
+/// custom rules. Returns how many were imported.
+#[tauri::command]
+#[specta::specta]
+pub fn import_pack(db: tauri::State<'_, AppDb>, path: String) -> Result<u32, String> {
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Couldn't read the file: {e}"))?;
+    let rules: Vec<PackRule> =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid pack JSON: {e}"))?;
+
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut imported = 0u32;
+    for rule in &rules {
+        let severity = match rule.severity.as_str() {
+            "hi" | "mid" | "lo" => rule.severity.as_str(),
+            _ => "mid",
+        };
+        query::add_custom_rule(&conn, &rule.title, &rule.pattern, severity)
+            .map_err(|e| e.to_string())?;
+        imported += 1;
+    }
+    Ok(imported)
+}
+
 /// Every scanned file for the Prompts table.
 #[tauri::command]
 #[specta::specta]

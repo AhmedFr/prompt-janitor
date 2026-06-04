@@ -42,6 +42,11 @@ export const commands = {
 	addCustomRule: (title: string, pattern: string, severity: string) => typedError<null, string>(__TAURI_INVOKE("add_custom_rule", { title, pattern, severity })),
 	/**  Delete a custom rule. */
 	deleteCustomRule: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_custom_rule", { id })),
+	/**
+	 *  Import a JSON pack file — an array of `{title, pattern, severity}` — as
+	 *  custom rules. Returns how many were imported.
+	 */
+	importPack: (path: string) => typedError<number, string>(__TAURI_INVOKE("import_pack", { path })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
