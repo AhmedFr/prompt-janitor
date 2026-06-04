@@ -13,6 +13,8 @@ export type {
   RuleInfo,
   AiConfig,
   FixSuggestion,
+  FixEdit,
+  ApplyResult,
   ScanSummary,
   Severity,
   Source,

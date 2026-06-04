@@ -311,6 +311,126 @@ pub async fn suggest_fix(
     crate::ai_fix::suggest(&creds, &content, &issue).await
 }
 
+/// Seconds since the Unix epoch, as a string — used to stamp backups and to
+/// make the git branch name unique.
+fn now_stamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+        .to_string()
+}
+
+/// Apply one or more fixes to a file (paid): snapshot the prior content into
+/// `backups` (for undo), write the new content, and — if `commit` — stage and
+/// commit it onto a `prompt-janitor/fix-*` branch. A failed commit rolls the
+/// whole operation back so nothing is left half-applied.
+#[tauri::command]
+#[specta::specta]
+pub fn apply_fix(
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+    edits: Vec<crate::apply::FixEdit>,
+    commit: bool,
+) -> Result<crate::apply::ApplyResult, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    let path: String = conn
+        .query_row("SELECT path FROM files WHERE id = ?1", [&file_id], |r| {
+            r.get(0)
+        })
+        .map_err(|e| e.to_string())?;
+
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("Couldn't read the file: {e}"))?;
+    let updated = crate::apply::apply_edits(&content, &edits)?;
+
+    let stamp = now_stamp();
+    conn.execute(
+        "INSERT INTO backups (file_id, pre_fix_content, applied_at, git_ref) VALUES (?1, ?2, ?3, NULL)",
+        rusqlite::params![&file_id, &content, &stamp],
+    )
+    .map_err(|e| e.to_string())?;
+    let backup_id = conn.last_insert_rowid();
+
+    std::fs::write(&path, &updated).map_err(|e| format!("Couldn't write the file: {e}"))?;
+
+    let git_ref = if commit {
+        match crate::vcs::commit_file(
+            std::path::Path::new(&path),
+            &stamp,
+            &format!("prompt-janitor: fix {file_id}"),
+        ) {
+            Ok(branch) => {
+                conn.execute(
+                    "UPDATE backups SET git_ref = ?1 WHERE id = ?2",
+                    rusqlite::params![&branch, backup_id],
+                )
+                .ok();
+                Some(branch)
+            }
+            Err(e) => {
+                // Roll back so the opt-in-to-git path is all-or-nothing.
+                let _ = std::fs::write(&path, &content);
+                let _ = conn.execute("DELETE FROM backups WHERE id = ?1", [backup_id]);
+                return Err(format!("Couldn't commit to git: {e}. Nothing was changed."));
+            }
+        }
+    } else {
+        None
+    };
+
+    Ok(crate::apply::ApplyResult { git_ref })
+}
+
+/// Restore a file to its most recent pre-fix snapshot and drop that snapshot.
+#[tauri::command]
+#[specta::specta]
+pub fn undo_fix(db: tauri::State<'_, AppDb>, file_id: String) -> Result<(), String> {
+    use rusqlite::OptionalExtension;
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    let row = conn
+        .query_row(
+            "SELECT id, pre_fix_content FROM backups WHERE file_id = ?1 ORDER BY id DESC LIMIT 1",
+            [&file_id],
+            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+
+    let Some((id, content)) = row else {
+        return Err("Nothing to undo for this file.".to_string());
+    };
+
+    let path: String = conn
+        .query_row("SELECT path FROM files WHERE id = ?1", [&file_id], |r| {
+            r.get(0)
+        })
+        .map_err(|e| e.to_string())?;
+
+    std::fs::write(&path, &content).map_err(|e| format!("Couldn't restore the file: {e}"))?;
+    conn.execute("DELETE FROM backups WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Whether a file has a pre-fix snapshot available to undo.
+#[tauri::command]
+#[specta::specta]
+pub fn has_backup(db: tauri::State<'_, AppDb>, file_id: String) -> Result<bool, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let n: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM backups WHERE file_id = ?1",
+            [&file_id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(n > 0)
+}
+
 /// Every scanned file for the Prompts table.
 #[tauri::command]
 #[specta::specta]

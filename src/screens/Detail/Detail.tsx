@@ -8,6 +8,7 @@ import { Icon } from "@/components/Icon";
 import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
+import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
 import "./Detail.css";
 
 export interface DetailProps {
@@ -16,8 +17,9 @@ export interface DetailProps {
 }
 
 export function Detail({ fileId, navigate }: DetailProps) {
-  const { detail, loading, aiReady } = useFileDetail(fileId);
+  const { detail, loading, aiReady, reload } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
 
   useEffect(() => {
     if (!detail || detail.issues.length === 0) {
@@ -28,7 +30,20 @@ export function Detail({ fileId, navigate }: DetailProps) {
     setSelectedIndex(firstWithLine >= 0 ? firstWithLine : 0);
   }, [detail]);
 
-  const fixable = detail?.issues.filter((i) => i.fix_to).length ?? 0;
+  const fixable = detail?.issues.filter((i) => i.fix_from && i.fix_to).length ?? 0;
+
+  // Apply every deterministic (static) fix on the file in one snapshot.
+  const runAutoFix = async () => {
+    if (!detail) return;
+    const edits = detail.issues
+      .filter((i) => i.fix_from && i.fix_to)
+      .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
+    if (edits.length === 0) return;
+    setAutoBusy(true);
+    const r = await runApply(detail.id, edits, false);
+    if (r.ok) await reload();
+    setAutoBusy(false);
+  };
 
   return (
     <section className="screen">
@@ -40,8 +55,14 @@ export function Detail({ fileId, navigate }: DetailProps) {
         {detail && <span className="path faint">{detail.project}</span>}
         <span className="toolbar-spacer" />
         {detail && fixable > 0 && (
-          <Button variant="primary" size="sm" disabled title="Auto-fix arrives in Phase 4 (paid)">
-            <Icon name="wand" /> Auto-fix {fixable}
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={autoBusy}
+            onClick={() => void runAutoFix()}
+            title="Apply every deterministic fix on this file"
+          >
+            <Icon name="wand" /> {autoBusy ? "Fixing…" : `Auto-fix ${fixable}`}
           </Button>
         )}
       </header>
@@ -66,6 +87,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
               aiReady={aiReady}
+              onReload={reload}
             />
           )}
         </div>
@@ -79,11 +101,13 @@ function DetailBody({
   selectedIndex,
   onSelect,
   aiReady,
+  onReload,
 }: {
   detail: FileDetail;
   selectedIndex: number | null;
   onSelect: (index: number) => void;
   aiReady: boolean;
+  onReload: () => Promise<void>;
 }) {
   const lines = detail.content.length ? detail.content.split("\n") : [];
   const lineIssue = new Map<number, number>();
@@ -185,39 +209,79 @@ function DetailBody({
           fileId={detail.id}
           index={selectedIndex}
           aiReady={aiReady}
+          onReload={onReload}
         />
       )}
     </>
   );
 }
 
-/** The selected issue: its explanation, plus the suggested fix — static by
- * default, replaced by a provider-generated rewrite once the user asks. */
+/** The selected issue: its explanation, the suggested fix (static or a
+ * provider-generated rewrite), and the Apply / Undo actions. */
 function IssuePanel({
   issue,
   fileId,
   index,
   aiReady,
+  onReload,
 }: {
   issue: FileDetail["issues"][number];
   fileId: string;
   index: number;
   aiReady: boolean;
+  onReload: () => Promise<void>;
 }) {
   const [suggestion, setSuggestion] = useState<FixSuggestion | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [action, setAction] = useState<"" | "applying" | "undoing">("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [commitGit, setCommitGit] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+
+  useEffect(() => {
+    void commands.hasBackup(fileId).then((r) => {
+      if (r.status === "ok") setCanUndo(r.data);
+    });
+  }, [fileId]);
 
   const generate = async () => {
-    setBusy(true);
+    setGenerating(true);
     setError(null);
     const res = await commands.suggestFix(fileId, index);
     if (res.status === "ok") setSuggestion(res.data);
     else setError(res.error);
-    setBusy(false);
+    setGenerating(false);
   };
 
+  const aiFix = suggestion ? { from: suggestion.from, to: suggestion.to } : null;
   const staticFix = issue.fix_from && issue.fix_to ? { from: issue.fix_from, to: issue.fix_to } : null;
+  const fix = aiFix ?? staticFix;
+
+  const apply = async () => {
+    if (!fix) return;
+    setAction("applying");
+    setStatus(null);
+    const r = await runApply(fileId, [{ from: fix.from, to: fix.to }], commitGit);
+    setStatus(r.message);
+    if (r.ok) {
+      setCanUndo(true);
+      await onReload();
+    }
+    setAction("");
+  };
+
+  const undo = async () => {
+    setAction("undoing");
+    setStatus(null);
+    const r = await runUndo(fileId);
+    setStatus(r.message);
+    if (r.ok) {
+      setCanUndo(false);
+      await onReload();
+    }
+    setAction("");
+  };
 
   return (
     <Card padded style={{ marginTop: 20 }}>
@@ -233,9 +297,9 @@ function IssuePanel({
 
       {aiReady && (
         <div className="row" style={{ gap: 8, marginTop: 14, alignItems: "center" }}>
-          <Button variant="primary" size="sm" onClick={() => void generate()} disabled={busy}>
+          <Button size="sm" onClick={() => void generate()} disabled={generating || action !== ""}>
             <Icon name="sparkles" />{" "}
-            {busy ? "Generating…" : suggestion ? "Regenerate" : "Suggest fix with AI"}
+            {generating ? "Generating…" : suggestion ? "Regenerate" : "Suggest fix with AI"}
           </Button>
           {error && (
             <span className="faint" style={{ fontSize: 12, color: "var(--red)", maxWidth: 440 }}>
@@ -245,13 +309,47 @@ function IssuePanel({
         </div>
       )}
 
-      {suggestion ? (
-        <FixDiff from={suggestion.from} to={suggestion.to} note={suggestion.note} ai />
-      ) : staticFix ? (
-        <FixDiff from={staticFix.from} to={staticFix.to} />
-      ) : null}
+      {fix && (
+        <>
+          <FixDiff from={fix.from} to={fix.to} note={suggestion?.note} ai={aiFix != null} />
+          <div
+            className="row"
+            style={{ gap: 12, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}
+          >
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void apply()}
+              disabled={action !== ""}
+            >
+              <Icon name="check" /> {action === "applying" ? "Applying…" : "Apply fix"}
+            </Button>
+            {canUndo && (
+              <Button size="sm" onClick={() => void undo()} disabled={action !== ""}>
+                <Icon name="refresh" /> {action === "undoing" ? "Reverting…" : "Undo"}
+              </Button>
+            )}
+            <label
+              className="row"
+              style={{ gap: 6, fontSize: 12, alignItems: "center", cursor: "pointer" }}
+            >
+              <input
+                type="checkbox"
+                checked={commitGit}
+                onChange={(e) => setCommitGit(e.target.checked)}
+              />
+              Commit to a git branch
+            </label>
+            {status && (
+              <span className="faint" style={{ fontSize: 12 }}>
+                {status}
+              </span>
+            )}
+          </div>
+        </>
+      )}
 
-      {!aiReady && (
+      {!fix && !aiReady && (
         <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
           Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored rewrite.
         </div>
@@ -260,7 +358,7 @@ function IssuePanel({
   );
 }
 
-/** A from → to diff with an Apply action (applying lands in #26). */
+/** Presentational from → to diff. */
 function FixDiff({ from, to, note, ai }: { from: string; to: string; note?: string; ai?: boolean }) {
   return (
     <div style={{ marginTop: 14 }}>
@@ -280,14 +378,6 @@ function FixDiff({ from, to, note, ai }: { from: string; to: string; note?: stri
           {note}
         </div>
       )}
-      <div className="row" style={{ gap: 8, marginTop: 12 }}>
-        <Button variant="primary" size="sm" disabled title="Applying fixes arrives in #26">
-          <Icon name="check" /> Apply fix
-        </Button>
-        <Button size="sm" disabled>
-          Dismiss
-        </Button>
-      </div>
     </div>
   );
 }

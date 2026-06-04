@@ -58,6 +58,17 @@ export const commands = {
 	 *  diff via the configured provider, replacing the static suggested fix.
 	 */
 	suggestFix: (fileId: string, issueIndex: number) => typedError<FixSuggestion, string>(__TAURI_INVOKE("suggest_fix", { fileId, issueIndex })),
+	/**
+	 *  Apply one or more fixes to a file (paid): snapshot the prior content into
+	 *  `backups` (for undo), write the new content, and — if `commit` — stage and
+	 *  commit it onto a `prompt-janitor/fix-*` branch. A failed commit rolls the
+	 *  whole operation back so nothing is left half-applied.
+	 */
+	applyFix: (fileId: string, edits: FixEdit[], commit: boolean) => typedError<ApplyResult, string>(__TAURI_INVOKE("apply_fix", { fileId, edits, commit })),
+	/**  Restore a file to its most recent pre-fix snapshot and drop that snapshot. */
+	undoFix: (fileId: string) => typedError<null, string>(__TAURI_INVOKE("undo_fix", { fileId })),
+	/**  Whether a file has a pre-fix snapshot available to undo. */
+	hasBackup: (fileId: string) => typedError<boolean, string>(__TAURI_INVOKE("has_backup", { fileId })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
@@ -100,6 +111,12 @@ export type AppStatus = {
 	file_count: number,
 };
 
+/**  The outcome of applying fixes. */
+export type ApplyResult = {
+	/**  The git branch the change was committed to, if the user opted in. */
+	git_ref: string | null,
+};
+
 /**  An item in the digest's "needs your eyes" list. */
 export type DigestItem = {
 	/**  "regressed" | "improved" | "new". */
@@ -132,6 +149,15 @@ export type FileRow = {
 	score: number,
 	issue_count: number,
 	modified: string | null,
+};
+
+/**
+ *  One edit: replace the first occurrence of `from` with `to`. An empty `from`
+ *  appends `to` as a new trailing section (used for insertions).
+ */
+export type FixEdit = {
+	from: string,
+	to: string,
 };
 
 /**
