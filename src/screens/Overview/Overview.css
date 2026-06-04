@@ -1,0 +1,55 @@
+.ov-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ov-section {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ov-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 18px;
+}
+
+.ov-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 4px;
+  border: none;
+  border-bottom: 0.5px solid var(--sep);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ov-row:last-child {
+  border-bottom: none;
+}
+
+.ov-row:hover {
+  background: var(--group);
+}
+
+.ov-chev {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+}
+
+.ov-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 32px 16px;
+}

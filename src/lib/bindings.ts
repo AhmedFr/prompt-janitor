@@ -13,6 +13,12 @@ export const commands = {
 	 *  Emits `scan-progress` per file and `scan-done` at the end.
 	 */
 	scanNow: (path: string) => typedError<ScanSummary, string>(__TAURI_INVOKE("scan_now", { path })),
+	/**  Aggregated data for the Overview screen. */
+	getOverview: () => typedError<Overview, string>(__TAURI_INVOKE("get_overview")),
+	/**  Persist the folder to scan. */
+	setScanFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_scan_folder", { path })),
+	/**  The currently configured scan folder, if any. */
+	getScanFolder: () => typedError<string | null, string>(__TAURI_INVOKE("get_scan_folder")),
 };
 
 /* Types */
@@ -32,6 +38,20 @@ export type AppStatus = {
 /**  Letter grade. */
 export type Grade = "A" | "B" | "C" | "D" | "F";
 
+export type Overview = {
+	has_data: boolean,
+	scan_folder: string | null,
+	overall_grade: Grade,
+	overall_score: number,
+	file_count: number,
+	project_count: number,
+	critical: number,
+	warnings: number,
+	nits: number,
+	worklist: WorklistItem[],
+	trend: number[],
+};
+
 /**  Summary of a completed scan, returned to the frontend. */
 export type ScanSummary = {
 	files_scanned: number,
@@ -41,6 +61,27 @@ export type ScanSummary = {
 	nits: number,
 	overall_score: number,
 	overall_grade: Grade,
+};
+
+/**  Issue severity. */
+export type Severity = 
+/**  Critical. */
+"hi" | 
+/**  Warning. */
+"mid" | 
+/**  Nit. */
+"lo";
+
+/**  Where a rule's authority comes from (drives the source badge). */
+export type Source = "anthropic" | "openai" | "karpathy" | "custom";
+
+export type WorklistItem = {
+	file_id: string,
+	title: string,
+	location: string,
+	severity: Severity,
+	source: Source,
+	line: number | null,
 };
 
 /* Tauri Specta runtime */

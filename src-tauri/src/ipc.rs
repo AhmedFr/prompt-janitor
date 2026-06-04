@@ -10,6 +10,9 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::get_app_status,
         crate::commands::ping,
         crate::commands::scan_now,
+        crate::commands::get_overview,
+        crate::commands::set_scan_folder,
+        crate::commands::get_scan_folder,
     ])
 }
 

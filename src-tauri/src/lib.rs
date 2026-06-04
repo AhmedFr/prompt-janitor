@@ -6,6 +6,7 @@
 mod commands;
 pub mod engine;
 mod ipc;
+mod query;
 pub mod rules;
 mod scan;
 pub mod scanner;
@@ -27,6 +28,7 @@ pub fn run() {
         .expect("failed to export TypeScript bindings");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");

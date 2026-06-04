@@ -1,5 +1,11 @@
 import { ScreenPlaceholder } from "@/components/ScreenPlaceholder";
+import type { Navigate } from "@/App/App.types";
 
-export function Detail() {
-  return <ScreenPlaceholder title="Prompt detail" subtitle="Annotated source and the scorecard land in Phase 1." />;
+export interface DetailProps {
+  fileId: string | null;
+  navigate: Navigate;
+}
+
+export function Detail(_props: DetailProps) {
+  return <ScreenPlaceholder title="Prompt detail" subtitle="Annotated source + scorecard land in #12." />;
 }
