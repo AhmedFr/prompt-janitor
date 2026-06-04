@@ -4,6 +4,7 @@
 //! rules engine, scheduler, tray, and AI/fix engine arrive in later phases.
 
 mod commands;
+pub mod engine;
 mod ipc;
 pub mod scanner;
 mod store;
