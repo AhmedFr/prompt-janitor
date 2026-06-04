@@ -9,6 +9,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         crate::commands::get_app_status,
         crate::commands::ping,
+        crate::commands::scan_now,
     ])
 }
 

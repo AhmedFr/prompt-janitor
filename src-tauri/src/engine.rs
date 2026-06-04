@@ -37,6 +37,42 @@ pub enum Grade {
     F,
 }
 
+impl Severity {
+    /// Lowercase string form used for persistence and the frontend.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Severity::Hi => "hi",
+            Severity::Mid => "mid",
+            Severity::Lo => "lo",
+        }
+    }
+}
+
+impl Source {
+    /// Lowercase string form used for persistence and the frontend.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Source::Anthropic => "anthropic",
+            Source::Openai => "openai",
+            Source::Karpathy => "karpathy",
+            Source::Custom => "custom",
+        }
+    }
+}
+
+impl Grade {
+    /// The grade letter.
+    pub fn letter(self) -> &'static str {
+        match self {
+            Grade::A => "A",
+            Grade::B => "B",
+            Grade::C => "C",
+            Grade::D => "D",
+            Grade::F => "F",
+        }
+    }
+}
+
 /// A suggested rewrite for an issue.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct Fix {

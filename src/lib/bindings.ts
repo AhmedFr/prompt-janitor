@@ -8,6 +8,11 @@ export const commands = {
 	getAppStatus: () => typedError<AppStatus, string>(__TAURI_INVOKE("get_app_status")),
 	/**  Liveness check. */
 	ping: () => __TAURI_INVOKE<string>("ping"),
+	/**
+	 *  Scan `path`, grade + persist every prompt file, and return a summary.
+	 *  Emits `scan-progress` per file and `scan-done` at the end.
+	 */
+	scanNow: (path: string) => typedError<ScanSummary, string>(__TAURI_INVOKE("scan_now", { path })),
 };
 
 /* Types */
@@ -22,6 +27,20 @@ export type AppStatus = {
 	db_path: string,
 	project_count: number,
 	file_count: number,
+};
+
+/**  Letter grade. */
+export type Grade = "A" | "B" | "C" | "D" | "F";
+
+/**  Summary of a completed scan, returned to the frontend. */
+export type ScanSummary = {
+	files_scanned: number,
+	projects: number,
+	critical: number,
+	warnings: number,
+	nits: number,
+	overall_score: number,
+	overall_grade: Grade,
 };
 
 /* Tauri Specta runtime */
