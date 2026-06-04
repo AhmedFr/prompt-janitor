@@ -24,7 +24,7 @@ export function App() {
         {route === "overview" && <Overview navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
-        {route === "scans" && <Scans />}
+        {route === "scans" && <Scans navigate={navigate} />}
         {route === "rules" && <Rules />}
         {route === "settings" && <Settings />}
       </main>

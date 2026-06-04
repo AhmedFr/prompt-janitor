@@ -8,6 +8,8 @@ export type {
   FileRow,
   FileDetail,
   IssueDetail,
+  ScansDigest,
+  DigestItem,
   ScanSummary,
   Severity,
   Source,

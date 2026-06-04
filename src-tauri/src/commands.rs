@@ -140,3 +140,11 @@ pub fn get_file_detail(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::get_file_detail(&conn, &file_id).map_err(|e| e.to_string())
 }
+
+/// The weekly Scans digest.
+#[tauri::command]
+#[specta::specta]
+pub fn get_scans_digest(db: tauri::State<'_, AppDb>) -> Result<query::ScansDigest, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_scans_digest(&conn).map_err(|e| e.to_string())
+}

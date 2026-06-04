@@ -17,6 +17,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::get_schedule,
         crate::commands::list_files,
         crate::commands::get_file_detail,
+        crate::commands::get_scans_digest,
     ])
 }
 
