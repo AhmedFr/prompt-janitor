@@ -2,7 +2,8 @@
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::engine::{grade_for_score, Grade, Severity, Source};
+use crate::engine::{grade_for_score, Grade, Rule, Severity, Source};
+use crate::rules::builtin_rules;
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct WorklistItem {
@@ -463,6 +464,112 @@ pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
     })
 }
 
+/// A built-in rule with its current enabled state (for the Rules screen).
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct RuleInfo {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub source: Source,
+    pub severity: Severity,
+    pub enabled: bool,
+}
+
+/// Seed the rules table from the built-in catalog. Idempotent — preserves toggles.
+pub fn seed_rules(conn: &Connection) -> rusqlite::Result<()> {
+    for rule in builtin_rules() {
+        conn.execute(
+            "INSERT OR IGNORE INTO rules(id, source, severity, title, description, enabled)
+             VALUES(?1, ?2, ?3, ?4, ?5, 1)",
+            params![
+                rule.id(),
+                rule.source().as_str(),
+                rule.severity().as_str(),
+                rule.title(),
+                rule.why(),
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+/// The built-in rules with their enabled state (defaults to on if unseeded).
+pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
+    let mut enabled = std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare("SELECT id, enabled FROM rules")?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? != 0))
+        })?;
+        for row in rows {
+            let (id, on) = row?;
+            enabled.insert(id, on);
+        }
+    }
+    Ok(builtin_rules()
+        .iter()
+        .map(|rule| RuleInfo {
+            id: rule.id().to_string(),
+            title: rule.title().to_string(),
+            description: rule.why().to_string(),
+            source: rule.source(),
+            severity: rule.severity(),
+            enabled: enabled.get(rule.id()).copied().unwrap_or(true),
+        })
+        .collect())
+}
+
+/// Enable/disable a single rule.
+pub fn set_rule(conn: &Connection, id: &str, enabled: bool) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE rules SET enabled = ?1 WHERE id = ?2",
+        params![enabled as i64, id],
+    )?;
+    Ok(())
+}
+
+/// Enable/disable every rule from a source pack.
+pub fn set_pack(conn: &Connection, source: &str, enabled: bool) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE rules SET enabled = ?1 WHERE source = ?2",
+        params![enabled as i64, source],
+    )?;
+    Ok(())
+}
+
+/// Whether every rule from a source pack is enabled (defaults to true).
+pub fn pack_enabled(conn: &Connection, source: &str) -> rusqlite::Result<bool> {
+    let disabled: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM rules WHERE source = ?1 AND enabled = 0",
+        [source],
+        |r| r.get(0),
+    )?;
+    Ok(disabled == 0)
+}
+
+/// The active (enabled) rule set used for grading. An empty rules table means
+/// "not seeded" → all built-ins (keeps tests + first-run working).
+pub fn active_rules(conn: &Connection) -> Vec<Box<dyn Rule>> {
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM rules", [], |r| r.get(0))
+        .unwrap_or(0);
+    if count == 0 {
+        return builtin_rules();
+    }
+    let mut stmt = match conn.prepare("SELECT id FROM rules WHERE enabled = 1") {
+        Ok(s) => s,
+        Err(_) => return builtin_rules(),
+    };
+    let enabled: std::collections::HashSet<String> = stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map(|rows| rows.filter_map(Result::ok).collect())
+        .unwrap_or_default();
+    builtin_rules()
+        .into_iter()
+        .filter(|rule| enabled.contains(rule.id()))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,5 +712,36 @@ mod tests {
         assert!(digest.regressed >= 1);
         assert!(digest.net_health < 0, "net_health: {}", digest.net_health);
         assert!(digest.needs_attention.iter().any(|i| i.kind == "regressed"));
+    }
+
+    #[test]
+    fn rule_toggles_affect_active_set() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_rules(&conn).unwrap();
+        assert_eq!(active_rules(&conn).len(), 5);
+
+        set_rule(&conn, "no-hardcoded-model", false).unwrap();
+        let active = active_rules(&conn);
+        assert_eq!(active.len(), 4);
+        assert!(!active.iter().any(|r| r.id() == "no-hardcoded-model"));
+        assert!(list_rules(&conn)
+            .unwrap()
+            .iter()
+            .any(|r| r.id == "no-hardcoded-model" && !r.enabled));
+    }
+
+    #[test]
+    fn pack_toggle_disables_a_whole_source() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_rules(&conn).unwrap();
+
+        set_pack(&conn, "openai", false).unwrap();
+        assert!(!pack_enabled(&conn, "openai").unwrap());
+        assert!(pack_enabled(&conn, "anthropic").unwrap());
+        assert!(!active_rules(&conn)
+            .iter()
+            .any(|r| r.source() == Source::Openai));
     }
 }
