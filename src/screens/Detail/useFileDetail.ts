@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { commands, isTauri, type FileDetail } from "@/lib/ipc";
 
 /** Loads a single file's source + issues whenever the selected file changes. */
@@ -6,6 +6,13 @@ export function useFileDetail(fileId: string | null) {
   const [detail, setDetail] = useState<FileDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiReady, setAiReady] = useState(false);
+
+  /** Re-fetch the file from disk + DB (after an apply/undo, or a fresh scan). */
+  const reload = useCallback(async () => {
+    if (!isTauri || !fileId) return;
+    const res = await commands.getFileDetail(fileId);
+    setDetail(res.status === "ok" ? res.data : null);
+  }, [fileId]);
 
   useEffect(() => {
     let active = true;
@@ -44,5 +51,5 @@ export function useFileDetail(fileId: string | null) {
     };
   }, []);
 
-  return { detail, loading, aiReady };
+  return { detail, loading, aiReady, reload };
 }

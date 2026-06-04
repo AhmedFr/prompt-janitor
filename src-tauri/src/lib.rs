@@ -5,6 +5,7 @@
 
 mod ai;
 mod ai_fix;
+mod apply;
 mod commands;
 pub mod engine;
 mod ipc;
@@ -16,6 +17,7 @@ pub mod scanner;
 mod scheduler;
 mod store;
 mod tray;
+mod vcs;
 
 use std::sync::Mutex;
 
