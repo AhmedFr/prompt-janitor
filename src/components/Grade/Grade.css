@@ -1,0 +1,59 @@
+.grade {
+  --gc: var(--grade-c);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+  background: var(--gc);
+  flex: 0 0 auto;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.grade--a {
+  --gc: var(--grade-a);
+}
+.grade--b {
+  --gc: var(--grade-b);
+}
+.grade--c {
+  --gc: var(--grade-c);
+}
+.grade--d {
+  --gc: var(--grade-d);
+}
+.grade--f {
+  --gc: var(--grade-f);
+}
+
+.grade--sm {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.grade--lg {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  font-size: 24px;
+}
+.grade--xl {
+  width: 76px;
+  height: 76px;
+  border-radius: 20px;
+  font-size: 44px;
+}
+
+.grade--ghost {
+  background: transparent;
+  color: var(--gc);
+  border: 2px solid var(--gc);
+  box-shadow: none;
+}
