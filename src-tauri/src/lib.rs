@@ -5,6 +5,7 @@
 
 mod commands;
 mod ipc;
+pub mod scanner;
 mod store;
 
 use std::sync::Mutex;
