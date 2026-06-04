@@ -52,9 +52,14 @@ export function Overview({ navigate }: OverviewProps) {
         <h1 className="screen__title">Overview</h1>
         <span className="toolbar-spacer" />
         {data?.has_data && (
-          <Button size="sm" onClick={() => void runScan(() => rescan(data.scan_folder ?? ""))} disabled={scanning}>
-            <Icon name="refresh" /> {scanning ? "Scanning…" : "Scan now"}
-          </Button>
+          <>
+            <Button size="sm" onClick={() => void runScan(pickAndScan)} disabled={scanning}>
+              <Icon name="folder" /> Change folder…
+            </Button>
+            <Button size="sm" onClick={() => void runScan(() => rescan(data.scan_folder ?? ""))} disabled={scanning}>
+              <Icon name="refresh" /> {scanning ? "Scanning…" : "Scan now"}
+            </Button>
+          </>
         )}
       </header>
 
