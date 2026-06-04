@@ -464,7 +464,7 @@ pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
     })
 }
 
-/// A built-in rule with its current enabled state (for the Rules screen).
+/// A rule (built-in or custom) with its current enabled state.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct RuleInfo {
     pub id: String,
@@ -473,6 +473,10 @@ pub struct RuleInfo {
     pub source: Source,
     pub severity: Severity,
     pub enabled: bool,
+    /// True for user-created custom rules (deletable).
+    pub custom: bool,
+    /// The forbidden substring, for custom pattern rules.
+    pub pattern: Option<String>,
 }
 
 /// Seed the rules table from the built-in catalog. Idempotent — preserves toggles.
@@ -506,7 +510,7 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             enabled.insert(id, on);
         }
     }
-    Ok(builtin_rules()
+    let mut out: Vec<RuleInfo> = builtin_rules()
         .iter()
         .map(|rule| RuleInfo {
             id: rule.id().to_string(),
@@ -515,17 +519,110 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             source: rule.source(),
             severity: rule.severity(),
             enabled: enabled.get(rule.id()).copied().unwrap_or(true),
+            custom: false,
+            pattern: None,
         })
-        .collect())
+        .collect();
+
+    let mut stmt = conn
+        .prepare("SELECT id, title, expr, severity, enabled FROM custom_rules WHERE kind = 'pattern' ORDER BY id")?;
+    let custom = stmt.query_map([], |r| {
+        Ok(RuleInfo {
+            id: r.get(0)?,
+            title: r.get(1)?,
+            description: format!("Flags prompts containing “{}”.", r.get::<_, String>(2)?),
+            source: Source::Custom,
+            severity: severity_from_db(&r.get::<_, String>(3)?),
+            enabled: r.get::<_, i64>(4)? != 0,
+            custom: true,
+            pattern: Some(r.get(2)?),
+        })
+    })?;
+    for rule in custom {
+        out.push(rule?);
+    }
+    Ok(out)
 }
 
-/// Enable/disable a single rule.
+/// Enable/disable a single rule (built-in or custom).
 pub fn set_rule(conn: &Connection, id: &str, enabled: bool) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE rules SET enabled = ?1 WHERE id = ?2",
         params![enabled as i64, id],
     )?;
+    conn.execute(
+        "UPDATE custom_rules SET enabled = ?1 WHERE id = ?2",
+        params![enabled as i64, id],
+    )?;
     Ok(())
+}
+
+/// Add a custom pattern rule (forbidden substring). Returns its id.
+pub fn add_custom_rule(
+    conn: &Connection,
+    title: &str,
+    pattern: &str,
+    severity: &str,
+) -> rusqlite::Result<String> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let id = format!("custom-{nanos}");
+    conn.execute(
+        "INSERT INTO custom_rules(id, kind, expr, severity, title, enabled)
+         VALUES(?1, 'pattern', ?2, ?3, ?4, 1)",
+        params![id, pattern, severity, title],
+    )?;
+    Ok(id)
+}
+
+/// Delete a custom rule.
+pub fn delete_custom_rule(conn: &Connection, id: &str) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM custom_rules WHERE id = ?1", [id])?;
+    Ok(())
+}
+
+/// Issues from enabled custom pattern rules for a file's content.
+pub fn custom_issues(conn: &Connection, content: &str) -> Vec<crate::engine::Issue> {
+    use crate::engine::{Issue, Source};
+    let lower = content.to_lowercase();
+    let mut out = Vec::new();
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT id, title, expr, severity FROM custom_rules WHERE enabled = 1 AND kind = 'pattern'",
+    ) else {
+        return out;
+    };
+    let Ok(rows) = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+        ))
+    }) else {
+        return out;
+    };
+    for (id, title, expr, sev) in rows.flatten() {
+        let needle = expr.to_lowercase();
+        if needle.is_empty() || !lower.contains(&needle) {
+            continue;
+        }
+        let line = content
+            .lines()
+            .position(|l| l.to_lowercase().contains(&needle))
+            .map(|i| i as u32 + 1);
+        out.push(Issue {
+            rule_id: id,
+            severity: severity_from_db(&sev),
+            source: Source::Custom,
+            title,
+            why: format!("Your rule flagged the text “{expr}”."),
+            line,
+            fix: None,
+        });
+    }
+    out
 }
 
 /// Enable/disable every rule from a source pack.
@@ -743,5 +840,28 @@ mod tests {
         assert!(!active_rules(&conn)
             .iter()
             .any(|r| r.source() == Source::Openai));
+    }
+
+    #[test]
+    fn custom_rules_flag_toggle_and_delete() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        add_custom_rule(&conn, "No Slack", "slack", "mid").unwrap();
+        let issues = custom_issues(&conn, "Ping the team on Slack when done.");
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Mid);
+        assert_eq!(issues[0].source, Source::Custom);
+
+        let rules = list_rules(&conn).unwrap();
+        let custom = rules.iter().find(|r| r.custom).expect("custom rule listed");
+        assert_eq!(custom.title, "No Slack");
+        let id = custom.id.clone();
+
+        set_rule(&conn, &id, false).unwrap();
+        assert!(custom_issues(&conn, "uses Slack").is_empty());
+
+        delete_custom_rule(&conn, &id).unwrap();
+        assert!(!list_rules(&conn).unwrap().iter().any(|r| r.custom));
     }
 }

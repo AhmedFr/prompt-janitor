@@ -189,6 +189,29 @@ pub fn set_rule(db: tauri::State<'_, AppDb>, id: String, enabled: bool) -> Resul
     query::set_rule(&conn, &id, enabled).map_err(|e| e.to_string())
 }
 
+/// Add a custom pattern rule (forbidden substring) with a severity.
+#[tauri::command]
+#[specta::specta]
+pub fn add_custom_rule(
+    db: tauri::State<'_, AppDb>,
+    title: String,
+    pattern: String,
+    severity: String,
+) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::add_custom_rule(&conn, &title, &pattern, &severity)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a custom rule.
+#[tauri::command]
+#[specta::specta]
+pub fn delete_custom_rule(db: tauri::State<'_, AppDb>, id: String) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::delete_custom_rule(&conn, &id).map_err(|e| e.to_string())
+}
+
 /// Every scanned file for the Prompts table.
 #[tauri::command]
 #[specta::specta]
