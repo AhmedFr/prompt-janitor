@@ -22,6 +22,8 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::list_rules,
         crate::commands::set_rule,
         crate::commands::add_custom_rule,
+        crate::commands::add_nl_rule,
+        crate::commands::evaluate_nl_rules,
         crate::commands::delete_custom_rule,
         crate::commands::import_pack,
         crate::commands::set_ai_config,

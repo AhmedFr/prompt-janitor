@@ -5,6 +5,7 @@
 
 mod ai;
 mod ai_fix;
+mod ai_rules;
 mod apply;
 mod commands;
 pub mod engine;

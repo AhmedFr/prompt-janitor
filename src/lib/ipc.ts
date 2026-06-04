@@ -15,6 +15,7 @@ export type {
   FixSuggestion,
   FixEdit,
   ApplyResult,
+  NlVerdict,
   ScanSummary,
   Severity,
   Source,

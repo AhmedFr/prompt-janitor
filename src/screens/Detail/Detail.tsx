@@ -9,6 +9,7 @@ import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ip
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
+import { NlRulesPanel } from "./NlRulesPanel";
 import "./Detail.css";
 
 export interface DetailProps {
@@ -212,6 +213,8 @@ function DetailBody({
           onReload={onReload}
         />
       )}
+
+      {aiReady && <NlRulesPanel fileId={detail.id} />}
     </>
   );
 }
