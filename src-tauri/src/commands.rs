@@ -244,6 +244,49 @@ pub fn import_pack(db: tauri::State<'_, AppDb>, path: String) -> Result<u32, Str
     Ok(imported)
 }
 
+/// Save the AI provider config. An empty `api_key` keeps the stored one.
+#[tauri::command]
+#[specta::specta]
+pub fn set_ai_config(
+    db: tauri::State<'_, AppDb>,
+    provider: String,
+    api_key: String,
+    model: String,
+) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "ai_provider", &provider).map_err(|e| e.to_string())?;
+    if !api_key.is_empty() {
+        query::set_setting(&conn, "ai_key", &api_key).map_err(|e| e.to_string())?;
+    }
+    query::set_setting(&conn, "ai_model", &model).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// The current AI config (without the key).
+#[tauri::command]
+#[specta::specta]
+pub fn get_ai_config(db: tauri::State<'_, AppDb>) -> Result<crate::ai::AiConfig, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    Ok(crate::ai::config_view(&conn))
+}
+
+/// Verify the configured provider + key with a tiny request.
+#[tauri::command]
+#[specta::specta]
+pub async fn test_ai_connection(db: tauri::State<'_, AppDb>) -> Result<String, String> {
+    let creds = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::ai::load_credentials(&conn)
+    };
+    crate::ai::complete(
+        &creds,
+        "You are a connectivity test.",
+        "Reply with the single word OK.",
+    )
+    .await
+    .map(|_| "Connected".to_string())
+}
+
 /// Every scanned file for the Prompts table.
 #[tauri::command]
 #[specta::specta]

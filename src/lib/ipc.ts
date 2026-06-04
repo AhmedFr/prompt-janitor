@@ -11,6 +11,7 @@ export type {
   ScansDigest,
   DigestItem,
   RuleInfo,
+  AiConfig,
   ScanSummary,
   Severity,
   Source,
