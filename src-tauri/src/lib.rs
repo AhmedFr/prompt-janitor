@@ -3,6 +3,7 @@
 //! Phase 0 stands up the window, the SQLite store, and typed IPC. The scanner,
 //! rules engine, scheduler, tray, and AI/fix engine arrive in later phases.
 
+mod ai;
 mod commands;
 pub mod engine;
 mod ipc;

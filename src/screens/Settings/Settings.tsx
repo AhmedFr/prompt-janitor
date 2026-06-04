@@ -6,15 +6,17 @@ import { commands, isTauri } from "@/lib/ipc";
 import { pickAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
+import { AiTab } from "./AiTab";
 import "./Settings.css";
 
-type Tab = "folders" | "schedule" | "alerts" | "rules" | "general";
+type Tab = "folders" | "schedule" | "alerts" | "rules" | "ai" | "general";
 
 const TABS: [Tab, string, IconName][] = [
   ["folders", "Folders", "folder"],
   ["schedule", "Schedule", "clock"],
   ["alerts", "Alerts", "bell"],
   ["rules", "Rules", "rules"],
+  ["ai", "AI", "sparkles"],
   ["general", "General", "settings"],
 ];
 
@@ -160,6 +162,8 @@ export function Settings({ navigate }: SettingsProps) {
                   </Button>
                 </Card>
               )}
+
+              {tab === "ai" && <AiTab ai={s.ai} onSave={s.saveAi} onTest={s.testAi} />}
 
               {tab === "general" && (
                 <>

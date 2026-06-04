@@ -47,6 +47,12 @@ export const commands = {
 	 *  custom rules. Returns how many were imported.
 	 */
 	importPack: (path: string) => typedError<number, string>(__TAURI_INVOKE("import_pack", { path })),
+	/**  Save the AI provider config. An empty `api_key` keeps the stored one. */
+	setAiConfig: (provider: string, apiKey: string, model: string) => typedError<null, string>(__TAURI_INVOKE("set_ai_config", { provider, apiKey, model })),
+	/**  The current AI config (without the key). */
+	getAiConfig: () => typedError<AiConfig, string>(__TAURI_INVOKE("get_ai_config")),
+	/**  Verify the configured provider + key with a tiny request. */
+	testAiConnection: () => typedError<string, string>(__TAURI_INVOKE("test_ai_connection")),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
@@ -67,6 +73,15 @@ export const commands = {
 };
 
 /* Types */
+/**  Public view of the AI config (no secret key). */
+export type AiConfig = {
+	/**  "anthropic", "openai", or "none". */
+	provider: string,
+	model: string,
+	/**  Whether an API key is stored. */
+	has_key: boolean,
+};
+
 /**
  *  A small status payload proving the typed store ↔ frontend round-trip.
  * 
