@@ -80,6 +80,21 @@ pub fn scan_now(app: tauri::AppHandle, path: String) -> Result<ScanSummary, Stri
     scan_and_emit(&app, &std::path::PathBuf::from(&path))
 }
 
+/// Scan the currently configured folder, if any. Used by the tray.
+pub fn scan_configured_folder(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let folder = {
+        let db = app.state::<AppDb>();
+        let Ok(conn) = db.conn.lock() else {
+            return;
+        };
+        query::get_setting(&conn, "scan_folder").ok().flatten()
+    };
+    if let Some(folder) = folder {
+        let _ = scan_and_emit(app, &std::path::PathBuf::from(folder));
+    }
+}
+
 /// Aggregated data for the Overview screen.
 #[tauri::command]
 #[specta::specta]
