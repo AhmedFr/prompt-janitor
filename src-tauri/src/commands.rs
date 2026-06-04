@@ -287,6 +287,30 @@ pub async fn test_ai_connection(db: tauri::State<'_, AppDb>) -> Result<String, S
     .map(|_| "Connected".to_string())
 }
 
+/// Generate an AI rewrite for one issue of a file (paid). Returns a `from → to`
+/// diff via the configured provider, replacing the static suggested fix.
+#[tauri::command]
+#[specta::specta]
+pub async fn suggest_fix(
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+    issue_index: u32,
+) -> Result<crate::ai_fix::FixSuggestion, String> {
+    let (creds, content, issue) = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let detail = query::get_file_detail(&conn, &file_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "File not found".to_string())?;
+        let issue = detail
+            .issues
+            .get(issue_index as usize)
+            .cloned()
+            .ok_or_else(|| "Issue not found".to_string())?;
+        (crate::ai::load_credentials(&conn), detail.content, issue)
+    };
+    crate::ai_fix::suggest(&creds, &content, &issue).await
+}
+
 /// Every scanned file for the Prompts table.
 #[tauri::command]
 #[specta::specta]

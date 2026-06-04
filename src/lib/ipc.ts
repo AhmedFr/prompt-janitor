@@ -12,6 +12,7 @@ export type {
   DigestItem,
   RuleInfo,
   AiConfig,
+  FixSuggestion,
   ScanSummary,
   Severity,
   Source,

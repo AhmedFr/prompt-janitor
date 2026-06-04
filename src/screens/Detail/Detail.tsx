@@ -5,7 +5,7 @@ import { SourceBadge } from "@/components/SourceBadge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { isTauri, type FileDetail } from "@/lib/ipc";
+import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import "./Detail.css";
@@ -16,7 +16,7 @@ export interface DetailProps {
 }
 
 export function Detail({ fileId, navigate }: DetailProps) {
-  const { detail, loading } = useFileDetail(fileId);
+  const { detail, loading, aiReady } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,7 +61,12 @@ export function Detail({ fileId, navigate }: DetailProps) {
               <div className="muted">Select a file from the Prompts tab.</div>
             </Card>
           ) : (
-            <DetailBody detail={detail} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+            <DetailBody
+              detail={detail}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+              aiReady={aiReady}
+            />
           )}
         </div>
       </div>
@@ -73,10 +78,12 @@ function DetailBody({
   detail,
   selectedIndex,
   onSelect,
+  aiReady,
 }: {
   detail: FileDetail;
   selectedIndex: number | null;
   onSelect: (index: number) => void;
+  aiReady: boolean;
 }) {
   const lines = detail.content.length ? detail.content.split("\n") : [];
   const lineIssue = new Map<number, number>();
@@ -171,43 +178,116 @@ function DetailBody({
         </div>
       </div>
 
-      {selected && (
-        <Card padded style={{ marginTop: 20 }}>
-          <div className="row" style={{ gap: 10, marginBottom: 8 }}>
-            <SeverityDot level={selected.severity} />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{selected.title}</div>
-            <SourceBadge source={selected.source} />
-            {selected.line != null && <span className="d-kbd">line {selected.line}</span>}
-          </div>
-          <div className="muted" style={{ maxWidth: 620 }}>
-            {selected.why}
-          </div>
-          {selected.fix_from && selected.fix_to && (
-            <div style={{ marginTop: 14 }}>
-              <h2 className="sec">Suggested fix</h2>
-              <div className="d-diff-line d-diff-from">
-                <span style={{ color: "var(--red)" }}>− </span>
-                {selected.fix_from}
-              </div>
-              <div className="d-diff-line d-diff-to">
-                <span style={{ color: "var(--green)" }}>+ </span>
-                {selected.fix_to}
-              </div>
-              <div className="row" style={{ gap: 8, marginTop: 12 }}>
-                <Button variant="primary" size="sm" disabled title="Auto-fix arrives in Phase 4 (paid)">
-                  <Icon name="check" /> Apply fix
-                </Button>
-                <Button size="sm" disabled>
-                  Dismiss
-                </Button>
-              </div>
-              <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
-                Auto-fix &amp; AI rewrites arrive in Phase 4 (paid).
-              </div>
-            </div>
-          )}
-        </Card>
+      {selected && selectedIndex != null && (
+        <IssuePanel
+          key={selectedIndex}
+          issue={selected}
+          fileId={detail.id}
+          index={selectedIndex}
+          aiReady={aiReady}
+        />
       )}
     </>
+  );
+}
+
+/** The selected issue: its explanation, plus the suggested fix — static by
+ * default, replaced by a provider-generated rewrite once the user asks. */
+function IssuePanel({
+  issue,
+  fileId,
+  index,
+  aiReady,
+}: {
+  issue: FileDetail["issues"][number];
+  fileId: string;
+  index: number;
+  aiReady: boolean;
+}) {
+  const [suggestion, setSuggestion] = useState<FixSuggestion | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const generate = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await commands.suggestFix(fileId, index);
+    if (res.status === "ok") setSuggestion(res.data);
+    else setError(res.error);
+    setBusy(false);
+  };
+
+  const staticFix = issue.fix_from && issue.fix_to ? { from: issue.fix_from, to: issue.fix_to } : null;
+
+  return (
+    <Card padded style={{ marginTop: 20 }}>
+      <div className="row" style={{ gap: 10, marginBottom: 8 }}>
+        <SeverityDot level={issue.severity} />
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{issue.title}</div>
+        <SourceBadge source={issue.source} />
+        {issue.line != null && <span className="d-kbd">line {issue.line}</span>}
+      </div>
+      <div className="muted" style={{ maxWidth: 620 }}>
+        {issue.why}
+      </div>
+
+      {aiReady && (
+        <div className="row" style={{ gap: 8, marginTop: 14, alignItems: "center" }}>
+          <Button variant="primary" size="sm" onClick={() => void generate()} disabled={busy}>
+            <Icon name="sparkles" />{" "}
+            {busy ? "Generating…" : suggestion ? "Regenerate" : "Suggest fix with AI"}
+          </Button>
+          {error && (
+            <span className="faint" style={{ fontSize: 12, color: "var(--red)", maxWidth: 440 }}>
+              {error}
+            </span>
+          )}
+        </div>
+      )}
+
+      {suggestion ? (
+        <FixDiff from={suggestion.from} to={suggestion.to} note={suggestion.note} ai />
+      ) : staticFix ? (
+        <FixDiff from={staticFix.from} to={staticFix.to} />
+      ) : null}
+
+      {!aiReady && (
+        <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
+          Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored rewrite.
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** A from → to diff with an Apply action (applying lands in #26). */
+function FixDiff({ from, to, note, ai }: { from: string; to: string; note?: string; ai?: boolean }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <h2 className="sec">{ai ? "AI suggested rewrite" : "Suggested fix"}</h2>
+      {from && (
+        <div className="d-diff-line d-diff-from" style={{ whiteSpace: "pre-wrap" }}>
+          <span style={{ color: "var(--red)" }}>− </span>
+          {from}
+        </div>
+      )}
+      <div className="d-diff-line d-diff-to" style={{ whiteSpace: "pre-wrap" }}>
+        <span style={{ color: "var(--green)" }}>+ </span>
+        {to}
+      </div>
+      {note && (
+        <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+          {note}
+        </div>
+      )}
+      <div className="row" style={{ gap: 8, marginTop: 12 }}>
+        <Button variant="primary" size="sm" disabled title="Applying fixes arrives in #26">
+          <Icon name="check" /> Apply fix
+        </Button>
+        <Button size="sm" disabled>
+          Dismiss
+        </Button>
+      </div>
+    </div>
   );
 }
