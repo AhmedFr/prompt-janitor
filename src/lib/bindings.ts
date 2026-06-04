@@ -19,6 +19,10 @@ export const commands = {
 	setScanFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_scan_folder", { path })),
 	/**  The currently configured scan folder, if any. */
 	getScanFolder: () => typedError<string | null, string>(__TAURI_INVOKE("get_scan_folder")),
+	/**  Persist the scan schedule ("1h", "6h", "1d", "save", or "manual"). */
+	setSchedule: (value: string) => typedError<null, string>(__TAURI_INVOKE("set_schedule", { value })),
+	/**  The current scan schedule (defaults to "6h"). */
+	getSchedule: () => typedError<string, string>(__TAURI_INVOKE("get_schedule")),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
