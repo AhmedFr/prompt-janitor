@@ -227,15 +227,23 @@ pub async fn evaluate_nl_rules(
     db: tauri::State<'_, AppDb>,
     file_id: String,
 ) -> Result<Vec<crate::ai_rules::NlVerdict>, String> {
-    let (creds, content, rules) = {
+    let (paid, creds, content, rules) = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let detail = query::get_file_detail(&conn, &file_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "File not found".to_string())?;
         let rules = query::enabled_nl_rules(&conn).map_err(|e| e.to_string())?;
-        (crate::ai::load_credentials(&conn), detail.content, rules)
+        (
+            entitlement_of(&conn).paid,
+            crate::ai::load_credentials(&conn),
+            detail.content,
+            rules,
+        )
     };
 
+    if !paid {
+        return Err(PAID_GATE.to_string());
+    }
     if creds.provider == "none" || creds.key.is_empty() {
         return Err(
             "Connect an AI provider in Settings → AI to evaluate natural-language rules."
@@ -341,6 +349,59 @@ pub async fn test_ai_connection(db: tauri::State<'_, AppDb>) -> Result<String, S
     .map(|_| "Connected".to_string())
 }
 
+/// The paid-tier entitlement derived from the stored license key.
+fn entitlement_of(conn: &rusqlite::Connection) -> crate::license::Entitlement {
+    let key = query::get_setting(conn, "license_key")
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    match crate::license::verify(&key) {
+        Some(info) => crate::license::Entitlement {
+            paid: true,
+            email: Some(info.email),
+            plan: Some(info.plan),
+        },
+        None => crate::license::Entitlement {
+            paid: false,
+            email: None,
+            plan: None,
+        },
+    }
+}
+
+const PAID_GATE: &str = "This is a paid feature. Add a license key in Settings → License.";
+
+/// The current entitlement (whether the paid tier is unlocked).
+#[tauri::command]
+#[specta::specta]
+pub fn get_entitlement(db: tauri::State<'_, AppDb>) -> Result<crate::license::Entitlement, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    Ok(entitlement_of(&conn))
+}
+
+/// Validate and store a license key. Returns the unlocked plan, or an error if
+/// the key isn't valid.
+#[tauri::command]
+#[specta::specta]
+pub fn set_license(
+    db: tauri::State<'_, AppDb>,
+    key: String,
+) -> Result<crate::license::LicenseInfo, String> {
+    let info =
+        crate::license::verify(&key).ok_or_else(|| "That license key isn't valid.".to_string())?;
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "license_key", key.trim()).map_err(|e| e.to_string())?;
+    Ok(info)
+}
+
+/// Remove the stored license, returning to the free tier.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_license(db: tauri::State<'_, AppDb>) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "license_key", "").map_err(|e| e.to_string())
+}
+
 /// Generate an AI rewrite for one issue of a file (paid). Returns a `from → to`
 /// diff via the configured provider, replacing the static suggested fix.
 #[tauri::command]
@@ -350,7 +411,7 @@ pub async fn suggest_fix(
     file_id: String,
     issue_index: u32,
 ) -> Result<crate::ai_fix::FixSuggestion, String> {
-    let (creds, content, issue) = {
+    let (paid, creds, content, issue) = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let detail = query::get_file_detail(&conn, &file_id)
             .map_err(|e| e.to_string())?
@@ -360,8 +421,16 @@ pub async fn suggest_fix(
             .get(issue_index as usize)
             .cloned()
             .ok_or_else(|| "Issue not found".to_string())?;
-        (crate::ai::load_credentials(&conn), detail.content, issue)
+        (
+            entitlement_of(&conn).paid,
+            crate::ai::load_credentials(&conn),
+            detail.content,
+            issue,
+        )
     };
+    if !paid {
+        return Err(PAID_GATE.to_string());
+    }
     crate::ai_fix::suggest(&creds, &content, &issue).await
 }
 

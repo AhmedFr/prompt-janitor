@@ -60,6 +60,15 @@ export const commands = {
 	getAiConfig: () => typedError<AiConfig, string>(__TAURI_INVOKE("get_ai_config")),
 	/**  Verify the configured provider + key with a tiny request. */
 	testAiConnection: () => typedError<string, string>(__TAURI_INVOKE("test_ai_connection")),
+	/**  The current entitlement (whether the paid tier is unlocked). */
+	getEntitlement: () => typedError<Entitlement, string>(__TAURI_INVOKE("get_entitlement")),
+	/**
+	 *  Validate and store a license key. Returns the unlocked plan, or an error if
+	 *  the key isn't valid.
+	 */
+	setLicense: (key: string) => typedError<LicenseInfo, string>(__TAURI_INVOKE("set_license", { key })),
+	/**  Remove the stored license, returning to the free tier. */
+	clearLicense: () => typedError<null, string>(__TAURI_INVOKE("clear_license")),
 	/**
 	 *  Generate an AI rewrite for one issue of a file (paid). Returns a `from → to`
 	 *  diff via the configured provider, replacing the static suggested fix.
@@ -133,6 +142,13 @@ export type DigestItem = {
 	detail: string,
 };
 
+/**  The current entitlement state (whether the paid tier is unlocked). */
+export type Entitlement = {
+	paid: boolean,
+	email: string | null,
+	plan: string | null,
+};
+
 /**  Everything the Detail screen needs for one file. */
 export type FileDetail = {
 	id: string,
@@ -189,6 +205,12 @@ export type IssueDetail = {
 	why: string,
 	fix_from: string | null,
 	fix_to: string | null,
+};
+
+/**  What a valid license unlocks, shown in Settings. */
+export type LicenseInfo = {
+	email: string,
+	plan: string,
 };
 
 /**  The provider's verdict on one NL rule for one file. */

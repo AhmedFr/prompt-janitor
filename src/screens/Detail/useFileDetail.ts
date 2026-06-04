@@ -6,6 +6,7 @@ export function useFileDetail(fileId: string | null) {
   const [detail, setDetail] = useState<FileDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiReady, setAiReady] = useState(false);
+  const [entitled, setEntitled] = useState(false);
 
   /** Re-fetch the file from disk + DB (after an apply/undo, or a fresh scan). */
   const reload = useCallback(async () => {
@@ -34,22 +35,23 @@ export function useFileDetail(fileId: string | null) {
     };
   }, [fileId]);
 
-  // AI config is stable across files — load it once. A rewrite needs both a
-  // provider and a stored key, or `suggest_fix` would fail with "no key".
+  // Provider config + entitlement are stable across files — load once. A rewrite
+  // needs a provider + key (or `suggest_fix` fails) AND a paid license (or it's
+  // gated server-side).
   useEffect(() => {
     let active = true;
-    async function loadAi() {
+    async function loadGates() {
       if (!isTauri) return;
-      const cfg = await commands.getAiConfig();
-      if (active && cfg.status === "ok") {
-        setAiReady(cfg.data.provider !== "none" && cfg.data.has_key);
-      }
+      const [cfg, ent] = await Promise.all([commands.getAiConfig(), commands.getEntitlement()]);
+      if (!active) return;
+      if (cfg.status === "ok") setAiReady(cfg.data.provider !== "none" && cfg.data.has_key);
+      if (ent.status === "ok") setEntitled(ent.data.paid);
     }
-    void loadAi();
+    void loadGates();
     return () => {
       active = false;
     };
   }, []);
 
-  return { detail, loading, aiReady, reload };
+  return { detail, loading, aiReady, entitled, reload };
 }

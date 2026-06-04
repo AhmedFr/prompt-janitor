@@ -27,7 +27,9 @@ const SEVERITIES: [Sev, string][] = [
 type Mode = "pattern" | "nl";
 
 export function Rules() {
-  const { rules, loading, aiReady, toggle, addRule, addNlRule, deleteRule, importPack } = useRules();
+  const { rules, loading, aiReady, entitled, toggle, addRule, addNlRule, deleteRule, importPack } =
+    useRules();
+  const nlReady = aiReady && entitled;
   const [pack, setPack] = useState<Pack>("all");
   const [mode, setMode] = useState<Mode>("pattern");
   const [title, setTitle] = useState("");
@@ -93,8 +95,14 @@ export function Rules() {
                     </button>
                     <button
                       className={mode === "nl" ? "on" : ""}
-                      disabled={!aiReady}
-                      title={aiReady ? undefined : "Connect an AI provider in Settings → AI"}
+                      disabled={!nlReady}
+                      title={
+                        nlReady
+                          ? undefined
+                          : !entitled
+                            ? "Paid feature — add a license in Settings → License"
+                            : "Connect an AI provider in Settings → AI"
+                      }
                       onClick={() => setMode("nl")}
                     >
                       <Icon name="sparkles" size={13} /> Natural language

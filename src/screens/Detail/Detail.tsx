@@ -18,7 +18,7 @@ export interface DetailProps {
 }
 
 export function Detail({ fileId, navigate }: DetailProps) {
-  const { detail, loading, aiReady, reload } = useFileDetail(fileId);
+  const { detail, loading, aiReady, entitled, reload } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
 
@@ -88,6 +88,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
               aiReady={aiReady}
+              entitled={entitled}
               onReload={reload}
             />
           )}
@@ -102,12 +103,14 @@ function DetailBody({
   selectedIndex,
   onSelect,
   aiReady,
+  entitled,
   onReload,
 }: {
   detail: FileDetail;
   selectedIndex: number | null;
   onSelect: (index: number) => void;
   aiReady: boolean;
+  entitled: boolean;
   onReload: () => Promise<void>;
 }) {
   const lines = detail.content.length ? detail.content.split("\n") : [];
@@ -210,11 +213,12 @@ function DetailBody({
           fileId={detail.id}
           index={selectedIndex}
           aiReady={aiReady}
+          entitled={entitled}
           onReload={onReload}
         />
       )}
 
-      {aiReady && <NlRulesPanel fileId={detail.id} />}
+      {aiReady && entitled && <NlRulesPanel fileId={detail.id} />}
     </>
   );
 }
@@ -226,12 +230,14 @@ function IssuePanel({
   fileId,
   index,
   aiReady,
+  entitled,
   onReload,
 }: {
   issue: FileDetail["issues"][number];
   fileId: string;
   index: number;
   aiReady: boolean;
+  entitled: boolean;
   onReload: () => Promise<void>;
 }) {
   const [suggestion, setSuggestion] = useState<FixSuggestion | null>(null);
@@ -260,6 +266,7 @@ function IssuePanel({
   const aiFix = suggestion ? { from: suggestion.from, to: suggestion.to } : null;
   const staticFix = issue.fix_from && issue.fix_to ? { from: issue.fix_from, to: issue.fix_to } : null;
   const fix = aiFix ?? staticFix;
+  const paidAi = aiReady && entitled;
 
   const apply = async () => {
     if (!fix) return;
@@ -298,7 +305,7 @@ function IssuePanel({
         {issue.why}
       </div>
 
-      {aiReady && (
+      {paidAi && (
         <div className="row" style={{ gap: 8, marginTop: 14, alignItems: "center" }}>
           <Button size="sm" onClick={() => void generate()} disabled={generating || action !== ""}>
             <Icon name="sparkles" />{" "}
@@ -352,9 +359,19 @@ function IssuePanel({
         </>
       )}
 
-      {!fix && !aiReady && (
+      {!paidAi && (
         <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
-          Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored rewrite.
+          {!entitled ? (
+            <>
+              ✦ AI auto-fix &amp; rewrites are a paid feature — add a license in{" "}
+              <strong>Settings → License</strong>.
+            </>
+          ) : (
+            <>
+              Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored
+              rewrite.
+            </>
+          )}
         </div>
       )}
     </Card>

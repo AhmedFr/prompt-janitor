@@ -16,6 +16,8 @@ export type {
   FixEdit,
   ApplyResult,
   NlVerdict,
+  Entitlement,
+  LicenseInfo,
   ScanSummary,
   Severity,
   Source,
