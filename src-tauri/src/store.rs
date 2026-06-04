@@ -122,7 +122,9 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         migrate(&conn).unwrap();
 
-        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(version, MIGRATIONS.len() as i64);
 
         let files_table: i64 = conn
@@ -136,7 +138,9 @@ mod tests {
 
         // Running again must not error or double-apply.
         migrate(&conn).unwrap();
-        let version_again: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        let version_again: i64 = conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(version_again, MIGRATIONS.len() as i64);
     }
 }
