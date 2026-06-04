@@ -6,6 +6,7 @@
 mod commands;
 pub mod engine;
 mod ipc;
+mod notify;
 mod query;
 pub mod rules;
 mod scan;
@@ -31,6 +32,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");

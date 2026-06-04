@@ -69,6 +69,7 @@ pub fn scan_and_emit(
     })
     .map_err(|e| e.to_string())?;
     let _ = app.emit("scan-done", &summary);
+    crate::notify::after_scan(app, &conn);
     Ok(summary)
 }
 
@@ -135,6 +136,24 @@ pub fn get_schedule(db: tauri::State<'_, AppDb>) -> Result<String, String> {
     Ok(query::get_setting(&conn, "schedule")
         .map_err(|e| e.to_string())?
         .unwrap_or_else(|| "6h".to_string()))
+}
+
+/// Toggle an alert ("regressions" or "digest").
+#[tauri::command]
+#[specta::specta]
+pub fn set_alert(db: tauri::State<'_, AppDb>, key: String, enabled: bool) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let value = if enabled { "true" } else { "false" };
+    query::set_setting(&conn, &format!("notify_{key}"), value).map_err(|e| e.to_string())
+}
+
+/// Whether an alert is on (defaults to on).
+#[tauri::command]
+#[specta::specta]
+pub fn get_alert(db: tauri::State<'_, AppDb>, key: String) -> Result<bool, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let value = query::get_setting(&conn, &format!("notify_{key}")).map_err(|e| e.to_string())?;
+    Ok(value.as_deref() != Some("false"))
 }
 
 /// Every scanned file for the Prompts table.
