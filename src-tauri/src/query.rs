@@ -12,6 +12,10 @@ pub struct WorklistItem {
     pub severity: Severity,
     pub source: Source,
     pub line: Option<u32>,
+    /// Containing project (for the "By project" grouping).
+    pub project: String,
+    /// File last-modified epoch string (for the "Newest" grouping).
+    pub modified: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
@@ -113,7 +117,7 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
     })? as u32;
 
     let mut stmt = conn.prepare(
-        "SELECT i.file_id, i.title, i.severity, i.source, i.line, f.project_id, f.kind
+        "SELECT i.file_id, i.title, i.severity, i.source, i.line, f.project_id, f.kind, f.modified_at
          FROM issues i JOIN files f ON f.id = i.file_id
          ORDER BY CASE i.severity WHEN 'hi' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END, f.project_id
          LIMIT 12",
@@ -123,6 +127,7 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
             let line: Option<i64> = r.get(4)?;
             let project: String = r.get(5)?;
             let kind: String = r.get(6)?;
+            let modified: Option<String> = r.get(7)?;
             let location = match line {
                 Some(l) => format!("{project} / {kind} · line {l}"),
                 None => format!("{project} / {kind}"),
@@ -133,6 +138,8 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
                 severity: severity_from_db(&r.get::<_, String>(2)?),
                 source: source_from_db(&r.get::<_, String>(3)?),
                 line: line.map(|l| l as u32),
+                project,
+                modified,
                 location,
             })
         })?

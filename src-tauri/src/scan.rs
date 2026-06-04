@@ -28,19 +28,13 @@ fn now_epoch() -> String {
         .unwrap_or_else(|_| "0".to_string())
 }
 
-/// Project = the first path component under `root`, else the root's own name.
-fn project_name(root: &Path, path: &Path) -> String {
-    let rel = path.strip_prefix(root).unwrap_or(path);
-    let mut comps = rel.components();
-    let first = comps.next();
-    let has_more = comps.next().is_some();
-    match first {
-        Some(c) if has_more => c.as_os_str().to_string_lossy().into_owned(),
-        _ => root
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "root".to_string()),
-    }
+/// Project = the name of the immediate folder containing the file
+/// (e.g. `~/code/.../homestop-testground/AGENTS.md` → `homestop-testground`).
+fn project_name(path: &Path) -> String {
+    path.parent()
+        .and_then(|p| p.file_name())
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "root".to_string())
 }
 
 /// Walk `root`, grade every prompt file, and persist the results. Calls
@@ -64,7 +58,7 @@ pub fn run_scan(
 
     for (i, file) in files.iter().enumerate() {
         let eval = evaluate(&file.content, &rules);
-        let project = project_name(root, Path::new(&file.path));
+        let project = project_name(Path::new(&file.path));
 
         conn.execute(
             "INSERT OR IGNORE INTO projects(id, name, root_path) VALUES(?1, ?1, ?2)",
@@ -239,5 +233,19 @@ For example:
         let mut last = (0u32, 0u32);
         run_scan(&conn, dir.path(), |done, total| last = (done, total)).unwrap();
         assert_eq!(last, (1, 1));
+    }
+
+    #[test]
+    fn project_is_the_immediate_parent_folder() {
+        assert_eq!(
+            project_name(Path::new(
+                "/Users/x/code/02-personal/homestop/homestop-testground/AGENTS.md"
+            )),
+            "homestop-testground"
+        );
+        assert_eq!(
+            project_name(Path::new("/Users/x/code/web-app/CLAUDE.md")),
+            "web-app"
+        );
     }
 }
