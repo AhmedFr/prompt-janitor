@@ -38,6 +38,8 @@ export const commands = {
 	/**  Score change since the previous scan of this file, if any. */
 	delta: number | null,
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
+	/**  The weekly Scans digest. */
+	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
 };
 
 /* Types */
@@ -52,6 +54,15 @@ export type AppStatus = {
 	db_path: string,
 	project_count: number,
 	file_count: number,
+};
+
+/**  An item in the digest's "needs your eyes" list. */
+export type DigestItem = {
+	/**  "regressed" | "improved" | "new". */
+	kind: string,
+	file_id: string,
+	title: string,
+	detail: string,
 };
 
 /**  Everything the Detail screen needs for one file. */
@@ -120,6 +131,18 @@ export type ScanSummary = {
 	nits: number,
 	overall_score: number,
 	overall_grade: Grade,
+};
+
+/**  The weekly Scans digest. */
+export type ScansDigest = {
+	has_data: boolean,
+	overall_grade: Grade,
+	net_health: number,
+	improved: number,
+	regressed: number,
+	scan_count: number,
+	trend: number[],
+	needs_attention: DigestItem[],
 };
 
 /**  Issue severity. */

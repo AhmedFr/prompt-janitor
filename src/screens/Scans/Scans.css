@@ -1,0 +1,68 @@
+.s-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.s-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.s-tile {
+  background: var(--group);
+  border-radius: var(--r-card);
+  padding: 16px;
+  text-align: center;
+}
+
+.s-tile-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.s-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 18px;
+}
+
+.s-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 4px;
+  border: none;
+  border-bottom: 0.5px solid var(--sep);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.s-row:last-child {
+  border-bottom: none;
+}
+
+.s-row:hover {
+  background: var(--group);
+}
+
+.s-chev {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  color: var(--text-3);
+}
+
+.s-ico-improved {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--green);
+}

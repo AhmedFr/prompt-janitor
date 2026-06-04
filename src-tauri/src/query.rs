@@ -325,6 +325,137 @@ pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Opt
     }))
 }
 
+/// An item in the digest's "needs your eyes" list.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct DigestItem {
+    /// "regressed" | "improved" | "new".
+    pub kind: String,
+    pub file_id: String,
+    pub title: String,
+    pub detail: String,
+}
+
+/// The weekly Scans digest.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct ScansDigest {
+    pub has_data: bool,
+    pub overall_grade: Grade,
+    pub net_health: i32,
+    pub improved: u32,
+    pub regressed: u32,
+    pub scan_count: u32,
+    pub trend: Vec<u32>,
+    pub needs_attention: Vec<DigestItem>,
+}
+
+/// Aggregate the recent scan history into a digest.
+pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
+    let file_count =
+        conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get::<_, i64>(0))? as u32;
+    if file_count == 0 {
+        return Ok(ScansDigest {
+            has_data: false,
+            overall_grade: Grade::A,
+            net_health: 0,
+            improved: 0,
+            regressed: 0,
+            scan_count: 0,
+            trend: Vec::new(),
+            needs_attention: Vec::new(),
+        });
+    }
+
+    let scan_count =
+        conn.query_row("SELECT COUNT(*) FROM scans", [], |r| r.get::<_, i64>(0))? as u32;
+    let overall_score = conn.query_row("SELECT COALESCE(AVG(score), 100) FROM files", [], |r| {
+        r.get::<_, f64>(0)
+    })? as u32;
+
+    let mut trend_stmt = conn.prepare(
+        "SELECT score FROM grade_history WHERE scope = 'overall' ORDER BY id DESC LIMIT 7",
+    )?;
+    let mut trend: Vec<u32> = trend_stmt
+        .query_map([], |r| r.get::<_, i64>(0).map(|n| n as u32))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    trend.reverse();
+    let net_health = if trend.len() >= 2 {
+        trend[trend.len() - 1] as i32 - trend[0] as i32
+    } else {
+        0
+    };
+
+    // Per-file history → improved / regressed / new.
+    let mut files_stmt = conn.prepare("SELECT id, path, kind, project_id, grade FROM files")?;
+    let files: Vec<(String, String, String, String, String)> = files_stmt
+        .query_map([], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let (mut improved, mut regressed) = (0u32, 0u32);
+    let (mut regressed_items, mut new_items, mut improved_items) =
+        (Vec::new(), Vec::new(), Vec::new());
+
+    for (id, path, kind, project, grade) in &files {
+        let name = std::path::Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(kind.as_str());
+        let mut hstmt = conn.prepare(
+            "SELECT score FROM grade_history WHERE scope = 'file' AND scope_id = ?1 ORDER BY id DESC LIMIT 2",
+        )?;
+        let scores: Vec<i64> = hstmt
+            .query_map([id], |r| r.get::<_, i64>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        if scores.len() < 2 {
+            new_items.push(DigestItem {
+                kind: "new".to_string(),
+                file_id: id.clone(),
+                title: format!("{name} — first scan"),
+                detail: format!("{project} · grade {grade}"),
+            });
+            continue;
+        }
+
+        let delta = scores[0] - scores[1];
+        let prev = grade_for_score(scores[1] as u32).letter();
+        if delta > 0 {
+            improved += 1;
+            improved_items.push(DigestItem {
+                kind: "improved".to_string(),
+                file_id: id.clone(),
+                title: format!("{name} improved {prev} → {grade}"),
+                detail: format!("{project} · +{delta}"),
+            });
+        } else if delta < 0 {
+            regressed += 1;
+            regressed_items.push(DigestItem {
+                kind: "regressed".to_string(),
+                file_id: id.clone(),
+                title: format!("{name} dropped {prev} → {grade}"),
+                detail: format!("{project} · {delta}"),
+            });
+        }
+    }
+
+    let mut needs_attention = regressed_items;
+    needs_attention.extend(new_items);
+    needs_attention.extend(improved_items);
+    needs_attention.truncate(8);
+
+    Ok(ScansDigest {
+        has_data: true,
+        overall_grade: grade_for_score(overall_score),
+        net_health,
+        improved,
+        regressed,
+        scan_count,
+        trend,
+        needs_attention,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,5 +570,33 @@ mod tests {
         let id = list_files(&conn).unwrap()[0].id.clone();
         let detail = get_file_detail(&conn, &id).unwrap().unwrap();
         assert!(detail.delta.unwrap() > 0, "file delta: {:?}", detail.delta);
+    }
+
+    #[test]
+    fn digest_reports_regressions() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CLAUDE.md");
+
+        std::fs::write(
+            &file,
+            "You are a senior reviewer.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        std::fs::write(
+            &file,
+            "You are an assistant.\nAlways use gpt-4.\nBe concise but thorough.\n",
+        )
+        .unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let digest = get_scans_digest(&conn).unwrap();
+        assert!(digest.has_data);
+        assert_eq!(digest.scan_count, 2);
+        assert!(digest.regressed >= 1);
+        assert!(digest.net_health < 0, "net_health: {}", digest.net_health);
+        assert!(digest.needs_attention.iter().any(|i| i.kind == "regressed"));
     }
 }
