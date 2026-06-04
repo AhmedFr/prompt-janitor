@@ -1,5 +1,10 @@
 import { ScreenPlaceholder } from "@/components/ScreenPlaceholder";
+import type { Navigate } from "@/App/App.types";
 
-export function Prompts() {
-  return <ScreenPlaceholder title="Prompts" subtitle="The graded file table lands in Phase 1." />;
+export interface PromptsProps {
+  navigate: Navigate;
+}
+
+export function Prompts(_props: PromptsProps) {
+  return <ScreenPlaceholder title="Prompts" subtitle="The graded file table lands in #11." />;
 }

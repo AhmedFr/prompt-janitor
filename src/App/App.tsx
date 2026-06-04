@@ -1,5 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
-import { commands, isTauri } from "@/lib/ipc";
+import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Overview } from "@/screens/Overview";
 import { Prompts } from "@/screens/Prompts";
@@ -9,37 +8,25 @@ import { Rules } from "@/screens/Rules";
 import { Settings } from "@/screens/Settings";
 import type { Route } from "./App.types";
 
-const SCREENS: Record<Route, ComponentType> = {
-  overview: Overview,
-  prompts: Prompts,
-  detail: Detail,
-  scans: Scans,
-  rules: Rules,
-  settings: Settings,
-};
-
 export function App() {
   const [route, setRoute] = useState<Route>("overview");
-  const Screen = SCREENS[route];
+  const [detailId, setDetailId] = useState<string | null>(null);
 
-  // Phase 0 typed-IPC round-trip: confirm the store is reachable when running
-  // inside Tauri. (Skipped in a plain browser dev server, where invoke is absent.)
-  useEffect(() => {
-    if (!isTauri) return;
-    void commands.getAppStatus().then((res) => {
-      if (res.status === "ok") {
-        console.info("[prompt-janitor] db status", res.data);
-      } else {
-        console.error("[prompt-janitor] get_app_status failed:", res.error);
-      }
-    });
-  }, []);
+  const navigate = (next: Route, fileId?: string) => {
+    setRoute(next);
+    if (fileId !== undefined) setDetailId(fileId);
+  };
 
   return (
     <div className="app-window">
-      <Sidebar active={route} onNavigate={setRoute} />
+      <Sidebar active={route} onNavigate={(r) => navigate(r)} />
       <main className="app-content">
-        <Screen />
+        {route === "overview" && <Overview navigate={navigate} />}
+        {route === "prompts" && <Prompts navigate={navigate} />}
+        {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
+        {route === "scans" && <Scans />}
+        {route === "rules" && <Rules />}
+        {route === "settings" && <Settings />}
       </main>
     </div>
   );

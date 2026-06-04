@@ -1,6 +1,7 @@
 //! Tauri commands exposed to the frontend. Each is `#[specta::specta]` so
 //! tauri-specta can generate typed TypeScript bindings.
 
+use crate::query::{self, Overview};
 use crate::scan::{run_scan, ScanSummary};
 use crate::store::AppDb;
 
@@ -72,4 +73,28 @@ pub fn scan_now(
     .map_err(|e| e.to_string())?;
     let _ = app.emit("scan-done", &summary);
     Ok(summary)
+}
+
+/// Aggregated data for the Overview screen.
+#[tauri::command]
+#[specta::specta]
+pub fn get_overview(db: tauri::State<'_, AppDb>) -> Result<Overview, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_overview(&conn).map_err(|e| e.to_string())
+}
+
+/// Persist the folder to scan.
+#[tauri::command]
+#[specta::specta]
+pub fn set_scan_folder(db: tauri::State<'_, AppDb>, path: String) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "scan_folder", &path).map_err(|e| e.to_string())
+}
+
+/// The currently configured scan folder, if any.
+#[tauri::command]
+#[specta::specta]
+pub fn get_scan_folder(db: tauri::State<'_, AppDb>) -> Result<Option<String>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_setting(&conn, "scan_folder").map_err(|e| e.to_string())
 }
