@@ -12,7 +12,7 @@ use std::time::Duration;
 use notify::{RecursiveMode, Watcher};
 use tauri::{AppHandle, Manager};
 
-use crate::query::get_setting;
+use crate::query::{get_setting, set_setting};
 use crate::store::AppDb;
 
 const TICK: Duration = Duration::from_secs(15);
@@ -64,7 +64,7 @@ pub fn start(app: AppHandle) {
             tokio::time::sleep(TICK).await;
 
             let db = app.state::<AppDb>();
-            let (schedule_str, folder, last_scan) = {
+            let (schedule_str, folder, last_scan, notify_digest, last_digest) = {
                 let Ok(conn) = db.conn.lock() else {
                     continue;
                 };
@@ -81,7 +81,17 @@ pub fn start(app: AppHandle) {
                     .flatten()
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
-                (schedule, folder, last)
+                let notify_digest = get_setting(&conn, "notify_digest")
+                    .ok()
+                    .flatten()
+                    .as_deref()
+                    != Some("false");
+                let last_digest = get_setting(&conn, "last_digest")
+                    .ok()
+                    .flatten()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
+                (schedule, folder, last, notify_digest, last_digest)
             };
 
             let Some(folder) = folder else {
@@ -118,6 +128,29 @@ pub fn start(app: AppHandle) {
                 dirty.store(false, Ordering::Relaxed);
                 change_at = 0;
                 let _ = crate::commands::scan_and_emit(&app, &std::path::PathBuf::from(&folder));
+            }
+
+            // Weekly digest notification.
+            const WEEK: u64 = 7 * 24 * 3600;
+            if last_digest == 0 {
+                if let Ok(conn) = db.conn.lock() {
+                    let _ = set_setting(&conn, "last_digest", &now_secs().to_string());
+                }
+            } else if notify_digest && now_secs().saturating_sub(last_digest) >= WEEK {
+                let digest = match db.conn.lock() {
+                    Ok(conn) => crate::query::get_scans_digest(&conn).ok(),
+                    Err(_) => None,
+                };
+                if let Some(d) = digest {
+                    crate::notify::send(
+                        &app,
+                        "Your weekly prompt digest",
+                        &crate::notify::digest_summary(&d),
+                    );
+                    if let Ok(conn) = db.conn.lock() {
+                        let _ = set_setting(&conn, "last_digest", &now_secs().to_string());
+                    }
+                }
             }
         }
     });

@@ -23,6 +23,10 @@ export const commands = {
 	setSchedule: (value: string) => typedError<null, string>(__TAURI_INVOKE("set_schedule", { value })),
 	/**  The current scan schedule (defaults to "6h"). */
 	getSchedule: () => typedError<string, string>(__TAURI_INVOKE("get_schedule")),
+	/**  Toggle an alert ("regressions" or "digest"). */
+	setAlert: (key: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_alert", { key, enabled })),
+	/**  Whether an alert is on (defaults to on). */
+	getAlert: (key: string) => typedError<boolean, string>(__TAURI_INVOKE("get_alert", { key })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
 	/**  One file's source + issues for the Detail screen. */
