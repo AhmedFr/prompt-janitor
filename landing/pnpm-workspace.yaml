@@ -1,0 +1,4 @@
+# Makes landing/ its own pnpm workspace root, independent of the app at the
+# repo root. esbuild ships its native binary via a postinstall that Vite needs.
+allowBuilds:
+  esbuild: true

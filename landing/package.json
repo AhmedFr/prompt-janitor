@@ -1,0 +1,15 @@
+{
+  "name": "prompt-janitor-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Marketing landing page for Prompt Janitor (static site).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.20"
+  }
+}

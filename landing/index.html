@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Janitor — Keep your AI prompts in shape</title>
+    <meta
+      name="description"
+      content="A macOS menu-bar app that scans the CLAUDE.md, AGENTS.md and .cursorrules files across your projects, grades them A–F against best-practice standards, and rewrites the weak parts for you."
+    />
+    <meta name="theme-color" content="#0a84ff" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:title" content="Prompt Janitor" />
+    <meta
+      property="og:description"
+      content="Scan, grade, and fix the AI prompt files scattered across your projects."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+
+    <header class="nav" id="top">
+      <div class="wrap nav__inner">
+        <a class="brand" href="#top" aria-label="Prompt Janitor home">
+          <span class="brand__mark" aria-hidden="true">🧹</span>
+          <span class="brand__name">Prompt Janitor</span>
+        </a>
+        <nav class="nav__links" aria-label="Primary">
+          <a href="#features">Features</a>
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="nav__cta">
+          <a class="btn btn--ghost" href="https://github.com/AhmedFr/prompt-janitor"
+            >GitHub</a
+          >
+          <a class="btn btn--primary" href="#download">Download</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="wrap hero__grid">
+          <div class="hero__copy reveal">
+            <p class="eyebrow">macOS menu-bar app</p>
+            <h1>Keep your AI prompts in shape.</h1>
+            <p class="lede">
+              Prompt Janitor scans the <code>CLAUDE.md</code>, <code>AGENTS.md</code> and
+              <code>.cursorrules</code> files scattered across your projects, grades each one
+              <strong>A–F</strong> against Anthropic, OpenAI &amp; community standards — and rewrites
+              the weak parts for you.
+            </p>
+            <div class="hero__actions">
+              <a class="btn btn--primary btn--lg" href="#download">Download for macOS</a>
+              <a class="btn btn--ghost btn--lg" href="https://github.com/AhmedFr/prompt-janitor"
+                >View on GitHub</a
+              >
+            </div>
+            <p class="hero__note">Free to scan &amp; grade · Local &amp; private · Bring your own AI key</p>
+          </div>
+
+          <!-- A faithful CSS mockup of the app's Overview. Swap for a real -->
+          <!-- screenshot (landing/public/overview.png) when one is captured. -->
+          <div class="hero__art reveal" aria-hidden="true">
+            <div class="appwin">
+              <div class="appwin__bar">
+                <span class="dot dot--r"></span><span class="dot dot--y"></span
+                ><span class="dot dot--g"></span>
+                <span class="appwin__title">Prompt Janitor — Overview</span>
+              </div>
+              <div class="appwin__body">
+                <aside class="appwin__side">
+                  <div class="side-brand"><span>🧹</span> Prompt Janitor</div>
+                  <span class="side-item side-item--on">Overview</span>
+                  <span class="side-item">Prompts</span>
+                  <span class="side-item">Scans</span>
+                  <span class="side-item">Rules</span>
+                  <span class="side-item">Settings</span>
+                </aside>
+                <div class="appwin__content">
+                  <div class="ov-head">
+                    <div class="ring" style="--p: 78">
+                      <span class="ring__grade">B</span>
+                    </div>
+                    <div class="ov-meta">
+                      <div class="ov-score">78<span>/100</span></div>
+                      <div class="bar"><i style="width: 78%"></i></div>
+                      <div class="ov-counts">
+                        <span class="pill pill--hi">3 critical</span>
+                        <span class="pill pill--mid">7 warnings</span>
+                        <span class="pill pill--lo">5 nits</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="worklist">
+                    <div class="wl-row">
+                      <span class="sev sev--hi"></span>
+                      <span class="wl-title">Hard-coded model name</span>
+                      <span class="wl-src">Karpathy</span>
+                    </div>
+                    <div class="wl-row">
+                      <span class="sev sev--hi"></span>
+                      <span class="wl-title">Contradictory instructions</span>
+                      <span class="wl-src">Anthropic</span>
+                    </div>
+                    <div class="wl-row">
+                      <span class="sev sev--mid"></span>
+                      <span class="wl-title">No role / persona set</span>
+                      <span class="wl-src">Anthropic</span>
+                    </div>
+                    <div class="wl-row">
+                      <span class="sev sev--mid"></span>
+                      <span class="wl-title">Output format unspecified</span>
+                      <span class="wl-src">OpenAI</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="section" id="features">
+        <div class="wrap">
+          <p class="eyebrow eyebrow--center">What it does</p>
+          <h2 class="section__title">Visibility over every prompt file you own.</h2>
+          <div class="grid">
+            <article class="feature reveal">
+              <div class="feature__icon">🅰️</div>
+              <h3>Grades every file A–F</h3>
+              <p>
+                Deterministic scoring against best-practice standards — the same checks a careful
+                reviewer would run, on every file, every time.
+              </p>
+            </article>
+            <article class="feature reveal">
+              <div class="feature__icon">📚</div>
+              <h3>Cited, explained issues</h3>
+              <p>
+                Each flag links its source — Anthropic, OpenAI, Karpathy/community — with a
+                plain-English reason and the exact line.
+              </p>
+            </article>
+            <article class="feature reveal">
+              <div class="feature__icon">🔔</div>
+              <h3>A calm cadence</h3>
+              <p>
+                Scans on a schedule, a weekly digest, and an alert when a file's grade slips. No
+                constant pinging.
+              </p>
+            </article>
+            <article class="feature reveal">
+              <div class="feature__icon">✨</div>
+              <h3>AI auto-fix <span class="tag">Pro</span></h3>
+              <p>
+                Provider-generated rewrites for the bad parts. Apply with a backup, one-click undo,
+                and an optional git branch so changes stay reviewable.
+              </p>
+            </article>
+            <article class="feature reveal">
+              <div class="feature__icon">🧩</div>
+              <h3>Your own rules</h3>
+              <p>
+                Pattern rules are free and instant. Natural-language rules — “must define an output
+                format” — are judged by your AI provider.
+              </p>
+            </article>
+            <article class="feature reveal">
+              <div class="feature__icon">🔒</div>
+              <h3>Local &amp; private</h3>
+              <p>
+                Runs entirely on your machine. Bring your own API key, an offline license — nothing
+                phones home.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="section section--alt" id="how">
+        <div class="wrap">
+          <p class="eyebrow eyebrow--center">How it works</p>
+          <h2 class="section__title">Three steps to cleaner prompts.</h2>
+          <ol class="steps">
+            <li class="step reveal">
+              <span class="step__num">1</span>
+              <h3>Point it at a folder</h3>
+              <p>Pick the root of your projects. It respects <code>.gitignore</code> and skips the noise.</p>
+            </li>
+            <li class="step reveal">
+              <span class="step__num">2</span>
+              <h3>See grades &amp; issues</h3>
+              <p>An Overview of overall health, a sortable list, and a detail view with the offending lines.</p>
+            </li>
+            <li class="step reveal">
+              <span class="step__num">3</span>
+              <h3>Fix with one click</h3>
+              <p>Apply a rewrite — backed up and reversible — or just learn what to change and why.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Pricing -->
+      <section class="section" id="pricing">
+        <div class="wrap">
+          <p class="eyebrow eyebrow--center">Pricing</p>
+          <h2 class="section__title">Free to keep an eye on things. Pro to fix them.</h2>
+          <div class="prices">
+            <article class="price reveal">
+              <h3>Free</h3>
+              <p class="price__tag">$0</p>
+              <ul class="price__list">
+                <li>Scan &amp; grade every file</li>
+                <li>Cited issues &amp; explanations</li>
+                <li>Scheduler, digest &amp; alerts</li>
+                <li>Pattern-based custom rules</li>
+                <li>Fully offline</li>
+              </ul>
+              <a class="btn btn--ghost btn--block" href="#download">Download</a>
+            </article>
+            <article class="price price--pro reveal">
+              <div class="price__badge">Pro</div>
+              <h3>Pro</h3>
+              <p class="price__tag">One-time<span> license</span></p>
+              <ul class="price__list">
+                <li>Everything in Free</li>
+                <li>AI rewrites &amp; Auto-fix</li>
+                <li>Backup, undo &amp; optional git branch</li>
+                <li>Natural-language rules</li>
+                <li>Bring your own AI key</li>
+              </ul>
+              <a class="btn btn--primary btn--block" href="#download">Get Pro</a>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="section section--alt" id="faq">
+        <div class="wrap wrap--narrow">
+          <p class="eyebrow eyebrow--center">FAQ</p>
+          <h2 class="section__title">Good questions.</h2>
+          <div class="faq">
+            <details class="faq__item">
+              <summary>Which files does it scan?</summary>
+              <p>
+                The prompt &amp; instruction files agents read — <code>CLAUDE.md</code>,
+                <code>AGENTS.md</code>, <code>.cursorrules</code>,
+                <code>.github/copilot-instructions.md</code> and friends.
+              </p>
+            </details>
+            <details class="faq__item">
+              <summary>Is my data private?</summary>
+              <p>
+                Yes. Everything runs locally on your Mac. The only network call is to the AI provider
+                you choose for the paid features — made with your own key, nowhere else.
+              </p>
+            </details>
+            <details class="faq__item">
+              <summary>Do I need an API key?</summary>
+              <p>
+                Only for the Pro AI features. Scanning, grading, cited issues, the scheduler and
+                pattern rules are free and fully offline.
+              </p>
+            </details>
+            <details class="faq__item">
+              <summary>Will it change my files?</summary>
+              <p>
+                Only when you click <em>Apply</em> — and it snapshots a backup first (undo anytime),
+                with an optional commit on a dedicated <code>prompt-janitor/fix-*</code> git branch.
+              </p>
+            </details>
+            <details class="faq__item">
+              <summary>How does the license work?</summary>
+              <p>
+                A one-time, offline license key. It's verified on your machine with public-key
+                cryptography — no account, no server, no phone-home.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Download / CTA -->
+      <section class="cta" id="download">
+        <div class="wrap cta__inner reveal">
+          <h2>Tidy up your prompts today.</h2>
+          <p>macOS 12+. Free to scan &amp; grade — upgrade to Pro whenever you're ready.</p>
+          <div class="hero__actions hero__actions--center">
+            <a class="btn btn--primary btn--lg" href="https://github.com/AhmedFr/prompt-janitor/releases"
+              >Download for macOS</a
+            >
+            <a class="btn btn--ghost btn--lg" href="https://github.com/AhmedFr/prompt-janitor"
+              >View on GitHub</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer__inner">
+        <div class="brand">
+          <span class="brand__mark" aria-hidden="true">🧹</span>
+          <span class="brand__name">Prompt Janitor</span>
+        </div>
+        <p class="footer__small">Made for people who care about their prompts.</p>
+        <p class="footer__small">© <span id="year">2026</span> Prompt Janitor</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
