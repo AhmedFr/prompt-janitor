@@ -6,6 +6,7 @@ import { commands, isTauri, type RuleInfo } from "@/lib/ipc";
 export function useRules() {
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiReady, setAiReady] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!isTauri) {
@@ -21,6 +22,14 @@ export function useRules() {
     void refetch();
   }, [refetch]);
 
+  // Natural-language rules need a provider + key; gate their composer on it.
+  useEffect(() => {
+    if (!isTauri) return;
+    void commands.getAiConfig().then((r) => {
+      if (r.status === "ok") setAiReady(r.data.provider !== "none" && r.data.has_key);
+    });
+  }, []);
+
   const toggle = useCallback(async (id: string, enabled: boolean) => {
     setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
     await commands.setRule(id, enabled);
@@ -29,6 +38,14 @@ export function useRules() {
   const addRule = useCallback(
     async (title: string, pattern: string, severity: string) => {
       await commands.addCustomRule(title, pattern, severity);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const addNlRule = useCallback(
+    async (title: string, instruction: string, severity: string) => {
+      await commands.addNlRule(title, instruction, severity);
       await refetch();
     },
     [refetch],
@@ -50,5 +67,5 @@ export function useRules() {
     return res.status === "ok" ? res.data : 0;
   }, [refetch]);
 
-  return { rules, loading, toggle, addRule, deleteRule, importPack };
+  return { rules, loading, aiReady, toggle, addRule, addNlRule, deleteRule, importPack };
 }

@@ -24,9 +24,12 @@ const SEVERITIES: [Sev, string][] = [
   ["lo", "Nit"],
 ];
 
+type Mode = "pattern" | "nl";
+
 export function Rules() {
-  const { rules, loading, toggle, addRule, deleteRule, importPack } = useRules();
+  const { rules, loading, aiReady, toggle, addRule, addNlRule, deleteRule, importPack } = useRules();
   const [pack, setPack] = useState<Pack>("all");
+  const [mode, setMode] = useState<Mode>("pattern");
   const [title, setTitle] = useState("");
   const [pattern, setPattern] = useState("");
   const [sev, setSev] = useState<Sev>("mid");
@@ -45,7 +48,8 @@ export function Rules() {
 
   const submit = async () => {
     if (!title.trim() || !pattern.trim()) return;
-    await addRule(title.trim(), pattern.trim(), sev);
+    if (mode === "nl") await addNlRule(title.trim(), pattern.trim(), sev);
+    else await addRule(title.trim(), pattern.trim(), sev);
     setTitle("");
     setPattern("");
   };
@@ -78,7 +82,25 @@ export function Rules() {
             <>
               {/* composer */}
               <Card padded style={{ borderStyle: "dashed", borderColor: "var(--sep-strong)", marginBottom: 18 }}>
-                <div style={{ fontWeight: 600, marginBottom: 10 }}>Add a custom rule</div>
+                <div className="row between wrap" style={{ gap: 10, marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600 }}>Add a custom rule</div>
+                  <div className="seg">
+                    <button
+                      className={mode === "pattern" ? "on" : ""}
+                      onClick={() => setMode("pattern")}
+                    >
+                      Pattern
+                    </button>
+                    <button
+                      className={mode === "nl" ? "on" : ""}
+                      disabled={!aiReady}
+                      title={aiReady ? undefined : "Connect an AI provider in Settings → AI"}
+                      onClick={() => setMode("nl")}
+                    >
+                      <Icon name="sparkles" size={13} /> Natural language
+                    </button>
+                  </div>
+                </div>
                 <div className="col" style={{ gap: 8 }}>
                   <input
                     className="input"
@@ -88,10 +110,19 @@ export function Rules() {
                   />
                   <input
                     className="input"
-                    placeholder="Forbidden text — flagged if it appears (e.g. slack)"
+                    placeholder={
+                      mode === "nl"
+                        ? "Describe the rule (e.g. Must define an explicit output format)"
+                        : "Forbidden text — flagged if it appears (e.g. slack)"
+                    }
                     value={pattern}
                     onChange={(e) => setPattern(e.target.value)}
                   />
+                </div>
+                <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>
+                  {mode === "nl"
+                    ? "Evaluated by your AI provider when you check a file on its detail page."
+                    : "Free & deterministic — flags any file that contains the text."}
                 </div>
                 <div className="row between wrap" style={{ marginTop: 12, gap: 10 }}>
                   <div className="seg">
@@ -146,6 +177,14 @@ export function Rules() {
                             {r.description}
                           </div>
                         </div>
+                        {r.nl && (
+                          <span
+                            className="chip on"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                          >
+                            <Icon name="sparkles" size={12} /> AI
+                          </span>
+                        )}
                         <SourceBadge source={r.source} />
                         {r.custom && (
                           <button

@@ -204,6 +204,60 @@ pub fn add_custom_rule(
         .map_err(|e| e.to_string())
 }
 
+/// Add a natural-language custom rule (paid; evaluated by the AI provider).
+#[tauri::command]
+#[specta::specta]
+pub fn add_nl_rule(
+    db: tauri::State<'_, AppDb>,
+    title: String,
+    instruction: String,
+    severity: String,
+) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::add_nl_rule(&conn, &title, &instruction, &severity)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Evaluate every enabled natural-language rule against a file via the
+/// configured provider. Errors gracefully when no provider is set.
+#[tauri::command]
+#[specta::specta]
+pub async fn evaluate_nl_rules(
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+) -> Result<Vec<crate::ai_rules::NlVerdict>, String> {
+    let (creds, content, rules) = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let detail = query::get_file_detail(&conn, &file_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "File not found".to_string())?;
+        let rules = query::enabled_nl_rules(&conn).map_err(|e| e.to_string())?;
+        (crate::ai::load_credentials(&conn), detail.content, rules)
+    };
+
+    if creds.provider == "none" || creds.key.is_empty() {
+        return Err(
+            "Connect an AI provider in Settings → AI to evaluate natural-language rules."
+                .to_string(),
+        );
+    }
+
+    let mut verdicts = Vec::new();
+    for (rule_id, title, instruction, severity) in rules {
+        let (violates, explanation) =
+            crate::ai_rules::evaluate(&creds, &instruction, &content).await?;
+        verdicts.push(crate::ai_rules::NlVerdict {
+            rule_id,
+            title,
+            severity,
+            violates,
+            explanation,
+        });
+    }
+    Ok(verdicts)
+}
+
 /// Delete a custom rule.
 #[tauri::command]
 #[specta::specta]

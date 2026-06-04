@@ -40,6 +40,13 @@ export const commands = {
 	setRule: (id: string, enabled: boolean) => typedError<null, string>(__TAURI_INVOKE("set_rule", { id, enabled })),
 	/**  Add a custom pattern rule (forbidden substring) with a severity. */
 	addCustomRule: (title: string, pattern: string, severity: string) => typedError<null, string>(__TAURI_INVOKE("add_custom_rule", { title, pattern, severity })),
+	/**  Add a natural-language custom rule (paid; evaluated by the AI provider). */
+	addNlRule: (title: string, instruction: string, severity: string) => typedError<null, string>(__TAURI_INVOKE("add_nl_rule", { title, instruction, severity })),
+	/**
+	 *  Evaluate every enabled natural-language rule against a file via the
+	 *  configured provider. Errors gracefully when no provider is set.
+	 */
+	evaluateNlRules: (fileId: string) => typedError<NlVerdict[], string>(__TAURI_INVOKE("evaluate_nl_rules", { fileId })),
 	/**  Delete a custom rule. */
 	deleteCustomRule: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_custom_rule", { id })),
 	/**
@@ -184,6 +191,15 @@ export type IssueDetail = {
 	fix_to: string | null,
 };
 
+/**  The provider's verdict on one NL rule for one file. */
+export type NlVerdict = {
+	rule_id: string,
+	title: string,
+	severity: string,
+	violates: boolean,
+	explanation: string,
+};
+
 export type Overview = {
 	has_data: boolean,
 	scan_folder: string | null,
@@ -212,7 +228,9 @@ export type RuleInfo = {
 	enabled: boolean,
 	/**  True for user-created custom rules (deletable). */
 	custom: boolean,
-	/**  The forbidden substring, for custom pattern rules. */
+	/**  True for natural-language rules evaluated by the AI provider. */
+	nl: boolean,
+	/**  The forbidden substring (pattern rules) or the instruction (NL rules). */
 	pattern: string | null,
 };
 

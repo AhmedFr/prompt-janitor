@@ -475,7 +475,9 @@ pub struct RuleInfo {
     pub enabled: bool,
     /// True for user-created custom rules (deletable).
     pub custom: bool,
-    /// The forbidden substring, for custom pattern rules.
+    /// True for natural-language rules evaluated by the AI provider.
+    pub nl: bool,
+    /// The forbidden substring (pattern rules) or the instruction (NL rules).
     pub pattern: Option<String>,
 }
 
@@ -520,22 +522,33 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             severity: rule.severity(),
             enabled: enabled.get(rule.id()).copied().unwrap_or(true),
             custom: false,
+            nl: false,
             pattern: None,
         })
         .collect();
 
-    let mut stmt = conn
-        .prepare("SELECT id, title, expr, severity, enabled FROM custom_rules WHERE kind = 'pattern' ORDER BY id")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, title, expr, severity, enabled, kind FROM custom_rules
+         WHERE kind IN ('pattern', 'nl') ORDER BY id",
+    )?;
     let custom = stmt.query_map([], |r| {
+        let expr: String = r.get(2)?;
+        let kind: String = r.get(5)?;
+        let nl = kind == "nl";
         Ok(RuleInfo {
             id: r.get(0)?,
             title: r.get(1)?,
-            description: format!("Flags prompts containing “{}”.", r.get::<_, String>(2)?),
+            description: if nl {
+                format!("AI rule — {expr}")
+            } else {
+                format!("Flags prompts containing “{expr}”.")
+            },
             source: Source::Custom,
             severity: severity_from_db(&r.get::<_, String>(3)?),
             enabled: r.get::<_, i64>(4)? != 0,
             custom: true,
-            pattern: Some(r.get(2)?),
+            nl,
+            pattern: Some(expr),
         })
     })?;
     for rule in custom {
@@ -575,6 +588,49 @@ pub fn add_custom_rule(
         params![id, pattern, severity, title],
     )?;
     Ok(id)
+}
+
+/// Add a natural-language rule (an instruction the AI provider evaluates).
+/// Returns its id. Evaluation is gated on a configured provider; the rule can
+/// still be stored without one.
+pub fn add_nl_rule(
+    conn: &Connection,
+    title: &str,
+    instruction: &str,
+    severity: &str,
+) -> rusqlite::Result<String> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let id = format!("custom-nl-{nanos}");
+    conn.execute(
+        "INSERT INTO custom_rules(id, kind, expr, severity, title, enabled)
+         VALUES(?1, 'nl', ?2, ?3, ?4, 1)",
+        params![id, instruction, severity, title],
+    )?;
+    Ok(id)
+}
+
+/// A natural-language rule ready to evaluate: (id, title, instruction, severity).
+pub fn enabled_nl_rules(
+    conn: &Connection,
+) -> rusqlite::Result<Vec<(String, String, String, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title, expr, severity FROM custom_rules
+         WHERE kind = 'nl' AND enabled = 1 ORDER BY id",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 /// Delete a custom rule.
