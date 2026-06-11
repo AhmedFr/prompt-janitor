@@ -15,6 +15,7 @@ target/
 .env
 .env.*
 !.env.example
+*.secret
 
 # macOS
 .DS_Store

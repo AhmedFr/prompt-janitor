@@ -20,6 +20,23 @@ It scans your folders on a schedule, grades each prompt file **A–F** against b
 
 Scanning & grading are **free forever**. A one-time purchase unlocks **AI auto-fix & rewrites**.
 
+### Minting license keys (vendor only)
+
+Licenses are Ed25519-signed payloads verified offline against the public key embedded in
+`src-tauri/src/license.rs`. The vendor keypair and customer keys are produced with the
+`license-tool` binary:
+
+```sh
+cd src-tauri
+cargo run --bin license-tool -- keygen                 # once: writes pj-vendor-key.secret,
+                                                       # prints the PUBKEY array for license.rs
+cargo run --bin license-tool -- mint --key pj-vendor-key.secret --email buyer@example.com
+cargo run --bin license-tool -- verify "PJ1.…"         # sanity-check against the embedded key
+```
+
+Store the private key in a password manager and delete the file — `*.secret` is gitignored,
+and the key can never be recovered or rotated transparently for existing customers.
+
 ## Development
 
 This project ships via GitHub milestones (one per phase), one issue per deliverable,

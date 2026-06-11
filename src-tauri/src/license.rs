@@ -8,7 +8,7 @@
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 /// The public half of the vendor signing key. Real keys are minted offline with
 /// the matching private key, which never ships.
@@ -62,26 +62,36 @@ pub fn verify(license: &str) -> Option<LicenseInfo> {
     verify_with(license, &key)
 }
 
+/// The embedded vendor public key, exposed so the vendor tool can check that a
+/// signing key matches what shipping builds will verify against.
+pub fn embedded_key() -> Option<VerifyingKey> {
+    VerifyingKey::from_bytes(&PUBKEY).ok()
+}
+
+/// Mint a license signed by `signing` — the vendor-side operation. This only
+/// produces keys the app accepts when `signing` matches the embedded [`PUBKEY`];
+/// it ships in the binary harmlessly because minting requires the private key.
+pub fn mint_with(email: &str, plan: &str, signing: &SigningKey) -> String {
+    let payload = serde_json::to_vec(&Payload {
+        email: email.to_string(),
+        plan: plan.to_string(),
+    })
+    .expect("payload serializes");
+    let sig = signing.sign(&payload);
+    format!(
+        "{PREFIX}{}.{}",
+        URL_SAFE_NO_PAD.encode(&payload),
+        URL_SAFE_NO_PAD.encode(sig.to_bytes())
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use base64::Engine;
-    use ed25519_dalek::{Signer, SigningKey};
 
-    /// Mint a license signed by `signing` — the vendor-side operation, exercised
-    /// here so the verify path has something valid to check.
     fn mint(email: &str, plan: &str, signing: &SigningKey) -> String {
-        let payload = serde_json::to_vec(&Payload {
-            email: email.to_string(),
-            plan: plan.to_string(),
-        })
-        .unwrap();
-        let sig = signing.sign(&payload);
-        format!(
-            "{PREFIX}{}.{}",
-            URL_SAFE_NO_PAD.encode(&payload),
-            URL_SAFE_NO_PAD.encode(sig.to_bytes())
-        )
+        mint_with(email, plan, signing)
     }
 
     fn keypair() -> (SigningKey, VerifyingKey) {
