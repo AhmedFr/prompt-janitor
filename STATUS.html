@@ -202,7 +202,7 @@
             <strong>Mint the production license keypair</strong>
             <span class="tag tag--external">external action</span>
           </div>
-          <p>After merging #67: cd src-tauri &amp;&amp; cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The currently embedded key has no known private half — Pro keys cannot be minted until you do this. Only you should ever hold this key.</p>
+          <p>After merging PR #69: cd src-tauri &amp;&amp; cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The current embedded key&#39;s private seed was discarded after minting your own dev pro key, so no customer keys can be minted today — and re-keygening invalidates that dev key (mint yourself a fresh one). Only you should ever hold this key.</p>
         </div>
       </li>
       <li class="action">
