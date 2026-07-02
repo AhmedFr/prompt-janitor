@@ -46,6 +46,7 @@ pub fn run() {
             let db_path = dir.join("prompt-janitor.db");
             let conn = store::open_and_migrate(&db_path).expect("initialize database");
             query::seed_rules(&conn).ok();
+            query::seed_builtin_nl_rules(&conn).ok();
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),

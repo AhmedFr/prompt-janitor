@@ -500,6 +500,24 @@ pub fn seed_rules(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Seed the built-in NL standards catalog. Idempotent — preserves toggles.
+pub fn seed_builtin_nl_rules(conn: &Connection) -> rusqlite::Result<()> {
+    for rule in crate::rules::builtin_nl_rules() {
+        conn.execute(
+            "INSERT OR IGNORE INTO rules(id, source, severity, title, description, enabled, kind)
+             VALUES(?1, ?2, ?3, ?4, ?5, 1, 'nl')",
+            params![
+                rule.id,
+                rule.source.as_str(),
+                rule.severity.as_str(),
+                rule.title,
+                rule.instruction,
+            ],
+        )?;
+    }
+    Ok(())
+}
+
 /// The built-in rules with their enabled state (defaults to on if unseeded).
 pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
     let mut enabled = std::collections::HashMap::new();
@@ -925,5 +943,35 @@ mod tests {
 
         delete_custom_rule(&conn, &id).unwrap();
         assert!(!list_rules(&conn).unwrap().iter().any(|r| r.custom));
+    }
+
+    #[test]
+    fn nl_seed_is_idempotent_and_preserves_toggles() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rules WHERE kind = 'nl'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 25);
+
+        set_rule(&conn, "anthropic-clarity", false).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap(); // re-seed must not resurrect or duplicate
+        let count_again: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rules WHERE kind = 'nl'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(count_again, 25);
+        let enabled: i64 = conn
+            .query_row(
+                "SELECT enabled FROM rules WHERE id = 'anthropic-clarity'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(enabled, 0);
     }
 }
