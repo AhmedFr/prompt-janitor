@@ -18,7 +18,17 @@ It scans your folders on a schedule, grades each prompt file **A–F** against b
 
 ## Pricing model
 
-Scanning & grading are **free forever**. A one-time purchase unlocks **AI auto-fix & rewrites**.
+**Diagnosis free. Treatment paid.**
+
+- **Free forever:** scanning, scheduling, and grading — including the built-in
+  natural-language standards catalog, evaluated on your own compute (local Ollama
+  or BYO API key). Unlimited scans, every finding shown.
+- **Pro (one-time purchase):** AI auto-fix & rewrites, custom natural-language
+  rules, starter template packs, the Prompt-File Field Guide, and 12 months of
+  feature updates (optional renewal afterwards — never required to keep using
+  the app).
+
+Full offer design: [`docs/superpowers/specs/2026-07-02-lifetime-offer-design.md`](docs/superpowers/specs/2026-07-02-lifetime-offer-design.md).
 
 ## Development
 
