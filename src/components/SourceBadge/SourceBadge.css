@@ -20,6 +20,10 @@
   background: #e6f2ec;
   color: #1f7a4d;
 }
+.src--cursor {
+  background: #f2e9f9;
+  color: #6f42c1;
+}
 .src--person {
   background: #eaeef7;
   color: #3a5a9a;

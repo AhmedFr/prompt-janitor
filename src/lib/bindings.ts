@@ -289,7 +289,7 @@ export type Severity =
 "lo";
 
 /**  Where a rule's authority comes from (drives the source badge). */
-export type Source = "anthropic" | "openai" | "karpathy" | "custom";
+export type Source = "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
 
 export type WorklistItem = {
 	file_id: string,

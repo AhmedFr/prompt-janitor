@@ -49,6 +49,7 @@ fn severity_from_db(s: &str) -> Severity {
 fn source_from_db(s: &str) -> Source {
     match s {
         "openai" => Source::Openai,
+        "cursor" => Source::Cursor,
         "karpathy" => Source::Karpathy,
         "custom" => Source::Custom,
         _ => Source::Anthropic,
@@ -726,6 +727,11 @@ pub fn active_rules(conn: &Connection) -> Vec<Box<dyn Rule>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_from_db_parses_cursor() {
+        assert_eq!(source_from_db("cursor"), Source::Cursor);
+    }
 
     #[test]
     fn empty_db_has_no_data() {

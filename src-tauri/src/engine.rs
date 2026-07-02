@@ -23,6 +23,7 @@ pub enum Severity {
 pub enum Source {
     Anthropic,
     Openai,
+    Cursor,
     Karpathy,
     Custom,
 }
@@ -54,6 +55,7 @@ impl Source {
         match self {
             Source::Anthropic => "anthropic",
             Source::Openai => "openai",
+            Source::Cursor => "cursor",
             Source::Karpathy => "karpathy",
             Source::Custom => "custom",
         }
@@ -260,6 +262,11 @@ mod tests {
                 fix: None,
             }]
         }
+    }
+
+    #[test]
+    fn cursor_source_roundtrips() {
+        assert_eq!(Source::Cursor.as_str(), "cursor");
     }
 
     #[test]
