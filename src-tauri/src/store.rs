@@ -90,6 +90,11 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_files_project ON files(project_id);
     CREATE INDEX idx_issues_file ON issues(file_id);
     ",
+    // 2: rules.kind (deterministic|nl) + issues.rule_id (tags NL-sourced issues).
+    "
+    ALTER TABLE rules ADD COLUMN kind TEXT NOT NULL DEFAULT 'deterministic';
+    ALTER TABLE issues ADD COLUMN rule_id TEXT;
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -142,5 +147,43 @@ mod tests {
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(version_again, MIGRATIONS.len() as i64);
+    }
+
+    #[test]
+    fn migration_2_adds_kind_and_rule_id() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // rules.kind exists and defaults to 'deterministic'
+        conn.execute(
+            "INSERT INTO rules(id, source, severity, title) VALUES('x', 'anthropic', 'hi', 'X')",
+            [],
+        )
+        .unwrap();
+        let kind: String = conn
+            .query_row("SELECT kind FROM rules WHERE id = 'x'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(kind, "deterministic");
+        // issues.rule_id exists and is nullable (issues.file_id has a FK to
+        // files(id), which is enforced by default in this build, so a
+        // parent project + file row is required first)
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('f', 'p', '/p/f.md', 'md')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why) VALUES('f', 'hi', 'custom', 'T', 'W')",
+            [],
+        )
+        .unwrap();
+        let rule_id: Option<String> = conn
+            .query_row("SELECT rule_id FROM issues LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rule_id, None);
     }
 }
