@@ -232,7 +232,8 @@ pub async fn evaluate_nl_rules(
         let detail = query::get_file_detail(&conn, &file_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "File not found".to_string())?;
-        let rules = query::enabled_nl_rules(&conn).map_err(|e| e.to_string())?;
+        let rules = query::enabled_nl_rules(&conn, entitlement_of(&conn).paid)
+            .map_err(|e| e.to_string())?;
         (
             entitlement_of(&conn).paid,
             crate::ai::load_credentials(&conn),
@@ -252,13 +253,13 @@ pub async fn evaluate_nl_rules(
     }
 
     let mut verdicts = Vec::new();
-    for (rule_id, title, instruction, severity) in rules {
+    for rule in rules {
         let (violates, explanation) =
-            crate::ai_rules::evaluate(&creds, &instruction, &content).await?;
+            crate::ai_rules::evaluate(&creds, &rule.instruction, &content).await?;
         verdicts.push(crate::ai_rules::NlVerdict {
-            rule_id,
-            title,
-            severity,
+            rule_id: rule.id,
+            title: rule.title,
+            severity: rule.severity,
             violates,
             explanation,
         });

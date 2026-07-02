@@ -546,6 +546,20 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
         })
         .collect();
 
+    for rule in crate::rules::builtin_nl_rules() {
+        out.push(RuleInfo {
+            id: rule.id.to_string(),
+            title: rule.title.to_string(),
+            description: rule.instruction.to_string(),
+            source: rule.source,
+            severity: rule.severity,
+            enabled: enabled.get(rule.id).copied().unwrap_or(true),
+            custom: false,
+            nl: true,
+            pattern: Some(rule.instruction.to_string()),
+        });
+    }
+
     let mut stmt = conn.prepare(
         "SELECT id, title, expr, severity, enabled, kind FROM custom_rules
          WHERE kind IN ('pattern', 'nl') ORDER BY id",
@@ -631,25 +645,66 @@ pub fn add_nl_rule(
     Ok(id)
 }
 
-/// A natural-language rule ready to evaluate: (id, title, instruction, severity).
+/// A natural-language rule ready to evaluate.
+pub struct NlRuleRow {
+    pub id: String,
+    pub title: String,
+    pub instruction: String,
+    pub severity: String,
+    // Not read yet outside tests — Task 8's richer `evaluate_nl_rules` return
+    // type surfaces this to the frontend.
+    #[allow(dead_code)]
+    pub source: String,
+}
+
+/// Enabled NL rules: the built-in catalog (free — provider-gated only), plus
+/// the user's custom NL rules when `include_custom` (licensed).
 pub fn enabled_nl_rules(
     conn: &Connection,
-) -> rusqlite::Result<Vec<(String, String, String, String)>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, expr, severity FROM custom_rules
-         WHERE kind = 'nl' AND enabled = 1 ORDER BY id",
-    )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-            ))
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(rows)
+    include_custom: bool,
+) -> rusqlite::Result<Vec<NlRuleRow>> {
+    let mut enabled = std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare("SELECT id, enabled FROM rules WHERE kind = 'nl'")?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? != 0))
+        })?;
+        for row in rows {
+            let (id, on) = row?;
+            enabled.insert(id, on);
+        }
+    }
+    let mut out: Vec<NlRuleRow> = crate::rules::builtin_nl_rules()
+        .into_iter()
+        .filter(|r| enabled.get(r.id).copied().unwrap_or(true))
+        .map(|r| NlRuleRow {
+            id: r.id.to_string(),
+            title: r.title.to_string(),
+            instruction: r.instruction.to_string(),
+            severity: r.severity.as_str().to_string(),
+            source: r.source.as_str().to_string(),
+        })
+        .collect();
+
+    if include_custom {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, expr, severity FROM custom_rules
+             WHERE kind = 'nl' AND enabled = 1 ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(NlRuleRow {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                instruction: r.get(2)?,
+                severity: r.get(3)?,
+                source: "custom".to_string(),
+            })
+        })?;
+        for row in rows {
+            out.push(row?);
+        }
+    }
+    Ok(out)
 }
 
 /// Delete a custom rule.
@@ -973,5 +1028,45 @@ mod tests {
             )
             .unwrap();
         assert_eq!(enabled, 0);
+    }
+
+    #[test]
+    fn enabled_nl_rules_unions_catalog_and_custom_by_entitlement() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        add_nl_rule(&conn, "No Slack", "VIOLATES if it mentions Slack.", "mid").unwrap();
+        set_rule(&conn, "anthropic-clarity", false).unwrap();
+
+        let free = enabled_nl_rules(&conn, false).unwrap();
+        assert_eq!(free.len(), 24, "24 enabled built-ins, no custom");
+        assert!(free.iter().all(|r| !r.id.starts_with("custom-nl-")));
+        assert!(!free.iter().any(|r| r.id == "anthropic-clarity"));
+        assert!(free.iter().any(|r| r.source == "cursor"));
+
+        let paid = enabled_nl_rules(&conn, true).unwrap();
+        assert_eq!(paid.len(), 25, "24 built-ins + 1 custom");
+        assert!(paid
+            .iter()
+            .any(|r| r.id.starts_with("custom-nl-") && r.source == "custom"));
+    }
+
+    #[test]
+    fn list_rules_includes_the_nl_catalog() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        let rules = list_rules(&conn).unwrap();
+        let clarity = rules
+            .iter()
+            .find(|r| r.id == "anthropic-clarity")
+            .expect("catalog rule listed");
+        assert!(clarity.nl);
+        assert!(!clarity.custom);
+        assert!(clarity
+            .pattern
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("The file VIOLATES"));
     }
 }
