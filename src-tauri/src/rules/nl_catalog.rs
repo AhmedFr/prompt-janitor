@@ -102,4 +102,21 @@ mod tests {
         assert_eq!(count(Source::Cursor), 6);
         assert_eq!(count(Source::Karpathy), 4);
     }
+
+    #[test]
+    fn every_catalog_id_appears_in_the_notes_doc() {
+        let doc = include_str!("../../../docs/standards/prompting-standards.md");
+        for rule in builtin_nl_rules() {
+            assert!(
+                doc.contains(&format!("`{}`", rule.id)),
+                "{} missing from docs/standards/prompting-standards.md",
+                rule.id
+            );
+            assert!(
+                doc.contains(rule.instruction),
+                "{}'s instruction drifted from the notes doc",
+                rule.id
+            );
+        }
+    }
 }
