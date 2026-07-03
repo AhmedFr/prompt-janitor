@@ -39,7 +39,7 @@ file — not a one-off LLM prompt.
 |---|---|
 | Storage | First-class built-in catalog (non-deletable, source-attributed) — not `custom_rules` rows. |
 | Scoring | NL violations **fold into the score**. |
-| Default state | **Enabled by default** (only fire on the explicit, paid NL action). |
+| Default state | **Enabled by default** — fires on the explicit NL action whenever a provider is configured (**free**; license not required — amended by the 2026-07-02 offer spec §5). |
 | `Source::Cursor` | **Add** the new enum variant. |
 | Catalog size | ~24–26 standards, deduped against the 5 deterministic rules. |
 
@@ -92,11 +92,11 @@ move AI calls into the free path. Instead:
 
 1. **`run_scan` (deterministic, free)** computes the **baseline** score and **clears any
    prior NL-sourced issues** for the file (stale once content changes).
-2. **`evaluate_nl_rules` (paid)** persists each violation as an `Issue` tagged NL-sourced
+2. **`evaluate_nl_rules` (provider-gated; custom rules require a license)** persists each violation as an `Issue` tagged NL-sourced
    (by rule id), recomputes the file's score + grade via the unchanged `score_for_issues`,
    and returns the new score alongside the verdicts.
 
-User flow: edit → rescan (baseline, free) → run AI standards (enriches score, paid). Same
+User flow: edit → rescan (baseline, free) → run AI standards (enriches score; free with your own provider). Same
 formula and grade bands — **no recalibration**.
 
 NL-sourced issues are distinguished in the `issues` table by their rule id prefix (or an
