@@ -12,6 +12,7 @@ pub struct NlVerdict {
     pub rule_id: String,
     pub title: String,
     pub severity: String,
+    pub source: String,
     pub violates: bool,
     pub explanation: String,
 }

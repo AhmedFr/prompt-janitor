@@ -651,9 +651,6 @@ pub struct NlRuleRow {
     pub title: String,
     pub instruction: String,
     pub severity: String,
-    // Not read yet outside tests — Task 8's richer `evaluate_nl_rules` return
-    // type surfaces this to the frontend.
-    #[allow(dead_code)]
     pub source: String,
 }
 
@@ -705,6 +702,53 @@ pub fn enabled_nl_rules(
         }
     }
     Ok(out)
+}
+
+/// Persist NL verdicts for a file: replace prior NL-sourced issues (tagged by
+/// non-NULL rule_id), insert current violations, and rescore the file with the
+/// unchanged formula. Returns `(score, grade_letter)`.
+// Not called from production code yet — Task 8 wires this into
+// `evaluate_nl_rules` so it persists+rescores after each provider round-trip.
+#[allow(dead_code)]
+pub fn apply_nl_verdicts(
+    conn: &Connection,
+    file_id: &str,
+    verdicts: &[crate::ai_rules::NlVerdict],
+) -> rusqlite::Result<(u32, String)> {
+    conn.execute(
+        "DELETE FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
+        [file_id],
+    )?;
+    for v in verdicts.iter().filter(|v| v.violates) {
+        conn.execute(
+            "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to)
+             VALUES(?1, ?2, NULL, ?3, ?4, ?5, ?6, NULL, NULL)",
+            params![file_id, v.rule_id, v.severity, v.source, v.title, v.explanation],
+        )?;
+    }
+
+    let (mut hi, mut mid, mut lo) = (0u32, 0u32, 0u32);
+    {
+        let mut stmt = conn.prepare("SELECT severity FROM issues WHERE file_id = ?1")?;
+        let rows = stmt.query_map([file_id], |r| r.get::<_, String>(0))?;
+        for row in rows {
+            match row?.as_str() {
+                "hi" => hi += 1,
+                "mid" => mid += 1,
+                _ => lo += 1,
+            }
+        }
+    }
+    let score = crate::engine::score_for_counts(hi, mid, lo);
+    let grade = crate::engine::grade_for_score(score);
+    conn.execute(
+        "UPDATE files
+         SET score = ?1, grade = ?2,
+             issue_count = (SELECT COUNT(*) FROM issues WHERE file_id = ?3)
+         WHERE id = ?3",
+        params![score as i64, grade.letter(), file_id],
+    )?;
+    Ok((score, grade.letter().to_string()))
 }
 
 /// Delete a custom rule.
@@ -1049,6 +1093,79 @@ mod tests {
         assert!(paid
             .iter()
             .any(|r| r.id.starts_with("custom-nl-") && r.source == "custom"));
+    }
+
+    #[test]
+    fn nl_verdicts_persist_as_issues_and_rescore() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f', 'p', 'f', 'CLAUDE.md', 'A', 100, 1, NULL)",
+            [],
+        )
+        .unwrap();
+        // one pre-existing deterministic issue (hi): baseline 100-15 = 85
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why) VALUES('f', 'hi', 'anthropic', 'Det', 'w')",
+            [],
+        )
+        .unwrap();
+
+        let verdicts = vec![
+            crate::ai_rules::NlVerdict {
+                rule_id: "anthropic-clarity".into(),
+                title: "Vague directives".into(),
+                severity: "mid".into(),
+                source: "anthropic".into(),
+                violates: true,
+                explanation: "Too vague.".into(),
+            },
+            crate::ai_rules::NlVerdict {
+                rule_id: "cursor-scoped".into(),
+                title: "Bloated, unscoped content".into(),
+                severity: "mid".into(),
+                source: "cursor".into(),
+                violates: false,
+                explanation: "Fine.".into(),
+            },
+        ];
+
+        // hi=1, mid=1 → 100 - 15 - 7 = 78 → C
+        let (score, grade) = apply_nl_verdicts(&conn, "f", &verdicts).unwrap();
+        assert_eq!((score, grade.as_str()), (78, "C"));
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM issues WHERE file_id='f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            n, 2,
+            "1 deterministic + 1 violating NL (pass verdicts add nothing)"
+        );
+
+        // Re-running must replace, not duplicate.
+        let (score2, _) = apply_nl_verdicts(&conn, "f", &verdicts).unwrap();
+        assert_eq!(score2, 78);
+        let n2: i64 = conn
+            .query_row("SELECT COUNT(*) FROM issues WHERE file_id='f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(n2, 2);
+        let (fscore, fcount): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id='f'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((fscore, fcount), (78, 2));
     }
 
     #[test]

@@ -260,6 +260,7 @@ pub async fn evaluate_nl_rules(
             rule_id: rule.id,
             title: rule.title,
             severity: rule.severity,
+            source: rule.source,
             violates,
             explanation,
         });
