@@ -712,12 +712,13 @@ pub fn apply_nl_verdicts(
     file_id: &str,
     verdicts: &[crate::ai_rules::NlVerdict],
 ) -> rusqlite::Result<(u32, String)> {
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "DELETE FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
         [file_id],
     )?;
     for v in verdicts.iter().filter(|v| v.violates) {
-        conn.execute(
+        tx.execute(
             "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to)
              VALUES(?1, ?2, NULL, ?3, ?4, ?5, ?6, NULL, NULL)",
             params![file_id, v.rule_id, v.severity, v.source, v.title, v.explanation],
@@ -726,7 +727,7 @@ pub fn apply_nl_verdicts(
 
     let (mut hi, mut mid, mut lo) = (0u32, 0u32, 0u32);
     {
-        let mut stmt = conn.prepare("SELECT severity FROM issues WHERE file_id = ?1")?;
+        let mut stmt = tx.prepare("SELECT severity FROM issues WHERE file_id = ?1")?;
         let rows = stmt.query_map([file_id], |r| r.get::<_, String>(0))?;
         for row in rows {
             match row?.as_str() {
@@ -738,13 +739,14 @@ pub fn apply_nl_verdicts(
     }
     let score = crate::engine::score_for_counts(hi, mid, lo);
     let grade = crate::engine::grade_for_score(score);
-    conn.execute(
+    tx.execute(
         "UPDATE files
          SET score = ?1, grade = ?2,
              issue_count = (SELECT COUNT(*) FROM issues WHERE file_id = ?3)
          WHERE id = ?3",
         params![score as i64, grade.letter(), file_id],
     )?;
+    tx.commit()?;
     Ok((score, grade.letter().to_string()))
 }
 
