@@ -219,35 +219,29 @@ pub fn add_nl_rule(
         .map_err(|e| e.to_string())
 }
 
-/// Evaluate every enabled natural-language rule against a file via the
-/// configured provider. Errors gracefully when no provider is set.
+/// Evaluate the built-in NL standards (free — needs only a configured
+/// provider) plus, for licensed users, the custom NL rules. Persists
+/// violations as issues and rescores the file (offer spec §5: the license
+/// gates treatment, not diagnosis).
 #[tauri::command]
 #[specta::specta]
 pub async fn evaluate_nl_rules(
     db: tauri::State<'_, AppDb>,
     file_id: String,
-) -> Result<Vec<crate::ai_rules::NlVerdict>, String> {
-    let (paid, creds, content, rules) = {
+) -> Result<crate::ai_rules::NlEvalResult, String> {
+    let (creds, content, rules) = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let detail = query::get_file_detail(&conn, &file_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "File not found".to_string())?;
-        let rules = query::enabled_nl_rules(&conn, entitlement_of(&conn).paid)
-            .map_err(|e| e.to_string())?;
-        (
-            entitlement_of(&conn).paid,
-            crate::ai::load_credentials(&conn),
-            detail.content,
-            rules,
-        )
+        let include_custom = entitlement_of(&conn).paid;
+        let rules = query::enabled_nl_rules(&conn, include_custom).map_err(|e| e.to_string())?;
+        (crate::ai::load_credentials(&conn), detail.content, rules)
     };
 
-    if !paid {
-        return Err(PAID_GATE.to_string());
-    }
     if creds.provider == "none" || creds.key.is_empty() {
         return Err(
-            "Connect an AI provider in Settings → AI to evaluate natural-language rules."
+            "Connect an AI provider in Settings → AI to evaluate the prompting standards."
                 .to_string(),
         );
     }
@@ -265,7 +259,16 @@ pub async fn evaluate_nl_rules(
             explanation,
         });
     }
-    Ok(verdicts)
+
+    let (score, grade) = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        query::apply_nl_verdicts(&conn, &file_id, &verdicts).map_err(|e| e.to_string())?
+    };
+    Ok(crate::ai_rules::NlEvalResult {
+        verdicts,
+        score,
+        grade,
+    })
 }
 
 /// Delete a custom rule.

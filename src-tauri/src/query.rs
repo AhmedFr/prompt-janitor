@@ -707,9 +707,6 @@ pub fn enabled_nl_rules(
 /// Persist NL verdicts for a file: replace prior NL-sourced issues (tagged by
 /// non-NULL rule_id), insert current violations, and rescore the file with the
 /// unchanged formula. Returns `(score, grade_letter)`.
-// Not called from production code yet — Task 8 wires this into
-// `evaluate_nl_rules` so it persists+rescores after each provider round-trip.
-#[allow(dead_code)]
 pub fn apply_nl_verdicts(
     conn: &Connection,
     file_id: &str,

@@ -17,6 +17,14 @@ pub struct NlVerdict {
     pub explanation: String,
 }
 
+/// Result of an NL evaluation run: the verdicts plus the file's new score.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct NlEvalResult {
+    pub verdicts: Vec<NlVerdict>,
+    pub score: u32,
+    pub grade: String,
+}
+
 const SYSTEM: &str = "You audit an AI instructions file (CLAUDE.md, AGENTS.md, and similar) against a single user-defined rule. Decide whether the file VIOLATES the rule. Respond with ONLY a JSON object and nothing else: {\"violates\": <true|false>, \"explanation\": <one short sentence>}. Set \"violates\" to true only when the file clearly breaks the rule; when unsure, return false.";
 
 /// Build the user message: the rule plus the file under audit.
