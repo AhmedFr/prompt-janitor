@@ -4,9 +4,17 @@ import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { commands, type NlVerdict } from "@/lib/ipc";
 
-/** Runs the user's natural-language rules against a file via the AI provider. */
-export function NlRulesPanel({ fileId }: { fileId: string }) {
+/** Runs the built-in prompting standards (plus any custom NL rules, when
+ * licensed) against a file via the AI provider, folding hits into the score. */
+export function NlRulesPanel({
+  fileId,
+  onApplied,
+}: {
+  fileId: string;
+  onApplied?: () => void;
+}) {
   const [verdicts, setVerdicts] = useState<NlVerdict[] | null>(null);
+  const [newScore, setNewScore] = useState<{ score: number; grade: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,8 +22,11 @@ export function NlRulesPanel({ fileId }: { fileId: string }) {
     setBusy(true);
     setError(null);
     const res = await commands.evaluateNlRules(fileId);
-    if (res.status === "ok") setVerdicts(res.data);
-    else setError(res.error);
+    if (res.status === "ok") {
+      setVerdicts(res.data.verdicts);
+      setNewScore({ score: res.data.score, grade: res.data.grade });
+      onApplied?.();
+    } else setError(res.error);
     setBusy(false);
   };
 
@@ -25,14 +36,15 @@ export function NlRulesPanel({ fileId }: { fileId: string }) {
         <span style={{ display: "flex", color: "var(--blue)" }}>
           <Icon name="sparkles" size={16} />
         </span>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>Custom AI rules</div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>AI standards</div>
         <span className="toolbar-spacer" />
         <Button size="sm" onClick={() => void check()} disabled={busy}>
-          {busy ? "Checking…" : "Check custom rules"}
+          {busy ? "Checking…" : "Check standards"}
         </Button>
       </div>
       <div className="muted" style={{ marginTop: 6, fontSize: 12.5, maxWidth: 620 }}>
-        Evaluate your natural-language rules against this file using the configured provider.
+        Audit this file against the built-in prompting standards (Anthropic, OpenAI, Cursor,
+        community) — plus your own AI rules on the Pro tier. Violations fold into the score.
       </div>
 
       {error && (
@@ -51,7 +63,7 @@ export function NlRulesPanel({ fileId }: { fileId: string }) {
         <div className="col" style={{ gap: 10, marginTop: 12 }}>
           {verdicts.every((v) => !v.violates) && (
             <div className="faint" style={{ fontSize: 12, color: "var(--green)" }}>
-              All {verdicts.length} custom rule{verdicts.length === 1 ? "" : "s"} pass.
+              All {verdicts.length} standard{verdicts.length === 1 ? "" : "s"} pass.
             </div>
           )}
           {verdicts.map((v) => (
@@ -81,6 +93,12 @@ export function NlRulesPanel({ fileId }: { fileId: string }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {newScore && (
+        <div className="faint" style={{ fontSize: 12, marginTop: 10 }}>
+          Score is now {newScore.score} ({newScore.grade}).
         </div>
       )}
     </Card>
