@@ -57,7 +57,7 @@ export function NlRulesPanel({
 
       {verdicts && verdicts.length === 0 && (
         <div className="faint" style={{ fontSize: 12, marginTop: 10 }}>
-          No natural-language rules yet — add one on the Rules tab.
+          All standards are toggled off — enable them on the Rules tab.
         </div>
       )}
 
