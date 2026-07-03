@@ -21,6 +21,8 @@ export function NlRulesPanel({
   const check = async () => {
     setBusy(true);
     setError(null);
+    setVerdicts(null);
+    setNewScore(null);
     const res = await commands.evaluateNlRules(fileId);
     if (res.status === "ok") {
       setVerdicts(res.data.verdicts);
