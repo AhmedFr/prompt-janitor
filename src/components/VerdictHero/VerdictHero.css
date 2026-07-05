@@ -1,0 +1,79 @@
+.vh-verdict {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.vh-cost {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.vh-sec {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.vh-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.vh-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 4px;
+  border: none;
+  border-bottom: 0.5px solid var(--sep);
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vh-row:last-child {
+  border-bottom: none;
+}
+
+.vh-row:hover {
+  background: var(--group);
+}
+
+.vh-points {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.vh-chev {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+}
+
+.vh-coverage {
+  margin-top: 14px;
+  font-size: 12px;
+}
+
+.vh-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.vh-link:hover {
+  text-decoration: underline;
+}
