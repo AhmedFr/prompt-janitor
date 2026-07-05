@@ -25,43 +25,102 @@ const EMPTY: VerdictData = {
 
 const SEV_RANK: Record<Severity, number> = { hi: 0, mid: 1, lo: 2 };
 
+/** Cap on simultaneous getFileDetail calls so large projects don't fan out unbounded. */
+const DETAIL_FETCH_CONCURRENCY = 8;
+
+/**
+ * Run `fn` over `items` with at most `limit` calls in flight at once — a
+ * small worker-pool so we don't need a dependency for this. Order of
+ * results matches `items`; order of completion doesn't.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 function countsOf(detail: FileDetail): SeverityCounts {
   const counts: SeverityCounts = { hi: 0, mid: 0, lo: 0 };
   for (const issue of detail.issues) counts[issue.severity] += 1;
   return counts;
 }
 
-/** Derive the fix path, projection and counts from the fetched files. */
-function compute(
+/** A candidate fix-path row before its sequential point gain is known. */
+export type FixCandidate = Omit<FixPathRow, "points">;
+
+/**
+ * Apply an ordered list of fix candidates one at a time against a running
+ * per-file counts map, so each row's point gain reflects whatever's left of
+ * that file's capped/diminishing marginal value once the earlier rows'
+ * fixes are "claimed" — instead of every row scoring itself independently
+ * against the pristine counts. Also returns the resulting per-file counts,
+ * so a projected overall grade can be built from the same sequence.
+ *
+ * Exported for unit testing the derivation logic in isolation.
+ */
+export function applyFixesSequentially(
+  candidates: FixCandidate[],
+  countsById: Map<string, SeverityCounts>,
+): { rows: FixPathRow[]; projected: Map<string, SeverityCounts> } {
+  const projected = new Map<string, SeverityCounts>();
+  const rows = candidates.map((candidate) => {
+    const before =
+      projected.get(candidate.fileId) ?? { ...(countsById.get(candidate.fileId) as SeverityCounts) };
+    const points = pointsRecoverable(before, candidate.severity);
+    const after = { ...before, [candidate.severity]: Math.max(0, before[candidate.severity] - 1) };
+    projected.set(candidate.fileId, after);
+    return { ...candidate, points };
+  });
+  return { rows, projected };
+}
+
+/**
+ * Derive the fix path, projection and counts from the fetched files.
+ * Exported for unit testing the derivation logic in isolation.
+ */
+export function compute(
   files: { id: string; score: number }[],
   details: FileDetail[],
 ): Pick<VerdictData, "fixPath" | "projectedGrade" | "fixesToA" | "autofixCount"> {
   const countsById = new Map(details.map((d) => [d.id, countsOf(d)]));
 
-  // Every open issue, ranked Hi > Mid > Lo, then by points recoverable.
-  const ranked = details
+  // Every open issue, ranked Hi > Mid > Lo, then by points recoverable
+  // against the pristine counts — this independent score only picks which
+  // 3 issues lead the fix path, it isn't what gets displayed.
+  const candidates: FixCandidate[] = details
     .flatMap((d) =>
       d.issues.map((issue) => ({
         fileId: d.id,
         fileName: d.name,
         title: issue.title,
         severity: issue.severity,
-        points: pointsRecoverable(countsById.get(d.id) as SeverityCounts, issue.severity),
+        rankPoints: pointsRecoverable(countsById.get(d.id) as SeverityCounts, issue.severity),
       })),
     )
-    .sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.points - a.points);
-  const fixPath: FixPathRow[] = ranked.slice(0, 3);
+    .sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || b.rankPoints - a.rankPoints)
+    .slice(0, 3)
+    .map(({ fileId, fileName, title, severity }) => ({ fileId, fileName, title, severity }));
+
+  // Walk the chosen fixes in order against a running counts map, so each
+  // row's displayed points are the true marginal gain of applying it after
+  // the rows before it — the same sequence the projection below is built from.
+  const { rows: fixPath, projected } = applyFixesSequentially(candidates, countsById);
 
   // Projected overall grade with the fix-path issues removed: rebuild each
   // affected file's severity counts, rescore it, and re-average all files.
   let projectedGrade = null;
   if (fixPath.length > 0) {
-    const projected = new Map<string, SeverityCounts>();
-    for (const row of fixPath) {
-      const counts = projected.get(row.fileId) ?? { ...(countsById.get(row.fileId) as SeverityCounts) };
-      counts[row.severity] = Math.max(0, counts[row.severity] - 1);
-      projected.set(row.fileId, counts);
-    }
     const scores = files.map((f) => {
       const counts = projected.get(f.id);
       if (!counts) return f.score;
@@ -94,8 +153,14 @@ export function useVerdictHero() {
   const [verdict, setVerdict] = useState<VerdictData>(EMPTY);
   const [autoFixBusy, setAutoFixBusy] = useState(false);
   const detailsRef = useRef<FileDetail[]>([]);
+  // Bumped on every refetch() call; a call only commits its results if it's
+  // still the most recent one when its async work resolves, so an older
+  // in-flight refetch (e.g. from mount) can't clobber a newer one's state
+  // (e.g. from a scan finishing) landing first.
+  const generationRef = useRef(0);
 
   const refetch = useCallback(async () => {
+    const generation = ++generationRef.current;
     if (!isTauri) {
       setVerdict((v) => ({ ...v, loading: false }));
       return;
@@ -107,14 +172,20 @@ export function useVerdictHero() {
       commands.getEntitlement(),
     ]);
     const files = filesRes.status === "ok" ? filesRes.data : [];
-    const detailResults = await Promise.all(
-      files.filter((f) => f.issue_count > 0).map((f) => commands.getFileDetail(f.id)),
+    const detailResults = await mapWithConcurrency(
+      files.filter((f) => f.issue_count > 0),
+      DETAIL_FETCH_CONCURRENCY,
+      (f) => commands.getFileDetail(f.id),
     );
     const details = detailResults
       .map((r) => (r.status === "ok" ? r.data : null))
       .filter((d): d is FileDetail => d != null);
-    detailsRef.current = details;
 
+    // A newer refetch started while this one was still fetching — drop
+    // these now-stale results instead of overwriting fresher state.
+    if (generation !== generationRef.current) return;
+
+    detailsRef.current = details;
     const rules = rulesRes.status === "ok" ? rulesRes.data.filter((r) => r.enabled) : [];
     setVerdict({
       ...compute(files, details),
