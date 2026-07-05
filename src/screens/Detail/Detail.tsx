@@ -6,6 +6,8 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ipc";
+import { openExternal } from "@/lib/open-external";
+import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE } from "@/lib/monetization";
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
@@ -382,17 +384,26 @@ function IssuePanel({
       )}
 
       {!paidAi && (
-        <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
+        <div className="row" style={{ gap: 10, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           {!entitled ? (
             <>
-              ✦ AI auto-fix &amp; rewrites are a paid feature — add a license in{" "}
-              <strong>Settings → License</strong>.
+              <Button
+                size="sm"
+                onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
+                title={FOUNDER_PRICE}
+              >
+                <Icon name="sparkles" /> {GET_PRO_LABEL}
+              </Button>
+              <span className="faint" style={{ fontSize: 12 }}>
+                ✦ AI auto-fix &amp; rewrites are a paid feature — {FOUNDER_PRICE}, or add a license
+                in <strong>Settings → License</strong>.
+              </span>
             </>
           ) : (
-            <>
+            <span className="faint" style={{ fontSize: 12 }}>
               Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored
               rewrite.
-            </>
+            </span>
           )}
         </div>
       )}
