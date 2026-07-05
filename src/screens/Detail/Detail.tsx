@@ -23,6 +23,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
   const { detail, loading, aiReady, entitled, reload } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!detail || detail.issues.length === 0) {
@@ -34,17 +35,26 @@ export function Detail({ fileId, navigate }: DetailProps) {
   }, [detail]);
 
   const fixable = detail?.issues.filter((i) => i.fix_from && i.fix_to).length ?? 0;
+  // Auto-fix across the whole file is a paid feature, same as VerdictHero's
+  // cross-file Auto-fix and the per-issue AI rewrite below.
+  const autoFixLocked = !entitled;
 
   // Apply every deterministic (static) fix on the file in one snapshot.
   const runAutoFix = async () => {
     if (!detail) return;
+    if (autoFixLocked) {
+      void openExternal(POLAR_CHECKOUT_URL);
+      return;
+    }
     const edits = detail.issues
       .filter((i) => i.fix_from && i.fix_to)
       .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
     if (edits.length === 0) return;
     setAutoBusy(true);
+    setAutoError(null);
     const r = await runApply(detail.id, edits, false);
     if (r.ok) await reload();
+    else setAutoError(r.message);
     setAutoBusy(false);
   };
 
@@ -63,9 +73,14 @@ export function Detail({ fileId, navigate }: DetailProps) {
             size="sm"
             disabled={autoBusy}
             onClick={() => void runAutoFix()}
-            title="Apply every deterministic fix on this file"
+            title={
+              autoFixLocked
+                ? "Auto-fix is a Pro feature — get a license"
+                : "Apply every deterministic fix on this file"
+            }
           >
-            <Icon name="wand" /> {autoBusy ? "Fixing…" : `Auto-fix ${fixable}`}
+            <Icon name={autoFixLocked ? "lock" : "wand"} />{" "}
+            {autoBusy ? "Fixing…" : `Auto-fix ${fixable}`}
           </Button>
         )}
       </header>
@@ -85,14 +100,33 @@ export function Detail({ fileId, navigate }: DetailProps) {
               <div className="muted">Select a file from the Prompts tab.</div>
             </Card>
           ) : (
-            <DetailBody
-              detail={detail}
-              selectedIndex={selectedIndex}
-              onSelect={setSelectedIndex}
-              aiReady={aiReady}
-              entitled={entitled}
-              onReload={reload}
-            />
+            <>
+              {(autoError || (autoFixLocked && fixable > 0)) && (
+                <div
+                  className="row wrap"
+                  style={{ gap: 10, marginBottom: 14, alignItems: "center" }}
+                >
+                  {autoError ? (
+                    <span className="faint" style={{ fontSize: 12, color: "var(--red)", maxWidth: 620 }}>
+                      {autoError}
+                    </span>
+                  ) : (
+                    <span className="faint" style={{ fontSize: 12 }}>
+                      ✦ Auto-fix across a whole file is a paid feature — {FOUNDER_PRICE}, or add a
+                      license in <strong>Settings → License</strong>.
+                    </span>
+                  )}
+                </div>
+              )}
+              <DetailBody
+                detail={detail}
+                selectedIndex={selectedIndex}
+                onSelect={setSelectedIndex}
+                aiReady={aiReady}
+                entitled={entitled}
+                onReload={reload}
+              />
+            </>
           )}
         </div>
       </div>
