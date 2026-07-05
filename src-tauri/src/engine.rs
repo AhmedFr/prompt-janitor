@@ -5,6 +5,8 @@
 //! A–F [`Grade`]. The concrete rules live in their own module (#8); this file is
 //! just the framework + the scoring math.
 
+use std::path::Path;
+
 /// Issue severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
@@ -111,6 +113,40 @@ pub struct Finding {
     pub fix: Option<Fix>,
 }
 
+/// Everything a rule may need beyond raw text: where the file lives and what
+/// project (if any) it belongs to. Repo-grounded rules use this to check
+/// facts (does this path exist? does this script exist in package.json?).
+///
+/// Filesystem probing driven by this context must stay cheap — `stat`/
+/// `exists` calls and small bounded reads, never scanning the whole repo —
+/// and must degrade gracefully: when a field is `None` (repo root couldn't
+/// be determined, mtime is unavailable, …), any rule that needs it simply
+/// doesn't fire rather than guessing.
+pub struct RuleContext<'a> {
+    pub content: &'a str,
+    /// Absolute path of the file being evaluated, if known.
+    pub file_path: Option<&'a Path>,
+    /// The project root that owns `file_path` (nearest ancestor that looks
+    /// like a repo/project root), if one could be determined.
+    pub repo_root: Option<&'a Path>,
+    /// The file's last-modified time, seconds since the Unix epoch.
+    pub modified_unix: Option<i64>,
+}
+
+impl<'a> RuleContext<'a> {
+    /// A context carrying only file content — used by content-only rules
+    /// and by callers (tests, the old `evaluate` API) that have no repo
+    /// context available.
+    pub fn content_only(content: &'a str) -> Self {
+        Self {
+            content,
+            file_path: None,
+            repo_root: None,
+            modified_unix: None,
+        }
+    }
+}
+
 /// A check that inspects prompt text and reports findings.
 pub trait Rule: Send + Sync {
     fn id(&self) -> &'static str;
@@ -118,8 +154,20 @@ pub trait Rule: Send + Sync {
     fn source(&self) -> Source;
     fn severity(&self) -> Severity;
     fn why(&self) -> &'static str;
-    /// Inspect `content` and return any findings.
-    fn check(&self, content: &str) -> Vec<Finding>;
+
+    /// Inspect `content` and return any findings. Content-only rules
+    /// implement this. Defaults to a no-op so repo-grounded rules (which
+    /// implement [`Rule::check_ctx`] instead) don't need a dummy override.
+    fn check(&self, _content: &str) -> Vec<Finding> {
+        Vec::new()
+    }
+
+    /// Inspect with the full evaluation context (file path, repo root,
+    /// mtime). Defaults to `check(ctx.content)`, so existing content-only
+    /// rules keep working unchanged.
+    fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
+        self.check(ctx.content)
+    }
 }
 
 // Penalty weights, calibrated so the design's focal file (api-worker/CLAUDE.md:
@@ -165,10 +213,20 @@ pub fn grade_for_score(score: u32) -> Grade {
 }
 
 /// Run every rule over `content` and produce a full evaluation.
+///
+/// Content-only convenience wrapper around [`evaluate_ctx`] — kept so existing
+/// call sites and tests that only have raw text don't need a repo context.
 pub fn evaluate(content: &str, rules: &[Box<dyn Rule>]) -> Evaluation {
+    evaluate_ctx(&RuleContext::content_only(content), rules)
+}
+
+/// Run every rule over `ctx` and produce a full evaluation. Repo-grounded
+/// rules use `ctx`'s file path / repo root / mtime; content-only rules just
+/// read `ctx.content`.
+pub fn evaluate_ctx(ctx: &RuleContext<'_>, rules: &[Box<dyn Rule>]) -> Evaluation {
     let mut issues = Vec::new();
     for rule in rules {
-        for finding in rule.check(content) {
+        for finding in rule.check_ctx(ctx) {
             issues.push(Issue {
                 rule_id: rule.id().to_string(),
                 severity: rule.severity(),

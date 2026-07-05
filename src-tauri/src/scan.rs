@@ -5,7 +5,10 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 
-use crate::engine::{evaluate, grade_for_score, score_for_issues, Grade, Severity};
+use crate::engine::{
+    evaluate_ctx, grade_for_score, score_for_issues, Grade, RuleContext, Severity,
+};
+use crate::repo_root::find_repo_root;
 use crate::scanner;
 
 /// Summary of a completed scan, returned to the frontend.
@@ -56,7 +59,15 @@ pub fn run_scan(
     let (mut critical, mut warnings, mut nits) = (0u32, 0u32, 0u32);
 
     for (i, file) in files.iter().enumerate() {
-        let mut issues = evaluate(&file.content, &rules).issues;
+        let file_path = Path::new(&file.path);
+        let repo_root = find_repo_root(file_path);
+        let ctx = RuleContext {
+            content: &file.content,
+            file_path: Some(file_path),
+            repo_root: repo_root.as_deref(),
+            modified_unix: file.modified_unix,
+        };
+        let mut issues = evaluate_ctx(&ctx, &rules).issues;
         issues.extend(crate::query::custom_issues(conn, &file.content));
         let score = score_for_issues(&issues);
         let grade = grade_for_score(score);
