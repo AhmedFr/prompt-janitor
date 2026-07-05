@@ -887,7 +887,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("good")).unwrap();
         std::fs::write(
             dir.path().join("good/AGENTS.md"),
-            "You are a senior reviewer.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
+            "You are a senior reviewer for this codebase.\nFocus on correctness and clear, idiomatic style.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
         )
         .unwrap();
         std::fs::create_dir_all(dir.path().join("bad")).unwrap();
@@ -994,11 +994,11 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         crate::store::migrate(&conn).unwrap();
         seed_rules(&conn).unwrap();
-        assert_eq!(active_rules(&conn).len(), 5);
+        assert_eq!(active_rules(&conn).len(), 14);
 
         set_rule(&conn, "no-hardcoded-model", false).unwrap();
         let active = active_rules(&conn);
-        assert_eq!(active.len(), 4);
+        assert_eq!(active.len(), 13);
         assert!(!active.iter().any(|r| r.id() == "no-hardcoded-model"));
         assert!(list_rules(&conn)
             .unwrap()

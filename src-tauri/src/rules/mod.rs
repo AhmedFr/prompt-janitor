@@ -4,29 +4,63 @@
 //! [`builtin_rules`] is the set used for grading.
 
 mod contradiction;
-mod hardcoded_model;
+mod dead_file_reference;
+mod deprecated_model;
+mod duplicate_rules;
+mod empty_stub;
+mod legacy_cursorrules;
 mod missing_few_shot;
 mod missing_output_format;
 mod missing_role;
+mod missing_script_reference;
 mod nl_catalog;
+mod package_manager_mismatch;
+mod placeholder_rot;
+mod stale_vs_churn;
+mod token_budget;
 
 pub use contradiction::Contradiction;
-pub use hardcoded_model::HardcodedModel;
+pub use dead_file_reference::DeadFileReference;
+pub use deprecated_model::DeprecatedModel;
+pub use duplicate_rules::DuplicateRules;
+pub use empty_stub::EmptyStub;
+pub use legacy_cursorrules::LegacyCursorrules;
 pub use missing_few_shot::MissingFewShot;
 pub use missing_output_format::MissingOutputFormat;
 pub use missing_role::MissingRole;
+pub use missing_script_reference::MissingScriptReference;
 pub use nl_catalog::{builtin_nl_rules, BuiltinNlRule};
+pub use package_manager_mismatch::PackageManagerMismatch;
+pub use placeholder_rot::PlaceholderRot;
+pub use stale_vs_churn::StaleVsChurn;
+pub use token_budget::TokenBudget;
 
 use crate::engine::Rule;
 
 /// The built-in rule set, in display order.
+///
+/// The first five are the original content-only rules (#8). The rest are
+/// repo-grounded "fact rules" (#74): they check the instruction file against
+/// the actual repo on disk (dead paths, wrong package manager, missing
+/// scripts, …) rather than judging prose, so they stay at zero false
+/// positives — a rule that needs repo context it doesn't have simply
+/// doesn't fire (see each rule's `check_ctx`).
 pub fn builtin_rules() -> Vec<Box<dyn Rule>> {
     vec![
-        Box::new(HardcodedModel),
+        Box::new(DeprecatedModel),
         Box::new(Contradiction),
         Box::new(MissingRole),
         Box::new(MissingFewShot),
         Box::new(MissingOutputFormat),
+        Box::new(DeadFileReference),
+        Box::new(PackageManagerMismatch),
+        Box::new(MissingScriptReference),
+        Box::new(TokenBudget),
+        Box::new(PlaceholderRot),
+        Box::new(DuplicateRules),
+        Box::new(LegacyCursorrules),
+        Box::new(StaleVsChurn),
+        Box::new(EmptyStub),
     ]
 }
 
@@ -52,7 +86,7 @@ mod tests {
 # API Worker assistant
 
 You are an assistant.
-Always use gpt-4 for completions.
+Always use claude-2 for completions.
 Be concise but also very thorough and detailed.
 Handle the request and return a result.
 Don't make mistakes.
@@ -62,6 +96,13 @@ Don't make mistakes.
 
     #[test]
     fn focal_fixture_grades_d_with_five_issues() {
+        // #74 narrowed the model rule from "any hard-coded model" (Hi) to
+        // "clearly deprecated model id" (Mid), so the fixture now names a
+        // retired model (claude-2) and the severity mix shifted from
+        // (2 hi, 2 mid, 1 lo)/53 to (1 hi, 3 mid, 1 lo)/61 — still 5 issues,
+        // still a D. The new repo-grounded rules (#74) all need a repo root
+        // or file path, which `evaluate` (content-only) doesn't provide, so
+        // none of them fire here.
         let eval = evaluate(API_WORKER, &builtin_rules());
         let hi = eval
             .issues
@@ -78,8 +119,8 @@ Don't make mistakes.
             .iter()
             .filter(|i| i.severity == Severity::Lo)
             .count();
-        assert_eq!((hi, mid, lo), (2, 2, 1), "issues: {:#?}", eval.issues);
-        assert_eq!(eval.score, 53);
+        assert_eq!((hi, mid, lo), (1, 3, 1), "issues: {:#?}", eval.issues);
+        assert_eq!(eval.score, 61);
         assert_eq!(eval.grade, Grade::D);
     }
 

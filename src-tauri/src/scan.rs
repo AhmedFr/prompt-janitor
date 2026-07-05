@@ -163,11 +163,13 @@ mod tests {
     use super::*;
     use std::fs;
 
+    // #74 narrowed the model rule to clearly-deprecated ids only, so this
+    // fixture names a retired model (claude-2) to keep the 5-issue count.
     const FOCAL: &str = "\
 # API Worker assistant
 
 You are an assistant.
-Always use gpt-4 for completions.
+Always use claude-2 for completions.
 Be concise but also very thorough and detailed.
 
 [no examples provided]
@@ -175,6 +177,7 @@ Be concise but also very thorough and detailed.
 
     const CLEAN: &str = "\
 You are a senior Rust reviewer for the service.
+Focus on correctness, idiomatic ownership, and clear error handling.
 Respond in JSON.
 For example:
 ```
