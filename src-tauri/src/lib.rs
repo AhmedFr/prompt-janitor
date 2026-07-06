@@ -18,6 +18,7 @@ mod scan;
 pub mod scanner;
 mod scheduler;
 mod store;
+pub mod templates;
 mod tray;
 mod vcs;
 

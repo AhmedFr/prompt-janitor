@@ -193,6 +193,9 @@ fn grade_from_db(s: &str) -> Grade {
 pub struct FileRow {
     pub id: String,
     pub name: String,
+    /// Absolute path on disk — lets the frontend match a freshly-written file
+    /// (e.g. an applied template) to its scanned id after a rescan.
+    pub path: String,
     pub project: String,
     pub grade: Grade,
     pub score: u32,
@@ -220,6 +223,7 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
             Ok(FileRow {
                 id: r.get(0)?,
                 name,
+                path: path.clone(),
                 project: r.get(3)?,
                 grade: grade_from_db(&r.get::<_, String>(4)?),
                 score: r.get::<_, i64>(5)? as u32,
