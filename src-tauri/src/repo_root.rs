@@ -38,6 +38,48 @@ pub fn find_repo_root(file_path: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Find the *nearest* project root that owns `file_path` — the base to
+/// resolve manifest-relative facts (scripts, lockfiles, sibling paths)
+/// against in a monorepo. Unlike [`find_repo_root`] (always the git
+/// worktree root), this walks up from the file looking for the closest
+/// ancestor with a manifest (`package.json`, `Cargo.toml`, `pyproject.toml`,
+/// `go.mod`), so `packages/api/CLAUDE.md` resolves against
+/// `packages/api/package.json` rather than the monorepo root's.
+///
+/// The walk stops at (and includes) the git worktree root if one exists: a
+/// manifest above the worktree root doesn't belong to this project. If no
+/// manifest is found between the file and the worktree root, falls back to
+/// the worktree root itself (same as [`find_repo_root`]). Outside of a git
+/// repo, falls back to the same unbounded ancestor-manifest search
+/// [`find_repo_root`] uses.
+pub fn resolution_root(file_path: &Path) -> Option<PathBuf> {
+    let start = file_path.parent()?;
+
+    if let Ok(repo) = Repository::discover(start) {
+        let Some(workdir) = repo.workdir() else {
+            return None; // bare repository — no working tree to ground against
+        };
+        let workdir = workdir.to_path_buf();
+
+        let mut dir = start.to_path_buf();
+        loop {
+            if MANIFEST_MARKERS.iter().any(|m| dir.join(m).exists()) {
+                return Some(dir);
+            }
+            if dir == workdir {
+                return Some(workdir); // inclusive boundary, nothing found above the file
+            }
+            dir = match dir.parent() {
+                Some(p) => p.to_path_buf(),
+                None => return Some(workdir), // shouldn't happen if workdir is an ancestor
+            };
+        }
+    }
+
+    // No git repo at all — same fallback chain as `find_repo_root`.
+    find_repo_root(file_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,5 +127,38 @@ mod tests {
         if Repository::discover(dir.path()).is_err() {
             assert!(find_repo_root(&file).is_none());
         }
+    }
+
+    #[test]
+    fn resolution_root_prefers_nearest_manifest_in_a_monorepo() {
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("package.json"), "{}").unwrap(); // monorepo root manifest
+        fs::create_dir_all(dir.path().join("packages/api")).unwrap();
+        fs::write(dir.path().join("packages/api/package.json"), "{}").unwrap();
+        let file = dir.path().join("packages/api/CLAUDE.md");
+        fs::write(&file, "hi").unwrap();
+
+        let root = resolution_root(&file).unwrap();
+        assert_eq!(
+            root.canonicalize().unwrap(),
+            dir.path().join("packages/api").canonicalize().unwrap()
+        );
+    }
+
+    #[test]
+    fn resolution_root_falls_back_to_git_root_when_no_nested_manifest() {
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("package.json"), "{}").unwrap();
+        fs::create_dir_all(dir.path().join("docs/nested")).unwrap();
+        let file = dir.path().join("docs/nested/AGENTS.md");
+        fs::write(&file, "hi").unwrap();
+
+        let root = resolution_root(&file).unwrap();
+        assert_eq!(
+            root.canonicalize().unwrap(),
+            dir.path().canonicalize().unwrap()
+        );
     }
 }

@@ -43,10 +43,10 @@ impl Rule for StaleVsChurn {
         Source::Custom
     }
     fn severity(&self) -> Severity {
-        Severity::Mid
+        Severity::Lo
     }
     fn why(&self) -> &'static str {
-        "The repo has moved on since this file was last updated — it's likely describing a stack or workflow that no longer matches reality."
+        "This file hasn't changed in over 6 months while the repository shows recent activity — worth a quick review to confirm it still matches reality."
     }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let Some(repo_root) = ctx.repo_root else {
@@ -105,6 +105,7 @@ mod tests {
             content: "stale instructions",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: Some(now() - 200 * DAY),
         };
         assert_eq!(StaleVsChurn.check_ctx(&ctx).len(), 1);
@@ -120,6 +121,7 @@ mod tests {
             content: "fresh instructions",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: Some(now() - 10 * DAY),
         };
         assert!(StaleVsChurn.check_ctx(&ctx).is_empty());
@@ -132,6 +134,7 @@ mod tests {
             content: "stale instructions",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: Some(now() - 200 * DAY),
         };
         assert!(StaleVsChurn.check_ctx(&ctx).is_empty());
@@ -147,6 +150,7 @@ mod tests {
             content: "stale instructions",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(StaleVsChurn.check_ctx(&ctx).is_empty());

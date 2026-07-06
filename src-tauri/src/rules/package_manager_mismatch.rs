@@ -1,8 +1,9 @@
+use std::path::Path;
 use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::{line_at, line_text};
+use super::{line_at, line_text, negated_nearby};
 use crate::engine::{Finding, Fix, Rule, RuleContext, Severity, Source};
 
 /// Flags instructions that name a package manager other than the one this
@@ -20,6 +21,11 @@ const LOCKFILES: &[(&str, &str)] = &[
     ("bun.lock", "bun"),
 ];
 
+/// How many words back on the same line to look for a negation cue
+/// ("don't run npm install") before treating a command mention as an
+/// instruction rather than a prohibition.
+const NEGATION_WINDOW: usize = 4;
+
 fn command_pattern() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -28,19 +34,51 @@ fn command_pattern() -> &'static Regex {
     })
 }
 
-/// The single package manager this repo's lockfile implies, or `None` if
-/// zero or more than one lockfile family is present.
-fn detect_manager(repo_root: &std::path::Path) -> Option<&'static str> {
+/// What a directory's lockfiles imply about its package manager.
+enum LockfileSignal {
+    /// Exactly one lockfile family present.
+    Single(&'static str),
+    /// More than one lockfile family present — don't guess.
+    Ambiguous,
+    /// No recognized lockfile present.
+    None,
+}
+
+fn lockfile_signal(root: &Path) -> LockfileSignal {
     let mut found = None;
     for (file, manager) in LOCKFILES {
-        if repo_root.join(file).exists() {
+        if root.join(file).exists() {
             if found.is_some() && found != Some(*manager) {
-                return None; // more than one family — ambiguous, don't guess
+                return LockfileSignal::Ambiguous;
             }
             found = Some(*manager);
         }
     }
-    found
+    match found {
+        Some(m) => LockfileSignal::Single(m),
+        None => LockfileSignal::None,
+    }
+}
+
+/// The single package manager this repo uses, checked at the nearest
+/// manifest (monorepo package) first, falling back to the git root's
+/// lockfiles when the package level has none at all. An ambiguous result at
+/// either level stops the search rather than guessing further.
+fn detect_manager(ctx: &RuleContext<'_>) -> Option<&'static str> {
+    if let Some(resolution_root) = ctx.resolution_root {
+        match lockfile_signal(resolution_root) {
+            LockfileSignal::Single(m) => return Some(m),
+            LockfileSignal::Ambiguous => return None,
+            LockfileSignal::None => {} // fall through to the git root's lockfiles
+        }
+    }
+    match ctx.repo_root {
+        Some(repo_root) => match lockfile_signal(repo_root) {
+            LockfileSignal::Single(m) => Some(m),
+            LockfileSignal::Ambiguous | LockfileSignal::None => None,
+        },
+        None => None,
+    }
 }
 
 impl Rule for PackageManagerMismatch {
@@ -60,10 +98,7 @@ impl Rule for PackageManagerMismatch {
         "The instruction names a package manager this repo doesn't use — checked against the lockfile actually on disk."
     }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
-        let Some(repo_root) = ctx.repo_root else {
-            return Vec::new();
-        };
-        let Some(actual) = detect_manager(repo_root) else {
+        let Some(actual) = detect_manager(ctx) else {
             return Vec::new(); // no lockfile, or ambiguous — don't guess
         };
 
@@ -73,6 +108,9 @@ impl Rule for PackageManagerMismatch {
             let manager = named.as_str().to_lowercase();
             if manager == actual {
                 continue;
+            }
+            if negated_nearby(ctx.content, named.start(), NEGATION_WINDOW) {
+                continue; // "don't run npm install" names it to forbid it, not to instruct it
             }
             let line = line_at(ctx.content, named.start());
             findings.push(Finding {
@@ -101,6 +139,7 @@ mod tests {
             content: "Run `npm install` to set up.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         let findings = PackageManagerMismatch.check_ctx(&ctx);
@@ -115,6 +154,7 @@ mod tests {
             content: "Run pnpm install to set up.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(PackageManagerMismatch.check_ctx(&ctx).is_empty());
@@ -129,6 +169,7 @@ mod tests {
             content: "Run npm install to set up.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(PackageManagerMismatch.check_ctx(&ctx).is_empty());
@@ -141,6 +182,7 @@ mod tests {
             content: "Run npm install to set up.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(PackageManagerMismatch.check_ctx(&ctx).is_empty());
@@ -150,5 +192,41 @@ mod tests {
     fn does_not_fire_without_repo_root() {
         let ctx = RuleContext::content_only("Run npm install to set up.");
         assert!(PackageManagerMismatch.check_ctx(&ctx).is_empty());
+    }
+
+    // Adversarial-review repro (#92): naming the wrong manager to forbid it
+    // is not an instruction to use it.
+    #[test]
+    fn ignores_negated_mention() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("pnpm-lock.yaml"), "").unwrap();
+        let ctx = RuleContext {
+            content: "Don't run npm install — use pnpm install instead.",
+            file_path: None,
+            repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
+            modified_unix: None,
+        };
+        assert!(PackageManagerMismatch.check_ctx(&ctx).is_empty());
+    }
+
+    // Monorepo resolution base (#92): a script/lockfile defined only in a
+    // nested package should be resolved from that package first.
+    #[test]
+    fn falls_back_to_git_root_lockfiles_when_package_has_none() {
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("pnpm-lock.yaml"), "").unwrap();
+        fs::create_dir_all(dir.path().join("packages/api")).unwrap();
+        fs::write(dir.path().join("packages/api/package.json"), "{}").unwrap();
+        let ctx = RuleContext {
+            content: "Run npm install to set up.",
+            file_path: None,
+            repo_root: Some(dir.path()),
+            resolution_root: Some(&dir.path().join("packages/api")),
+            modified_unix: None,
+        };
+        let findings = PackageManagerMismatch.check_ctx(&ctx);
+        assert_eq!(findings.len(), 1);
     }
 }

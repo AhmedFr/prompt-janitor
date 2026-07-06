@@ -2,8 +2,12 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use super::{line_at, line_text};
+use super::{line_at, line_text, negated_nearby};
 use crate::engine::{Finding, Fix, Rule, Severity, Source};
+
+/// How many words back on the same line to look for a negation cue ("do NOT
+/// use claude-2") before treating a mention as an instruction to use it.
+const NEGATION_WINDOW: usize = 4;
 
 /// Flags model ids that providers have already retired. Deliberately narrow:
 /// pinning a *current* model is a style choice (not checked here); pinning a
@@ -56,6 +60,20 @@ fn pattern() -> &'static Regex {
     })
 }
 
+/// `\b` treats `-` as a non-word character, so it doesn't stop a match like
+/// `gemini-pro` from also "matching" inside `gemini-pro-vision` — the regex
+/// crate has no lookahead to rule that out in the pattern itself. Post-filter
+/// instead: a real hit must be followed by end-of-string or a character that
+/// isn't a hyphen or word character, so a longer, unlisted, differently
+/// versioned id never gets truncated into a listed one.
+fn is_hyphen_continuation(content: &str, end: usize) -> bool {
+    content[end..]
+        .chars()
+        .next()
+        .map(|c| c == '-' || c.is_alphanumeric() || c == '_')
+        .unwrap_or(false)
+}
+
 impl Rule for DeprecatedModel {
     fn id(&self) -> &'static str {
         // Kept from the rule's original, broader incarnation ("no hardcoded
@@ -77,6 +95,8 @@ impl Rule for DeprecatedModel {
     fn check(&self, content: &str) -> Vec<Finding> {
         pattern()
             .find_iter(content)
+            .filter(|m| !is_hyphen_continuation(content, m.end()))
+            .filter(|m| !negated_nearby(content, m.start(), NEGATION_WINDOW))
             .map(|m| {
                 let line = line_at(content, m.start());
                 Finding {
@@ -128,6 +148,28 @@ mod tests {
     fn ignores_configured_model_language() {
         assert!(DeprecatedModel
             .check("Use the project's configured model.")
+            .is_empty());
+    }
+
+    // Adversarial-review repros (#92): a bare (unversioned) entry must not
+    // match as a truncated prefix of a longer, unlisted, differently
+    // versioned id.
+    #[test]
+    fn ignores_hyphen_continuation_of_a_bare_entry() {
+        assert!(DeprecatedModel
+            .check("We use gemini-pro-vision for image tasks.")
+            .is_empty());
+    }
+
+    #[test]
+    fn still_flags_the_bare_entry_on_its_own() {
+        assert_eq!(DeprecatedModel.check("gemini-pro").len(), 1);
+    }
+
+    #[test]
+    fn ignores_negated_mention() {
+        assert!(DeprecatedModel
+            .check("Do NOT use claude-2 for completions.")
             .is_empty());
     }
 }

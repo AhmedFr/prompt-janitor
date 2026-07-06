@@ -126,9 +126,17 @@ pub struct RuleContext<'a> {
     pub content: &'a str,
     /// Absolute path of the file being evaluated, if known.
     pub file_path: Option<&'a Path>,
-    /// The project root that owns `file_path` (nearest ancestor that looks
-    /// like a repo/project root), if one could be determined.
+    /// The git worktree root that owns `file_path`, if one could be
+    /// determined. Used by rules that reason about repo-wide activity
+    /// (e.g. `stale-vs-churn`'s git-activity signal).
     pub repo_root: Option<&'a Path>,
+    /// The *nearest* project root that owns `file_path` — the nearest
+    /// ancestor with a manifest (`package.json`, `Cargo.toml`, …), bounded
+    /// by the git worktree root. Used by rules that resolve manifest-
+    /// relative facts (scripts, lockfiles, sibling paths) so a monorepo
+    /// package resolves against its own manifest rather than the repo
+    /// root's.
+    pub resolution_root: Option<&'a Path>,
     /// The file's last-modified time, seconds since the Unix epoch.
     pub modified_unix: Option<i64>,
 }
@@ -142,6 +150,7 @@ impl<'a> RuleContext<'a> {
             content,
             file_path: None,
             repo_root: None,
+            resolution_root: None,
             modified_unix: None,
         }
     }

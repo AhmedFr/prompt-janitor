@@ -33,10 +33,10 @@ impl Rule for EmptyStub {
         Source::Custom
     }
     fn severity(&self) -> Severity {
-        Severity::Hi
+        Severity::Mid
     }
     fn why(&self) -> &'static str {
-        "Your AI reads this file every session and learns nothing from it — there's barely any content here."
+        "This file is very short — it may be too brief to usefully steer your AI. Consider covering commands, conventions, and gotchas."
     }
     fn check(&self, content: &str) -> Vec<Finding> {
         if substantive_chars(content) >= MIN_CONTENT_CHARS {
@@ -44,7 +44,7 @@ impl Rule for EmptyStub {
         }
         vec![Finding {
             line: None,
-            why: "Your AI reads this file every session and learns nothing from it — under ~120 characters of real content.".to_string(),
+            why: "This file is very short — it may be too brief to usefully steer your AI. Consider covering commands, conventions, and gotchas.".to_string(),
             fix: None,
         }]
     }
@@ -72,7 +72,7 @@ with keys summary and actions so downstream tooling can parse the result.
     }
 
     #[test]
-    fn ignores_pure_whitespace_and_headings() {
+    fn flags_file_with_only_headings_and_whitespace() {
         let findings = EmptyStub.check("# Title\n\n## Subtitle\n\n---\n");
         assert_eq!(findings.len(), 1);
     }

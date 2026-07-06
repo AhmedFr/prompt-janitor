@@ -77,6 +77,28 @@ pub(crate) fn line_text(content: &str, line: u32) -> &str {
         .unwrap_or("")
 }
 
+/// Cue phrases that negate whatever they precede — "don't use X", "never run
+/// Y", "avoid Z", "use A instead of B". Naming a forbidden thing looks
+/// identical, at the regex level, to naming the thing you're instructed to
+/// use; a nearby negation cue is the difference between the two.
+const NEGATION_CUES: &[&str] = &["don't", "do not", "never", "avoid", "instead of", "not"];
+
+/// True if a negation cue appears on the same line as `match_start`, within
+/// `window` words immediately before it. Shared by rules that flag a named
+/// thing (a package manager, a model id) without distinguishing "use X" from
+/// "don't use X" at the pattern level.
+pub(crate) fn negated_nearby(content: &str, match_start: usize, window: usize) -> bool {
+    let line_start = content[..match_start]
+        .rfind('\n')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let before = content[line_start..match_start].to_lowercase();
+    let words: Vec<&str> = before.split_whitespace().collect();
+    let take_from = words.len().saturating_sub(window);
+    let recent = words[take_from..].join(" ");
+    NEGATION_CUES.iter().any(|cue| recent.contains(cue))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

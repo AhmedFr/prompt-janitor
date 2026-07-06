@@ -86,18 +86,22 @@ impl Rule for DeadFileReference {
         "A path the agent can't find sends it hunting or hallucinating a substitute — checked against the repo on disk."
     }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
-        let Some(repo_root) = ctx.repo_root else {
+        let Some(resolution_root) = ctx.resolution_root else {
             return Vec::new(); // no repo context — can't verify, don't guess
         };
         let mut findings = Vec::new();
         for cap in backtick_span().captures_iter(ctx.content) {
             let m = cap.get(1).unwrap();
             let candidate = m.as_str();
-            if !looks_like_path(candidate) {
+            // A `#fragment` suffix (markdown anchor, e.g. `docs/x.md#testing`)
+            // isn't part of the filesystem path — strip it before judging
+            // path-shape or checking existence.
+            let path_part = candidate.split('#').next().unwrap_or(candidate);
+            if !looks_like_path(path_part) {
                 continue;
             }
-            let stripped = candidate.strip_prefix("./").unwrap_or(candidate);
-            if repo_root.join(stripped).exists() {
+            let stripped = path_part.strip_prefix("./").unwrap_or(path_part);
+            if resolution_root.join(stripped).exists() {
                 continue;
             }
             let line = line_at(ctx.content, m.start());
@@ -127,6 +131,7 @@ mod tests {
             content: "See `src/foo.ts` for details.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         let findings = DeadFileReference.check_ctx(&ctx);
@@ -143,6 +148,7 @@ mod tests {
             content: "See `src/foo.ts` for details.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(DeadFileReference.check_ctx(&ctx).is_empty());
@@ -156,6 +162,7 @@ mod tests {
             content,
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(DeadFileReference.check_ctx(&ctx).is_empty());
@@ -168,6 +175,7 @@ mod tests {
             content: "Run `pnpm install` first.",
             file_path: None,
             repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
             modified_unix: None,
         };
         assert!(DeadFileReference.check_ctx(&ctx).is_empty());
@@ -176,6 +184,63 @@ mod tests {
     #[test]
     fn does_not_fire_without_repo_root() {
         let ctx = RuleContext::content_only("See `src/missing.ts` for details.");
+        assert!(DeadFileReference.check_ctx(&ctx).is_empty());
+    }
+
+    // Adversarial-review repros (#92): a markdown anchor fragment on an
+    // otherwise-real path must resolve against the file, not the literal
+    // (nonexistent) `path#fragment` string.
+    #[test]
+    fn flags_missing_path_with_fragment() {
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = RuleContext {
+            content: "See `docs/CONTRIBUTING.md#testing` for details.",
+            file_path: None,
+            repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
+            modified_unix: None,
+        };
+        let findings = DeadFileReference.check_ctx(&ctx);
+        assert_eq!(findings.len(), 1);
+    }
+
+    #[test]
+    fn accepts_existing_path_with_fragment() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("docs")).unwrap();
+        fs::write(dir.path().join("docs/CONTRIBUTING.md"), "").unwrap();
+        let ctx = RuleContext {
+            content: "See `docs/CONTRIBUTING.md#testing` for details.",
+            file_path: None,
+            repo_root: Some(dir.path()),
+            resolution_root: Some(dir.path()),
+            modified_unix: None,
+        };
+        assert!(DeadFileReference.check_ctx(&ctx).is_empty());
+    }
+
+    // Monorepo resolution base (#92): a package.json-scoped package should
+    // resolve its own relative paths against its own directory, not the
+    // workspace root.
+    #[test]
+    fn resolves_against_nearest_package_in_a_monorepo() {
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("package.json"), "{}").unwrap();
+        fs::create_dir_all(dir.path().join("packages/api/src")).unwrap();
+        fs::write(dir.path().join("packages/api/package.json"), "{}").unwrap();
+        fs::write(dir.path().join("packages/api/src/index.ts"), "").unwrap();
+        let file = dir.path().join("packages/api/CLAUDE.md");
+        fs::write(&file, "See `src/index.ts` for details.").unwrap();
+
+        let resolution_root = crate::repo_root::resolution_root(&file).unwrap();
+        let ctx = RuleContext {
+            content: "See `src/index.ts` for details.",
+            file_path: Some(&file),
+            repo_root: Some(dir.path()),
+            resolution_root: Some(&resolution_root),
+            modified_unix: None,
+        };
         assert!(DeadFileReference.check_ctx(&ctx).is_empty());
     }
 }
