@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         main: r("index.html"),
         thanks: r("thanks.html"),
+        fieldGuide: r("field-guide.html"),
       },
     },
   },
