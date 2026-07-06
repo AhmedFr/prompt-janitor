@@ -38,7 +38,10 @@ pub struct Overview {
     pub last_scan: Option<String>,
 }
 
-fn severity_from_db(s: &str) -> Severity {
+/// Parse a persisted severity string. Shared with `scan::run_scan`, which
+/// reconstructs prior NL issues from the `issues` table to carry them forward
+/// across unchanged-content rescans (#85).
+pub(crate) fn severity_from_db(s: &str) -> Severity {
     match s {
         "hi" => Severity::Hi,
         "lo" => Severity::Lo,
@@ -46,7 +49,9 @@ fn severity_from_db(s: &str) -> Severity {
     }
 }
 
-fn source_from_db(s: &str) -> Source {
+/// Parse a persisted source string. Shared with `scan::run_scan` (see
+/// [`severity_from_db`]).
+pub(crate) fn source_from_db(s: &str) -> Source {
     match s {
         "openai" => Source::Openai,
         "cursor" => Source::Cursor,
@@ -715,7 +720,12 @@ pub fn enabled_nl_rules(
 
 /// Persist NL verdicts for a file: replace prior NL-sourced issues (tagged by
 /// non-NULL rule_id), insert current violations, and rescore the file with the
-/// unchanged formula. Returns `(score, grade_letter)`.
+/// unchanged formula. Also appends to `grade_history` (#86) — both the file's
+/// own scope and the `overall` scope the Overview trend/sparkline reads — so
+/// an AI-standards rescore is reflected the same way a scan's baseline score
+/// is. Each write is skipped when it would duplicate the latest entry for
+/// that scope, so repeatedly re-running the check on an unchanged file
+/// doesn't spam history. Returns `(score, grade_letter)`.
 pub fn apply_nl_verdicts(
     conn: &Connection,
     file_id: &str,
@@ -755,6 +765,44 @@ pub fn apply_nl_verdicts(
          WHERE id = ?3",
         params![score as i64, grade.letter(), file_id],
     )?;
+
+    let now = crate::scan::now_epoch();
+
+    let last_file_score: Option<i64> = tx
+        .query_row(
+            "SELECT score FROM grade_history WHERE scope = 'file' AND scope_id = ?1
+             ORDER BY id DESC LIMIT 1",
+            [file_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if last_file_score != Some(score as i64) {
+        tx.execute(
+            "INSERT INTO grade_history(scope, scope_id, score, recorded_at) VALUES('file', ?1, ?2, ?3)",
+            params![file_id, score as i64, now],
+        )?;
+    }
+
+    let overall_score: i64 = tx
+        .query_row("SELECT COALESCE(AVG(score), 100) FROM files", [], |r| {
+            r.get::<_, f64>(0)
+        })
+        .map(|avg| avg as i64)?;
+    let last_overall_score: Option<i64> = tx
+        .query_row(
+            "SELECT score FROM grade_history WHERE scope = 'overall' AND scope_id = 'overall'
+             ORDER BY id DESC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if last_overall_score != Some(overall_score) {
+        tx.execute(
+            "INSERT INTO grade_history(scope, scope_id, score, recorded_at) VALUES('overall', 'overall', ?1, ?2)",
+            params![overall_score, now],
+        )?;
+    }
+
     tx.commit()?;
     Ok((score, grade.letter().to_string()))
 }
@@ -1221,6 +1269,115 @@ mod tests {
             )
             .unwrap();
         assert_eq!((fscore, fcount), (78, 2));
+    }
+
+    #[test]
+    fn apply_nl_verdicts_writes_grade_history_and_dedupes_unchanged_scores() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f', 'p', 'f', 'CLAUDE.md', 'A', 100, 0, NULL)",
+            [],
+        )
+        .unwrap();
+
+        let violating = vec![crate::ai_rules::NlVerdict {
+            rule_id: "anthropic-clarity".into(),
+            title: "Vague directives".into(),
+            severity: "mid".into(),
+            source: "anthropic".into(),
+            violates: true,
+            explanation: "Too vague.".into(),
+        }];
+
+        // mid=1 → 100 - 7 = 93
+        let (score, _) = apply_nl_verdicts(&conn, "f", &violating).unwrap();
+        assert_eq!(score, 93);
+
+        let file_hist: Vec<i64> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT score FROM grade_history WHERE scope='file' AND scope_id='f' ORDER BY id",
+                )
+                .unwrap();
+            stmt.query_map([], |r| r.get(0))
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap()
+        };
+        assert_eq!(
+            file_hist,
+            vec![93],
+            "the rescore must land in the same history the Detail delta reads"
+        );
+
+        let overall_hist: Vec<i64> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT score FROM grade_history WHERE scope='overall' AND scope_id='overall' ORDER BY id",
+                )
+                .unwrap();
+            stmt.query_map([], |r| r.get(0))
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap()
+        };
+        assert_eq!(
+            overall_hist,
+            vec![93],
+            "the Overview sparkline must move too, not just the file delta"
+        );
+
+        // Re-running with the exact same verdicts (score unchanged) must not
+        // duplicate either history row.
+        apply_nl_verdicts(&conn, "f", &violating).unwrap();
+        let file_hist_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM grade_history WHERE scope='file' AND scope_id='f'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            file_hist_count, 1,
+            "unchanged rescore must not duplicate file history"
+        );
+        let overall_hist_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM grade_history WHERE scope='overall' AND scope_id='overall'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            overall_hist_count, 1,
+            "unchanged rescore must not duplicate overall history"
+        );
+
+        // A verdict flip that changes the score must append a new row.
+        let passing = vec![crate::ai_rules::NlVerdict {
+            violates: false,
+            ..violating[0].clone()
+        }];
+        let (score2, _) = apply_nl_verdicts(&conn, "f", &passing).unwrap();
+        assert_eq!(score2, 100);
+        let file_hist_count2: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM grade_history WHERE scope='file' AND scope_id='f'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            file_hist_count2, 2,
+            "a real score change must append a new row"
+        );
     }
 
     #[test]
