@@ -90,3 +90,29 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  fulfillment:
+    name: Fulfillment
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fulfillment
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
