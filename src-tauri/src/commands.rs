@@ -463,21 +463,35 @@ pub fn apply_fix(
     commit: bool,
 ) -> Result<crate::apply::ApplyResult, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    apply_fix_with_conn(&conn, &file_id, &edits, commit)
+}
+
+/// The body of [`apply_fix`], taking a `&Connection` directly rather than a
+/// Tauri `State` so it can be exercised in tests.
+fn apply_fix_with_conn(
+    conn: &rusqlite::Connection,
+    file_id: &str,
+    edits: &[crate::apply::FixEdit],
+    commit: bool,
+) -> Result<crate::apply::ApplyResult, String> {
+    if !entitlement_of(conn).paid {
+        return Err(PAID_GATE.to_string());
+    }
 
     let path: String = conn
-        .query_row("SELECT path FROM files WHERE id = ?1", [&file_id], |r| {
+        .query_row("SELECT path FROM files WHERE id = ?1", [file_id], |r| {
             r.get(0)
         })
         .map_err(|e| e.to_string())?;
 
     let content =
         std::fs::read_to_string(&path).map_err(|e| format!("Couldn't read the file: {e}"))?;
-    let updated = crate::apply::apply_edits(&content, &edits)?;
+    let updated = crate::apply::apply_edits(&content, edits)?;
 
     let stamp = now_stamp();
     conn.execute(
         "INSERT INTO backups (file_id, pre_fix_content, applied_at, git_ref) VALUES (?1, ?2, ?3, NULL)",
-        rusqlite::params![&file_id, &content, &stamp],
+        rusqlite::params![file_id, &content, &stamp],
     )
     .map_err(|e| e.to_string())?;
     let backup_id = conn.last_insert_rowid();
@@ -611,4 +625,40 @@ pub fn apply_template(
         return Err(PAID_GATE.to_string());
     }
     crate::templates::apply(&template_id, &dest_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A freshly migrated in-memory DB with no license key set — i.e. a free,
+    /// unentitled user.
+    fn free_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn apply_fix_is_paid_gated_for_a_free_user() {
+        let conn = free_conn();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('f', 'p', '/p/f.md', 'md')",
+            [],
+        )
+        .unwrap();
+
+        let edits = vec![crate::apply::FixEdit {
+            from: "x".to_string(),
+            to: "y".to_string(),
+        }];
+        let result = apply_fix_with_conn(&conn, "f", &edits, false);
+
+        assert_eq!(result.unwrap_err(), PAID_GATE);
+    }
 }
