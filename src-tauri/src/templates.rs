@@ -101,9 +101,83 @@ pub fn find(id: &str) -> Option<TemplateInfo> {
     all().into_iter().find(|t| t.id == id)
 }
 
+/// The JS package managers a react-ts template's commands can be adapted
+/// for, detected by which lockfile is present in the target repo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackageManager {
+    Pnpm,
+    Npm,
+    Yarn,
+    Bun,
+}
+
+impl PackageManager {
+    fn command_name(self) -> &'static str {
+        match self {
+            PackageManager::Pnpm => "pnpm",
+            PackageManager::Npm => "npm",
+            PackageManager::Yarn => "yarn",
+            PackageManager::Bun => "bun",
+        }
+    }
+
+    fn lockfile_name(self) -> &'static str {
+        match self {
+            PackageManager::Pnpm => "pnpm-lock.yaml",
+            PackageManager::Npm => "package-lock.json",
+            PackageManager::Yarn => "yarn.lock",
+            PackageManager::Bun => "bun.lock",
+        }
+    }
+}
+
+/// Detect the target repo's JS package manager by lockfile presence.
+/// Defaults to pnpm when no lockfile is found at all, which keeps the
+/// template's original (unmodified) content for a fresh/empty repo.
+fn detect_package_manager(dir: &std::path::Path) -> PackageManager {
+    if dir.join("pnpm-lock.yaml").is_file() {
+        PackageManager::Pnpm
+    } else if dir.join("package-lock.json").is_file() {
+        PackageManager::Npm
+    } else if dir.join("yarn.lock").is_file() {
+        PackageManager::Yarn
+    } else if dir.join("bun.lockb").is_file() || dir.join("bun.lock").is_file() {
+        PackageManager::Bun
+    } else {
+        PackageManager::Pnpm
+    }
+}
+
+/// Adapt the react-ts template's pnpm-specific commands and lockfile
+/// mentions to the target repo's actual package manager (#75 review
+/// finding P1). Without this, a template applied into an npm/yarn/bun repo
+/// would hardcode `pnpm install`/`pnpm test`/`pnpm build`, which the
+/// `package_manager_mismatch` rule (landing on feat/74) flags at Hi
+/// severity — three hits is a D grade, breaking the "apply → instant A"
+/// promise for the most common JS setups.
+///
+/// This intentionally does a plain token swap (`pnpm` -> `npm`/`yarn`/
+/// `bun`) rather than rewriting the dev/lint/typecheck lines into
+/// `npm run <script>` form. That form would read as more idiomatic npm,
+/// but this template gets applied into an arbitrary repo where we can't
+/// guarantee those scripts exist in `package.json` — introducing an
+/// explicit `run <script>` we don't control would risk tripping a
+/// `missing_script_reference`-shaped rule that the bare `<pm> <script>`
+/// invocation (pnpm/yarn/bun's own convention, and what npm's `test`/
+/// `install` already do) does not.
+fn adapt_react_ts_content(content: &str, pm: PackageManager) -> String {
+    if pm == PackageManager::Pnpm {
+        return content.to_string();
+    }
+    content
+        .replace("pnpm-lock.yaml", pm.lockfile_name())
+        .replace("pnpm", pm.command_name())
+}
+
 /// Write `template_id`'s content into `dest_dir` as its `file_type` name.
 /// Errors if the template id is unknown, `dest_dir` doesn't exist, or a
-/// same-named file is already there — this never overwrites.
+/// same-named file (or a symlink, dangling or not, planted at that path)
+/// is already there — this never overwrites and never follows a symlink.
 pub fn apply(template_id: &str, dest_dir: &str) -> Result<ApplyTemplateResult, String> {
     let template = find(template_id).ok_or_else(|| format!("Unknown template: {template_id}"))?;
     let dir = std::path::Path::new(dest_dir);
@@ -111,13 +185,32 @@ pub fn apply(template_id: &str, dest_dir: &str) -> Result<ApplyTemplateResult, S
         return Err(format!("{dest_dir} isn't a folder."));
     }
     let dest = dir.join(&template.file_type);
-    if dest.exists() {
-        return Err(format!(
-            "{} already exists there — remove or rename it first.",
-            template.file_type
-        ));
-    }
-    std::fs::write(&dest, &template.preview)
+    let file_type = &template.file_type;
+
+    let content = if template.stack == "react-ts" {
+        adapt_react_ts_content(&template.preview, detect_package_manager(dir))
+    } else {
+        template.preview.clone()
+    };
+
+    // Atomic create-new open (O_CREAT|O_EXCL): fails if `dest` already
+    // exists OR is a symlink, dangling or not, instead of a separate
+    // `exists()` check followed by a `write` that would happily follow a
+    // symlink and write outside the picked folder. This also removes the
+    // TOCTOU window between checking and writing.
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&dest)
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => {
+                format!("{file_type} already exists there — remove or rename it first.")
+            }
+            _ => format!("Couldn't write the template: {e}"),
+        })?;
+    f.write_all(content.as_bytes())
         .map_err(|e| format!("Couldn't write the template: {e}"))?;
     Ok(ApplyTemplateResult {
         path: dest.to_string_lossy().into_owned(),
@@ -253,5 +346,144 @@ mod tests {
     fn apply_rejects_a_missing_destination_folder() {
         let err = apply("rust-claude", "/no/such/folder/anywhere").unwrap_err();
         assert!(err.contains("isn't a folder"));
+    }
+
+    /// Review finding P0 (#96): a dangling symlink planted at the
+    /// destination path used to pass the old `dest.exists()` check (which
+    /// returns false for a dangling symlink) and then `std::fs::write`
+    /// would follow it, writing the template to an attacker-chosen path
+    /// outside the folder the user picked. `apply` must now refuse to
+    /// follow the symlink at all — succeeding or failing on the *link*,
+    /// never the target.
+    #[test]
+    #[cfg(unix)]
+    fn apply_refuses_to_follow_a_dangling_symlink_at_the_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let outside_target = outside.path().join("should-not-be-created.md");
+
+        // Dangling: the symlink exists, but its target does not.
+        std::os::unix::fs::symlink(&outside_target, dir.path().join("CLAUDE.md")).unwrap();
+
+        let err = apply("rust-claude", dir.path().to_str().unwrap()).unwrap_err();
+        assert!(err.contains("already exists"), "unexpected error: {err}");
+        assert!(
+            !outside_target.exists(),
+            "apply must never write outside the picked folder via a dangling symlink"
+        );
+    }
+
+    /// Same attack, but the symlink points at a file that *does* exist
+    /// outside the picked folder — apply must refuse to overwrite that
+    /// file too, not just skip dangling links.
+    #[test]
+    #[cfg(unix)]
+    fn apply_refuses_to_follow_a_symlink_pointing_at_an_existing_outside_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let outside_target = outside.path().join("victim.md");
+        std::fs::write(&outside_target, "do not touch").unwrap();
+
+        std::os::unix::fs::symlink(&outside_target, dir.path().join("CLAUDE.md")).unwrap();
+
+        let err = apply("rust-claude", dir.path().to_str().unwrap()).unwrap_err();
+        assert!(err.contains("already exists"), "unexpected error: {err}");
+        assert_eq!(
+            std::fs::read_to_string(&outside_target).unwrap(),
+            "do not touch",
+            "apply must never overwrite a file outside the picked folder via a symlink"
+        );
+    }
+
+    #[test]
+    fn detect_package_manager_reads_lockfiles_and_defaults_to_pnpm() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Pnpm);
+
+        std::fs::write(dir.path().join("package-lock.json"), "{}").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Npm);
+        std::fs::remove_file(dir.path().join("package-lock.json")).unwrap();
+
+        std::fs::write(dir.path().join("yarn.lock"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Yarn);
+        std::fs::remove_file(dir.path().join("yarn.lock")).unwrap();
+
+        std::fs::write(dir.path().join("bun.lock"), "").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Bun);
+        std::fs::remove_file(dir.path().join("bun.lock")).unwrap();
+
+        // pnpm-lock.yaml wins even if another lockfile is somehow present too.
+        std::fs::write(dir.path().join("pnpm-lock.yaml"), "").unwrap();
+        std::fs::write(dir.path().join("package-lock.json"), "{}").unwrap();
+        assert_eq!(detect_package_manager(dir.path()), PackageManager::Pnpm);
+    }
+
+    /// Review finding P1 (#96): the react-ts templates hardcode
+    /// `pnpm install`/`pnpm test`/`pnpm build`. Applied as-is into a repo
+    /// that uses npm/yarn/bun, the (feat/74) `package_manager_mismatch`
+    /// rule fires Hi severity on each of those lines — three hits is a D
+    /// grade, breaking the "apply a template → instant A" promise for the
+    /// most common JS setup. `apply` must rewrite the package-manager
+    /// commands and lockfile mention to match the target repo before
+    /// writing.
+    ///
+    /// NOTE on coverage: the real `package_manager_mismatch` and
+    /// `missing_script_reference` rules live on feat/74-fact-rules and its
+    /// 14-rule `evaluate_ctx`, not on this branch, so this test can't run
+    /// the real evaluator end to end. Instead it directly asserts the two
+    /// properties those rules check: (1) no package-manager command token
+    /// in the applied file disagrees with the target repo's actual
+    /// lockfile-implied manager (no stray `pnpm` leaking into an npm repo),
+    /// and (2) no `<pm> run <script>` form is introduced at all (we only
+    /// ever emit bare `<pm> <script>`), so there is nothing new for
+    /// `missing_script_reference` to flag as missing. Re-run this scenario
+    /// against the real rule set once feat/74 merges.
+    #[test]
+    fn apply_adapts_react_ts_commands_to_an_npm_repo() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("package-lock.json"), "{}").unwrap();
+        std::fs::write(
+            dir.path().join("package.json"),
+            r#"{"name":"fixture","scripts":{"dev":"vite","test":"vitest","lint":"eslint .","typecheck":"tsc --noEmit","build":"vite build"}}"#,
+        )
+        .unwrap();
+
+        for id in ["react-ts-claude", "react-ts-agents"] {
+            let result = apply(id, dir.path().to_str().unwrap()).unwrap();
+            let written = std::fs::read_to_string(&result.path).unwrap();
+
+            assert!(
+                !written.contains("pnpm"),
+                "{id} written into an npm repo still mentions pnpm:\n{written}"
+            );
+            assert!(
+                !written.contains("pnpm-lock.yaml"),
+                "{id} still claims a pnpm-lock.yaml lockfile:\n{written}"
+            );
+            assert!(
+                written.contains("package-lock.json"),
+                "{id} doesn't mention the repo's actual lockfile:\n{written}"
+            );
+            assert!(
+                !written.contains("npm run"),
+                "{id} introduces an `npm run <script>` form we can't back with a guaranteed script:\n{written}"
+            );
+            for cmd in ["npm install", "npm test", "npm build"] {
+                assert!(
+                    written.contains(cmd),
+                    "{id} missing `{cmd}` after adapting to npm:\n{written}"
+                );
+            }
+        }
+    }
+
+    /// Left untouched: a repo with a pnpm lockfile (or no lockfile at all)
+    /// gets the template's original, unmodified content.
+    #[test]
+    fn apply_leaves_react_ts_content_unchanged_for_a_pnpm_repo() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = apply("react-ts-claude", dir.path().to_str().unwrap()).unwrap();
+        let written = std::fs::read_to_string(&result.path).unwrap();
+        assert_eq!(written, find("react-ts-claude").unwrap().preview);
     }
 }
