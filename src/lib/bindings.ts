@@ -104,6 +104,16 @@ export const commands = {
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
 	/**  The weekly Scans digest. */
 	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
+	/**
+	 *  Every starter template pack (#75): free to browse and preview — the
+	 *  one-click write is the paid action, gated in `apply_template`.
+	 */
+	listTemplates: () => __TAURI_INVOKE<TemplateInfo[]>("list_templates"),
+	/**
+	 *  Write a starter template into `dest_dir` (paid). Never overwrites an
+	 *  existing same-named file.
+	 */
+	applyTemplate: (templateId: string, destDir: string) => typedError<ApplyTemplateResult, string>(__TAURI_INVOKE("apply_template", { templateId, destDir })),
 };
 
 /* Types */
@@ -133,6 +143,12 @@ export type AppStatus = {
 export type ApplyResult = {
 	/**  The git branch the change was committed to, if the user opted in. */
 	git_ref: string | null,
+};
+
+/**  Result of writing a template to disk. */
+export type ApplyTemplateResult = {
+	/**  The full path the template was written to. */
+	path: string,
 };
 
 /**  An item in the digest's "needs your eyes" list. */
@@ -169,6 +185,11 @@ export type FileDetail = {
 export type FileRow = {
 	id: string,
 	name: string,
+	/**
+	 *  Absolute path on disk — lets the frontend match a freshly-written file
+	 *  (e.g. an applied template) to its scanned id after a rescan.
+	 */
+	path: string,
 	project: string,
 	grade: Grade,
 	score: number,
@@ -300,6 +321,22 @@ export type Severity =
 
 /**  Where a rule's authority comes from (drives the source badge). */
 export type Source = "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
+
+/**  One starter template: metadata plus its full content for the free preview. */
+export type TemplateInfo = {
+	id: string,
+	/**  Stack id: `react-ts`, `python`, or `rust`. */
+	stack: string,
+	/**  The instruction file name this template produces: `CLAUDE.md` or `AGENTS.md`. */
+	file_type: string,
+	title: string,
+	description: string,
+	/**
+	 *  The full file content — shown as a free, honest preview even though
+	 *  writing it to disk is a paid action.
+	 */
+	preview: string,
+};
 
 export type WorklistItem = {
 	file_id: string,

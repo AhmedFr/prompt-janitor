@@ -600,6 +600,33 @@ pub fn get_scans_digest(db: tauri::State<'_, AppDb>) -> Result<query::ScansDiges
     query::get_scans_digest(&conn).map_err(|e| e.to_string())
 }
 
+/// Every starter template pack (#75): free to browse and preview — the
+/// one-click write is the paid action, gated in `apply_template`.
+#[tauri::command]
+#[specta::specta]
+pub fn list_templates() -> Vec<crate::templates::TemplateInfo> {
+    crate::templates::all()
+}
+
+/// Write a starter template into `dest_dir` (paid). Never overwrites an
+/// existing same-named file.
+#[tauri::command]
+#[specta::specta]
+pub fn apply_template(
+    db: tauri::State<'_, AppDb>,
+    template_id: String,
+    dest_dir: String,
+) -> Result<crate::templates::ApplyTemplateResult, String> {
+    let paid = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        entitlement_of(&conn).paid
+    };
+    if !paid {
+        return Err(PAID_GATE.to_string());
+    }
+    crate::templates::apply(&template_id, &dest_dir)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

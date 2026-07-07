@@ -22,6 +22,8 @@ export type {
   Severity,
   Source,
   Grade,
+  TemplateInfo,
+  ApplyTemplateResult,
 } from "./bindings";
 
 /** True when running inside the Tauri runtime (vs. a plain browser dev server). */
