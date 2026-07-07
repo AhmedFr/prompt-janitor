@@ -100,8 +100,25 @@ const MIGRATIONS: &[&str] = &[
     // carry its AI-standards issues forward instead of losing them on every
     // scheduled rescan (#85). NULL for rows written before this migration;
     // that's treated as "unknown", which conservatively means no carry-forward.
+    //
+    // One-time UX consequence: existing rows get content_hash = NULL, which
+    // reads as "unknown" rather than "matches" — so the very first rescan
+    // after upgrading to this version cannot confirm any file is unchanged
+    // and drops every file's previously-recorded AI-standards issues (they
+    // return once the user re-runs "Check standards" on that file). This is
+    // a one-time reset on upgrade, not a recurring loss; every rescan after
+    // that first one carries verdicts forward normally.
     "
     ALTER TABLE files ADD COLUMN content_hash TEXT;
+    ",
+    // 4: grade_history.issue_signature — lets apply_nl_verdicts's dedupe (see
+    // its doc comment) distinguish "genuinely unchanged rescore" from "the
+    // net score happens to match, but a different rule is now violated"
+    // (#94 P2). NULL for rows written before this migration or by the
+    // full-rescan path (scan.rs), which always appends a history row
+    // unconditionally and has no need for the dedupe.
+    "
+    ALTER TABLE grade_history ADD COLUMN issue_signature TEXT;
     ",
 ];
 
