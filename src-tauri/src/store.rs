@@ -95,6 +95,31 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE rules ADD COLUMN kind TEXT NOT NULL DEFAULT 'deterministic';
     ALTER TABLE issues ADD COLUMN rule_id TEXT;
     ",
+    // 3: files.content_hash — lets a rescan tell whether a file's content
+    // changed since NL verdicts were last recorded, so an unchanged file can
+    // carry its AI-standards issues forward instead of losing them on every
+    // scheduled rescan (#85). NULL for rows written before this migration;
+    // that's treated as "unknown", which conservatively means no carry-forward.
+    //
+    // One-time UX consequence: existing rows get content_hash = NULL, which
+    // reads as "unknown" rather than "matches" — so the very first rescan
+    // after upgrading to this version cannot confirm any file is unchanged
+    // and drops every file's previously-recorded AI-standards issues (they
+    // return once the user re-runs "Check standards" on that file). This is
+    // a one-time reset on upgrade, not a recurring loss; every rescan after
+    // that first one carries verdicts forward normally.
+    "
+    ALTER TABLE files ADD COLUMN content_hash TEXT;
+    ",
+    // 4: grade_history.issue_signature — lets apply_nl_verdicts's dedupe (see
+    // its doc comment) distinguish "genuinely unchanged rescore" from "the
+    // net score happens to match, but a different rule is now violated"
+    // (#94 P2). NULL for rows written before this migration or by the
+    // full-rescan path (scan.rs), which always appends a history row
+    // unconditionally and has no need for the dedupe.
+    "
+    ALTER TABLE grade_history ADD COLUMN issue_signature TEXT;
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -185,5 +210,41 @@ mod tests {
             .query_row("SELECT rule_id FROM issues LIMIT 1", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rule_id, None);
+    }
+
+    #[test]
+    fn migration_3_adds_content_hash() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, content_hash) VALUES('f', 'p', '/p/f.md', 'md', 'abc123')",
+            [],
+        )
+        .unwrap();
+        let hash: Option<String> = conn
+            .query_row("SELECT content_hash FROM files WHERE id = 'f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(hash.as_deref(), Some("abc123"));
+
+        // Rows written before this migration have no hash — treated as
+        // "unknown", never as a match.
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('g', 'p', '/p/g.md', 'md')",
+            [],
+        )
+        .unwrap();
+        let missing: Option<String> = conn
+            .query_row("SELECT content_hash FROM files WHERE id = 'g'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(missing, None);
     }
 }
