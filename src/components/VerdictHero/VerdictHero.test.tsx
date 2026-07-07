@@ -91,8 +91,39 @@ describe("VerdictHero", () => {
     renderHero();
     expect(screen.getByText("Deprecated model")).toBeInTheDocument();
     expect(screen.getByText("+15 pts")).toBeInTheDocument();
-    expect(screen.getByText("Fix these 1 →")).toBeInTheDocument();
+    expect(screen.getByText("Fix this 1 →")).toBeInTheDocument();
     expect(screen.getByLabelText("Grade B")).toBeInTheDocument();
+  });
+
+  it("pluralizes the fix-path footer for more than one fix", () => {
+    renderHero({
+      verdict: {
+        ...verdict,
+        fixPath: [
+          { fileId: "f1", fileName: "CLAUDE.md", title: "A", severity: "hi", points: 15 },
+          { fileId: "f1", fileName: "CLAUDE.md", title: "B", severity: "mid", points: 7 },
+          { fileId: "f2", fileName: "AGENTS.md", title: "C", severity: "lo", points: 3 },
+        ],
+        projectedGrade: "D",
+      },
+    });
+    expect(screen.getByText("Fix these 3 →")).toBeInTheDocument();
+  });
+
+  it("keeps the header honest when the shown fixes don't reach an A", () => {
+    // Grade F, top 3 fixes only project to a D — the header must say so
+    // instead of claiming "an A", or it contradicts the footer right below it.
+    renderHero({
+      data: { ...overview, overall_grade: "F", overall_score: 34, critical: 9, warnings: 8, nits: 6 },
+      verdict: { ...verdict, projectedGrade: "D", fixesToA: 14, autofixCount: 7 },
+    });
+    expect(screen.getByText("Fastest path to D")).toBeInTheDocument();
+    expect(screen.queryByText("Fastest path to an A")).not.toBeInTheDocument();
+  });
+
+  it("keeps 'an A' in the header when the shown fixes do reach an A", () => {
+    renderHero({ verdict: { ...verdict, projectedGrade: "A" } });
+    expect(screen.getByText("Fastest path to an A")).toBeInTheDocument();
   });
 
   it("navigates to the file's detail view when a fix-path row is clicked", () => {
@@ -118,11 +149,19 @@ describe("VerdictHero", () => {
   it("opens the checkout instead of fixing when Auto-fix is locked", () => {
     const onAutoFix = vi.fn();
     renderHero({ onAutoFix });
-    fireEvent.click(screen.getByRole("button", { name: /Auto-fix 4/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Unlock Auto-fix/ }));
     expect(openExternal).toHaveBeenCalledWith(expect.stringContaining("polar"));
     expect(onAutoFix).not.toHaveBeenCalled();
     // The paste-a-key escape hatch is offered next to the locked button.
     expect(screen.getByText("Settings → License")).toBeInTheDocument();
+  });
+
+  it("gives the locked Auto-fix button a distinct label from the unlocked one", () => {
+    // Locked and unlocked previously differed only by icon — easy to miss.
+    // The label itself must now differ, matching TemplatePicker's idiom.
+    renderHero();
+    expect(screen.getByRole("button", { name: "Unlock Auto-fix" })).toBeInTheDocument();
+    expect(screen.queryByText("Auto-fix 4")).not.toBeInTheDocument();
   });
 
   it("runs the auto-fix when entitled", () => {
@@ -131,5 +170,32 @@ describe("VerdictHero", () => {
     fireEvent.click(screen.getByRole("button", { name: /Auto-fix 4/ }));
     expect(onAutoFix).toHaveBeenCalled();
     expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  describe("pluralization", () => {
+    it("singularizes warnings, nits, and file/project counts at 1", () => {
+      renderHero({
+        data: { ...overview, file_count: 1, project_count: 1, critical: 1, warnings: 1, nits: 1 },
+      });
+      expect(screen.getByText("1 prompt file · 1 project")).toBeInTheDocument();
+      expect(screen.getByText("1 critical")).toBeInTheDocument();
+      expect(screen.getByText("1 warning")).toBeInTheDocument();
+      expect(screen.getByText("1 nit")).toBeInTheDocument();
+    });
+
+    it("pluralizes warnings, nits, and file/project counts above 1", () => {
+      renderHero({
+        data: { ...overview, file_count: 2, project_count: 2, critical: 2, warnings: 2, nits: 2 },
+      });
+      expect(screen.getByText("2 prompt files · 2 projects")).toBeInTheDocument();
+      expect(screen.getByText("2 critical")).toBeInTheDocument();
+      expect(screen.getByText("2 warnings")).toBeInTheDocument();
+      expect(screen.getByText("2 nits")).toBeInTheDocument();
+    });
+
+    it("singularizes the standards-coverage line at 1", () => {
+      renderHero({ verdict: { ...verdict, aiReady: true, totalStandards: 1 } });
+      expect(screen.getByText("Grading against 1 standard.")).toBeInTheDocument();
+    });
   });
 });

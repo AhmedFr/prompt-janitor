@@ -7,10 +7,11 @@ import { Icon } from "@/components/Icon";
 import { openExternal } from "@/lib/open-external";
 import {
   POLAR_CHECKOUT_URL,
+  FOUNDER_PRICE,
   PASTE_KEY_HINT_PREFIX,
   PASTE_KEY_HINT_LOCATION,
 } from "@/lib/monetization";
-import { verdictSentence, costSentence } from "./VerdictHero.constants";
+import { verdictSentence, costSentence, plural } from "./VerdictHero.constants";
 import type { VerdictHeroProps } from "./VerdictHero.types";
 import "./VerdictHero.css";
 
@@ -51,16 +52,17 @@ export function VerdictHero({
           {data.critical > 0 && <div className="vh-cost">{costSentence(data.critical)}</div>}
           <div className="row wrap" style={{ gap: 16, marginTop: 10, fontSize: 12 }}>
             <span className="muted">
-              {data.file_count} prompt files · {data.project_count} projects
+              {data.file_count} {plural(data.file_count, "prompt file")} ·{" "}
+              {data.project_count} {plural(data.project_count, "project")}
             </span>
             <span className="row" style={{ gap: 6 }}>
               <SeverityDot level="hi" /> {data.critical} critical
             </span>
             <span className="row" style={{ gap: 6 }}>
-              <SeverityDot level="mid" /> {data.warnings} warnings
+              <SeverityDot level="mid" /> {data.warnings} {plural(data.warnings, "warning")}
             </span>
             <span className="row" style={{ gap: 6 }}>
-              <SeverityDot level="lo" /> {data.nits} nits
+              <SeverityDot level="lo" /> {data.nits} {plural(data.nits, "nit")}
             </span>
           </div>
           {data.scan_folder && (
@@ -73,7 +75,11 @@ export function VerdictHero({
 
       {verdict.fixPath.length > 0 && (
         <div style={{ marginTop: 18 }}>
-          <div className="vh-sec">Fastest path to an A</div>
+          <div className="vh-sec">
+            {verdict.projectedGrade === "A"
+              ? "Fastest path to an A"
+              : `Fastest path to ${verdict.projectedGrade}`}
+          </div>
           <div className="vh-list">
             {verdict.fixPath.map((row, i) => (
               <button key={i} className="vh-row" onClick={() => navigate("detail", row.fileId)}>
@@ -94,7 +100,7 @@ export function VerdictHero({
           {verdict.projectedGrade && (
             <div className="row" style={{ gap: 8, marginTop: 10, fontSize: 13, alignItems: "center" }}>
               <span className="muted">
-                Fix these {verdict.fixPath.length} →
+                Fix {plural(verdict.fixPath.length, "this", "these")} {verdict.fixPath.length} →
               </span>
               <Grade grade={verdict.projectedGrade} size="sm" />
             </div>
@@ -105,10 +111,13 @@ export function VerdictHero({
       {!verdict.loading && (
         <div className="vh-coverage faint">
           {verdict.aiReady ? (
-            <>Grading against {verdict.totalStandards} standards.</>
+            <>
+              Grading against {verdict.totalStandards} {plural(verdict.totalStandards, "standard")}.
+            </>
           ) : (
             <>
-              Graded on {verdict.detStandards} of {verdict.totalStandards} standards —{" "}
+              Graded on {verdict.detStandards} of {verdict.totalStandards}{" "}
+              {plural(verdict.totalStandards, "standard")} —{" "}
               <button className="vh-link" onClick={() => navigate("settings", "ai")}>
                 connect a model to grade all {verdict.totalStandards}
               </button>
@@ -127,12 +136,12 @@ export function VerdictHero({
             disabled={autoFixBusy || scanning}
             title={
               locked
-                ? "Auto-fix is a Pro feature — get a license"
+                ? `Unlock Auto-fix — ${FOUNDER_PRICE}`
                 : "Apply every deterministic fix across all files"
             }
           >
             <Icon name={locked ? "lock" : "wand"} />{" "}
-            {autoFixBusy ? "Fixing…" : `Auto-fix ${verdict.autofixCount}`}
+            {autoFixBusy ? "Fixing…" : locked ? "Unlock Auto-fix" : `Auto-fix ${verdict.autofixCount}`}
           </Button>
         )}
         <Button size="sm" onClick={onScanNow} disabled={scanning || autoFixBusy}>
