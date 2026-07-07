@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon, type IconName } from "@/components/Icon";
@@ -32,11 +32,22 @@ const FREQS: [string, string, string][] = [
 
 export interface SettingsProps {
   navigate: Navigate;
+  /** Tab to open on (e.g. "ai" from the Overview coverage line). */
+  initialTab?: string;
 }
 
-export function Settings({ navigate }: SettingsProps) {
+const isTab = (value: string | undefined): value is Tab =>
+  TABS.some(([key]) => key === value);
+
+export function Settings({ navigate, initialTab }: SettingsProps) {
   const s = useSettings();
-  const [tab, setTab] = useState<Tab>("schedule");
+  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "schedule");
+
+  // Follow later in-app deep links (e.g. Overview → Settings → AI) even if
+  // the screen happens to stay mounted.
+  useEffect(() => {
+    if (isTab(initialTab)) setTab(initialTab);
+  }, [initialTab]);
 
   const changeFolder = async () => {
     const ok = await pickAndScan();

@@ -180,3 +180,20 @@
   gap: 14px;
   padding: 48px 40px;
 }
+
+.ob-reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 30px 22px;
+}
+
+.ob-verdict {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  max-width: 420px;
+}
