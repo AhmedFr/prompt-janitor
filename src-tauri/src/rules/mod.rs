@@ -8,12 +8,14 @@ mod hardcoded_model;
 mod missing_few_shot;
 mod missing_output_format;
 mod missing_role;
+mod nl_catalog;
 
 pub use contradiction::Contradiction;
 pub use hardcoded_model::HardcodedModel;
 pub use missing_few_shot::MissingFewShot;
 pub use missing_output_format::MissingOutputFormat;
 pub use missing_role::MissingRole;
+pub use nl_catalog::{builtin_nl_rules, BuiltinNlRule};
 
 use crate::engine::Rule;
 

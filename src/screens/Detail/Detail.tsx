@@ -240,7 +240,7 @@ function DetailBody({
         />
       )}
 
-      {aiReady && entitled && <NlRulesPanel fileId={detail.id} />}
+      {aiReady && <NlRulesPanel fileId={detail.id} onApplied={() => void onReload()} />}
     </>
   );
 }
