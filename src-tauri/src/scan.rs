@@ -1,6 +1,6 @@
 //! Scan orchestration: walk → grade → persist.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use rusqlite::{params, Connection};
@@ -42,6 +42,16 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
         }
     }
 
+    // Rules that are still enabled and still exist — a rescan must not carry
+    // forward an issue for a rule the user has since disabled or deleted
+    // (#94 P0). `enabled_nl_rules(.., true)` already applies the same
+    // enabled/exists filtering `query::evaluate_nl_rules` uses for a fresh
+    // check, so carry-forward and a fresh check agree on what counts.
+    let active_nl_ids: HashSet<String> = crate::query::enabled_nl_rules(conn, true)?
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+
     let mut issues: HashMap<String, Vec<Issue>> = HashMap::new();
     {
         let mut stmt = conn.prepare(
@@ -64,6 +74,11 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
         })?;
         for row in rows {
             let (file_id, rule_id, line, severity, source, title, why, fix_from, fix_to) = row?;
+            if !active_nl_ids.contains(&rule_id) {
+                // Rule has since been disabled or deleted — drop the stale
+                // carry-forward instead of folding it into the score again.
+                continue;
+            }
             let fix = match (fix_from, fix_to) {
                 (Some(from), Some(to)) => Some(Fix { from, to }),
                 _ => None,
@@ -507,6 +522,113 @@ For example:
             nl_issues_after, 0,
             "an NL issue must not survive a content change"
         );
+    }
+
+    #[test]
+    fn rescan_drops_nl_issue_when_rule_disabled() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        crate::query::seed_builtin_nl_rules(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CLAUDE.md");
+        fs::write(&file, CLEAN).unwrap();
+        let file_id = file.display().to_string();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        let (baseline_score, baseline_issues): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+
+        let verdicts = vec![clarity_verdict(true)];
+        crate::query::apply_nl_verdicts(&conn, &file_id, &verdicts).unwrap();
+
+        // Disable the rule that produced the carried issue — mirrors a user
+        // toggling a standard off between scans.
+        crate::query::set_rule(&conn, "anthropic-clarity", false).unwrap();
+
+        // Rescan unchanged content — the disabled rule's issue must not
+        // survive, and the score must match what a fresh check (which
+        // already filters by rule state) would produce.
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let (score, issue_count): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            score, baseline_score,
+            "a disabled rule's carried issue must not depress the score"
+        );
+        assert_eq!(issue_count, baseline_issues);
+
+        let nl_issue_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
+                [&file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(nl_issue_count, 0);
+    }
+
+    #[test]
+    fn rescan_drops_nl_issue_when_custom_rule_deleted() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        crate::query::seed_builtin_nl_rules(&conn).unwrap();
+        let rule_id =
+            crate::query::add_nl_rule(&conn, "No Slack", "VIOLATES if it mentions Slack.", "mid")
+                .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CLAUDE.md");
+        fs::write(&file, CLEAN).unwrap();
+        let file_id = file.display().to_string();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        let (baseline_score, baseline_issues): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+
+        let verdict = crate::ai_rules::NlVerdict {
+            rule_id: rule_id.clone(),
+            title: "No Slack".into(),
+            severity: "mid".into(),
+            source: "custom".into(),
+            violates: true,
+            explanation: "Mentions Slack.".into(),
+        };
+        crate::query::apply_nl_verdicts(&conn, &file_id, &[verdict]).unwrap();
+
+        // Delete the custom rule entirely — mirrors a user removing an AI
+        // rule between scans.
+        crate::query::delete_custom_rule(&conn, &rule_id).unwrap();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let (score, issue_count): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            score, baseline_score,
+            "a deleted custom rule's carried issue must not depress the score"
+        );
+        assert_eq!(issue_count, baseline_issues);
     }
 
     #[test]
