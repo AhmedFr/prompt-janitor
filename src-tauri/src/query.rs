@@ -482,12 +482,21 @@ pub struct RuleInfo {
     pub pattern: Option<String>,
 }
 
-/// Seed the rules table from the built-in catalog. Idempotent — preserves toggles.
+/// Seed the rules table from the built-in catalog. Idempotent — preserves the
+/// user's `enabled` toggle, but *upserts* the metadata (source, severity,
+/// title, description) on every seed so existing installs pick up rule
+/// repurposes (e.g. no-hardcoded-model → deprecated-model) instead of
+/// keeping stale metadata forever.
 pub fn seed_rules(conn: &Connection) -> rusqlite::Result<()> {
     for rule in builtin_rules() {
         conn.execute(
-            "INSERT OR IGNORE INTO rules(id, source, severity, title, description, enabled)
-             VALUES(?1, ?2, ?3, ?4, ?5, 1)",
+            "INSERT INTO rules(id, source, severity, title, description, enabled)
+             VALUES(?1, ?2, ?3, ?4, ?5, 1)
+             ON CONFLICT(id) DO UPDATE SET
+                 source = excluded.source,
+                 severity = excluded.severity,
+                 title = excluded.title,
+                 description = excluded.description",
             params![
                 rule.id(),
                 rule.source().as_str(),
@@ -874,7 +883,9 @@ mod tests {
         let ov = get_overview(&conn).unwrap();
         assert!(ov.has_data);
         assert_eq!(ov.file_count, 1);
-        assert!(ov.critical >= 2);
+        // Contradiction (Hi); empty-stub is Mid since the #92 softening, so
+        // only one critical remains on this fixture.
+        assert!(ov.critical >= 1);
         assert!(!ov.worklist.is_empty());
         assert_eq!(ov.worklist[0].severity, Severity::Hi);
     }
@@ -887,7 +898,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("good")).unwrap();
         std::fs::write(
             dir.path().join("good/AGENTS.md"),
-            "You are a senior reviewer.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
+            "You are a senior reviewer for this codebase.\nFocus on correctness and clear, idiomatic style.\nRespond in JSON.\nFor example:\n```\n{}\n```\n",
         )
         .unwrap();
         std::fs::create_dir_all(dir.path().join("bad")).unwrap();
@@ -994,16 +1005,61 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         crate::store::migrate(&conn).unwrap();
         seed_rules(&conn).unwrap();
-        assert_eq!(active_rules(&conn).len(), 5);
+        assert_eq!(active_rules(&conn).len(), 14);
 
         set_rule(&conn, "no-hardcoded-model", false).unwrap();
         let active = active_rules(&conn);
-        assert_eq!(active.len(), 4);
+        assert_eq!(active.len(), 13);
         assert!(!active.iter().any(|r| r.id() == "no-hardcoded-model"));
         assert!(list_rules(&conn)
             .unwrap()
             .iter()
             .any(|r| r.id == "no-hardcoded-model" && !r.enabled));
+    }
+
+    #[test]
+    fn seed_rules_upserts_metadata_but_preserves_enabled_flag() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        // Simulate an old install: stale metadata from the rule's previous
+        // incarnation, one row disabled by the user and one left enabled.
+        conn.execute(
+            "INSERT INTO rules(id, source, severity, title, description, enabled)
+             VALUES('no-hardcoded-model', 'karpathy', 'hi', 'Hardcoded model name', 'old copy', 0)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO rules(id, source, severity, title, description, enabled)
+             VALUES('empty-stub', 'custom', 'hi', 'old title', 'old copy', 1)",
+            [],
+        )
+        .unwrap();
+
+        seed_rules(&conn).unwrap();
+
+        let (source, severity, title, enabled): (String, String, String, i64) = conn
+            .query_row(
+                "SELECT source, severity, title, enabled FROM rules WHERE id = 'no-hardcoded-model'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(source, "custom");
+        assert_eq!(severity, "mid");
+        assert_eq!(title, "Deprecated model name");
+        assert_eq!(enabled, 0, "user's disabled toggle must survive re-seed");
+
+        let (severity, enabled): (String, i64) = conn
+            .query_row(
+                "SELECT severity, enabled FROM rules WHERE id = 'empty-stub'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(severity, "mid");
+        assert_eq!(enabled, 1, "enabled rows stay enabled after re-seed");
     }
 
     #[test]
