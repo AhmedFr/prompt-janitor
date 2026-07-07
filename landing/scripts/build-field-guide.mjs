@@ -1,0 +1,286 @@
+#!/usr/bin/env node
+// Generates landing/field-guide.html from docs/standards/prompting-standards.md.
+//
+// This is a *committed transformation*: the generated field-guide.html is
+// checked into git so the landing page works even if this script or the
+// source markdown ever move. Re-run this script (`pnpm run build:guide` from
+// landing/) whenever docs/standards/prompting-standards.md changes, and
+// commit the regenerated landing/field-guide.html alongside it.
+//
+// Bump EDITION_VERSION / EDITION_DATE below when the standards content
+// changes meaningfully — they're fixed strings (not "generated at build
+// time") so rebuilding the site doesn't produce a diff-only-in-date noise.
+
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SOURCE_MD = path.resolve(__dirname, "../../docs/standards/prompting-standards.md");
+const OUTPUT_HTML = path.resolve(__dirname, "../field-guide.html");
+
+const EDITION_VERSION = "v1.0";
+const EDITION_DATE = "July 2026";
+
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Minimal inline markdown -> HTML: `code`, **bold**, *italic*.
+function mdInline(raw) {
+  let s = escapeHtml(raw.trim());
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  return s;
+}
+
+function splitRow(line) {
+  // Strip leading/trailing pipe, split on unescaped pipes, trim each cell.
+  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return trimmed.split("|").map((c) => c.trim());
+}
+
+function isSeparatorRow(cells) {
+  return cells.every((c) => /^:?-+:?$/.test(c));
+}
+
+function parseStandardsMarkdown(md) {
+  const lines = md.split("\n");
+  const sections = [];
+  let current = null;
+  let inTable = false;
+  let sawHeaderRow = false;
+
+  for (const line of lines) {
+    const headingMatch = /^##\s+(.+)$/.exec(line);
+    if (headingMatch) {
+      current = { name: headingMatch[1].trim(), standards: [] };
+      sections.push(current);
+      inTable = false;
+      sawHeaderRow = false;
+      continue;
+    }
+    if (!current) continue;
+
+    const isTableLine = /^\s*\|/.test(line);
+    if (!isTableLine) {
+      inTable = false;
+      sawHeaderRow = false;
+      continue;
+    }
+
+    const cells = splitRow(line);
+    if (!inTable) {
+      // First table line after a heading is the header row (Id | Sev | ...).
+      inTable = true;
+      sawHeaderRow = false;
+      continue;
+    }
+    if (!sawHeaderRow) {
+      // Second table line is the --- separator row.
+      sawHeaderRow = true;
+      continue;
+    }
+    if (cells.length < 4) continue;
+
+    const [id, sev, instruction, why] = cells;
+    current.standards.push({
+      id: id.replace(/`/g, ""),
+      sev: sev.trim(),
+      instruction: mdInline(instruction),
+      why: mdInline(why),
+    });
+  }
+
+  return sections.filter((s) => s.standards.length > 0);
+}
+
+function sevClass(sev) {
+  const s = sev.trim().toLowerCase();
+  if (s === "hi") return "hi";
+  if (s === "mid") return "mid";
+  return "lo";
+}
+
+function sevLabel(sev) {
+  const s = sev.trim().toLowerCase();
+  if (s === "hi") return "High";
+  if (s === "mid") return "Medium";
+  return "Low";
+}
+
+function renderSection(section, index) {
+  const anchor = `sec-${index}-${section.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+  const cards = section.standards
+    .map(
+      (st) => `      <article class="fg-standard">
+        <div class="fg-standard-head">
+          <code class="fg-id">${escapeHtml(st.id)}</code>
+          <span class="fg-sev fg-sev-${sevClass(st.sev)}">${sevLabel(st.sev)}</span>
+        </div>
+        <p class="fg-instruction">${st.instruction}</p>
+        <p class="fg-why"><strong>Why it matters —</strong> ${st.why}</p>
+      </article>`
+    )
+    .join("\n");
+
+  return `    <section class="fg-section" aria-labelledby="${anchor}">
+      <h2 id="${anchor}">${escapeHtml(section.name)} <span class="fg-count">${section.standards.length} standard${section.standards.length === 1 ? "" : "s"}</span></h2>
+      <div class="fg-standards">
+${cards}
+      </div>
+    </section>`;
+}
+
+function renderToc(sections) {
+  return sections
+    .map((s, i) => {
+      const anchor = `sec-${i}-${s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+      return `        <li><a href="#${anchor}">${escapeHtml(s.name)}</a> <span class="fg-count">${s.standards.length}</span></li>`;
+    })
+    .join("\n");
+}
+
+function build() {
+  const md = readFileSync(SOURCE_MD, "utf8");
+  const sections = parseStandardsMarkdown(md);
+  const totalCount = sections.reduce((n, s) => n + s.standards.length, 0);
+
+  const sectionsHtml = sections.map(renderSection).join("\n\n");
+  const tocHtml = renderToc(sections);
+
+  const html = `<!--
+  Generated by landing/scripts/build-field-guide.mjs from
+  docs/standards/prompting-standards.md — do not hand-edit the standards
+  content below; edit the source markdown and re-run the script instead.
+
+  This page is intentionally NOT linked from the public nav or index.html.
+  It's a Pro bonus delivered via Polar's file-download benefit as a PDF that
+  the owner prints from this page (File → Print → Save as PDF) and attaches
+  to the product in Polar. It only needs to exist at a stable URL; it is not
+  meant to be discovered by search engines or site visitors.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Prompt-File Field Guide — Prompt Janitor</title>
+    <meta
+      name="description"
+      content="The 25 standards your AI instruction files are graded against — Prompt Janitor Pro bonus."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <style>
+      body { background: var(--bg); }
+      .fg-topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 28px; border-bottom: 1px solid var(--line);
+        max-width: var(--maxw); margin: 0 auto;
+      }
+      .fg-print-btn {
+        display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600;
+        padding: 9px 18px; border-radius: var(--r-pill); border: 1px solid var(--line-2);
+        background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); cursor: pointer;
+      }
+      .fg-print-btn:hover { background: #fafafa; }
+
+      .fg-cover {
+        max-width: var(--maxw); margin: 0 auto; padding: 90px 28px 70px; text-align: center;
+      }
+      .fg-cover .eyebrow { display: block; margin-bottom: 22px; }
+      .fg-cover h1 { font-size: clamp(34px, 5.5vw, 56px); font-weight: 700; letter-spacing: -.03em; max-width: 16ch; margin: 0 auto; }
+      .fg-cover .fg-sub { font-size: 19px; color: var(--ink-2); max-width: 46ch; margin: 20px auto 0; }
+      .fg-cover .fg-meta { margin-top: 34px; font-size: 14px; color: var(--ink-3); }
+      .fg-cover .fg-meta span + span::before { content: "·"; margin: 0 10px; }
+
+      .fg-toc { max-width: 620px; margin: 0 auto 90px; padding: 0 28px; }
+      .fg-toc h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-weight: 600; margin-bottom: 14px; }
+      .fg-toc ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+      .fg-toc li { display: flex; justify-content: space-between; padding: 12px 2px; border-bottom: 1px solid var(--line); font-size: 16px; }
+      .fg-toc a { color: var(--ink); font-weight: 500; }
+      .fg-toc a:hover { color: var(--blue); }
+
+      .fg-section { max-width: var(--maxw); margin: 0 auto; padding: 0 28px 64px; }
+      .fg-section h2 { font-size: clamp(24px, 3.4vw, 32px); display: flex; align-items: baseline; gap: 12px; margin-bottom: 26px; padding-top: 40px; border-top: 1px solid var(--line); }
+      .fg-section .fg-count { font-size: 14px; font-weight: 500; color: var(--ink-3); }
+      .fg-standards { display: flex; flex-direction: column; gap: 16px; }
+      .fg-standard { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); padding: 20px 24px; }
+      .fg-standard-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+      .fg-id { font-family: var(--mono); font-size: 13px; color: var(--blue-press); background: var(--blue-tint); padding: 3px 9px; border-radius: 6px; }
+      .fg-sev { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: var(--r-pill); }
+      .fg-sev-hi { background: rgba(255,59,48,.12); color: #b8271e; }
+      .fg-sev-mid { background: rgba(245,158,11,.14); color: #92600a; }
+      .fg-sev-lo { background: rgba(10,132,255,.1); color: var(--blue-press); }
+      .fg-instruction { margin: 0 0 8px; font-size: 16px; color: var(--ink); line-height: 1.55; }
+      .fg-why { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+      .fg-standard code { font-family: var(--mono); font-size: .92em; background: var(--bg-tint); padding: 1px 6px; border-radius: 5px; }
+
+      .fg-closing { max-width: var(--maxw); margin: 0 auto; padding: 0 28px 90px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+      @media print {
+        .no-print { display: none !important; }
+        body { font-size: 13px; }
+        .fg-cover { padding: 40px 0 30px; page-break-after: page; break-after: page; }
+        .fg-toc { padding: 0; margin-bottom: 40px; }
+        .fg-section {
+          padding: 0 0 30px; margin: 0 auto;
+          page-break-before: page; break-before: page;
+        }
+        .fg-section:first-of-type { page-break-before: auto; break-before: auto; }
+        .fg-section h2 { border-top: none; padding-top: 0; }
+        .fg-standard { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+        a { color: inherit; text-decoration: none; }
+        .wrap, .fg-cover, .fg-toc, .fg-section, .fg-closing { max-width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fg-topbar no-print">
+      <a class="brand" href="/#hero" style="font-family:var(--display);font-weight:600;display:flex;align-items:center;gap:10px;">
+        <span class="logo" aria-hidden="true" style="width:28px;height:28px;border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg, #36a3ff, #0a6fff);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="6" x2="19" y2="6"/><line x1="5" y1="11" x2="14" y2="11"/><line x1="5" y1="16" x2="9" y2="16" stroke-opacity=".5"/><path d="M15 15.5l1.5 1.5M16.5 15.5L15 17" stroke-width="1.4"/></svg></span>
+        Prompt Janitor
+      </a>
+      <button class="fg-print-btn" onclick="window.print()" type="button">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print / Save as PDF
+      </button>
+    </div>
+
+    <main id="main">
+      <div class="fg-cover">
+        <span class="eyebrow">Prompt Janitor Pro bonus</span>
+        <h1>Prompt-File Field Guide</h1>
+        <p class="fg-sub">The ${totalCount} standards your AI instruction files are graded against — with citations, so you know exactly why each one matters.</p>
+        <p class="fg-sub" style="font-size:16px;margin-top:10px;">Pro bonus — included with your Prompt Janitor license.</p>
+        <div class="fg-meta"><span>${EDITION_VERSION}</span><span>${EDITION_DATE}</span><span>${totalCount} standards</span></div>
+      </div>
+
+      <div class="fg-toc no-print">
+        <h3>Contents</h3>
+        <ul>
+${tocHtml}
+        </ul>
+      </div>
+
+${sectionsHtml}
+
+      <div class="fg-closing">
+        <p>Prompt Janitor — the visibility layer for every prompt on your Mac.</p>
+      </div>
+    </main>
+  </body>
+</html>
+`;
+
+  writeFileSync(OUTPUT_HTML, html, "utf8");
+  console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_HTML)} (${sections.length} sections, ${totalCount} standards)`);
+}
+
+build();
