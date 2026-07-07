@@ -130,4 +130,92 @@ describe("worker fetch handler", () => {
     expect(response.status).toBe(502);
     expect(kv.has("webhook:msg_fail")).toBe(false);
   });
+
+  it("a retry after a failed send succeeds and actually sends the email", async () => {
+    const kv = new MemoryKV();
+    const env = makeEnv(kv);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("server error", { status: 500 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = signedRequest(orderPaidEvent({ email: "buyer@example.com" }), { id: "msg_retry" });
+    const firstResponse = await worker.fetch(first, env);
+    expect(firstResponse.status).toBe(502);
+    expect(kv.has("webhook:msg_retry")).toBe(false); // marker released, retry not suppressed
+
+    const second = signedRequest(orderPaidEvent({ email: "buyer@example.com" }), { id: "msg_retry" });
+    const secondResponse = await worker.fetch(second, env);
+
+    expect(secondResponse.status).toBe(202);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(kv.has("webhook:msg_retry")).toBe(true);
+    expect(JSON.parse(kv.raw.get("webhook:msg_retry")!).status).toBe("sent");
+  });
+
+  it("collapses a concurrent duplicate delivery to a single email (optimistic-lock idempotency)", async () => {
+    let resolveEmail!: (response: Response) => void;
+    const emailGate = new Promise<Response>((resolve) => {
+      resolveEmail = resolve;
+    });
+    const fetchMock = vi.fn(() => emailGate);
+    vi.stubGlobal("fetch", fetchMock);
+    const kv = new MemoryKV();
+    const env = makeEnv(kv);
+
+    const first = signedRequest(orderPaidEvent({ email: "buyer@example.com" }), { id: "msg_concurrent" });
+    const firstPromise = worker.fetch(first, env);
+
+    // Let the first delivery run far enough to write the "processing"
+    // marker and call out to Resend (which is now blocked on `emailGate`)
+    // before the "concurrent" second delivery starts — this exercises the
+    // window the optimistic lock is meant to close: the marker is already
+    // there well before the first delivery's email actually completes.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(kv.has("webhook:msg_concurrent")).toBe(true);
+
+    const second = signedRequest(orderPaidEvent({ email: "buyer@example.com" }), { id: "msg_concurrent" });
+    const secondResponse = await worker.fetch(second, env);
+
+    // The duplicate delivery sees the "processing" marker and bails
+    // immediately, without ever calling Resend again.
+    expect(secondResponse.status).toBe(202);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveEmail(new Response("{}", { status: 200 }));
+    const firstResponse = await firstPromise;
+
+    expect(firstResponse.status).toBe(202);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // still just one email, ever
+    expect(JSON.parse(kv.raw.get("webhook:msg_concurrent")!).status).toBe("sent");
+  });
+
+  it("returns 500 with a non-secret diagnostic log when the signing key is malformed", async () => {
+    const kv = new MemoryKV();
+    const env: Env = { ...makeEnv(kv), LICENSE_SIGNING_KEY: "not-a-valid-seed" };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const request = signedRequest(orderPaidEvent({ email: "buyer@example.com" }), { id: "msg_badkey" });
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(500);
+    expect(fetchMock).not.toHaveBeenCalled(); // never got as far as emailing
+
+    // A diagnostic line was logged, but it never contains the secret value.
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    const loggedText = consoleErrorSpy.mock.calls
+      .flat()
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    expect(loggedText).toContain("license signing key misconfigured");
+    expect(loggedText).not.toContain(env.LICENSE_SIGNING_KEY);
+
+    // Marker released so a retry (after the secret is fixed) isn't suppressed.
+    expect(kv.has("webhook:msg_badkey")).toBe(false);
+
+    consoleErrorSpy.mockRestore();
+  });
 });

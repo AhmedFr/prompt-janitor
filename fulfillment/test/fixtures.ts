@@ -116,8 +116,16 @@ export class MemoryKV {
     this.store.set(key, value);
   }
 
+  async delete(key: string): Promise<void> {
+    this.store.delete(key);
+  }
+
   has(key: string): boolean {
     return this.store.has(key);
+  }
+
+  get raw(): Map<string, string> {
+    return this.store;
   }
 }
 
