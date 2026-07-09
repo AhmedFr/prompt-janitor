@@ -26,7 +26,8 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     // landing/ and fulfillment/ are self-contained pnpm packages with their
     // own vitest configs and toolchains; don't let this project's default
-    // test glob pick up their test files.
-    exclude: [...configDefaults.exclude, "landing/**", "fulfillment/**"],
+    // test glob pick up their test files. `.claude/**` holds nested git
+    // worktrees (duplicate repo checkouts) that must not be scanned either.
+    exclude: [...configDefaults.exclude, "landing/**", "fulfillment/**", ".claude/**"],
   },
 });
