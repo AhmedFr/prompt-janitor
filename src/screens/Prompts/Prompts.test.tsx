@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Prompts } from "./Prompts";
 import type { FileRow, ProjectRow } from "@/lib/ipc";
+
+// jsdom does not implement scrollIntoView.
+Element.prototype.scrollIntoView = vi.fn();
 
 vi.mock("@/lib/ipc", async (orig) => {
   const mod = await orig<typeof import("@/lib/ipc")>();
@@ -49,5 +52,19 @@ describe("Prompts", () => {
   it("has no accessibility violations", async () => {
     const { container } = render(<Prompts navigate={vi.fn()} />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("deep-link scrolls to and highlights the target project group", () => {
+    const { getByText } = render(<Prompts navigate={vi.fn()} target="/api" />);
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    const group = getByText("api").closest(".p-group");
+    expect(group).toHaveClass("p-group--hl");
+  });
+
+  it("does not re-scroll on filter changes after the deep-link target is handled", () => {
+    const { getByLabelText } = render(<Prompts navigate={vi.fn()} target="/api" />);
+    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+    fireEvent.change(getByLabelText("Search prompts"), { target: { value: "CLAUDE" } });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });

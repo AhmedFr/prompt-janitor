@@ -37,10 +37,20 @@ export function Prompts({ navigate, target }: PromptsProps) {
   // Deep-link: scroll to and briefly highlight the target project group.
   const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const handledTarget = useRef<string | null>(null);
+
+  // A new deep-link target resets the "handled" marker so its group scrolls
+  // into view once its row renders; filter/search changes afterwards do not
+  // re-trigger it.
   useEffect(() => {
-    if (!target) return;
+    handledTarget.current = null;
+  }, [target]);
+
+  useEffect(() => {
+    if (!target || handledTarget.current === target) return;
     const el = groupRefs.current[target];
-    if (!el) return;
+    if (!el) return; // group not rendered yet (data still loading) — wait
+    handledTarget.current = target;
     el.scrollIntoView({ behavior: "smooth", block: "start" });
     setHighlighted(target);
     const t = setTimeout(() => setHighlighted(null), 1200);
