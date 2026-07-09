@@ -5,8 +5,8 @@ import type { FileRow, ProjectRow } from "@/lib/ipc";
 const proj = (id: string, name: string, grade: ProjectRow["grade"], issues = 0): ProjectRow => ({
   id, name, grade, score: 50, file_count: 0, issue_count: issues, logo: null, modified: "100",
 });
-const file = (id: string, project: string, kind: string, grade: FileRow["grade"], issues = 0, modified = "100"): FileRow => ({
-  id, name: kind, path: `/x/${project}/${kind}`, project, kind, grade, score: 50, issue_count: issues, modified,
+const file = (id: string, projectId: string, project: string, kind: string, grade: FileRow["grade"], issues = 0, modified = "100"): FileRow => ({
+  id, name: kind, path: `/x/${project}/${kind}`, project, project_id: projectId, kind, grade, score: 50, issue_count: issues, modified,
 });
 
 const F = {
@@ -16,8 +16,8 @@ const F = {
 describe("buildGroups", () => {
   const projects = [proj("/a", "api", "D", 11), proj("/b", "web", "A", 0)];
   const files = [
-    file("/a/CLAUDE.md", "api", "CLAUDE.md", "D", 5),
-    file("/b/AGENTS.md", "web", "AGENTS.md", "A", 0),
+    file("/a/CLAUDE.md", "/a", "api", "CLAUDE.md", "D", 5),
+    file("/b/AGENTS.md", "/b", "web", "AGENTS.md", "A", 0),
   ];
 
   it("groups files under their project, worst grade first", () => {

@@ -194,6 +194,11 @@ export type FileRow = {
 	path: string,
 	project: string,
 	/**
+	 *  Owning project's id (its absolute repo-root path) — used to group
+	 *  files without colliding same-named projects.
+	 */
+	project_id: string,
+	/**
 	 *  File classification (e.g. `CLAUDE.md`, `AGENTS.md`, `.cursorrules`) —
 	 *  drives the provider icon in the UI.
 	 */

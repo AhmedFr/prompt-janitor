@@ -26,7 +26,7 @@ const projects: ProjectRow[] = [
   { id: "/api", name: "api", grade: "D", score: 52, file_count: 1, issue_count: 5, logo: null, modified: "200" },
 ];
 const files: FileRow[] = [
-  { id: "/api/CLAUDE.md", name: "CLAUDE.md", path: "/api/CLAUDE.md", project: "api", kind: "CLAUDE.md", grade: "D", score: 52, issue_count: 5, modified: "200" },
+  { id: "/api/CLAUDE.md", name: "CLAUDE.md", path: "/api/CLAUDE.md", project: "api", project_id: "/api", kind: "CLAUDE.md", grade: "D", score: 52, issue_count: 5, modified: "200" },
 ];
 vi.mock("./usePromptsList", async (orig) => {
   const mod = await orig<typeof import("./usePromptsList")>();

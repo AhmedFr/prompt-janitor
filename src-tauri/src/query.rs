@@ -202,6 +202,9 @@ pub struct FileRow {
     /// (e.g. an applied template) to its scanned id after a rescan.
     pub path: String,
     pub project: String,
+    /// Owning project's id (its absolute repo-root path) — used to group
+    /// files without colliding same-named projects.
+    pub project_id: String,
     /// File classification (e.g. `CLAUDE.md`, `AGENTS.md`, `.cursorrules`) —
     /// drives the provider icon in the UI.
     pub kind: String,
@@ -214,7 +217,7 @@ pub struct FileRow {
 /// All scanned files, best grade first.
 pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
     let mut stmt = conn.prepare(
-        "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at
+        "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at, f.project_id
          FROM files f JOIN projects p ON p.id = f.project_id
          ORDER BY CASE f.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
                   p.name, f.kind",
@@ -238,6 +241,7 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
                 score: r.get::<_, i64>(5)? as u32,
                 issue_count: r.get::<_, i64>(6)? as u32,
                 modified: r.get::<_, Option<String>>(7)?,
+                project_id: r.get(8)?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;

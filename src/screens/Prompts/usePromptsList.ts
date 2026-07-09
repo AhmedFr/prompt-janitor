@@ -23,14 +23,14 @@ export function buildGroups(
   const byProject = new Map<string, FileRow[]>();
   for (const f of files) {
     if (!matches(f)) continue;
-    const bucket = byProject.get(f.project);
+    const bucket = byProject.get(f.project_id);
     if (bucket) bucket.push(f);
-    else byProject.set(f.project, [f]);
+    else byProject.set(f.project_id, [f]);
   }
 
   const groups: ProjectGroup[] = projects
-    .filter((p) => byProject.has(p.name))
-    .map((p) => ({ project: p, files: byProject.get(p.name) ?? [] }));
+    .filter((p) => byProject.has(p.id))
+    .map((p) => ({ project: p, files: byProject.get(p.id) ?? [] }));
 
   const cmp: Record<PromptFilters["sort"], (a: ProjectGroup, b: ProjectGroup) => number> = {
     grade: (a, b) => GRADE_RANK[b.project.grade] - GRADE_RANK[a.project.grade],
