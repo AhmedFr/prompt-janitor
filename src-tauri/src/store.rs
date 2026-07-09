@@ -120,6 +120,12 @@ const MIGRATIONS: &[&str] = &[
     "
     ALTER TABLE grade_history ADD COLUMN issue_signature TEXT;
     ",
+    // 5: projects.logo — a base64 data: URI of a logo detected in the project
+    // root at scan time (NULL when none found). Lets the UI show a real
+    // project mark instead of a generic folder.
+    "
+    ALTER TABLE projects ADD COLUMN logo TEXT;
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -246,5 +252,14 @@ mod tests {
             })
             .unwrap();
         assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn migration_adds_project_logo_column() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // A column that only exists after migration 5.
+        conn.execute("UPDATE projects SET logo = 'x' WHERE 1=0", [])
+            .expect("logo column should exist");
     }
 }
