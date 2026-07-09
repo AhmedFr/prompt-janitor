@@ -1,12 +1,12 @@
-import type { Route } from "@/App/App.types";
+import type { Navigate, Route } from "@/App/App.types";
 import type { Grade } from "@/lib/ipc";
 import type { IconName } from "@/components/Icon";
 
 export interface SidebarProps {
   /** Currently active route. */
   active: Route;
-  /** Navigate to a different route. */
-  onNavigate: (route: Route) => void;
+  /** Navigate to a route, optionally with a target (e.g. a project id). */
+  onNavigate: Navigate;
   /** Replay the onboarding wizard. */
   onReplay?: () => void;
 }
@@ -20,10 +20,14 @@ export interface NavItem {
 
 /** A scanned project, rolled up for the sidebar's Projects list. */
 export interface SidebarProject {
+  /** Project id, used to deep-link into the Prompts screen. */
+  id: string;
   /** Project name (the on-disk folder). */
   name: string;
   /** Health grade, averaged across the project's files. */
   grade: Grade;
+  /** Detected logo data URI, if any. */
+  logo: string | null;
   /** Most recent file mtime in the project (epoch seconds string), for ordering. */
   modified: string | null;
 }

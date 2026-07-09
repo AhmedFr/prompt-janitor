@@ -30,8 +30,8 @@ describe("Sidebar", () => {
     mockSidebar.mockReturnValue({
       counts: { prompts: 42, rules: 27 },
       projects: [
-        { name: "web-app", grade: "A", modified: "200" },
-        { name: "scripts", grade: "F", modified: "100" },
+        { id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" },
+        { id: "/scripts", name: "scripts", grade: "F", logo: null, modified: "100" },
       ],
     });
     const { getByRole, getByText } = render(
@@ -44,21 +44,21 @@ describe("Sidebar", () => {
     expect(getByText("Projects")).toBeInTheDocument();
   });
 
-  it("routes a project click to the Prompts list", () => {
+  it("routes a project click to Prompts with the project id", () => {
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({
       counts: {},
-      projects: [{ name: "web-app", grade: "A", modified: "200" }],
+      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" }],
     });
     const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
     getByRole("button", { name: /web-app/ }).click();
-    expect(onNavigate).toHaveBeenCalledWith("prompts");
+    expect(onNavigate).toHaveBeenCalledWith("prompts", "/web-app");
   });
 
   it("has no accessibility violations", async () => {
     mockSidebar.mockReturnValue({
       counts: { prompts: 42, rules: 27 },
-      projects: [{ name: "web-app", grade: "A", modified: "200" }],
+      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" }],
     });
     const { container } = render(
       <Sidebar active="overview" onNavigate={() => {}} onReplay={() => {}} />,

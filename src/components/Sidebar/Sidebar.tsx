@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { ProjectGlyph } from "@/components/ProjectGlyph";
 import type { SidebarProps } from "./Sidebar.types";
 import { NAV_ITEMS } from "./Sidebar.constants";
 import { useSidebar } from "./useSidebar";
@@ -44,13 +45,12 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
             <p className="sidebar__section-label">Projects</p>
             {projects.map((project) => (
               <button
-                key={project.name}
+                key={project.id}
                 type="button"
                 className="sidebar__item sidebar__item--project"
-                onClick={() => onNavigate("prompts")}
+                onClick={() => onNavigate("prompts", project.id)}
               >
-                {/* No per-project logo source yet — the folder is the default glyph. */}
-                <Icon name="folder" className="sidebar__proj-icon" />
+                <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>
                 <span
                   className={`sidebar__grade sidebar__grade--${project.grade.toLowerCase()}`}
