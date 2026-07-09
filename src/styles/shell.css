@@ -41,7 +41,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
   color: #fff;
   background: linear-gradient(160deg, #36a3ff, #0a6fff);
   box-shadow:
@@ -91,6 +90,83 @@
 
 .sidebar__item--active:hover {
   background: var(--blue-press);
+}
+
+/* Leading nav glyph — accent-tinted, turning white on the active row. */
+.sidebar__item-icon {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.sidebar__item--active .sidebar__item-icon {
+  color: #fff;
+}
+
+/* Label takes the row; the count/grade that follows is pushed to the edge. */
+.sidebar__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.sidebar__item--active .sidebar__count {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---- projects section ---- */
+.sidebar__section {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__section-label {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.sidebar__proj-icon {
+  flex: 0 0 auto;
+  color: var(--text-3);
+}
+
+.sidebar__grade {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sidebar__grade--a {
+  color: var(--grade-a);
+}
+.sidebar__grade--b {
+  color: var(--grade-b);
+}
+.sidebar__grade--c {
+  color: var(--grade-c);
+}
+.sidebar__grade--d {
+  color: var(--grade-d);
+}
+.sidebar__grade--f {
+  color: var(--grade-f);
 }
 
 .sidebar__footer {

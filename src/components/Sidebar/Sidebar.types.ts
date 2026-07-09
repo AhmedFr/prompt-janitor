@@ -1,4 +1,6 @@
 import type { Route } from "@/App/App.types";
+import type { Grade } from "@/lib/ipc";
+import type { IconName } from "@/components/Icon";
 
 export interface SidebarProps {
   /** Currently active route. */
@@ -12,4 +14,19 @@ export interface SidebarProps {
 export interface NavItem {
   route: Route;
   label: string;
+  /** Leading glyph, drawn from the shared {@link IconName} set. */
+  icon: IconName;
 }
+
+/** A scanned project, rolled up for the sidebar's Projects list. */
+export interface SidebarProject {
+  /** Project name (the on-disk folder). */
+  name: string;
+  /** Health grade, averaged across the project's files. */
+  grade: Grade;
+  /** Most recent file mtime in the project (epoch seconds string), for ordering. */
+  modified: string | null;
+}
+
+/** Optional per-route badge counts shown on the right of a nav item. */
+export type NavCounts = Partial<Record<Route, number>>;
