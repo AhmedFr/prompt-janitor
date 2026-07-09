@@ -149,13 +149,23 @@ pub(crate) fn now_epoch() -> String {
         .unwrap_or_else(|_| "0".to_string())
 }
 
-/// Project = the name of the immediate folder containing the file
-/// (e.g. `~/code/.../homestop-testground/AGENTS.md` → `homestop-testground`).
-fn project_name(path: &Path) -> String {
-    path.parent()
-        .and_then(|p| p.file_name())
+/// Resolve the project that owns `path`: `(id, name, root_path)`.
+///
+/// The project root is the git worktree root (or nearest manifest) from
+/// `find_repo_root`; a loose file with no root falls back to its parent
+/// folder, so every file maps to a project. `id` is the absolute root path
+/// (unique — two same-named repos stay distinct); `name` is the root's final
+/// path component.
+fn resolve_project(path: &Path, roots: &mut RootCache) -> (String, String, String) {
+    let root = roots
+        .repo_root_for(path)
+        .unwrap_or_else(|| path.parent().map(|p| p.to_path_buf()).unwrap_or_default());
+    let name = root
+        .file_name()
         .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "root".to_string())
+        .unwrap_or_else(|| "root".to_string());
+    let root_path = root.display().to_string();
+    (root_path.clone(), name, root_path)
 }
 
 /// Walk `root`, grade every prompt file, and persist the results. Calls
@@ -169,7 +179,6 @@ pub fn run_scan(
     let total = files.len() as u32;
     let rules = crate::query::active_rules(conn);
     let now = now_epoch();
-    let root_str = root.display().to_string();
 
     // Snapshot NL-sourced issues + content hashes before the wipe below, so a
     // file whose content is unchanged can carry its AI-standards verdicts
@@ -219,19 +228,20 @@ pub fn run_scan(
         }
         let score = score_for_counts(hi, mid, lo);
         let grade = grade_for_score(score);
-        let project = project_name(Path::new(&file.path));
+        let (project_id, project_name, project_root) = resolve_project(file_path, &mut roots);
         let issue_count = issues.len() + carried_nl.len();
 
+        let logo = crate::project_logo::detect_logo(Path::new(&project_root));
         conn.execute(
-            "INSERT OR IGNORE INTO projects(id, name, root_path) VALUES(?1, ?1, ?2)",
-            params![project, root_str],
+            "INSERT OR IGNORE INTO projects(id, name, root_path, logo) VALUES(?1, ?2, ?3, ?4)",
+            params![project_id, project_name, project_root, logo],
         )?;
         conn.execute(
             "INSERT OR REPLACE INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at, content_hash)
              VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 file.path,
-                project,
+                project_id,
                 file.path,
                 file.kind,
                 grade.letter(),
@@ -281,7 +291,7 @@ pub fn run_scan(
             "INSERT INTO grade_history(scope, scope_id, score, recorded_at) VALUES('file', ?1, ?2, ?3)",
             params![file.path, score as i64, now],
         )?;
-        project_scores.entry(project).or_default().push(score);
+        project_scores.entry(project_id).or_default().push(score);
         on_progress(i as u32 + 1, total);
     }
 
@@ -372,7 +382,8 @@ For example:
 
         let focal_grade: String = conn
             .query_row(
-                "SELECT grade FROM files WHERE project_id = 'api-worker'",
+                "SELECT f.grade FROM files f JOIN projects p ON p.id = f.project_id
+                 WHERE p.name = 'api-worker'",
                 [],
                 |r| r.get(0),
             )
@@ -381,7 +392,8 @@ For example:
 
         let focal_issues: i64 = conn
             .query_row(
-                "SELECT issue_count FROM files WHERE project_id = 'api-worker'",
+                "SELECT f.issue_count FROM files f JOIN projects p ON p.id = f.project_id
+                 WHERE p.name = 'api-worker'",
                 [],
                 |r| r.get(0),
             )
@@ -390,7 +402,8 @@ For example:
 
         let clean_grade: String = conn
             .query_row(
-                "SELECT grade FROM files WHERE project_id = 'web-app'",
+                "SELECT f.grade FROM files f JOIN projects p ON p.id = f.project_id
+                 WHERE p.name = 'web-app'",
                 [],
                 |r| r.get(0),
             )
@@ -632,16 +645,27 @@ For example:
     }
 
     #[test]
-    fn project_is_the_immediate_parent_folder() {
-        assert_eq!(
-            project_name(Path::new(
-                "/Users/x/code/02-personal/homestop/homestop-testground/AGENTS.md"
-            )),
-            "homestop-testground"
-        );
-        assert_eq!(
-            project_name(Path::new("/Users/x/code/web-app/CLAUDE.md")),
-            "web-app"
-        );
+    fn project_resolves_to_repo_root_else_parent() {
+        use std::fs;
+        // Inside a git repo: a nested file resolves to the repo root name.
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::create_dir_all(dir.path().join("ios")).unwrap();
+        let nested = dir.path().join("ios/AGENTS.md");
+        fs::write(&nested, "x").unwrap();
+        let mut roots = RootCache::default();
+        let (_, name, _) = resolve_project(&nested, &mut roots);
+        let repo_name = dir.path().file_name().unwrap().to_string_lossy().into_owned();
+        assert_eq!(name, repo_name);
+
+        // Outside any repo/manifest: fall back to the immediate parent folder.
+        let loose = tempfile::tempdir().unwrap();
+        if git2::Repository::discover(loose.path()).is_err() {
+            fs::create_dir_all(loose.path().join("scripts")).unwrap();
+            let f = loose.path().join("scripts/CLAUDE.md");
+            fs::write(&f, "x").unwrap();
+            let (_, name, _) = resolve_project(&f, &mut RootCache::default());
+            assert_eq!(name, "scripts");
+        }
     }
 }

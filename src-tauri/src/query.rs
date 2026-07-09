@@ -202,6 +202,9 @@ pub struct FileRow {
     /// (e.g. an applied template) to its scanned id after a rescan.
     pub path: String,
     pub project: String,
+    /// File classification (e.g. `CLAUDE.md`, `AGENTS.md`, `.cursorrules`) —
+    /// drives the provider icon in the UI.
+    pub kind: String,
     pub grade: Grade,
     pub score: u32,
     pub issue_count: u32,
@@ -211,10 +214,10 @@ pub struct FileRow {
 /// All scanned files, best grade first.
 pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
     let mut stmt = conn.prepare(
-        "SELECT id, path, kind, project_id, grade, score, issue_count, modified_at
-         FROM files
-         ORDER BY CASE grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
-                  project_id, kind",
+        "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at
+         FROM files f JOIN projects p ON p.id = f.project_id
+         ORDER BY CASE f.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
+                  p.name, f.kind",
     )?;
     let rows = stmt
         .query_map([], |r| {
@@ -230,6 +233,7 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
                 name,
                 path: path.clone(),
                 project: r.get(3)?,
+                kind,
                 grade: grade_from_db(&r.get::<_, String>(4)?),
                 score: r.get::<_, i64>(5)? as u32,
                 issue_count: r.get::<_, i64>(6)? as u32,
