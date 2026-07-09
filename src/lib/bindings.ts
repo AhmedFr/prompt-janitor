@@ -89,6 +89,8 @@ export const commands = {
 	hasBackup: (fileId: string) => typedError<boolean, string>(__TAURI_INVOKE("has_backup", { fileId })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
+	/**  Every project with its rolled-up counts and detected logo. */
+	listProjects: () => typedError<ProjectRow[], string>(__TAURI_INVOKE("list_projects")),
 	/**  One file's source + issues for the Detail screen. */
 	getFileDetail: (fileId: string) => typedError<{
 	id: string,
@@ -191,6 +193,11 @@ export type FileRow = {
 	 */
 	path: string,
 	project: string,
+	/**
+	 *  File classification (e.g. `CLAUDE.md`, `AGENTS.md`, `.cursorrules`) —
+	 *  drives the provider icon in the UI.
+	 */
+	kind: string,
 	grade: Grade,
 	score: number,
 	issue_count: number,
@@ -269,6 +276,20 @@ export type Overview = {
 	trend_delta: number,
 	/**  Most recent scan finish time (epoch seconds string). */
 	last_scan: string | null,
+};
+
+/**  A project rollup for the sidebar and the Prompts group headers. */
+export type ProjectRow = {
+	id: string,
+	name: string,
+	grade: Grade,
+	score: number,
+	file_count: number,
+	issue_count: number,
+	/**  Base64 `data:` URI of the project's logo, if one was detected. */
+	logo: string | null,
+	/**  Most recent file mtime in the project (epoch seconds string). */
+	modified: string | null,
 };
 
 /**  A rule (built-in or custom) with its current enabled state. */

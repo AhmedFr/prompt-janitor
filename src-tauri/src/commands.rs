@@ -581,6 +581,14 @@ pub fn list_files(db: tauri::State<'_, AppDb>) -> Result<Vec<query::FileRow>, St
     query::list_files(&conn).map_err(|e| e.to_string())
 }
 
+/// Every project with its rolled-up counts and detected logo.
+#[tauri::command]
+#[specta::specta]
+pub fn list_projects(db: tauri::State<'_, AppDb>) -> Result<Vec<query::ProjectRow>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::list_projects(&conn).map_err(|e| e.to_string())
+}
+
 /// One file's source + issues for the Detail screen.
 #[tauri::command]
 #[specta::specta]

@@ -244,6 +244,48 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
     Ok(rows)
 }
 
+/// A project rollup for the sidebar and the Prompts group headers.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct ProjectRow {
+    pub id: String,
+    pub name: String,
+    pub grade: Grade,
+    pub score: u32,
+    pub file_count: u32,
+    pub issue_count: u32,
+    /// Base64 `data:` URI of the project's logo, if one was detected.
+    pub logo: Option<String>,
+    /// Most recent file mtime in the project (epoch seconds string).
+    pub modified: Option<String>,
+}
+
+/// Every project with its rolled-up file/issue counts, worst-grade first.
+pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.name, p.grade, p.score, p.logo,
+                COUNT(f.id), COALESCE(SUM(f.issue_count), 0), MAX(f.modified_at)
+         FROM projects p LEFT JOIN files f ON f.project_id = p.id
+         GROUP BY p.id
+         ORDER BY CASE p.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
+                  MAX(f.modified_at) DESC",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(ProjectRow {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                grade: grade_from_db(&r.get::<_, Option<String>>(2)?.unwrap_or_else(|| "F".into())),
+                score: r.get::<_, Option<i64>>(3)?.unwrap_or(0) as u32,
+                logo: r.get(4)?,
+                file_count: r.get::<_, i64>(5)? as u32,
+                issue_count: r.get::<_, i64>(6)? as u32,
+                modified: r.get::<_, Option<String>>(7)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
+}
+
 /// One issue in the Detail view.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct IssueDetail {
@@ -1501,6 +1543,20 @@ mod tests {
             hist_count_after, 2,
             "a genuinely unchanged re-check must not spam history"
         );
+    }
+
+    #[test]
+    fn list_projects_rolls_up_counts() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute("INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a','a','/a','D',52)", []).unwrap();
+        conn.execute("INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at) VALUES('/a/CLAUDE.md','/a','/a/CLAUDE.md','CLAUDE.md','D',52,5,'100')", []).unwrap();
+        conn.execute("INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at) VALUES('/a/AGENTS.md','/a','/a/AGENTS.md','AGENTS.md','F',40,6,'200')", []).unwrap();
+        let projects = list_projects(&conn).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].file_count, 2);
+        assert_eq!(projects[0].issue_count, 11);
+        assert_eq!(projects[0].modified.as_deref(), Some("200"));
     }
 
     #[test]

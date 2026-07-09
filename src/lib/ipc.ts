@@ -6,6 +6,7 @@ export type {
   Overview,
   WorklistItem,
   FileRow,
+  ProjectRow,
   FileDetail,
   IssueDetail,
   ScansDigest,
