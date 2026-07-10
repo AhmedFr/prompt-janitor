@@ -51,7 +51,13 @@ const detail: FileDetail = {
       fix_to: "current model",
     },
   ],
-  dimensions: [],
+  dimensions: [
+    { dimension: "Consistency", score: 62 },
+    { dimension: "Format", score: 30 },
+    { dimension: "Clarity", score: 71 },
+    { dimension: "Structure", score: 55 },
+    { dimension: "Examples", score: 20 },
+  ],
 };
 
 function setup(entitled: boolean) {
@@ -68,6 +74,17 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("Detail file scorecard", () => {
+  it("renders the dimension radar scorecard with the weakest-two dimensions", async () => {
+    setup(true);
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("File scorecard")).toBeInTheDocument();
+    expect(screen.getByText("C · 71")).toBeInTheDocument();
+    expect(screen.getByText("Weakest on Examples & Format")).toBeInTheDocument();
+  });
+});
 
 describe("Detail toolbar Auto-fix", () => {
   it("opens the checkout instead of calling apply_fix when the user isn't entitled", async () => {

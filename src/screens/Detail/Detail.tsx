@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScoreRing } from "@/components/ScoreRing";
+import { RadarChart } from "@/components/RadarChart";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ipc";
+import { commands, isTauri, type DimensionScore, type FileDetail, type FixSuggestion } from "@/lib/ipc";
 import { openExternal } from "@/lib/open-external";
 import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE } from "@/lib/monetization";
 import type { Navigate } from "@/App/App.types";
@@ -134,6 +134,18 @@ export function Detail({ fileId, navigate }: DetailProps) {
   );
 }
 
+/** The two lowest-scoring dimension names, joined with " & " for the
+ * scorecard's "Weakest on …" line. Ties are broken by the dimensions'
+ * original (fixed) order. */
+function weakestTwo(dims: DimensionScore[]): string {
+  return [...dims]
+    .map((d, i) => ({ ...d, i }))
+    .sort((a, b) => a.score - b.score || a.i - b.i)
+    .slice(0, 2)
+    .map((d) => d.dimension)
+    .join(" & ");
+}
+
 function DetailBody({
   detail,
   selectedIndex,
@@ -224,11 +236,17 @@ function DetailBody({
         </Card>
 
         <div className="d-scorecard">
-          <Card
-            padded
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}
-          >
-            <ScoreRing score={detail.score} grade={detail.grade} size={120} />
+          <Card padded className="d-scorecard-card">
+            <div className="row between">
+              <span style={{ fontSize: 13, fontWeight: 600 }}>File scorecard</span>
+              <span className={`d-scorecard-grade grade-fg--${detail.grade.toLowerCase()}`}>
+                {detail.grade} · {detail.score}
+              </span>
+            </div>
+            <RadarChart data={detail.dimensions} grade={detail.grade} />
+            <div className="faint" style={{ fontSize: 12 }}>
+              Weakest on {weakestTwo(detail.dimensions)}
+            </div>
             {detail.delta != null && detail.delta !== 0 && (
               <div className="faint" style={{ fontSize: 12 }}>
                 <span style={{ color: detail.delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
