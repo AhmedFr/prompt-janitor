@@ -124,3 +124,18 @@ describe("Detail toolbar Auto-fix", () => {
     expect(await screen.findByText(/PAID_GATE: auto-fix requires a license/)).toBeInTheDocument();
   });
 });
+
+describe("Detail per-issue Apply fix", () => {
+  it("calls apply_fix with origin 'manual', not 'auto'", async () => {
+    setup(true);
+    applyFix.mockResolvedValue({ status: "ok", data: { git_ref: null } });
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    const button = await screen.findByRole("button", { name: /Apply fix/ });
+    fireEvent.click(button);
+
+    await waitFor(() =>
+      expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "manual"),
+    );
+  });
+});
