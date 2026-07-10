@@ -1051,6 +1051,43 @@ pub fn active_rules(conn: &Connection) -> Vec<Box<dyn Rule>> {
         .collect()
 }
 
+/// Record `n` applied-fix events for `file_id`, one row per edit, tagged with
+/// `origin` ('auto' | 'manual') and the current time. Called by `apply_fix`
+/// after a successful apply (i.e. after the git-commit step that can still
+/// roll the whole operation back) so a failed/rolled-back apply never leaves
+/// a dangling event.
+pub fn record_fix_events(
+    conn: &Connection,
+    file_id: &str,
+    origin: &str,
+    n: usize,
+) -> rusqlite::Result<()> {
+    let now = crate::scan::now_epoch();
+    for _ in 0..n {
+        conn.execute(
+            "INSERT INTO fix_events (file_id, origin, applied_at) VALUES (?1, ?2, ?3)",
+            params![file_id, origin, &now],
+        )?;
+    }
+    Ok(())
+}
+
+/// Total applied-fix events, split by origin: `(total, auto, manual)`.
+pub fn fix_counts(conn: &Connection) -> rusqlite::Result<(u32, u32, u32)> {
+    let total: u32 = conn.query_row("SELECT COUNT(*) FROM fix_events", [], |r| r.get(0))?;
+    let auto: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM fix_events WHERE origin = 'auto'",
+        [],
+        |r| r.get(0),
+    )?;
+    let manual: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM fix_events WHERE origin = 'manual'",
+        [],
+        |r| r.get(0),
+    )?;
+    Ok((total, auto, manual))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1679,5 +1716,19 @@ mod tests {
             .as_deref()
             .unwrap_or("")
             .starts_with("The file VIOLATES"));
+    }
+
+    #[test]
+    fn record_fix_events_then_fix_counts_splits_by_origin() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        record_fix_events(&conn, "f1", "auto", 2).unwrap();
+        record_fix_events(&conn, "f2", "manual", 3).unwrap();
+
+        let (total, auto, manual) = fix_counts(&conn).unwrap();
+        assert_eq!(total, 5);
+        assert_eq!(auto, 2);
+        assert_eq!(manual, 3);
     }
 }

@@ -52,7 +52,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
     if (edits.length === 0) return;
     setAutoBusy(true);
     setAutoError(null);
-    const r = await runApply(detail.id, edits, false);
+    const r = await runApply(detail.id, edits, false, "auto");
     if (r.ok) await reload();
     else setAutoError(r.message);
     setAutoBusy(false);
@@ -354,7 +354,7 @@ function IssuePanel({
     if (!fix) return;
     setAction("applying");
     setStatus(null);
-    const r = await runApply(fileId, [{ from: fix.from, to: fix.to }], commitGit);
+    const r = await runApply(fileId, [{ from: fix.from, to: fix.to }], commitGit, "manual");
     setStatus(r.message);
     if (r.ok) {
       setCanUndo(true);

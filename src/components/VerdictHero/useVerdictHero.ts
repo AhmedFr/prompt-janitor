@@ -217,7 +217,7 @@ export function useVerdictHero() {
         const edits = detail.issues
           .filter((i) => i.fix_from && i.fix_to)
           .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
-        if (edits.length > 0) await commands.applyFix(detail.id, edits, false);
+        if (edits.length > 0) await commands.applyFix(detail.id, edits, false, "auto");
       }
       const folder = await commands.getScanFolder();
       if (folder.status === "ok" && folder.data) await commands.scanNow(folder.data);

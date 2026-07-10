@@ -8,13 +8,17 @@ async function rescanConfigured(): Promise<void> {
   if (f.status === "ok" && f.data) await commands.scanNow(f.data);
 }
 
-/** Apply edits to a file (optionally committing to git), then rescan. */
+/** Apply edits to a file (optionally committing to git), then rescan.
+ * `origin` records how the fix was triggered — `"manual"` for a single
+ * user-picked issue, `"auto"` for a bulk/auto-fix pass — so the Analytics
+ * page can report a real "issues fixed" count split by origin. */
 export async function applyFix(
   fileId: string,
   edits: FixEdit[],
   commit: boolean,
+  origin: "auto" | "manual",
 ): Promise<ApplyOutcome> {
-  const res = await commands.applyFix(fileId, edits, commit);
+  const res = await commands.applyFix(fileId, edits, commit, origin);
   if (res.status !== "ok") return { ok: false, message: res.error };
   await rescanConfigured();
   const branch = res.data.git_ref;

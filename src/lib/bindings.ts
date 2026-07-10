@@ -82,7 +82,7 @@ export const commands = {
 	 *  commit it onto a `prompt-janitor/fix-*` branch. A failed commit rolls the
 	 *  whole operation back so nothing is left half-applied.
 	 */
-	applyFix: (fileId: string, edits: FixEdit[], commit: boolean) => typedError<ApplyResult, string>(__TAURI_INVOKE("apply_fix", { fileId, edits, commit })),
+	applyFix: (fileId: string, edits: FixEdit[], commit: boolean, origin: string) => typedError<ApplyResult, string>(__TAURI_INVOKE("apply_fix", { fileId, edits, commit, origin })),
 	/**  Restore a file to its most recent pre-fix snapshot and drop that snapshot. */
 	undoFix: (fileId: string) => typedError<null, string>(__TAURI_INVOKE("undo_fix", { fileId })),
 	/**  Whether a file has a pre-fix snapshot available to undo. */

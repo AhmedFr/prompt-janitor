@@ -107,7 +107,9 @@ describe("Detail toolbar Auto-fix", () => {
     const button = await screen.findByRole("button", { name: /Auto-fix 1/ });
     fireEvent.click(button);
 
-    await waitFor(() => expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false));
+    await waitFor(() =>
+      expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "auto"),
+    );
     expect(openExternal).not.toHaveBeenCalled();
   });
 

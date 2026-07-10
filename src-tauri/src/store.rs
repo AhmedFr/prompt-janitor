@@ -134,6 +134,18 @@ const MIGRATIONS: &[&str] = &[
     "
     ALTER TABLE issues ADD COLUMN dimension TEXT;
     ",
+    // 7: fix_events — a durable, append-only log of every applied fix
+    // (one row per edit), tagged with its origin ('auto' | 'manual'). Lets
+    // the Analytics page show a real "issues fixed" count broken down by how
+    // the fix was applied (#88 data-viz epic).
+    "
+    CREATE TABLE fix_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id TEXT NOT NULL,
+        origin  TEXT NOT NULL,     -- 'auto' | 'manual'
+        applied_at TEXT NOT NULL
+    );
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
