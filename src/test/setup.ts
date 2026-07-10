@@ -13,3 +13,7 @@ declare module "vitest" {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface AsymmetricMatchersContaining extends AxeMatchers {}
 }
+
+// Recharts' ResponsiveContainer needs ResizeObserver, absent in jsdom.
+class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
+globalThis.ResizeObserver = globalThis.ResizeObserver ?? (ResizeObserverStub as unknown as typeof ResizeObserver);
