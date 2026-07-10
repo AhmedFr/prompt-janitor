@@ -106,6 +106,11 @@ export const commands = {
 	/**  Per-dimension scores, always length 5 in `Dimension::ALL` order. */
 	dimensions: DimensionScore[],
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
+	/**
+	 *  Everything the Analytics page needs, windowed to the trailing
+	 *  `range_days`.
+	 */
+	getAnalytics: (rangeDays: number) => typedError<Analytics, string>(__TAURI_INVOKE("get_analytics", { rangeDays })),
 	/**  The weekly Scans digest. */
 	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
 	/**
@@ -131,6 +136,32 @@ export type AiConfig = {
 };
 
 /**
+ *  Everything the Analytics page needs in one round trip (#88 data-viz
+ *  epic). `issues_fixed_*` are lifetime totals (all of `fix_events`); every
+ *  other field is a live snapshot except `trend`, which is windowed to the
+ *  trailing `range_days`.
+ */
+export type Analytics = {
+	overall_score: number,
+	overall_grade: Grade,
+	/**
+	 *  Latest overall-history score minus the earliest within the window
+	 *  (0 if the window has fewer than two points).
+	 */
+	overall_delta: number,
+	files_tracked: number,
+	project_count: number,
+	issues_fixed_total: number,
+	issues_fixed_auto: number,
+	issues_fixed_manual: number,
+	open_issues: number,
+	open_critical: number,
+	grade_distribution: GradeCount[],
+	trend: TrendPoint[],
+	common_issues: CommonIssue[],
+};
+
+/**
  *  A small status payload proving the typed store ↔ frontend round-trip.
  * 
  *  Fields are `i32` so specta exports them as TS `number` (specta refuses to
@@ -153,6 +184,15 @@ export type ApplyResult = {
 export type ApplyTemplateResult = {
 	/**  The full path the template was written to. */
 	path: string,
+};
+
+/**
+ *  One title from the "most common issues" leaderboard, with how many
+ *  distinct files it appears in.
+ */
+export type CommonIssue = {
+	title: string,
+	files_affected: number,
 };
 
 /**  An item in the digest's "needs your eyes" list. */
@@ -240,6 +280,16 @@ export type FixSuggestion = {
 
 /**  Letter grade. */
 export type Grade = "A" | "B" | "C" | "D" | "F";
+
+/**
+ *  One grade's share of `files_tracked`, always emitted for all five grades
+ *  (zero-filled) so the Analytics distribution chart never has to guess at
+ *  missing buckets.
+ */
+export type GradeCount = {
+	grade: Grade,
+	count: number,
+};
 
 /**  One issue in the Detail view. */
 export type IssueDetail = {
@@ -372,6 +422,13 @@ export type TemplateInfo = {
 	 *  writing it to disk is a paid action.
 	 */
 	preview: string,
+};
+
+/**  One point on the Analytics overall-score trend line. */
+export type TrendPoint = {
+	/**  Epoch-seconds string (matches `grade_history.recorded_at`). */
+	t: string,
+	score: number,
 };
 
 export type WorklistItem = {

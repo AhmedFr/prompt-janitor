@@ -607,6 +607,18 @@ pub fn get_file_detail(
     query::get_file_detail(&conn, &file_id).map_err(|e| e.to_string())
 }
 
+/// Everything the Analytics page needs, windowed to the trailing
+/// `range_days`.
+#[tauri::command]
+#[specta::specta]
+pub fn get_analytics(
+    db: tauri::State<'_, AppDb>,
+    range_days: u32,
+) -> Result<query::Analytics, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_analytics(&conn, range_days).map_err(|e| e.to_string())
+}
+
 /// The weekly Scans digest.
 #[tauri::command]
 #[specta::specta]

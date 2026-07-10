@@ -38,6 +38,54 @@ pub struct Overview {
     pub last_scan: Option<String>,
 }
 
+/// One grade's share of `files_tracked`, always emitted for all five grades
+/// (zero-filled) so the Analytics distribution chart never has to guess at
+/// missing buckets.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct GradeCount {
+    pub grade: Grade,
+    pub count: u32,
+}
+
+/// One point on the Analytics overall-score trend line.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct TrendPoint {
+    /// Epoch-seconds string (matches `grade_history.recorded_at`).
+    pub t: String,
+    pub score: u32,
+}
+
+/// One title from the "most common issues" leaderboard, with how many
+/// distinct files it appears in.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct CommonIssue {
+    pub title: String,
+    pub files_affected: u32,
+}
+
+/// Everything the Analytics page needs in one round trip (#88 data-viz
+/// epic). `issues_fixed_*` are lifetime totals (all of `fix_events`); every
+/// other field is a live snapshot except `trend`, which is windowed to the
+/// trailing `range_days`.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct Analytics {
+    pub overall_score: u32,
+    pub overall_grade: Grade,
+    /// Latest overall-history score minus the earliest within the window
+    /// (0 if the window has fewer than two points).
+    pub overall_delta: i32,
+    pub files_tracked: u32,
+    pub project_count: u32,
+    pub issues_fixed_total: u32,
+    pub issues_fixed_auto: u32,
+    pub issues_fixed_manual: u32,
+    pub open_issues: u32,
+    pub open_critical: u32,
+    pub grade_distribution: Vec<GradeCount>,
+    pub trend: Vec<TrendPoint>,
+    pub common_issues: Vec<CommonIssue>,
+}
+
 /// Parse a persisted severity string. Shared with `scan::run_scan`, which
 /// reconstructs prior NL issues from the `issues` table to carry them forward
 /// across unchanged-content rescans (#85).
@@ -1088,6 +1136,108 @@ pub fn fix_counts(conn: &Connection) -> rusqlite::Result<(u32, u32, u32)> {
     Ok((total, auto, manual))
 }
 
+/// Everything the Analytics page needs, rolled up in one round trip.
+/// `range_days` windows only the `trend`; every other field (including the
+/// lifetime `issues_fixed_*` totals from [`fix_counts`]) is unwindowed.
+pub fn get_analytics(conn: &Connection, range_days: u32) -> rusqlite::Result<Analytics> {
+    let overall_score = conn.query_row("SELECT COALESCE(AVG(score), 100) FROM files", [], |r| {
+        r.get::<_, f64>(0)
+    })? as u32;
+    let overall_grade = grade_for_score(overall_score);
+
+    let files_tracked =
+        conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get::<_, i64>(0))? as u32;
+    let project_count =
+        conn.query_row("SELECT COUNT(*) FROM projects", [], |r| r.get::<_, i64>(0))? as u32;
+
+    let (issues_fixed_total, issues_fixed_auto, issues_fixed_manual) = fix_counts(conn)?;
+
+    let open_issues =
+        conn.query_row("SELECT COUNT(*) FROM issues", [], |r| r.get::<_, i64>(0))? as u32;
+    let open_critical = conn.query_row(
+        "SELECT COUNT(*) FROM issues WHERE severity = 'hi'",
+        [],
+        |r| r.get::<_, i64>(0),
+    )? as u32;
+
+    // Fixed A..F order, zero-filled — never rely on GROUP BY to surface every
+    // grade (a grade with no files simply wouldn't have a row).
+    let mut counts_by_grade: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare("SELECT grade, COUNT(*) FROM files GROUP BY grade")?;
+        let rows = stmt.query_map([], |r| {
+            let grade: Option<String> = r.get(0)?;
+            let count: i64 = r.get(1)?;
+            Ok((grade.unwrap_or_default(), count as u32))
+        })?;
+        for row in rows {
+            let (grade, count) = row?;
+            counts_by_grade.insert(grade, count);
+        }
+    }
+    let grade_distribution: Vec<GradeCount> = ["A", "B", "C", "D", "F"]
+        .into_iter()
+        .map(|g| GradeCount {
+            grade: grade_from_db(g),
+            count: *counts_by_grade.get(g).unwrap_or(&0),
+        })
+        .collect();
+
+    // Match the codebase's epoch-time convention (`scan::now_epoch`) rather
+    // than reaching for `SystemTime::now()` directly here.
+    let now: i64 = crate::scan::now_epoch().parse().unwrap_or(0);
+    let cutoff = now - (range_days as i64) * 86400;
+    let mut trend_stmt = conn.prepare(
+        "SELECT recorded_at, score FROM grade_history
+         WHERE scope = 'overall' AND CAST(recorded_at AS INTEGER) >= ?1
+         ORDER BY CAST(recorded_at AS INTEGER)",
+    )?;
+    let trend = trend_stmt
+        .query_map(params![cutoff], |r| {
+            Ok(TrendPoint {
+                t: r.get::<_, String>(0)?,
+                score: r.get::<_, i64>(1)? as u32,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let overall_delta = if trend.len() >= 2 {
+        trend[trend.len() - 1].score as i32 - trend[0].score as i32
+    } else {
+        0
+    };
+
+    let mut common_stmt = conn.prepare(
+        "SELECT title, COUNT(DISTINCT file_id) FROM issues
+         GROUP BY title ORDER BY 2 DESC LIMIT 6",
+    )?;
+    let common_issues = common_stmt
+        .query_map([], |r| {
+            Ok(CommonIssue {
+                title: r.get(0)?,
+                files_affected: r.get::<_, i64>(1)? as u32,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(Analytics {
+        overall_score,
+        overall_grade,
+        overall_delta,
+        files_tracked,
+        project_count,
+        issues_fixed_total,
+        issues_fixed_auto,
+        issues_fixed_manual,
+        open_issues,
+        open_critical,
+        grade_distribution,
+        trend,
+        common_issues,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1730,5 +1880,124 @@ mod tests {
         assert_eq!(total, 5);
         assert_eq!(auto, 2);
         assert_eq!(manual, 3);
+    }
+
+    #[test]
+    fn analytics_rolls_up_grades_fixes_trend_and_common_issues() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f1', 'p', '/tmp/f1', 'CLAUDE.md', 'A', 95, 1, NULL)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f2', 'p', '/tmp/f2', 'CLAUDE.md', 'B', 85, 2, NULL)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f3', 'p', '/tmp/f3', 'CLAUDE.md', 'F', 40, 3, NULL)",
+            [],
+        )
+        .unwrap();
+
+        // Two files hit "Contradiction", one hits "Hardcoded model" — common
+        // issues must rank Contradiction first (2 files > 1 file).
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why)
+             VALUES('f2', 'hi', 'anthropic', 'Contradiction', 'w')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why)
+             VALUES('f3', 'hi', 'anthropic', 'Contradiction', 'w')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why)
+             VALUES('f3', 'mid', 'anthropic', 'Hardcoded model', 'w')",
+            [],
+        )
+        .unwrap();
+
+        record_fix_events(&conn, "f1", "auto", 2).unwrap();
+        record_fix_events(&conn, "f2", "manual", 1).unwrap();
+
+        // Overall history: one row outside a 7-day window, two inside it.
+        let now: i64 = crate::scan::now_epoch().parse().unwrap();
+        let range_days: u32 = 7;
+        let old = now - (range_days as i64 + 5) * 86400;
+        let inside_early = now - 3 * 86400;
+        let inside_late = now - 1 * 86400;
+        conn.execute(
+            "INSERT INTO grade_history(scope, scope_id, score, recorded_at)
+             VALUES('overall', 'overall', 50, ?1)",
+            params![old.to_string()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grade_history(scope, scope_id, score, recorded_at)
+             VALUES('overall', 'overall', 60, ?1)",
+            params![inside_early.to_string()],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO grade_history(scope, scope_id, score, recorded_at)
+             VALUES('overall', 'overall', 75, ?1)",
+            params![inside_late.to_string()],
+        )
+        .unwrap();
+
+        let analytics = get_analytics(&conn, range_days).unwrap();
+
+        assert_eq!(analytics.files_tracked, 3);
+        assert_eq!(analytics.project_count, 1);
+
+        assert_eq!(
+            analytics
+                .grade_distribution
+                .iter()
+                .map(|g| g.grade)
+                .collect::<Vec<_>>(),
+            vec![Grade::A, Grade::B, Grade::C, Grade::D, Grade::F],
+            "grade_distribution must emit all five grades in fixed order"
+        );
+        let sum: u32 = analytics.grade_distribution.iter().map(|g| g.count).sum();
+        assert_eq!(sum, 3, "grade_distribution must sum to files_tracked");
+        assert_eq!(analytics.grade_distribution[0].count, 1); // A
+        assert_eq!(analytics.grade_distribution[1].count, 1); // B
+        assert_eq!(analytics.grade_distribution[2].count, 0); // C
+        assert_eq!(analytics.grade_distribution[3].count, 0); // D
+        assert_eq!(analytics.grade_distribution[4].count, 1); // F
+
+        assert_eq!(analytics.issues_fixed_total, 3);
+        assert_eq!(analytics.issues_fixed_auto, 2);
+        assert_eq!(analytics.issues_fixed_manual, 1);
+
+        assert_eq!(analytics.open_issues, 3);
+        assert_eq!(analytics.open_critical, 2);
+
+        // Only the two in-window rows appear, ascending by time.
+        assert_eq!(analytics.trend.len(), 2);
+        assert_eq!(analytics.trend[0].score, 60);
+        assert_eq!(analytics.trend[1].score, 75);
+        assert_eq!(analytics.overall_delta, 15);
+
+        assert_eq!(analytics.common_issues[0].title, "Contradiction");
+        assert_eq!(analytics.common_issues[0].files_affected, 2);
+        assert_eq!(analytics.common_issues[1].title, "Hardcoded model");
+        assert_eq!(analytics.common_issues[1].files_affected, 1);
     }
 }
