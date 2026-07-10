@@ -21,7 +21,8 @@ export type IconName =
   | "arrowUp"
   | "arrowDown"
   | "wand"
-  | "lock";
+  | "lock"
+  | "barChart";
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;

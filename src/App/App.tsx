@@ -5,6 +5,7 @@ import { Overview } from "@/screens/Overview";
 import { Prompts } from "@/screens/Prompts";
 import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
+import { Analytics } from "@/screens/Analytics";
 import { Rules } from "@/screens/Rules";
 import { Settings } from "@/screens/Settings";
 import { isTauri } from "@/lib/ipc";
@@ -45,6 +46,7 @@ export function App() {
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
+        {route === "analytics" && <Analytics navigate={navigate} />}
         {route === "rules" && <Rules />}
         {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
       </main>

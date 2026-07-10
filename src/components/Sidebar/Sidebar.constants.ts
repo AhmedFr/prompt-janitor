@@ -5,6 +5,7 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "overview", label: "Overview", icon: "dashboard" },
   { route: "prompts", label: "Prompts", icon: "prompts" },
   { route: "scans", label: "Scans", icon: "scans" },
+  { route: "analytics", label: "Analytics", icon: "barChart" },
   { route: "rules", label: "Rules", icon: "rules" },
   { route: "settings", label: "Settings", icon: "settings" },
 ];
