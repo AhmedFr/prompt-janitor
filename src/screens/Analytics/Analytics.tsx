@@ -23,6 +23,13 @@ const RANGES: [number, string][] = [
 
 const DEFAULT_RANGE_DAYS = 30;
 
+/** Caption for the Overall-tile delta, keyed by the active range_days. */
+const DELTA_CAPTION: Record<number, string> = {
+  7: "vs last week",
+  30: "vs last month",
+  90: "vs last quarter",
+};
+
 export function Analytics({ navigate }: AnalyticsProps) {
   const [rangeDays, setRangeDays] = useState(DEFAULT_RANGE_DAYS);
   const { data, loading } = useAnalytics(rangeDays);
@@ -61,7 +68,7 @@ export function Analytics({ navigate }: AnalyticsProps) {
               <div className="muted">No data yet — scan a folder from the Overview tab.</div>
             </Card>
           ) : (
-            <AnalyticsBody data={data} navigate={navigate} />
+            <AnalyticsBody data={data} navigate={navigate} rangeDays={rangeDays} />
           )}
         </div>
       </div>
@@ -69,7 +76,15 @@ export function Analytics({ navigate }: AnalyticsProps) {
   );
 }
 
-function AnalyticsBody({ data, navigate }: { data: AnalyticsData; navigate: Navigate }) {
+function AnalyticsBody({
+  data,
+  navigate,
+  rangeDays,
+}: {
+  data: AnalyticsData;
+  navigate: Navigate;
+  rangeDays: number;
+}) {
   const bars = useMemo(() => gradeBars(data.grade_distribution), [data.grade_distribution]);
   const issues = useMemo(() => issueBars(data.common_issues), [data.common_issues]);
 
@@ -88,7 +103,7 @@ function AnalyticsBody({ data, navigate }: { data: AnalyticsData; navigate: Navi
               style={{ color: data.overall_delta > 0 ? "var(--green)" : "var(--red)" }}
             >
               {data.overall_delta > 0 ? "▲" : "▼"} {data.overall_delta > 0 ? "+" : ""}
-              {data.overall_delta} vs last month
+              {data.overall_delta} {DELTA_CAPTION[rangeDays] ?? "vs last month"}
             </div>
           )}
         </Card>

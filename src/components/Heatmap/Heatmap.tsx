@@ -8,7 +8,7 @@ export function Heatmap({ files, onSelect }: HeatmapProps) {
   const { squares } = useMemo(() => bucketFiles(files), [files]);
 
   return (
-    <div className="heatmap" aria-label="Files by grade">
+    <div className="heatmap" role="group" aria-label="Files by grade">
       {squares.map((s) => (
         <button
           key={s.id}

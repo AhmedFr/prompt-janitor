@@ -21,6 +21,7 @@ export function useAnalytics(rangeDays: number) {
   }, [rangeDays]);
 
   useEffect(() => {
+    setLoading(true);
     void refetch();
   }, [refetch]);
 

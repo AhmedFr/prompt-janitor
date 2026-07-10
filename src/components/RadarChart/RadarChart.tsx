@@ -35,7 +35,7 @@ export function RadarChart({ data, grade, size = 240 }: RadarChartProps) {
   return (
     <div style={{ width: "100%", height: size }} role="img" aria-label="Dimension scorecard">
       <ResponsiveContainer>
-        <RC data={chartData} outerRadius="72%">
+        <RC data={chartData} outerRadius="66%" margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <PolarGrid stroke="var(--sep-strong)" />
           <PolarAngleAxis dataKey="dim" tick={{ fill: "var(--text-2)", fontSize: 11 }} />
           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
