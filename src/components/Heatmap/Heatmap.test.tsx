@@ -21,7 +21,7 @@ describe("Heatmap", () => {
 
   it("renders one square per file and calls onSelect", () => {
     const onSelect = vi.fn();
-    const { getAllByRole } = render(
+    const { container } = render(
       <Heatmap
         files={[
           f("a", "A", 95),
@@ -30,9 +30,9 @@ describe("Heatmap", () => {
         onSelect={onSelect}
       />
     );
-    const items = getAllByRole("listitem");
+    const items = container.querySelectorAll(".heatmap__sq");
     expect(items).toHaveLength(2);
-    items[0].click();
+    (items[0] as HTMLButtonElement).click();
     expect(onSelect).toHaveBeenCalledWith("a");
   });
 });
