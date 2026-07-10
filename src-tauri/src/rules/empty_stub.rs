@@ -38,6 +38,9 @@ impl Rule for EmptyStub {
     fn why(&self) -> &'static str {
         "This file is very short — it may be too brief to usefully steer your AI. Consider covering commands, conventions, and gotchas."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Clarity
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         if substantive_chars(content) >= MIN_CONTENT_CHARS {
             return Vec::new();

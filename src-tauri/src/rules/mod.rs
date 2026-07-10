@@ -102,7 +102,18 @@ pub(crate) fn negated_nearby(content: &str, match_start: usize, window: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{evaluate, Grade, Severity};
+    use crate::engine::{evaluate, Dimension, Grade, Severity};
+
+    #[test]
+    fn every_builtin_rule_has_a_dimension() {
+        for rule in builtin_rules() {
+            assert!(
+                Dimension::ALL.contains(&rule.dimension()),
+                "{} has an unmapped dimension",
+                rule.id()
+            );
+        }
+    }
 
     const API_WORKER: &str = "\
 # API Worker assistant

@@ -92,6 +92,9 @@ impl Rule for DeprecatedModel {
     fn why(&self) -> &'static str {
         "Providers retire old model ids on public deprecation schedules — pin to one of these and the instruction breaks the day it's turned off."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         pattern()
             .find_iter(content)

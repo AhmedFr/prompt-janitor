@@ -55,7 +55,7 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
     let mut issues: HashMap<String, Vec<Issue>> = HashMap::new();
     {
         let mut stmt = conn.prepare(
-            "SELECT file_id, rule_id, line, severity, source, title, why, fix_from, fix_to
+            "SELECT file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension
              FROM issues WHERE rule_id IS NOT NULL",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -68,12 +68,14 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
             let why: String = r.get(6)?;
             let fix_from: Option<String> = r.get(7)?;
             let fix_to: Option<String> = r.get(8)?;
+            let dimension: Option<String> = r.get(9)?;
             Ok((
-                file_id, rule_id, line, severity, source, title, why, fix_from, fix_to,
+                file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension,
             ))
         })?;
         for row in rows {
-            let (file_id, rule_id, line, severity, source, title, why, fix_from, fix_to) = row?;
+            let (file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension) =
+                row?;
             if !active_nl_ids.contains(&rule_id) {
                 // Rule has since been disabled or deleted — drop the stale
                 // carry-forward instead of folding it into the score again.
@@ -91,6 +93,7 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
                 why,
                 line: line.map(|l| l as u32),
                 fix,
+                dimension: crate::engine::Dimension::from_db(&dimension.unwrap_or_default()),
             });
         }
     }
@@ -253,8 +256,8 @@ pub fn run_scan(
         )?;
         for issue in &issues {
             conn.execute(
-                "INSERT INTO issues(file_id, line, severity, source, title, why, fix_from, fix_to)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO issues(file_id, line, severity, source, title, why, fix_from, fix_to, dimension)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 params![
                     file.path,
                     issue.line.map(|l| l as i64),
@@ -264,13 +267,14 @@ pub fn run_scan(
                     issue.why,
                     issue.fix.as_ref().map(|f| f.from.as_str()),
                     issue.fix.as_ref().map(|f| f.to.as_str()),
+                    issue.dimension.as_str(),
                 ],
             )?;
         }
         for issue in &carried_nl {
             conn.execute(
-                "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     file.path,
                     issue.rule_id,
@@ -281,6 +285,7 @@ pub fn run_scan(
                     issue.why,
                     issue.fix.as_ref().map(|f| f.from.as_str()),
                     issue.fix.as_ref().map(|f| f.to.as_str()),
+                    issue.dimension.as_str(),
                 ],
             )?;
         }
@@ -415,6 +420,38 @@ For example:
             .query_row("SELECT COUNT(*) FROM grade_history", [], |r| r.get(0))
             .unwrap();
         assert_eq!(history, 3);
+    }
+
+    #[test]
+    fn persisted_issue_carries_the_rules_dimension() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), FOCAL).unwrap();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        // The FOCAL fixture's deprecated-model ("claude-2") issue is tagged
+        // Consistency in the rule→dimension mapping.
+        let dimension: String = conn
+            .query_row(
+                "SELECT dimension FROM issues WHERE title = 'Deprecated model name'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(dimension, "Consistency");
+
+        // Every persisted issue for this scan must have a non-null dimension.
+        let missing: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM issues WHERE dimension IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(missing, 0);
     }
 
     #[test]

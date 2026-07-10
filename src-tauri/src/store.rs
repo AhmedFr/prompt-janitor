@@ -126,6 +126,14 @@ const MIGRATIONS: &[&str] = &[
     "
     ALTER TABLE projects ADD COLUMN logo TEXT;
     ",
+    // 6: issues.dimension — the quality dimension (Clarity|Consistency|
+    // Structure|Examples|Format) a rule's finding speaks to, powering the
+    // per-file dimension radar (#88 data-viz epic). NULL for rows written
+    // before this migration; `Dimension::from_db` treats an unknown value as
+    // `Consistency`.
+    "
+    ALTER TABLE issues ADD COLUMN dimension TEXT;
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.

@@ -824,11 +824,28 @@ pub fn apply_nl_verdicts(
         "DELETE FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
         [file_id],
     )?;
+    // NL verdicts only carry the rule id — look up its quality dimension from
+    // the built-in catalog; custom NL rules (not in the catalog) default to
+    // Consistency, matching custom pattern-rule issues.
+    let catalog = crate::rules::builtin_nl_rules();
     for v in verdicts.iter().filter(|v| v.violates) {
+        let dimension = catalog
+            .iter()
+            .find(|r| r.id == v.rule_id)
+            .map(|r| r.dimension)
+            .unwrap_or(crate::engine::Dimension::Consistency);
         tx.execute(
-            "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to)
-             VALUES(?1, ?2, NULL, ?3, ?4, ?5, ?6, NULL, NULL)",
-            params![file_id, v.rule_id, v.severity, v.source, v.title, v.explanation],
+            "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension)
+             VALUES(?1, ?2, NULL, ?3, ?4, ?5, ?6, NULL, NULL, ?7)",
+            params![
+                file_id,
+                v.rule_id,
+                v.severity,
+                v.source,
+                v.title,
+                v.explanation,
+                dimension.as_str()
+            ],
         )?;
     }
 
@@ -946,6 +963,7 @@ pub fn custom_issues(conn: &Connection, content: &str) -> Vec<crate::engine::Iss
             why: format!("Your rule flagged the text “{expr}”."),
             line,
             fix: None,
+            dimension: crate::engine::Dimension::Consistency,
         });
     }
     out

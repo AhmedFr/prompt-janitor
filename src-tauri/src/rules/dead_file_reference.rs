@@ -85,6 +85,9 @@ impl Rule for DeadFileReference {
     fn why(&self) -> &'static str {
         "A path the agent can't find sends it hunting or hallucinating a substitute — checked against the repo on disk."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let Some(resolution_root) = ctx.resolution_root else {
             return Vec::new(); // no repo context — can't verify, don't guess

@@ -36,6 +36,9 @@ impl Rule for MissingOutputFormat {
     fn why(&self) -> &'static str {
         "State the expected format (code block, JSON, prose) so results are consistent."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Format
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let lower = content.to_lowercase();
         if FORMAT_HINTS.iter().any(|h| lower.contains(h)) {

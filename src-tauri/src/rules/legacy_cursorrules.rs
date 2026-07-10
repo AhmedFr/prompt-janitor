@@ -22,6 +22,9 @@ impl Rule for LegacyCursorrules {
     fn why(&self) -> &'static str {
         "Cursor's docs deprecate .cursorrules in favor of scoped, composable rules in .cursor/rules/*.mdc (Cursor docs, \"Rules\" migration guidance)."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Structure
+    }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let is_cursorrules = ctx
             .file_path

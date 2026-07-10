@@ -33,6 +33,9 @@ impl Rule for MissingRole {
     fn why(&self) -> &'static str {
         "A clear role grounds tone and scope. Start with who the assistant is and what it owns."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Clarity
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let role_line = content
             .lines()

@@ -33,6 +33,9 @@ impl Rule for TokenBudget {
     fn why(&self) -> &'static str {
         "This file consumes a large share of every session's context window before any real work starts."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Structure
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let tokens = estimated_tokens(content);
         if tokens <= TOKEN_BUDGET_THRESHOLD {

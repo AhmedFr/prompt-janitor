@@ -40,6 +40,50 @@ pub enum Grade {
     F,
 }
 
+/// The quality dimension a rule's finding speaks to — drives the per-file
+/// radar chart (#88 data-viz epic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub enum Dimension {
+    Clarity,
+    Consistency,
+    Structure,
+    Examples,
+    Format,
+}
+
+impl Dimension {
+    /// String form used for persistence and the frontend.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clarity => "Clarity",
+            Self::Consistency => "Consistency",
+            Self::Structure => "Structure",
+            Self::Examples => "Examples",
+            Self::Format => "Format",
+        }
+    }
+
+    /// Parse a persisted dimension string. Unknown/legacy rows (written
+    /// before this column existed) default to `Consistency`.
+    pub fn from_db(s: &str) -> Dimension {
+        match s {
+            "Clarity" => Self::Clarity,
+            "Structure" => Self::Structure,
+            "Examples" => Self::Examples,
+            "Format" => Self::Format,
+            _ => Self::Consistency,
+        }
+    }
+
+    pub const ALL: [Dimension; 5] = [
+        Self::Clarity,
+        Self::Consistency,
+        Self::Structure,
+        Self::Examples,
+        Self::Format,
+    ];
+}
+
 impl Severity {
     /// Lowercase string form used for persistence and the frontend.
     pub fn as_str(self) -> &'static str {
@@ -95,6 +139,7 @@ pub struct Issue {
     /// 1-based line number, if the issue is tied to a specific line.
     pub line: Option<u32>,
     pub fix: Option<Fix>,
+    pub dimension: Dimension,
 }
 
 /// Result of evaluating a file against the active rules.
@@ -163,6 +208,8 @@ pub trait Rule: Send + Sync {
     fn source(&self) -> Source;
     fn severity(&self) -> Severity;
     fn why(&self) -> &'static str;
+    /// The quality dimension this rule's findings speak to.
+    fn dimension(&self) -> Dimension;
 
     /// Inspect `content` and return any findings. Content-only rules
     /// implement this. Defaults to a no-op so repo-grounded rules (which
@@ -244,6 +291,7 @@ pub fn evaluate_ctx(ctx: &RuleContext<'_>, rules: &[Box<dyn Rule>]) -> Evaluatio
                 why: finding.why,
                 line: finding.line,
                 fix: finding.fix,
+                dimension: rule.dimension(),
             });
         }
     }
@@ -268,6 +316,7 @@ mod tests {
             why: "w".into(),
             line: None,
             fix: None,
+            dimension: Dimension::Clarity,
         }
     }
 
@@ -328,6 +377,9 @@ mod tests {
         fn why(&self) -> &'static str {
             "because"
         }
+        fn dimension(&self) -> Dimension {
+            Dimension::Clarity
+        }
         fn check(&self, _content: &str) -> Vec<Finding> {
             vec![Finding {
                 line: Some(1),
@@ -340,6 +392,18 @@ mod tests {
     #[test]
     fn cursor_source_roundtrips() {
         assert_eq!(Source::Cursor.as_str(), "cursor");
+    }
+
+    #[test]
+    fn every_dimension_has_a_str_roundtrip() {
+        for d in Dimension::ALL {
+            assert_eq!(Dimension::from_db(d.as_str()), d);
+        }
+    }
+
+    #[test]
+    fn dimension_all_has_five_entries() {
+        assert_eq!(Dimension::ALL.len(), 5);
     }
 
     #[test]
