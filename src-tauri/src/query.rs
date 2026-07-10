@@ -2,7 +2,7 @@
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::engine::{grade_for_score, Grade, Rule, Severity, Source};
+use crate::engine::{grade_for_score, Dimension, Grade, Rule, Severity, Source};
 use crate::rules::builtin_rules;
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
@@ -302,6 +302,13 @@ pub struct IssueDetail {
     pub fix_to: Option<String>,
 }
 
+/// One dimension's rolled-up score for a file (drives the radar chart, #88).
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct DimensionScore {
+    pub dimension: String,
+    pub score: u32,
+}
+
 /// Everything the Detail screen needs for one file.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct FileDetail {
@@ -315,6 +322,8 @@ pub struct FileDetail {
     pub issues: Vec<IssueDetail>,
     /// Score change since the previous scan of this file, if any.
     pub delta: Option<i32>,
+    /// Per-dimension scores, always length 5 in `Dimension::ALL` order.
+    pub dimensions: Vec<DimensionScore>,
 }
 
 /// Load a single file with its current source + issues. `None` if unknown.
@@ -348,23 +357,53 @@ pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Opt
         .to_string();
 
     let mut stmt = conn.prepare(
-        "SELECT line, severity, source, title, why, fix_from, fix_to FROM issues WHERE file_id = ?1
+        "SELECT line, severity, source, title, why, fix_from, fix_to, dimension FROM issues WHERE file_id = ?1
          ORDER BY CASE severity WHEN 'hi' THEN 0 WHEN 'mid' THEN 1 ELSE 2 END, COALESCE(line, 1000000)",
     )?;
-    let issues = stmt
+    let issue_rows = stmt
         .query_map([file_id], |r| {
             let line: Option<i64> = r.get(0)?;
-            Ok(IssueDetail {
-                line: line.map(|l| l as u32),
-                severity: severity_from_db(&r.get::<_, String>(1)?),
-                source: source_from_db(&r.get::<_, String>(2)?),
-                title: r.get(3)?,
-                why: r.get(4)?,
-                fix_from: r.get(5)?,
-                fix_to: r.get(6)?,
-            })
+            let severity: String = r.get(1)?;
+            let dimension: Option<String> = r.get(7)?;
+            Ok((
+                IssueDetail {
+                    line: line.map(|l| l as u32),
+                    severity: severity_from_db(&severity),
+                    source: source_from_db(&r.get::<_, String>(2)?),
+                    title: r.get(3)?,
+                    why: r.get(4)?,
+                    fix_from: r.get(5)?,
+                    fix_to: r.get(6)?,
+                },
+                severity,
+                dimension,
+            ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let dimensions = Dimension::ALL
+        .iter()
+        .map(|d| {
+            let (mut hi, mut mid, mut lo) = (0u32, 0u32, 0u32);
+            for (_, severity, dimension) in &issue_rows {
+                let row_dim = Dimension::from_db(dimension.as_deref().unwrap_or(""));
+                if row_dim != *d {
+                    continue;
+                }
+                match severity.as_str() {
+                    "hi" => hi += 1,
+                    "mid" => mid += 1,
+                    _ => lo += 1,
+                }
+            }
+            DimensionScore {
+                dimension: d.as_str().into(),
+                score: crate::engine::score_for_counts(hi, mid, lo),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let issues = issue_rows.into_iter().map(|(issue, _, _)| issue).collect();
 
     let delta = {
         let mut hist = conn.prepare(
@@ -390,6 +429,7 @@ pub fn get_file_detail(conn: &Connection, file_id: &str) -> rusqlite::Result<Opt
         content,
         issues,
         delta,
+        dimensions,
     }))
 }
 
@@ -1098,6 +1138,47 @@ mod tests {
         assert_eq!(detail.issues[0].severity, Severity::Hi);
 
         assert!(get_file_detail(&conn, "does-not-exist").unwrap().is_none());
+    }
+
+    #[test]
+    fn file_detail_dimensions_are_five_in_fixed_order_with_only_consistency_penalized() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f', 'p', '/tmp/f', 'CLAUDE.md', 'A', 100, 1, NULL)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why, dimension)
+             VALUES('f', 'hi', 'anthropic', 'Contradiction', 'w', 'Consistency')",
+            [],
+        )
+        .unwrap();
+
+        let detail = get_file_detail(&conn, "f").unwrap().unwrap();
+        assert_eq!(detail.dimensions.len(), 5);
+        assert_eq!(
+            detail
+                .dimensions
+                .iter()
+                .map(|d| d.dimension.clone())
+                .collect::<Vec<_>>(),
+            vec!["Clarity", "Consistency", "Structure", "Examples", "Format"]
+        );
+        for d in &detail.dimensions {
+            if d.dimension == "Consistency" {
+                assert!(d.score < 100, "Consistency score should be penalized");
+            } else {
+                assert_eq!(d.score, 100, "{} should be untouched", d.dimension);
+            }
+        }
     }
 
     #[test]

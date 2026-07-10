@@ -51,6 +51,7 @@ const detail: FileDetail = {
       fix_to: "current model",
     },
   ],
+  dimensions: [],
 };
 
 function setup(entitled: boolean) {

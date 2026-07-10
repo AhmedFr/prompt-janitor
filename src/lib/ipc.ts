@@ -9,6 +9,7 @@ export type {
   ProjectRow,
   FileDetail,
   IssueDetail,
+  DimensionScore,
   ScansDigest,
   DigestItem,
   RuleInfo,

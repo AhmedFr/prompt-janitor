@@ -103,6 +103,8 @@ export const commands = {
 	issues: IssueDetail[],
 	/**  Score change since the previous scan of this file, if any. */
 	delta: number | null,
+	/**  Per-dimension scores, always length 5 in `Dimension::ALL` order. */
+	dimensions: DimensionScore[],
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
 	/**  The weekly Scans digest. */
 	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
@@ -162,6 +164,12 @@ export type DigestItem = {
 	detail: string,
 };
 
+/**  One dimension's rolled-up score for a file (drives the radar chart, #88). */
+export type DimensionScore = {
+	dimension: string,
+	score: number,
+};
+
 /**  The current entitlement state (whether the paid tier is unlocked). */
 export type Entitlement = {
 	paid: boolean,
@@ -181,6 +189,8 @@ export type FileDetail = {
 	issues: IssueDetail[],
 	/**  Score change since the previous scan of this file, if any. */
 	delta: number | null,
+	/**  Per-dimension scores, always length 5 in `Dimension::ALL` order. */
+	dimensions: DimensionScore[],
 };
 
 /**  A row in the Prompts table. */
