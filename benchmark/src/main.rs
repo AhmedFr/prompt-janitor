@@ -1,5 +1,7 @@
 //! CLI entry for the offline benchmark harness.
 
+mod metrics;
+
 /// Parsed CLI invocation.
 #[derive(Debug, PartialEq)]
 enum Cmd {

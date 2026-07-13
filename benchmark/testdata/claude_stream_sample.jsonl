@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","session_id":"abc","tools":["Bash","Write"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I'll create the file."},{"type":"tool_use","id":"tu1","name":"Write","input":{"file_path":"hi.txt","content":"hello"}}]},"session_id":"abc"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu2","name":"Bash","input":{"command":"cat hi.txt"}}]},"session_id":"abc"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":8100,"num_turns":3,"result":"Done","session_id":"abc","total_cost_usd":0.012,"usage":{"input_tokens":1200,"output_tokens":540,"cache_read_input_tokens":0}}
