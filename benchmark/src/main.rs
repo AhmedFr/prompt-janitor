@@ -1,6 +1,7 @@
 //! CLI entry for the offline benchmark harness.
 
 mod metrics;
+mod verify;
 
 /// Parsed CLI invocation.
 #[derive(Debug, PartialEq)]
