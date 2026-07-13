@@ -1,5 +1,6 @@
 //! CLI entry for the offline benchmark harness.
 
+mod fixture;
 mod metrics;
 mod verify;
 
