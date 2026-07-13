@@ -81,7 +81,7 @@ benchmark/fixtures/<rule>/
 
 | Rule | Fixture task | How the defect bites | Verifier |
 |---|---|---|---|
-| `package_manager_mismatch` | install deps + add a script (repo uses pnpm) | prompt says npm → wrong lockfile, retries | install succeeds + `pnpm-lock.yaml` touched |
+| `missing_few_shot` | implement a component to an existing repo convention | no examples → inconsistent, off-pattern output → high review burden | tests green + **review burden** (see §5.1) |
 | `missing_output_format` | "return result as JSON matching schema X" | no format → agent guesses → correction turns | output parses against schema |
 | `contradiction` | task under two conflicting rules | agent flip-flops | tests green + turn count |
 | `token_budget` | any task, bloated ~8k-token file | +input tokens every turn | tests green; measure tokens |
@@ -94,8 +94,18 @@ benchmark/fixtures/<rule>/
 - Standalone Rust binary `benchmark-runner` (NOT linked into the app binary; the app never shells out to Claude during normal use).
 - Drives `claude -p --output-format json` per condition.
 - **Pinned for reproducibility:** model id, Claude Code version, temperature — all recorded in output.
-- Captures per run: input/output tokens, num turns, full tool-call log (→ subagent/capability usage), verifier pass/fail, wall-clock.
+- Captures per run: input/output tokens, num turns, full tool-call log (→ subagent/capability usage), verifier pass/fail, wall-clock, and **review burden** (§5.1).
 - N ≈ 20–30 runs per condition offline (affordable because it runs once); small N for the live premium tier, labeled "indicative."
+
+### 5.1 Review burden — the "human intervention" metric
+
+The faithful, measurable form of "how much human intervention this prompt costs." A headless run has no human in the loop, so instead of counting interventions we count the **fixes a human would still have to make** after the agent stops:
+
+- After each run, an **LLM-reviewer** pass evaluates the resulting diff against a fixed rubric and returns fix counts bucketed **major / minor / nice-to-have** (major = correctness/breakage, minor = quality/convention, nice-to-have = polish).
+- The reviewer is a *separate* metric from the deterministic verifier. To tame its stochasticity it runs its own small N (e.g. 3) per resulting diff; we report the median bucket counts. Pass/fail stays deterministic (verifier), so the headline "did it work" number is never at the mercy of a judge.
+- Rubric + reviewer prompt are pinned and versioned alongside the suite so review-burden numbers are comparable across runs.
+
+This is the loudest line in the letter: *"the bad prompt left 6 major + 4 minor fixes for you; the fixed prompt left 1 minor."*
 
 ## 6. Effect-size table — `effects.json`
 
@@ -107,6 +117,7 @@ Per rule:
   "delta_tokens":   { "mean": 41200, "ci95": [33800, 48600] },
   "delta_turns":    { "mean": 1.8,   "ci95": [1.1, 2.5] },
   "delta_pass_rate": -0.12,
+  "delta_review_burden": { "major": 2.1, "minor": 1.4, "nice": 0.6 },
   "delta_tool_usage": { "subagent": -0.4 },
   "significant": true,
   "suite_version": "2026-07-13.1"
@@ -164,6 +175,7 @@ src/components/BeforeAfter/        # premium live A/B receipt UI
 - **Fixture isolation** — the defect must be the *only* variable or the number is junk. Mitigation: verifier + manual review + `meta.json` rationale per fixture.
 - **Stochastic noise** — mitigated by N + 95% CI + significance gate; small-N live tier labeled "indicative."
 - **Effect additivity** — conservative combined estimate in v1; combined-defect calibration is v2.
+- **LLM-reviewer subjectivity** (review burden) — the judge is stochastic. Mitigation: fixed rubric, pinned+versioned reviewer prompt, own small N with median, and it never touches the deterministic pass/fail. Labeled as a judged estimate, not a hard count.
 - **Rules may not survive the data** — expected and healthy; be ready to demote/cut, traceable to a suite version.
 - **Cost of offline runs** — bounded (headline 5 × 2 conditions × N ≈ 300 runs per refresh); acceptable, and it runs on the owner's dime, not per user.
 - **Open:** final headline-5 selection; exact significance test (e.g. Welch's t / bootstrap CI) — decided in implementation.
