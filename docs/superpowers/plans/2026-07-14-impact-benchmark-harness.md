@@ -1037,7 +1037,7 @@ Create `benchmark/src/runner.rs`:
 ```rust
 //! Orchestrate N runs × {good, bad} for one fixture into an EffectRow.
 
-use crate::effects::{aggregate, EffectRow, GeneratedWith, ReviewBurden, Sample};
+use crate::effects::{aggregate, EffectRow, GeneratedWith, Sample};
 use crate::fixture::Fixture;
 use crate::metrics::parse_stream;
 use crate::review::{build_review_prompt, parse_review, Reviewer};
@@ -1052,7 +1052,6 @@ pub trait Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics::RunMetrics;
 
     /// Fake agent: bad prompt → expensive stream; good prompt → cheap stream.
     struct FakeAgent;
@@ -1102,14 +1101,6 @@ mod tests {
         assert!(row.delta_turns.mean > 0.0);
         assert!(row.delta_review_burden.major > 0.0);
         assert!(row.significant);
-    }
-
-    #[test]
-    fn parse_stream_still_used() {
-        // guard: a malformed transcript from the agent surfaces as an error path,
-        // not a panic — sample construction lives in run_one.
-        let m = RunMetrics { input_tokens: 1, output_tokens: 1, num_turns: 1, tool_calls: vec![], wall_clock_ms: 1 };
-        assert_eq!(m.num_turns, 1);
     }
 }
 ```
@@ -1169,16 +1160,12 @@ pub fn run_fixture(
     let good = collect(&fx.claude_good);
     aggregate(&fx.rule, &bad, &good, gen)
 }
-
-// Silence unused import warning for ReviewBurden in non-test builds.
-#[allow(unused_imports)]
-use crate::effects::ReviewBurden as _ReviewBurden;
 ```
 
 - [ ] **Step 4: Run tests**
 
 Run: `cd benchmark && cargo test runner`
-Expected: 2 passed.
+Expected: 1 passed.
 
 - [ ] **Step 5: Wire the `run` subcommand + real `ClaudeAgent`/`AnthropicReviewer` are added in Task 10; for now leave `main` printing the parsed `Cmd`. Run full suite:**
 
