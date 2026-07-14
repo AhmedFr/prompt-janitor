@@ -9,6 +9,24 @@ pub trait Reviewer {
     fn review(&self, prompt: &str) -> Result<String, String>;
 }
 
+/// Reviewer backed by `claude -p` (plain text), used to score review burden.
+pub struct ClaudeReviewer {
+    pub model: String,
+}
+
+impl Reviewer for ClaudeReviewer {
+    fn review(&self, prompt: &str) -> Result<String, String> {
+        let out = std::process::Command::new("claude")
+            .args(["-p", prompt, "--output-format", "text", "--model", &self.model])
+            .output()
+            .map_err(|e| format!("spawn claude reviewer: {e}"))?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).into_owned());
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+}
+
 /// Pinned rubric. Versioned with the suite; changing it bumps suite_version.
 const RUBRIC: &str = "\
 You are a strict senior reviewer. Given a diff a coding agent produced, \

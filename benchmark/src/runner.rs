@@ -12,6 +12,49 @@ pub trait Agent {
     fn run(&self, claude_md: &str, task: &str, repo_dir: &Path) -> Result<String, String>;
 }
 
+/// Real agent: copies `repo/` to a temp dir, writes CLAUDE.md, runs `claude -p`.
+pub struct ClaudeAgent {
+    pub model: String,
+    pub temperature: f64,
+}
+
+impl Agent for ClaudeAgent {
+    fn run(&self, claude_md: &str, task: &str, repo_dir: &Path) -> Result<String, String> {
+        let work = tempfile::tempdir().map_err(|e| e.to_string())?;
+        // fresh copy of the fixture repo so runs don't contaminate each other
+        copy_dir(repo_dir, work.path()).map_err(|e| e.to_string())?;
+        std::fs::write(work.path().join("CLAUDE.md"), claude_md).map_err(|e| e.to_string())?;
+        let out = std::process::Command::new("claude")
+            .current_dir(work.path())
+            .args([
+                "-p", task,
+                "--output-format", "stream-json",
+                "--verbose",
+                "--model", &self.model,
+            ])
+            .output()
+            .map_err(|e| format!("spawn claude: {e}"))?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).into_owned());
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+}
+
+fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            std::fs::create_dir_all(&to)?;
+            copy_dir(&entry.path(), &to)?;
+        } else {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
 /// Run one condition once: write CLAUDE.md, invoke the agent, verify, review.
 /// The review prompt embeds the CLAUDE.md marker so review burden reflects
 /// the condition (real runs pass the actual git diff of `repo/`).
@@ -42,19 +85,19 @@ pub fn run_fixture(
     reviewer: &dyn Reviewer,
     gen: GeneratedWith,
 ) -> EffectRow {
-    let collect = |md: &str| -> Vec<Sample> {
+    let collect = |md: &str, label: &str| -> Vec<Sample> {
         (0..n)
             .filter_map(|i| match run_one(md, fx, agent, reviewer) {
                 Ok(s) => Some(s),
                 Err(e) => {
-                    eprintln!("run {i} ({md} variant) failed: {e}");
+                    eprintln!("run {i} [{}/{}] failed: {e}", fx.rule, label);
                     None
                 }
             })
             .collect()
     };
-    let bad = collect(&fx.claude_bad);
-    let good = collect(&fx.claude_good);
+    let bad = collect(&fx.claude_bad, "bad");
+    let good = collect(&fx.claude_good, "good");
     aggregate(&fx.rule, &bad, &good, gen)
 }
 
