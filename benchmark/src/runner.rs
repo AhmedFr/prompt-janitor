@@ -19,9 +19,19 @@ pub struct ClaudeAgent {
 }
 impl Agent for ClaudeAgent {
     fn run(&self, task: &str, work_dir: &Path) -> Result<String, String> {
+        // `--dangerously-skip-permissions`: headless `claude -p` cannot prompt
+        // for approval, so without this it denies file edits and the agent can
+        // never complete the task. Safe here — every run is isolated in a
+        // throwaway temp copy of a fixture repo (work_dir), never the real tree.
         let out = std::process::Command::new("claude")
             .current_dir(work_dir)
-            .args(["-p", task, "--output-format", "stream-json", "--verbose", "--model", &self.model])
+            .args([
+                "-p", task,
+                "--output-format", "stream-json",
+                "--verbose",
+                "--dangerously-skip-permissions",
+                "--model", &self.model,
+            ])
             .output()
             .map_err(|e| format!("spawn claude: {e}"))?;
         if !out.status.success() {
