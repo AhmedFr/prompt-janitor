@@ -1,0 +1,35 @@
+{
+  "suite_version": "2026-07-14.3-smoke",
+  "generated_with": {
+    "model": "claude-haiku-4-5-20251001",
+    "cc_version": "2.1.209 (Claude Code)",
+    "temperature": 0.0
+  },
+  "rules": [
+    {
+      "rule": "encourage-examples",
+      "n": 5,
+      "delta_tokens": {
+        "mean": 36759.399999999994,
+        "ci95": [
+          -24714.600000000006,
+          98518.6
+        ]
+      },
+      "delta_turns": {
+        "mean": 0.7999999999999998,
+        "ci95": [
+          -1.4000000000000004,
+          2.999999999999999
+        ]
+      },
+      "delta_pass_rate": 0.0,
+      "delta_review_burden": {
+        "major": -0.39999999999999997,
+        "minor": 0.19999999999999996,
+        "nice": 0.4
+      },
+      "significant": false
+    }
+  ]
+}
