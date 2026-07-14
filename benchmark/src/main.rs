@@ -4,6 +4,7 @@ mod effects;
 mod fixture;
 mod metrics;
 mod review;
+mod runner;
 mod stats;
 mod verify;
 
