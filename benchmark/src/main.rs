@@ -59,9 +59,13 @@ fn main() {
         Cmd::Run { fixture, n } => {
             let model = std::env::var("BENCH_MODEL").unwrap_or_else(|_| "claude-opus-4-8".into());
             let cc_version = std::env::var("BENCH_CC_VERSION").unwrap_or_else(|_| "unknown".into());
-            let gen = GeneratedWith { model: model.clone(), cc_version, temperature: 0.0 };
+            let temperature: f64 = std::env::var("BENCH_TEMPERATURE")
+                .unwrap_or_else(|_| "0.0".into())
+                .parse()
+                .expect("BENCH_TEMPERATURE must be a valid f64");
+            let gen = GeneratedWith { model: model.clone(), cc_version, temperature };
             let fx = fixture::load(fixtures_root, &fixture).expect("load fixture");
-            let agent = runner::ClaudeAgent { model: model.clone(), temperature: 0.0 };
+            let agent = runner::ClaudeAgent { model: model.clone() };
             let reviewer = review::ClaudeReviewer { model };
             let row = runner::run_fixture(&fx, n, &agent, &reviewer, gen.clone());
             let table = EffectsTable {

@@ -26,6 +26,9 @@ pub struct Sample {
 pub struct GeneratedWith {
     pub model: String,
     pub cc_version: String,
+    /// `claude -p` does not currently expose a temperature control, so this
+    /// records the requested/assumed value for provenance, not a verified
+    /// applied parameter.
     pub temperature: f64,
 }
 
