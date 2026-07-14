@@ -2,6 +2,7 @@
 
 mod fixture;
 mod metrics;
+mod stats;
 mod verify;
 
 /// Parsed CLI invocation.
