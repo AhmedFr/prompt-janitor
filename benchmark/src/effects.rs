@@ -51,7 +51,8 @@ pub struct EffectRow {
     pub delta_turns: DeltaJson,
     pub delta_pass_rate: f64,
     pub delta_review_burden: ReviewBurden,
-    /// Significant iff ANY headline metric's CI excludes 0.
+    /// Significant iff the tokens OR turns delta CI excludes 0. (Pass-rate and
+    /// review-burden have no CI and do not participate in this flag.)
     pub significant: bool,
 }
 
