@@ -1,0 +1,256 @@
+- generic [active] [ref=f12e1]:
+  - generic [ref=f12e2]:
+    - link "Prompt Janitor" [ref=f12e3] [cursor=pointer]:
+      - /url: /#hero
+      - img [ref=f12e5]
+      - text: Prompt Janitor
+    - button "Print / Save as PDF" [ref=f12e7] [cursor=pointer]:
+      - img [ref=f12e8]
+      - text: Print / Save as PDF
+  - main [ref=f12e12]:
+    - generic [ref=f12e13]:
+      - generic [ref=f12e14]: Prompt Janitor Pro bonus
+      - heading "Prompt-File Field Guide" [level=1] [ref=f12e15]
+      - paragraph [ref=f12e16]: The 25 standards your AI instruction files are graded against — with citations, so you know exactly why each one matters.
+      - paragraph [ref=f12e17]: Pro bonus — included with your Prompt Janitor license.
+      - generic [ref=f12e18]: v1.0·July 2026·25 standards
+    - generic [ref=f12e19]:
+      - heading "Contents" [level=3] [ref=f12e20]
+      - list [ref=f12e21]:
+        - listitem [ref=f12e22]:
+          - link "Anthropic" [ref=f12e23] [cursor=pointer]:
+            - /url: "#sec-0-anthropic"
+          - generic [ref=f12e24]: "7"
+        - listitem [ref=f12e25]:
+          - link "OpenAI" [ref=f12e26] [cursor=pointer]:
+            - /url: "#sec-1-openai"
+          - generic [ref=f12e27]: "8"
+        - listitem [ref=f12e28]:
+          - link "Cursor" [ref=f12e29] [cursor=pointer]:
+            - /url: "#sec-2-cursor"
+          - generic [ref=f12e30]: "6"
+        - listitem [ref=f12e31]:
+          - link "Karpathy / community" [ref=f12e32] [cursor=pointer]:
+            - /url: "#sec-3-karpathy-community"
+          - generic [ref=f12e33]: "4"
+    - region "Anthropic 7 standards" [ref=f12e34]:
+      - heading "Anthropic 7 standards" [level=2] [ref=f12e35]:
+        - text: Anthropic
+        - generic [ref=f12e36]: 7 standards
+      - generic [ref=f12e37]:
+        - article [ref=f12e38]:
+          - generic [ref=f12e39]:
+            - code [ref=f12e40]: anthropic-clarity
+            - generic [ref=f12e41]: Medium
+          - paragraph [ref=f12e42]: The file VIOLATES if instructions are vague or ambiguous where a concrete directive is needed (e.g. "be helpful", "handle errors well" with no specifics).
+          - paragraph [ref=f12e43]:
+            - strong [ref=f12e44]: Why it matters —
+            - text: Vague asks produce vague behavior; models follow specifics.
+        - article [ref=f12e45]:
+          - generic [ref=f12e46]:
+            - code [ref=f12e47]: anthropic-examples
+            - generic [ref=f12e48]: Medium
+          - paragraph [ref=f12e49]: VIOLATES if non-obvious conventions, formats, or behaviors are described without at least one concrete example.
+          - paragraph [ref=f12e50]:
+            - strong [ref=f12e51]: Why it matters —
+            - text: One example beats three sentences of description.
+        - article [ref=f12e52]:
+          - generic [ref=f12e53]:
+            - code [ref=f12e54]: anthropic-delimit-sections
+            - generic [ref=f12e55]: Low
+          - paragraph [ref=f12e56]: VIOLATES if the file mixes unrelated concerns in one undifferentiated block with no headings, tags, or delimiters separating sections.
+          - paragraph [ref=f12e57]:
+            - strong [ref=f12e58]: Why it matters —
+            - text: Structure tells the model what belongs together.
+        - article [ref=f12e59]:
+          - generic [ref=f12e60]:
+            - code [ref=f12e61]: anthropic-data-vs-instructions
+            - generic [ref=f12e62]: Medium
+          - paragraph [ref=f12e63]: VIOLATES if variable or contextual data is tangled directly into directives instead of being clearly marked as data.
+          - paragraph [ref=f12e64]:
+            - strong [ref=f12e65]: Why it matters —
+            - text: Unmarked data gets treated as instruction, and vice versa.
+        - article [ref=f12e66]:
+          - generic [ref=f12e67]:
+            - code [ref=f12e68]: anthropic-allow-idk
+            - generic [ref=f12e69]: High
+          - paragraph [ref=f12e70]: VIOLATES if the file asks the agent to produce facts, APIs, file paths, or commands but never tells it to admit uncertainty or avoid inventing details.
+          - paragraph [ref=f12e71]:
+            - strong [ref=f12e72]: Why it matters —
+            - text: "The #1 defense against hallucinated paths and APIs."
+        - article [ref=f12e73]:
+          - generic [ref=f12e74]:
+            - code [ref=f12e75]: anthropic-positive-framing
+            - generic [ref=f12e76]: Low
+          - paragraph [ref=f12e77]: VIOLATES if guidance is expressed almost entirely as prohibitions ("don't…") without stating the desired behavior to do instead.
+          - paragraph [ref=f12e78]:
+            - strong [ref=f12e79]: Why it matters —
+            - text: Models steer better toward stated targets than away from bans.
+        - article [ref=f12e80]:
+          - generic [ref=f12e81]:
+            - code [ref=f12e82]: anthropic-context-placement
+            - generic [ref=f12e83]: Low
+          - paragraph [ref=f12e84]: VIOLATES if long reference material or background is placed in the middle of actionable instructions rather than grouped at the end or in its own section.
+          - paragraph [ref=f12e85]:
+            - strong [ref=f12e86]: Why it matters —
+            - text: Mid-stream reference dilutes the directives around it.
+    - region "OpenAI 8 standards" [ref=f12e87]:
+      - heading "OpenAI 8 standards" [level=2] [ref=f12e88]:
+        - text: OpenAI
+        - generic [ref=f12e89]: 8 standards
+      - generic [ref=f12e90]:
+        - article [ref=f12e91]:
+          - generic [ref=f12e92]:
+            - code [ref=f12e93]: openai-identity
+            - generic [ref=f12e94]: Medium
+          - paragraph [ref=f12e95]: VIOLATES if the file never states the agent's purpose, role, or the project it serves.
+          - paragraph [ref=f12e96]:
+            - strong [ref=f12e97]: Why it matters —
+            - text: Identity anchors every downstream decision.
+        - article [ref=f12e98]:
+          - generic [ref=f12e99]:
+            - code [ref=f12e100]: openai-dos-and-donts
+            - generic [ref=f12e101]: Medium
+          - paragraph [ref=f12e102]: VIOLATES if behavioral rules are stated only abstractly without explicit dos and don'ts the agent can follow.
+          - paragraph [ref=f12e103]:
+            - strong [ref=f12e104]: Why it matters —
+            - text: Abstract values don't constrain concrete actions.
+        - article [ref=f12e105]:
+          - generic [ref=f12e106]:
+            - code [ref=f12e107]: openai-example-consistency
+            - generic [ref=f12e108]: Low
+          - paragraph [ref=f12e109]: VIOLATES if examples in the file use inconsistent formatting or contradict each other.
+          - paragraph [ref=f12e110]:
+            - strong [ref=f12e111]: Why it matters —
+            - text: Contradictory examples train contradictory behavior.
+        - article [ref=f12e112]:
+          - generic [ref=f12e113]:
+            - code [ref=f12e114]: openai-structure
+            - generic [ref=f12e115]: Low
+          - paragraph [ref=f12e116]: VIOLATES if the file lacks any markdown headers or hierarchy and is hard to scan for distinct topics.
+          - paragraph [ref=f12e117]:
+            - strong [ref=f12e118]: Why it matters —
+            - text: Both humans and models navigate by structure.
+        - article [ref=f12e119]:
+          - generic [ref=f12e120]:
+            - code [ref=f12e121]: openai-explicitness
+            - generic [ref=f12e122]: High
+          - paragraph [ref=f12e123]: VIOLATES if the file relies on the agent inferring critical requirements (stack, commands, constraints) that are never stated outright.
+          - paragraph [ref=f12e124]:
+            - strong [ref=f12e125]: Why it matters —
+            - text: What isn't stated will be guessed — sometimes wrong.
+        - article [ref=f12e126]:
+          - generic [ref=f12e127]:
+            - code [ref=f12e128]: openai-context-early
+            - generic [ref=f12e129]: Low
+          - paragraph [ref=f12e130]: VIOLATES if static, reusable context (project facts, conventions) is buried at the end after volatile task detail rather than established up front.
+          - paragraph [ref=f12e131]:
+            - strong [ref=f12e132]: Why it matters —
+            - text: Stable facts up front frame everything after them.
+        - article [ref=f12e133]:
+          - generic [ref=f12e134]:
+            - code [ref=f12e135]: openai-agentic-planning
+            - generic [ref=f12e136]: Low
+          - paragraph [ref=f12e137]: VIOLATES if the file describes multi-step tasks without guiding the agent to plan or decompose before acting.
+          - paragraph [ref=f12e138]:
+            - strong [ref=f12e139]: Why it matters —
+            - text: Unplanned multi-step work drifts and stalls.
+        - article [ref=f12e140]:
+          - generic [ref=f12e141]:
+            - code [ref=f12e142]: openai-persistence
+            - generic [ref=f12e143]: Medium
+          - paragraph [ref=f12e144]: VIOLATES if the file asks the agent to complete tasks but permits stopping early without finishing or verifying the work.
+          - paragraph [ref=f12e145]:
+            - strong [ref=f12e146]: Why it matters —
+            - text: Agents stop at the first plausible answer unless told not to.
+    - region "Cursor 6 standards" [ref=f12e147]:
+      - heading "Cursor 6 standards" [level=2] [ref=f12e148]:
+        - text: Cursor
+        - generic [ref=f12e149]: 6 standards
+      - generic [ref=f12e150]:
+        - article [ref=f12e151]:
+          - generic [ref=f12e152]:
+            - code [ref=f12e153]: cursor-scoped
+            - generic [ref=f12e154]: Medium
+          - paragraph [ref=f12e155]: VIOLATES if the file is bloated with rambling or tangential content rather than concise, scoped instructions.
+          - paragraph [ref=f12e156]:
+            - strong [ref=f12e157]: Why it matters —
+            - text: Every wasted token crowds out code context.
+        - article [ref=f12e158]:
+          - generic [ref=f12e159]:
+            - code [ref=f12e160]: cursor-specific-refs
+            - generic [ref=f12e161]: Low
+          - paragraph [ref=f12e162]: VIOLATES if it points to "the relevant files" or "the config" vaguely instead of naming specific files or paths.
+          - paragraph [ref=f12e163]:
+            - strong [ref=f12e164]: Why it matters —
+            - text: Named paths are actionable; "the config" is a guess.
+        - article [ref=f12e165]:
+          - generic [ref=f12e166]:
+            - code [ref=f12e167]: cursor-declare-conventions
+            - generic [ref=f12e168]: Medium
+          - paragraph [ref=f12e169]: VIOLATES if the project's stack, build/test commands, or core conventions are never declared.
+          - paragraph [ref=f12e170]:
+            - strong [ref=f12e171]: Why it matters —
+            - text: The first thing an agent needs is how to build and test.
+        - article [ref=f12e172]:
+          - generic [ref=f12e173]:
+            - code [ref=f12e174]: cursor-one-concern
+            - generic [ref=f12e175]: Low
+          - paragraph [ref=f12e176]: VIOLATES if a single section tries to govern many unrelated concerns that should be split.
+          - paragraph [ref=f12e177]:
+            - strong [ref=f12e178]: Why it matters —
+            - text: Mixed sections are half-read and half-applied.
+        - article [ref=f12e179]:
+          - generic [ref=f12e180]:
+            - code [ref=f12e181]: cursor-no-stale-blanket
+            - generic [ref=f12e182]: Low
+          - paragraph [ref=f12e183]: VIOLATES if it contains always-apply guidance that is over-broad, outdated, or no longer matches the described project.
+          - paragraph [ref=f12e184]:
+            - strong [ref=f12e185]: Why it matters —
+            - text: Stale blanket rules teach the agent to distrust the file.
+        - article [ref=f12e186]:
+          - generic [ref=f12e187]:
+            - code [ref=f12e188]: cursor-code-style-examples
+            - generic [ref=f12e189]: Low
+          - paragraph [ref=f12e190]: VIOLATES if it mandates a code style without showing a concrete example of compliant code.
+          - paragraph [ref=f12e191]:
+            - strong [ref=f12e192]: Why it matters —
+            - text: Style is imitated from examples, not adjectives.
+    - region "Karpathy / community 4 standards" [ref=f12e193]:
+      - heading "Karpathy / community 4 standards" [level=2] [ref=f12e194]:
+        - text: Karpathy / community
+        - generic [ref=f12e195]: 4 standards
+      - generic [ref=f12e196]:
+        - article [ref=f12e197]:
+          - generic [ref=f12e198]:
+            - code [ref=f12e199]: community-success-criteria
+            - generic [ref=f12e200]: Medium
+          - paragraph [ref=f12e201]: VIOLATES if tasks are described without any definition of done or success criteria.
+          - paragraph [ref=f12e202]:
+            - strong [ref=f12e203]: Why it matters —
+            - text: Without "done", agents under- or over-shoot.
+        - article [ref=f12e204]:
+          - generic [ref=f12e205]:
+            - code [ref=f12e206]: community-no-dead-context
+            - generic [ref=f12e207]: Low
+          - paragraph [ref=f12e208]: VIOLATES if it includes reference content that is never connected to any instruction or used by any task.
+          - paragraph [ref=f12e209]:
+            - strong [ref=f12e210]: Why it matters —
+            - text: Dead context costs tokens and buys nothing.
+        - article [ref=f12e211]:
+          - generic [ref=f12e212]:
+            - code [ref=f12e213]: community-single-source
+            - generic [ref=f12e214]: Medium
+          - paragraph [ref=f12e215]: VIOLATES if the same topic is governed by guidance scattered across multiple places that could drift out of sync.
+          - paragraph [ref=f12e216]:
+            - strong [ref=f12e217]: Why it matters —
+            - text: Duplicated guidance always eventually contradicts itself.
+        - article [ref=f12e218]:
+          - generic [ref=f12e219]:
+            - code [ref=f12e220]: community-concrete-over-abstract
+            - generic [ref=f12e221]: Low
+          - paragraph [ref=f12e222]: VIOLATES if key guidance stays abstract where a concrete rule, value, or example is clearly needed.
+          - paragraph [ref=f12e223]:
+            - strong [ref=f12e224]: Why it matters —
+            - text: Concrete rules are checkable; abstractions are vibes.
+    - paragraph [ref=f12e226]: Prompt Janitor — the visibility layer for every prompt on your Mac.

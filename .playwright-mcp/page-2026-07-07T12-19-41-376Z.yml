@@ -1,0 +1,31 @@
+- dialog "Start from a template" [ref=f5e4]:
+  - generic [ref=f5e5]:
+    - heading "Start from a template" [level=2] [ref=f5e6]
+    - button "Close" [ref=f5e7] [cursor=pointer]:
+      - img [ref=f5e8]
+  - generic [ref=f5e11]:
+    - navigation [ref=f5e12]:
+      - generic [ref=f5e13]:
+        - generic [ref=f5e14]: React + TypeScript
+        - button "React + TypeScript CLAUDE.md" [pressed] [ref=f5e15] [cursor=pointer]: CLAUDE.md
+        - button "React + TypeScript AGENTS.md" [ref=f5e16] [cursor=pointer]: AGENTS.md
+      - generic [ref=f5e17]:
+        - generic [ref=f5e18]: Python
+        - button "Python CLAUDE.md" [ref=f5e19] [cursor=pointer]: CLAUDE.md
+        - button "Python AGENTS.md" [ref=f5e20] [cursor=pointer]: AGENTS.md
+      - generic [ref=f5e21]:
+        - generic [ref=f5e22]: Rust
+        - button "Rust CLAUDE.md" [ref=f5e23] [cursor=pointer]: CLAUDE.md
+        - button "Rust AGENTS.md" [ref=f5e24] [cursor=pointer]: AGENTS.md
+    - generic [ref=f5e25]:
+      - generic [ref=f5e26]:
+        - generic [ref=f5e27]: React + TypeScript — CLAUDE.md
+        - generic [ref=f5e28]: Role, pnpm commands, output format, and a worked example.
+      - generic [ref=f5e29]: "# CLAUDE.md — React + TypeScript (pnpm) ## Role You are a senior React and TypeScript engineer working directly in this codebase. ## Stack facts - Package manager: pnpm - Run tests: `pnpm test`"
+      - generic [ref=f5e30]:
+        - button "Get Pro" [ref=f5e31] [cursor=pointer]:
+          - img [ref=f5e32]
+          - text: Get Pro
+        - generic [ref=f5e36]:
+          - text: or paste your key in
+          - button "Settings → License" [ref=f5e37] [cursor=pointer]

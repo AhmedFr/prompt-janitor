@@ -1,0 +1,28 @@
+- generic [ref=f2e3]:
+  - generic [ref=f2e4]:
+    - generic [ref=f2e5]:
+      - img [ref=f2e6]
+      - generic [ref=f2e9]:
+        - generic [ref=f2e10]: A
+        - generic [ref=f2e11]: 96/100
+    - generic [ref=f2e12]:
+      - generic [ref=f2e13]: Good enough. Your instruction files meet the bar.
+      - generic [ref=f2e14]:
+        - generic [ref=f2e15]: 14 prompt files · 6 projects
+        - generic [ref=f2e16]:
+          - img "Critical" [ref=f2e17]
+          - text: 0 critical
+        - generic [ref=f2e18]:
+          - img "Warning" [ref=f2e19]
+          - text: 1 warnings
+        - generic [ref=f2e20]:
+          - img "Nit" [ref=f2e21]
+          - text: 2 nits
+      - generic [ref=f2e22]: ~/code
+  - generic [ref=f2e23]:
+    - text: Graded on 5 of 30 standards —
+    - button "connect a model to grade all 30" [ref=f2e24] [cursor=pointer]
+    - text: .
+  - button "Scan now" [ref=f2e26] [cursor=pointer]:
+    - img [ref=f2e27]
+    - text: Scan now

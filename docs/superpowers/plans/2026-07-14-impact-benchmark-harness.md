@@ -1213,19 +1213,19 @@ Add a `setAge` action creator to src/actions.js. Run `npm test` and make it pass
 
 - [ ] **Step 4: Write `claude.good.md`** (defect ABSENT — includes a worked example)
 
+The prose MUST be identical to `claude.bad.md`; the ONLY addition is the example block. Do NOT add any extra explicit rule sentence (e.g. "Match that shape: SCREAMING_SNAKE…") — that would be a second information channel and confound the experiment.
+
 ```
 You are a JS engineer. Follow the existing action-creator convention exactly.
 
 Example of the convention:
     export const setName = (name) => ({ type: "SET_NAME", payload: { name } });
-
-Match that shape: SCREAMING_SNAKE type, a single `payload` object keyed by the argument name.
 ```
 
-- [ ] **Step 5: Write `claude.bad.md`** (defect PRESENT — same guidance, NO example; this is the ONLY difference)
+- [ ] **Step 5: Write `claude.bad.md`** (defect PRESENT — same guidance, NO example; the example block is the ONLY difference)
 
 ```
-You are a JS engineer. Follow the existing action-creator convention.
+You are a JS engineer. Follow the existing action-creator convention exactly.
 ```
 
 - [ ] **Step 6: Write `verify.sh`** (deterministic pass/fail)

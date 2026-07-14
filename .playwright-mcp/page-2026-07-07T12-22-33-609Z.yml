@@ -1,0 +1,324 @@
+- generic [active] [ref=f9e1]:
+  - link "Skip to content" [ref=f9e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation [ref=f9e3]:
+    - generic [ref=f9e4]:
+      - link "Prompt Janitor" [ref=f9e5] [cursor=pointer]:
+        - /url: "#hero"
+        - img [ref=f9e7]
+        - text: Prompt Janitor
+      - generic [ref=f9e9]:
+        - link "Features" [ref=f9e10] [cursor=pointer]:
+          - /url: "#features"
+        - link "Pricing" [ref=f9e11] [cursor=pointer]:
+          - /url: "#pricing"
+        - link "FAQ" [ref=f9e12] [cursor=pointer]:
+          - /url: "#faq"
+        - link "Download" [ref=f9e13] [cursor=pointer]:
+          - /url: "#pricing"
+          - img [ref=f9e14]
+          - text: Download
+  - main [ref=f9e16]:
+    - generic [ref=f9e18]:
+      - generic [ref=f9e19]: macOS app · runs 100% locally
+      - heading "Your prompts, finally under inspection." [level=1] [ref=f9e20]:
+        - text: Your prompts,
+        - text: finally under inspection.
+      - paragraph [ref=f9e21]: Prompt Janitor scans every AGENTS.md and CLAUDE.md on your Mac, grades them A–F against the best standards, and flags what's rotting — before your agents trip on it.
+      - generic [ref=f9e22]:
+        - link "Download for macOS" [ref=f9e23] [cursor=pointer]:
+          - /url: "#pricing"
+          - img [ref=f9e24]
+          - text: Download for macOS
+        - link "See how it works" [ref=f9e26] [cursor=pointer]:
+          - /url: "#features"
+      - generic [ref=f9e27]:
+        - generic [ref=f9e28]:
+          - img [ref=f9e29]
+          - text: Diagnosis free forever
+        - generic [ref=f9e31]:
+          - img [ref=f9e32]
+          - text: Runs fully offline
+        - generic [ref=f9e34]:
+          - img [ref=f9e35]
+          - text: macOS Sonoma 14+
+        - generic [ref=f9e37]:
+          - img [ref=f9e38]
+          - text: 30-day grade-up guarantee
+      - img "Prompt Janitor overview with health grades" [ref=f9e42]
+    - generic [ref=f9e44]:
+      - generic [ref=f9e45]:
+        - heading "Visibility you've never had" [level=2] [ref=f9e46]
+        - paragraph [ref=f9e47]: Until now there was no single place to see how good your prompts actually are. Prompt Janitor is that layer.
+      - generic [ref=f9e48]:
+        - generic [ref=f9e49]: Auto-scan every 6h
+        - generic [ref=f9e50]: A–F grades
+        - generic [ref=f9e51]: Best-practice rules
+        - generic [ref=f9e52]: Source-cited issues
+        - generic [ref=f9e53]: Local-first
+        - generic [ref=f9e54]: Custom rules
+        - generic [ref=f9e55]: Regression alerts
+        - generic [ref=f9e56]: Weekly digest
+    - generic [ref=f9e58]:
+      - generic [ref=f9e59]:
+        - generic [ref=f9e60]:
+          - generic [ref=f9e61]:
+            - generic [ref=f9e62]: A
+            - text: Health scores
+          - heading "Every prompt, graded A to F" [level=3] [ref=f9e63]
+          - paragraph [ref=f9e64]: One health score per file, rolled up per project. Watch grades rise and fall as you edit — no more guessing whether a prompt is actually any good.
+        - img "Prompt list with per-file grades" [ref=f9e66]
+      - generic [ref=f9e67]:
+        - generic [ref=f9e68]:
+          - generic [ref=f9e69]:
+            - generic [ref=f9e71]: Karpathy
+            - generic [ref=f9e72]: Anthropic
+          - heading "Catches what's rotting" [level=3] [ref=f9e73]
+          - paragraph [ref=f9e74]: Stale model names, contradictory instructions, missing examples, walls of text. Every issue is cited to its source — Anthropic, OpenAI, or the practitioners who wrote the playbook — with a suggested fix.
+        - img "Annotated prompt with cited issues and a suggested fix" [ref=f9e76]
+      - generic [ref=f9e77]:
+        - generic [ref=f9e78]:
+          - generic [ref=f9e79]:
+            - generic [ref=f9e80]: Your rule
+            - text: Standards
+          - heading "Your standards, enforced" [level=3] [ref=f9e81]
+          - paragraph [ref=f9e82]: Start from trusted rule packs, then write your own in plain English. “Never name a specific model version.” Done — checked on every scan, every file.
+        - img "Rules library with plain-language composer" [ref=f9e84]
+      - generic [ref=f9e85]:
+        - generic [ref=f9e86]:
+          - generic [ref=f9e87]: Calm by design
+          - heading "Quiet by default" [level=3] [ref=f9e88]
+          - paragraph [ref=f9e89]: Scans in the background on your schedule. A glance from the menu bar, a calm weekly digest, and alerts only when something regresses. Never naggy.
+        - img "Menu-bar popover with status snapshot" [ref=f9e91]
+    - generic [ref=f9e94]:
+      - generic [ref=f9e95]:
+        - heading "Custom rules, plain English" [level=4] [ref=f9e96]
+        - paragraph [ref=f9e97]: House rules live right alongside the built-ins — type the intent, pick a severity, done.
+        - generic [ref=f9e98]:
+          - generic [ref=f9e100]: No hard-coded model names
+          - generic [ref=f9e101]: Karpathy
+        - generic [ref=f9e102]:
+          - generic [ref=f9e104]: Always mention the deploy command
+          - generic [ref=f9e105]: Custom
+        - generic [ref=f9e106]:
+          - generic [ref=f9e108]: Must define a clear role
+          - generic [ref=f9e109]: Anthropic
+      - generic [ref=f9e110]:
+        - heading "Grouped by project & source" [level=4] [ref=f9e111]
+        - paragraph [ref=f9e112]: Filter your whole prompt estate by repo, file type, or which guidebook flagged the issue.
+        - generic [ref=f9e113]:
+          - generic [ref=f9e114]: Anthropic
+          - generic [ref=f9e115]: OpenAI
+          - generic [ref=f9e116]: Karpathy
+          - generic [ref=f9e117]: Custom
+        - generic [ref=f9e118]:
+          - generic [ref=f9e119]: A
+          - generic [ref=f9e120]: web-app
+          - generic [ref=f9e121]: 6 files
+        - generic [ref=f9e122]:
+          - generic [ref=f9e123]: D
+          - generic [ref=f9e124]: api-worker
+          - generic [ref=f9e125]: 2 critical
+    - generic [ref=f9e127]:
+      - generic [ref=f9e128]:
+        - heading "Built for everyone with a CLAUDE.md" [level=2] [ref=f9e129]
+        - paragraph [ref=f9e130]: If you write prompts for agents, you need to know they're holding up.
+      - generic [ref=f9e131]:
+        - generic [ref=f9e132]:
+          - img [ref=f9e134]
+          - heading "Solo developers" [level=4] [ref=f9e137]
+          - paragraph [ref=f9e138]: Keep your one CLAUDE.md sharp without thinking about it.
+        - generic [ref=f9e139]:
+          - img [ref=f9e141]
+          - heading "Eng teams & leads" [level=4] [ref=f9e146]
+          - paragraph [ref=f9e147]: One view of every repo's prompt health across the org.
+        - generic [ref=f9e148]:
+          - img [ref=f9e150]
+          - heading "AI engineers" [level=4] [ref=f9e152]
+          - paragraph [ref=f9e153]: Hold your agent prompts to a measurable standard.
+        - generic [ref=f9e154]:
+          - img [ref=f9e156]
+          - heading "Agencies" [level=4] [ref=f9e158]
+          - paragraph [ref=f9e159]: Audit client prompt files and prove the quality.
+        - generic [ref=f9e160]:
+          - img [ref=f9e162]
+          - heading "Indie hackers" [level=4] [ref=f9e164]
+          - paragraph [ref=f9e165]: Ship faster knowing your prompts won't quietly rot.
+        - generic [ref=f9e166]:
+          - img [ref=f9e168]
+          - heading "Anyone, really" [level=4] [ref=f9e171]
+          - paragraph [ref=f9e172]: Got a prompt file on disk? Now you can see how good it is.
+    - generic [ref=f9e174]:
+      - generic [ref=f9e175]:
+        - heading "Diagnosis free. Treatment paid." [level=2] [ref=f9e176]
+        - paragraph [ref=f9e177]: We grade your prompt files against the industry's own standards — free, unlimited, on your machine, with your compute. Grading against YOUR standards, and fixing anything — that's Pro.
+      - generic [ref=f9e178]:
+        - generic [ref=f9e179]:
+          - generic [ref=f9e180]:
+            - generic [ref=f9e181]: Free — Diagnosis
+            - generic [ref=f9e183]: $0
+            - generic [ref=f9e184]: Free forever · no scan caps
+          - generic [ref=f9e185]:
+            - list [ref=f9e186]:
+              - listitem [ref=f9e187]:
+                - img [ref=f9e189]
+                - generic [ref=f9e191]: Unlimited scanning — scheduling, watch mode, notifications, history & trends. No scan caps, ever
+              - listitem [ref=f9e192]:
+                - img [ref=f9e194]
+                - generic [ref=f9e196]: All deterministic fact rules, with source-cited findings — never hidden or blurred
+              - listitem [ref=f9e197]:
+                - img [ref=f9e199]
+                - generic [ref=f9e201]: Built-in 25-standard AI catalog evaluation — free when you bring compute (local Ollama or your own API key)
+              - listitem [ref=f9e202]:
+                - img [ref=f9e204]
+                - generic [ref=f9e206]: Standards updates keep flowing to free users
+            - link "Download for macOS" [ref=f9e207] [cursor=pointer]:
+              - /url: "#"
+              - img [ref=f9e208]
+              - text: Download for macOS
+            - paragraph [ref=f9e210]: No payment required · no account needed
+        - generic [ref=f9e211]:
+          - generic [ref=f9e212]:
+            - generic [ref=f9e213]: Pro — Treatment
+            - generic [ref=f9e214]:
+              - generic [ref=f9e215]: $69
+              - generic [ref=f9e216]: $99
+            - generic [ref=f9e217]: Founder pricing · one-time
+          - generic [ref=f9e218]:
+            - paragraph [ref=f9e219]: "Everything in Free, plus:"
+            - list [ref=f9e220]:
+              - listitem [ref=f9e221]:
+                - img [ref=f9e223]
+                - generic [ref=f9e225]: AI rewrites + Apply fix / Auto-fix — backup, undo, optional git branch
+              - listitem [ref=f9e226]:
+                - img [ref=f9e228]
+                - generic [ref=f9e230]: Custom rules in plain English — your standards, enforced on every scan
+              - listitem [ref=f9e231]:
+                - img [ref=f9e233]
+                - generic [ref=f9e235]: Starter template packs — A-grade CLAUDE.md, AGENTS.md & .cursorrules per stack
+              - listitem [ref=f9e236]:
+                - img [ref=f9e238]
+                - generic [ref=f9e240]: "Bonus: Prompt-File Field Guide (PDF) — the 25 standards, explained"
+              - listitem [ref=f9e241]:
+                - img [ref=f9e243]
+                - generic [ref=f9e245]: 12 months of feature updates
+            - link "Get Pro — $69" [ref=f9e246] [cursor=pointer]:
+              - /url: https://buy.polar.sh/polar_cl_PLACEHOLDER
+            - paragraph [ref=f9e247]:
+              - text: "One-time purchase: perpetual license + 12 months of feature updates"
+              - text: $29/yr optional renewal, never required to keep using the app
+            - paragraph [ref=f9e248]: After checkout, Polar emails your license key — paste it into Settings → License. Verified offline, no account.
+      - generic [ref=f9e249]:
+        - img [ref=f9e251]
+        - generic [ref=f9e254]: 30-day grade-up guarantee. If your prompt-file health doesn't go up a full letter grade within 30 days, full refund.
+    - generic [ref=f9e256]:
+      - generic [ref=f9e257]:
+        - heading "Frequently asked questions" [level=2] [ref=f9e258]
+        - paragraph [ref=f9e259]: Privacy, compatibility, and how grading actually works.
+      - generic [ref=f9e260]:
+        - generic [ref=f9e261]:
+          - button "What does Prompt Janitor scan?" [ref=f9e262] [cursor=pointer]:
+            - text: What does Prompt Janitor scan?
+            - generic [ref=f9e263]: +
+          - generic [ref=f9e264]: Prompt and agent-instruction files in the folders you choose — AGENTS.md, CLAUDE.md, .cursorrules and more.
+        - generic [ref=f9e265]:
+          - button "Does it send my prompts anywhere?" [ref=f9e266] [cursor=pointer]:
+            - text: Does it send my prompts anywhere?
+            - generic [ref=f9e267]: +
+          - generic [ref=f9e268]: No. Scanning and grading run entirely on your Mac. Nothing is uploaded — Prompt Janitor is local-first by design.
+        - generic [ref=f9e269]:
+          - button "What standards does it grade against?" [ref=f9e270] [cursor=pointer]:
+            - text: What standards does it grade against?
+            - generic [ref=f9e271]: +
+          - generic [ref=f9e272]: Built-in rule packs distilled from Anthropic and OpenAI guidance and respected practitioners, plus any custom rules you write yourself.
+        - generic [ref=f9e273]:
+          - button "Can I write my own rules?" [ref=f9e274] [cursor=pointer]:
+            - text: Can I write my own rules?
+            - generic [ref=f9e275]: +
+          - generic [ref=f9e276]: Yes — in plain English, with a severity level. They're checked on every scan, right next to the built-ins.
+        - generic [ref=f9e277]:
+          - button "How often does it scan?" [ref=f9e278] [cursor=pointer]:
+            - text: How often does it scan?
+            - generic [ref=f9e279]: +
+          - generic [ref=f9e280]: "On a schedule you set: hourly, every 6 hours, daily, on file save (watch mode), or manually whenever you click."
+        - generic [ref=f9e281]:
+          - button "What's free, what's paid?" [ref=f9e282] [cursor=pointer]:
+            - text: What's free, what's paid?
+            - generic [ref=f9e283]: +
+          - generic [ref=f9e284]: "Diagnosis is free, forever: scanning, scheduling, watch mode, notifications, history & trends — no scan caps, ever — plus every deterministic fact rule with cited findings. The built-in 25-standard AI catalog evaluation is free too when you bring your own compute (local Ollama or your API key), and findings are never hidden or blurred. Treatment is Pro: grading against your standards, AI rewrites, and applying fixes."
+        - generic [ref=f9e285]:
+          - button "Is it a subscription?" [ref=f9e286] [cursor=pointer]:
+            - text: Is it a subscription?
+            - generic [ref=f9e287]: +
+          - generic [ref=f9e288]: "No. Pro is a one-time purchase: perpetual license + 12 months of feature updates. After that there's a $29/yr optional renewal for continued updates — never required to keep using the app."
+        - generic [ref=f9e289]:
+          - button "How do I get my license key?" [ref=f9e290] [cursor=pointer]:
+            - text: How do I get my license key?
+            - generic [ref=f9e291]: +
+          - generic [ref=f9e292]: Checkout runs through Polar, our merchant of record. Right after purchase, Polar emails you a license key — paste it into Settings → License and Pro unlocks. Keys are verified offline; no account needed.
+        - generic [ref=f9e293]:
+          - button "What's the guarantee?" [ref=f9e294] [cursor=pointer]:
+            - text: What's the guarantee?
+            - generic [ref=f9e295]: +
+          - generic [ref=f9e296]: If your prompt-file health doesn't go up a full letter grade within 30 days, full refund.
+        - generic [ref=f9e297]:
+          - button "Will it change my files?" [ref=f9e298] [cursor=pointer]:
+            - text: Will it change my files?
+            - generic [ref=f9e299]: +
+          - generic [ref=f9e300]: Only when you apply a fix — and it snapshots a backup first, with one-click undo and an optional dedicated git branch so changes stay reviewable.
+        - generic [ref=f9e301]:
+          - button "How do I get the app?" [ref=f9e302] [cursor=pointer]:
+            - text: How do I get the app?
+            - generic [ref=f9e303]: +
+          - generic [ref=f9e304]: Download it and you're scanning in under a minute. No account, no sign-up.
+    - generic [ref=f9e306]:
+      - generic [ref=f9e307]: Featured on
+      - generic [ref=f9e308]:
+        - generic [ref=f9e309]: badge
+        - generic [ref=f9e310]: badge
+        - generic [ref=f9e311]: badge
+        - generic [ref=f9e312]: badge
+    - generic [ref=f9e314]:
+      - img [ref=f9e316]
+      - heading "Grade once. Stay sharp." [level=2] [ref=f9e318]:
+        - text: Grade once.
+        - text: Stay sharp.
+      - paragraph [ref=f9e319]: Give your prompts the visibility layer they've been missing.
+      - link "Download for macOS" [ref=f9e320] [cursor=pointer]:
+        - /url: "#pricing"
+        - img [ref=f9e321]
+        - text: Download for macOS
+  - contentinfo [ref=f9e323]:
+    - generic [ref=f9e324]:
+      - generic [ref=f9e325]:
+        - generic [ref=f9e326]:
+          - link "Prompt Janitor" [ref=f9e327] [cursor=pointer]:
+            - /url: "#hero"
+            - img [ref=f9e329]
+            - text: Prompt Janitor
+          - paragraph [ref=f9e331]: The visibility layer for every prompt on your Mac.
+        - generic [ref=f9e332]:
+          - heading "Product" [level=5] [ref=f9e333]
+          - link "Features" [ref=f9e334] [cursor=pointer]:
+            - /url: "#features"
+          - link "Pricing" [ref=f9e335] [cursor=pointer]:
+            - /url: "#pricing"
+          - link "FAQ" [ref=f9e336] [cursor=pointer]:
+            - /url: "#faq"
+        - generic [ref=f9e337]:
+          - heading "Company" [level=5] [ref=f9e338]
+          - link "Roadmap" [ref=f9e339] [cursor=pointer]:
+            - /url: "#"
+          - link "Contact" [ref=f9e340] [cursor=pointer]:
+            - /url: "#"
+          - link "Changelog" [ref=f9e341] [cursor=pointer]:
+            - /url: "#"
+        - generic [ref=f9e342]:
+          - heading "Legal" [level=5] [ref=f9e343]
+          - link "Privacy" [ref=f9e344] [cursor=pointer]:
+            - /url: "#"
+          - link "Terms" [ref=f9e345] [cursor=pointer]:
+            - /url: "#"
+      - generic [ref=f9e346]:
+        - generic [ref=f9e347]: © 2026 Prompt Janitor — All rights reserved
+        - generic [ref=f9e348]: Built for people who care about their prompts

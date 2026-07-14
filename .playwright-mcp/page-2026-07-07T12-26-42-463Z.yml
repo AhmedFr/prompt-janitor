@@ -1,0 +1,36 @@
+- generic [ref=f14e3]:
+  - link "Skip to content" [ref=f14e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=f14e5]:
+    - generic [ref=f14e7]:
+      - generic [ref=f14e8]: 🧹
+      - generic [ref=f14e9]: Prompt Janitor
+    - navigation [ref=f14e10]:
+      - button "Overview" [ref=f14e11] [cursor=pointer]
+      - button "Prompts" [ref=f14e12] [cursor=pointer]
+      - button "Scans" [ref=f14e13] [cursor=pointer]
+      - button "Rules" [ref=f14e14] [cursor=pointer]
+      - button "Settings" [ref=f14e15] [cursor=pointer]
+    - button "Replay setup" [active] [ref=f14e17] [cursor=pointer]
+  - main [ref=f14e18]:
+    - generic [ref=f14e19]:
+      - heading "Overview" [level=1] [ref=f14e21]
+      - generic [ref=f14e25]: Open the Prompt Janitor desktop app to see live data.
+  - generic [ref=f14e27]:
+    - generic [ref=f14e28]:
+      - generic [ref=f14e29]: 1 · Folder
+      - generic [ref=f14e30]: 2 · Scan
+      - generic [ref=f14e31]: 3 · Verdict
+    - generic [ref=f14e32]:
+      - generic [ref=f14e33]: 🧹
+      - heading "Where should I look for prompts?" [level=2] [ref=f14e34]
+      - paragraph [ref=f14e35]: I'll find AGENTS.md, CLAUDE.md, .cursorrules and other AI prompt files inside this folder.
+      - button "Choose a folder…" [ref=f14e36] [cursor=pointer]:
+        - img [ref=f14e37]
+        - text: Choose a folder…
+      - paragraph [ref=f14e39]: Standards packs and scan schedule start with sensible defaults — change them anytime in Settings.
+    - generic [ref=f14e40]:
+      - button "Skip setup" [ref=f14e41] [cursor=pointer]
+      - button "Run first scan" [disabled] [ref=f14e42] [cursor=pointer]:
+        - img [ref=f14e43]
+        - text: Run first scan
