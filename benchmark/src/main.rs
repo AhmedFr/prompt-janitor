@@ -46,10 +46,11 @@ fn main() {
         Ok(c) => c,
         Err(e) => { eprintln!("{e}"); std::process::exit(2); }
     };
-    let fixtures_root = Path::new("fixtures");
+    let fixtures_root = std::fs::canonicalize("fixtures")
+        .expect("fixtures/ directory not found (run from the benchmark/ crate root)");
     match cmd {
         Cmd::List => {
-            for e in std::fs::read_dir(fixtures_root).expect("fixtures/ dir") {
+            for e in std::fs::read_dir(&fixtures_root).expect("fixtures/ dir") {
                 let e = e.unwrap();
                 if e.file_type().unwrap().is_dir() {
                     println!("{}", e.file_name().to_string_lossy());
@@ -64,7 +65,7 @@ fn main() {
                 .parse()
                 .expect("BENCH_TEMPERATURE must be a valid f64");
             let gen = GeneratedWith { model: model.clone(), cc_version, temperature };
-            let fx = fixture::load(fixtures_root, &fixture).expect("load fixture");
+            let fx = fixture::load(&fixtures_root, &fixture).expect("load fixture");
             let agent = runner::ClaudeAgent { model: model.clone() };
             let reviewer = review::ClaudeReviewer { model };
             let row = runner::run_fixture(&fx, n, &agent, &reviewer, gen.clone());

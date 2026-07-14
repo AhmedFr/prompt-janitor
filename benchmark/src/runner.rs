@@ -1,6 +1,6 @@
 //! Orchestrate N runs × {good, bad} for one fixture into an EffectRow.
 
-use crate::effects::{aggregate, EffectRow, GeneratedWith, Sample};
+use crate::effects::{aggregate, EffectRow, GeneratedWith, ReviewBurden, Sample};
 use crate::fixture::Fixture;
 use crate::metrics::parse_stream;
 use crate::review::{build_review_prompt, parse_review, Reviewer};
@@ -62,7 +62,16 @@ fn run_one(
     let metrics = parse_stream(&transcript)?;
     let passed = run_verifier(work.path(), &fx.dir.join("verify.sh"));
     let diff = diff_dirs(&pristine, work.path());
-    let review = parse_review(&reviewer.review(&build_review_prompt(&diff))?)?;
+    let review = match reviewer
+        .review(&build_review_prompt(&diff))
+        .and_then(|raw| parse_review(&raw))
+    {
+        Ok(rb) => rb,
+        Err(e) => {
+            eprintln!("run [{}]: review-burden unavailable ({e}); recording zero", fx.rule);
+            ReviewBurden { major: 0.0, minor: 0.0, nice: 0.0 }
+        }
+    };
     Ok(Sample { metrics, passed, review })
 }
 
@@ -157,6 +166,14 @@ mod tests {
         }
     }
 
+    /// Failing reviewer: always returns an error (simulates a crashed judge).
+    struct FailingReviewer;
+    impl Reviewer for FailingReviewer {
+        fn review(&self, _prompt: &str) -> Result<String, String> {
+            Err("judge exploded".into())
+        }
+    }
+
     fn fx(dir: &Path) -> Fixture {
         std::fs::create_dir_all(dir.join("repo")).unwrap();
         std::fs::write(dir.join("verify.sh"), "exit 0").unwrap();
@@ -198,5 +215,16 @@ mod tests {
         assert!(d.contains("c.txt") && d.contains("added"));
         assert!(!d.contains("a.txt")); // unchanged not shown
         assert!(!d.contains("CLAUDE.md")); // harness file skipped
+    }
+
+    #[test]
+    fn failing_reviewer_does_not_discard_samples() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = fx(dir.path());
+        let gen = GeneratedWith { model: "m".into(), cc_version: "v".into(), temperature: 0.0 };
+        let row = run_fixture(&f, 4, &FakeAgent, &FailingReviewer, gen);
+        assert_eq!(row.n, 4, "samples must survive a failing reviewer");
+        assert!(row.delta_tokens.mean > 0.0, "token signal still measured");
+        assert_eq!(row.delta_review_burden.major, 0.0, "burden defaults to zero when judge fails");
     }
 }
