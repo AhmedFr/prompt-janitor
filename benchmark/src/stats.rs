@@ -53,6 +53,9 @@ const SEED: u64 = 0x1234_5678_9ABC_DEF0;
 /// mean(bad) − mean(good) with a fixed-seed bootstrap 95% CI on the difference.
 /// `significant` iff the CI excludes 0.
 pub fn delta(bad: &[f64], good: &[f64]) -> Delta {
+    if bad.is_empty() || good.is_empty() {
+        return Delta { mean: 0.0, ci95: Ci { lo: 0.0, hi: 0.0 }, significant: false };
+    }
     let point = mean(bad) - mean(good);
     let mut rng = Rng(SEED);
     let mut diffs: Vec<f64> = (0..BOOTSTRAP_ITERS)
@@ -97,5 +100,13 @@ mod tests {
         let bad = vec![5.0, 6.0, 7.0, 8.0, 9.0];
         let good = vec![1.0, 2.0, 3.0];
         assert_eq!(delta(&bad, &good), delta(&bad, &good));
+    }
+
+    #[test]
+    fn empty_input_does_not_panic() {
+        let d = delta(&[], &[1.0, 2.0]);
+        assert_eq!(d, Delta { mean: 0.0, ci95: Ci { lo: 0.0, hi: 0.0 }, significant: false });
+        let d2 = delta(&[1.0, 2.0], &[]);
+        assert!(!d2.significant);
     }
 }
