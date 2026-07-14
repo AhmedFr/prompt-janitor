@@ -7,10 +7,21 @@ use serde::Deserialize;
 pub struct RunMetrics {
     pub input_tokens: u64,
     pub output_tokens: u64,
+    pub cache_creation_input_tokens: u64,
+    pub cache_read_input_tokens: u64,
     pub num_turns: u32,
     /// Tool names in call order (e.g. "Task" => a subagent was spawned).
     pub tool_calls: Vec<String>,
     pub wall_clock_ms: u64,
+}
+
+impl RunMetrics {
+    /// Total input tokens actually consumed, including prompt-cache creation
+    /// and reads — the real cost driver. Raw `input_tokens` alone is tiny
+    /// because most of the prompt is served from / written to cache.
+    pub fn total_input_tokens(&self) -> u64 {
+        self.input_tokens + self.cache_creation_input_tokens + self.cache_read_input_tokens
+    }
 }
 
 #[derive(Deserialize)]
@@ -42,6 +53,10 @@ struct Block {
 struct Usage {
     input_tokens: u64,
     output_tokens: u64,
+    #[serde(default)]
+    cache_creation_input_tokens: u64,
+    #[serde(default)]
+    cache_read_input_tokens: u64,
 }
 
 /// Parse a `stream-json` transcript. Collects tool names from assistant
@@ -79,6 +94,8 @@ pub fn parse_stream(text: &str) -> Result<RunMetrics, String> {
     Ok(RunMetrics {
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens,
+        cache_read_input_tokens: usage.cache_read_input_tokens,
         num_turns,
         tool_calls,
         wall_clock_ms,
@@ -98,6 +115,8 @@ mod tests {
         assert!(m.num_turns >= 1, "expected >=1 turn, got {}", m.num_turns);
         assert!(m.input_tokens > 0 && m.output_tokens > 0);
         assert!(!m.tool_calls.is_empty(), "expected at least one tool call");
+        assert!(m.cache_read_input_tokens > 0, "real sample has prompt-cache reads");
+        assert!(m.total_input_tokens() > m.input_tokens, "cache tokens dominate raw input");
     }
 
     #[test]
@@ -113,6 +132,9 @@ mod tests {
         assert_eq!(m.output_tokens, 540);
         assert_eq!(m.wall_clock_ms, 8100);
         assert_eq!(m.tool_calls, vec!["Write".to_string(), "Task".to_string()]);
+        assert_eq!(m.cache_creation_input_tokens, 0);
+        assert_eq!(m.cache_read_input_tokens, 0);
+        assert_eq!(m.total_input_tokens(), 1200);
     }
 
     #[test]

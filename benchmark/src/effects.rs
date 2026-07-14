@@ -64,7 +64,7 @@ pub struct EffectsTable {
 }
 
 fn tokens_f64(s: &[Sample]) -> Vec<f64> {
-    s.iter().map(|x| x.metrics.input_tokens as f64).collect()
+    s.iter().map(|x| x.metrics.total_input_tokens() as f64).collect()
 }
 fn turns_f64(s: &[Sample]) -> Vec<f64> {
     s.iter().map(|x| x.metrics.num_turns as f64).collect()
@@ -123,6 +123,8 @@ mod tests {
             metrics: RunMetrics {
                 input_tokens: tokens,
                 output_tokens: 0,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 0,
                 num_turns: turns,
                 tool_calls: vec![],
                 wall_clock_ms: 0,
