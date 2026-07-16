@@ -248,3 +248,37 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .prose a { color: var(--blue-press); text-decoration: underline; }
 .prose strong { color: var(--ink); }
 .post-cta { max-width: 680px; margin: 56px auto 0; text-align: center; background: var(--bg-tint); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 40px 28px; }
+
+/* ---------- waitlist form ---------- */
+.wl-form { position: relative; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+.wl-form input[type="email"] { font: inherit; font-size: 16px; padding: 12px 18px; min-width: 280px; border-radius: var(--r-pill); border: 1px solid var(--line-2); background: #fff; box-shadow: var(--shadow-sm); }
+.wl-form input[type="email"]:focus { border-color: var(--blue); outline: none; }
+.wl-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.wl-msg { width: 100%; text-align: center; font-size: 14.5px; margin: 10px 0 0; min-height: 1.4em; color: var(--ink-2); }
+.wl-msg.ok { color: #1d7a3e; font-weight: 600; }
+.wl-msg.err { color: var(--red); }
+.wl-form.compact { justify-content: stretch; margin-top: 0; }
+.wl-form.compact input[type="email"] { flex: 1 1 100%; min-width: 0; }
+.wl-form.compact .btn { flex: 1 1 100%; justify-content: center; }
+
+/* ---------- evidence strip ---------- */
+.ev-stats { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin: 0 0 26px; }
+.ev-stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); padding: 24px 34px; min-width: 220px; }
+.ev-stat .n { font-family: var(--display); font-weight: 700; font-size: 40px; letter-spacing: -.03em; }
+.ev-stat .l { color: var(--ink-2); font-size: 15px; margin-top: 4px; }
+.ev-caveat { max-width: 580px; margin: 0 auto; font-size: 14.5px; color: var(--ink-3); text-align: center; }
+.ev-link { display: inline-block; margin-top: 18px; color: var(--blue-press); font-weight: 600; }
+.evidence { text-align: center; }
+
+/* ---------- how it works ---------- */
+.how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.how-step { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); padding: 26px 24px; }
+.how-step .n { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; background: var(--blue-tint); color: var(--blue-press); font-family: var(--display); font-weight: 700; margin-bottom: 14px; }
+.how-step h4 { font-size: 19px; }
+.how-step p { color: var(--ink-2); font-size: 15.5px; margin: 8px 0 0; }
+@media (max-width: 720px) { .how { grid-template-columns: 1fr; } }
+
+/* ---------- philosophy strip ---------- */
+.philosophy { text-align: center; }
+.philosophy blockquote { font-family: var(--display); font-weight: 600; letter-spacing: -.02em; font-size: clamp(24px, 3.4vw, 36px); line-height: 1.25; color: var(--ink); max-width: 22ch; margin: 18px auto 0; }
+.philosophy .who { margin: 22px auto 0; color: var(--ink-2); font-size: 17px; max-width: 560px; }

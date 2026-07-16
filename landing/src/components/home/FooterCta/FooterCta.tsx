@@ -1,3 +1,5 @@
+import { WaitlistForm } from "@/components/WaitlistForm";
+
 export function FooterCta() {
   return (
     <section className="section footer-cta">
@@ -15,15 +17,8 @@ export function FooterCta() {
           <br />
           Stay sharp.
         </h2>
-        <p>Give your prompts the visibility layer they've been missing.</p>
-        <a className="btn" href="/#pricing">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 4v11" />
-            <path d="M7 11l5 5 5-5" />
-            <path d="M5 20h14" />
-          </svg>{" "}
-          Download for macOS
-        </a>
+        <p>Give your prompts the visibility layer they've been missing — waitlist members launch first, at founder pricing.</p>
+        <WaitlistForm source="footer" />
       </div>
     </section>
   );

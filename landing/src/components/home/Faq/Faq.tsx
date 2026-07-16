@@ -9,6 +9,14 @@ interface FaqItem {
 
 const ITEMS: FaqItem[] = [
   {
+    q: "When does it launch?",
+    a: "Soon — Prompt Janitor is in pre-launch. Join the waitlist and you'll get the download link the moment it ships, with founder pricing ($69 instead of $99) locked in.",
+  },
+  {
+    q: "What happens when I join the waitlist?",
+    a: "You get one confirmation email right away, and one email when the app launches. That's the whole campaign — no drip sequences, and you can unsubscribe any time.",
+  },
+  {
     q: "What does Prompt Janitor scan?",
     a: (
       <>
@@ -69,7 +77,7 @@ const ITEMS: FaqItem[] = [
   },
   {
     q: "How do I get the app?",
-    a: "Download it and you're scanning in under a minute. No account, no sign-up.",
+    a: "It's pre-launch. Join the waitlist and you'll be scanning within a minute of the launch email — no account, no sign-up.",
   },
 ];
 

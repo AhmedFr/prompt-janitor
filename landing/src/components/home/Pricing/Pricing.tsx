@@ -1,3 +1,5 @@
+import { WaitlistForm } from "@/components/WaitlistForm";
+
 export function Pricing() {
   return (
     <section className="section" id="pricing">
@@ -55,15 +57,8 @@ export function Pricing() {
                   <span>Standards updates keep flowing to free users</span>
                 </li>
               </ul>
-              <a className="btn ghost" href="#">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 4v11" />
-                  <path d="M7 11l5 5 5-5" />
-                  <path d="M5 20h14" />
-                </svg>{" "}
-                Download for macOS
-              </a>
-              <p className="price-note">No payment required · no account needed</p>
+              <WaitlistForm source="pricing-free" compact buttonLabel="Join the waitlist" />
+              <p className="price-note">Launching soon — the waitlist gets the download first. No payment, no account.</p>
             </div>
           </div>
 
@@ -128,15 +123,12 @@ export function Pricing() {
                   <span>12 months of feature updates</span>
                 </li>
               </ul>
-              <a className="btn" href="/#pricing">
-                Get Pro — $69
-              </a>
+              <WaitlistForm source="pricing-pro" compact buttonLabel="Join — lock in $69" />
               <p className="price-note">
-                One-time purchase: perpetual license + 12 months of feature updates
+                Founder pricing is locked for waitlist members at launch.
                 <br />
-                $29/yr optional renewal, never required to keep using the app
+                One-time purchase: perpetual license + 12 months of updates · $29/yr optional renewal, never required.
               </p>
-              <p className="price-note">After checkout, Polar emails your license key — paste it into Settings → License. Verified offline, no account.</p>
             </div>
           </div>
         </div>

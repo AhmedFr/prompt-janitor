@@ -18,13 +18,8 @@ export function Nav() {
           <a href="/#pricing">Pricing</a>
           <a href="/blog">Blog</a>
           <a href="/#faq">FAQ</a>
-          <a className="btn sm" href="/#pricing">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 4v11" />
-              <path d="M7 11l5 5 5-5" />
-              <path d="M5 20h14" />
-            </svg>{" "}
-            Download
+          <a className="btn sm" href="/#hero">
+            Join waitlist
           </a>
         </div>
       </div>
