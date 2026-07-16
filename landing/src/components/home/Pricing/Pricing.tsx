@@ -55,7 +55,7 @@ export function Pricing() {
                   <span>Standards updates keep flowing to free users</span>
                 </li>
               </ul>
-              <a className="btn ghost" href="/#pricing">
+              <a className="btn ghost" href="#">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 4v11" />
                   <path d="M7 11l5 5 5-5" />
