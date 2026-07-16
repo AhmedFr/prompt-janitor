@@ -1,16 +1,29 @@
 {
   "name": "prompt-janitor-landing",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "description": "Marketing landing page for Prompt Janitor (static site).",
+  "version": "0.2.0",
+  "description": "Marketing site for Prompt Janitor (Next.js on Vercel).",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "next dev",
+    "build": "node scripts/build-field-guide.mjs && next build",
+    "start": "next start",
+    "test": "vitest run",
     "build:guide": "node scripts/build-field-guide.mjs"
   },
+  "dependencies": {
+    "@next/third-parties": "^15.4.0",
+    "gray-matter": "^4.0.3",
+    "next": "^15.4.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remark": "^15.0.1",
+    "remark-html": "^16.0.1"
+  },
   "devDependencies": {
-    "vite": "^5.4.20"
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.0"
   }
 }

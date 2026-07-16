@@ -2,3 +2,4 @@
 # repo root. esbuild ships its native binary via a postinstall that Vite needs.
 allowBuilds:
   esbuild: true
+  sharp: false
