@@ -1,6 +1,6 @@
 # Pre-launch Marketing Site — Design
 
-**Date:** 2026-07-16
+**Date:** 2026-07-16 (rev 2 — stack switched to Next.js/Vercel at owner request)
 **Status:** Approved (brainstorm with owner)
 **Goal:** Let the public judge the idea before committing more dev. Ship a proper
 pre-launch website, post to socials, measure traction. Dev on Plans 2–4 of the
@@ -11,59 +11,65 @@ benchmark epic resumes only if traction is good (see `docs/BENCHMARK_STATUS.md`)
 | Decision | Choice |
 |---|---|
 | Primary CTA | **Waitlist-first, pricing visible** — every CTA joins the waitlist; $69 founder price stays visible framed as "lock in founder pricing at launch" |
-| Analytics | **Google Analytics 4 only** |
+| Analytics | **Google Analytics 4 only** (`G-RX37WJZFSQ`) |
 | Blog angles | Craft guides, evidence/benchmark story, philosophy/manifesto |
 | Site scope | Landing + blog section (no multi-page split) |
-| Stack | **Migrate `landing/` to Astro** (chosen over extending the Vite static site) |
+| Stack | **Next.js (App Router) on Vercel** — replaces the Vite static site AND the separate waitlist backend: the Resend call runs in a same-origin API route, so no Cloudflare Worker is needed (owner decision 2026-07-16, superseding the earlier Astro + Worker choice) |
 
 ## Architecture
 
-### Astro site (replaces `landing/` Vite site)
+### Next.js site (replaces `landing/` Vite site)
 
-- Same `landing/` directory, still **outside the pnpm workspace**
-  (`pnpm install --ignore-workspace`), static output (`output: 'static'`).
+- Same `landing/` directory, still **its own pnpm workspace root** (own
+  `pnpm-workspace.yaml`), Next.js 15 App Router + TypeScript, `src/` layout.
 - **Pages:**
-  - `src/pages/index.astro` — the landing page (structure below)
-  - `src/pages/blog/index.astro` — post list
-  - `src/pages/blog/[slug].astro` — posts from a content collection
-    (`src/content/blog/*.md`; schema: `title`, `description`, `pubDate`,
-    `tags`, `draft`)
-  - `src/pages/thanks.astro` — kept for the eventual Polar flow
+  - `src/app/page.tsx` — the landing page (structure below), sections as React
+    components under `src/components/` following the repo component convention
+    (folder per component: `index.ts` + `Component.tsx` + `.types.ts` when the
+    component has props)
+  - `src/app/blog/page.tsx` — post list
+  - `src/app/blog/[slug]/page.tsx` — statically generated from markdown in
+    `landing/content/blog/*.md` (frontmatter: `title`, `description`,
+    `pubDate`, `tags`, `draft`; parsed with gray-matter + remark)
+  - `src/app/thanks/page.tsx` — kept for the eventual Polar flow
+  - `src/app/rss.xml/route.ts` + `src/app/sitemap.ts` — RSS and sitemap
   - Field guide: keep the existing generator
     (`landing/scripts/build-field-guide.mjs`, source
-    `docs/standards/prompting-standards.md`) emitting to
+    `docs/standards/prompting-standards.md`) emitting a self-contained
     `public/field-guide.html`. No rewrite.
-- **Astro extras:** `@astrojs/rss` feed, `@astrojs/sitemap`, per-page SEO +
-  OpenGraph meta (needed for social link previews).
-- **Styling:** port the current visual identity from `landing/src/styles.css`
-  into an Astro base layout + components. Re-skin of markup, not a redesign.
-  No CSS framework; hand-rolled CSS stays.
-- **Deploy:** update `.github/workflows/landing.yml` to build Astro → GitHub
-  Pages. Same trigger: push to `main`, path-filtered to `landing/**`.
+- **Styling:** the existing `styles.css` visual identity moves verbatim to
+  `src/app/globals.css` (plus additive sections for new components). Re-skin of
+  markup into JSX, not a redesign. No CSS framework.
+- **Deploy:** **Vercel** git integration (project root directory = `landing/`).
+  The GitHub Pages workflow (`.github/workflows/landing.yml`) is deleted; the
+  CI build-check job for `landing/` stays. Custom domain `promptjanitor.app`
+  configured in Vercel; canonical URLs/RSS/sitemap use it.
+  - Note: Vercel Hobby tier is nominally non-commercial; acceptable for the
+    pre-launch test, revisit (Pro, $20/mo) if traction is good.
 
-### Waitlist — standalone `waitlist/` Cloudflare Worker
+### Waitlist — Next.js API route (no separate backend)
 
-Deliberately **separate** from the fulfillment worker (`fulfillment/`, unmerged
-PR #95) so marketing is not coupled to unfinished dev. Reuse its patterns
-(wrangler config, Resend client shape) where sensible.
+`POST /api/subscribe` (same origin — no CORS), body `{ email, source }`
+(`source` = which CTA: hero, pricing-free, pricing-pro, footer, blog-<slug>).
 
-- `POST /subscribe` — body `{ email, source }` (`source` = which CTA: hero,
-  pricing-free, pricing-pro, footer, blog-<slug>).
-- Validate email → via Resend, send two emails (no Resend Audience — owner
-  decision 2026-07-16):
+- Validate email → via Resend REST API, send two emails (no Resend Audience —
+  owner decision 2026-07-16):
   1. **Confirmation email to the subscriber** from
      `prompt-janitor@studiotristar.com` — "you're on the list", branded.
   2. **Notification email to the owner** (`prompt-janitor@studiotristar.com`,
      subject includes subscriber email + `source`) so the owner can manually
      maintain the Excel of interested people.
-- CORS locked to the site origin. Honeypot field for bots. Duplicate emails are
-  a silent success (Resend dedupes).
+- `RESEND_API_KEY` lives in a Vercel environment variable (and `.env.local`
+  for dev) — never in client code.
+- Honeypot field for bots (silent fake success). Duplicate emails are a
+  silent success.
 - Landing form: email input in hero, repeated at pricing and footer; inline
   success/error states (no page navigation).
 
 ### Analytics — GA4
 
-- gtag snippet in the Astro base layout (all pages).
+- `@next/third-parties` `<GoogleAnalytics gaId="G-RX37WJZFSQ" />` in the root
+  layout, production builds only.
 - Custom events: `waitlist_submit` (with `source`), `cta_click`.
 - UTM convention for social posts, documented in the repo:
   `utm_source=x|linkedin|reddit|hn`, `utm_medium=social`,
@@ -71,7 +77,7 @@ PR #95) so marketing is not coupled to unfinished dev. Reuse its patterns
 
 ## Landing page structure
 
-1. **Hero** — "Know in 10 seconds whether your prompts are good enough."
+1. **Hero** — "Know in 10 seconds if your prompts are good enough."
    Sub: prompt files (`CLAUDE.md`, `AGENTS.md`, `.cursorrules`) are
    infrastructure nobody inspects; Prompt Janitor scans, grades A–F, tells you
    what to fix. CTA: email field → **Join the waitlist**.
@@ -94,7 +100,8 @@ PR #95) so marketing is not coupled to unfinished dev. Reuse its patterns
 8. **Footer** — waitlist repeat, blog + RSS links.
 
 Dead CTAs removed: no `href="#"` download button, no placeholder Polar
-checkout on the page (Polar wiring stays out of scope; `thanks.html` kept).
+checkout on the page (Polar wiring stays out of scope; the thanks page is
+kept). The placeholder "Featured on" badge strip is removed.
 
 ## Launch blog batch (3 posts, fully drafted, owner edits voice)
 
@@ -118,16 +125,15 @@ Provided 2026-07-16:
 - **Sender/notification email:** `prompt-janitor@studiotristar.com` (no Resend
   Audience; owner tracks signups manually in Excel from the notification
   emails)
-- **Custom domain:** `promptjanitor.app` — GitHub Pages custom domain
-  (`CNAME` file in the site's `public/`), Astro `site:
-  "https://promptjanitor.app"` for canonical URLs/RSS/sitemap.
+- **Custom domain:** `promptjanitor.app`
 
 Still needed to go live (not to build):
 
-- Resend API key as a worker secret; `studiotristar.com` verified as a sending
-  domain in Resend.
-- Cloudflare account creds for deploying `waitlist/` worker.
-- DNS for `promptjanitor.app` pointed at GitHub Pages.
+- A Vercel account with the repo imported (project root directory =
+  `landing/`), and `RESEND_API_KEY` set as a Vercel environment variable.
+- `studiotristar.com` verified as a sending domain in Resend.
+- DNS for `promptjanitor.app` pointed at Vercel (Vercel dashboard shows the
+  records).
 
 ## Out of scope
 
@@ -137,18 +143,18 @@ Still needed to go live (not to build):
 
 ## Error handling
 
-- Waitlist form: client-side email validation; worker returns 400 (bad email),
-  429-ish behavior via honeypot silently dropping bots; network failure shows
-  a retry message with a `mailto:` fallback.
-- Worker → Resend failure: return 502 with a friendly message; log to worker
-  console (visible in Cloudflare dashboard).
+- Waitlist form: client-side email validation; API route returns 400 (bad
+  email/body), honeypot silently returns success, 503 if `RESEND_API_KEY` is
+  unset, 502 if Resend rejects the send (logged server-side); network failure
+  in the form shows a `mailto:` fallback message.
 
 ## Testing / verification
 
-- `astro build` + `astro preview` locally; check landing, blog index, one post,
-  RSS, sitemap, field guide.
-- Worker: `wrangler dev` locally, curl `POST /subscribe` happy/invalid/honeypot
-  paths; then a real end-to-end signup against deployed worker with a test
-  email → contact appears in Resend Audience + welcome email received.
+- `next build` locally; `next start` and check landing, blog index, each post,
+  RSS, sitemap, thanks, field guide.
+- API route: vitest unit tests on the pure validation/email-builder modules;
+  curl `POST /api/subscribe` happy/invalid/honeypot paths against `next dev`
+  (dummy key → 502 proves wiring); then one real end-to-end signup on the
+  deployed site with a test email → confirmation + owner notification received.
 - GA4: DebugView shows pageview + `waitlist_submit` with `source`.
-- Deploy: Pages workflow green; live site spot-check on mobile viewport.
+- Deploy: Vercel preview build green; live site spot-check on mobile viewport.
