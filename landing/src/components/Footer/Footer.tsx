@@ -28,15 +28,10 @@ export function Footer() {
             <a href="/#faq">FAQ</a>
           </div>
           <div>
-            <h5>Company</h5>
-            <a href="#">Roadmap</a>
-            <a href="#">Contact</a>
-            <a href="#">Changelog</a>
-          </div>
-          <div>
-            <h5>Legal</h5>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
+            <h5>Resources</h5>
+            <a href="/blog">Blog</a>
+            <a href="/rss.xml">RSS</a>
+            <a href="mailto:prompt-janitor@studiotristar.com">Contact</a>
           </div>
         </div>
         <div className="footer-bottom">

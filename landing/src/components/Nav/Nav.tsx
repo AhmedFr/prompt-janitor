@@ -16,6 +16,7 @@ export function Nav() {
         <div className="nav-links">
           <a href="/#features">Features</a>
           <a href="/#pricing">Pricing</a>
+          <a href="/blog">Blog</a>
           <a href="/#faq">FAQ</a>
           <a className="btn sm" href="/#pricing">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
