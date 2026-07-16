@@ -49,8 +49,13 @@ PR #95) so marketing is not coupled to unfinished dev. Reuse its patterns
 
 - `POST /subscribe` — body `{ email, source }` (`source` = which CTA: hero,
   pricing-free, pricing-pro, footer, blog-<slug>).
-- Validate email → add contact to a **Resend Audience** → send branded welcome
-  email. Single opt-in.
+- Validate email → via Resend, send two emails (no Resend Audience — owner
+  decision 2026-07-16):
+  1. **Confirmation email to the subscriber** from
+     `prompt-janitor@studiotristar.com` — "you're on the list", branded.
+  2. **Notification email to the owner** (`prompt-janitor@studiotristar.com`,
+     subject includes subscriber email + `source`) so the owner can manually
+     maintain the Excel of interested people.
 - CORS locked to the site origin. Honeypot field for bots. Duplicate emails are
   a silent success (Resend dedupes).
 - Landing form: email input in hero, repeated at pricing and footer; inline
@@ -105,12 +110,24 @@ checkout on the page (Polar wiring stays out of scope; `thanks.html` kept).
 
 Every post ends with the waitlist CTA (with `source=blog-<slug>`).
 
-## Owner-provided inputs (blockers to go live, not to build)
+## Owner-provided inputs
 
-- GA4 measurement ID (create GA4 property).
-- Resend API key + Audience ID (create audience "Prompt Janitor waitlist").
+Provided 2026-07-16:
+
+- **GA4 measurement ID:** `G-RX37WJZFSQ`
+- **Sender/notification email:** `prompt-janitor@studiotristar.com` (no Resend
+  Audience; owner tracks signups manually in Excel from the notification
+  emails)
+- **Custom domain:** `promptjanitor.app` — GitHub Pages custom domain
+  (`CNAME` file in the site's `public/`), Astro `site:
+  "https://promptjanitor.app"` for canonical URLs/RSS/sitemap.
+
+Still needed to go live (not to build):
+
+- Resend API key as a worker secret; `studiotristar.com` verified as a sending
+  domain in Resend.
 - Cloudflare account creds for deploying `waitlist/` worker.
-- Custom domain decision (GitHub Pages default works; base is relative).
+- DNS for `promptjanitor.app` pointed at GitHub Pages.
 
 ## Out of scope
 
