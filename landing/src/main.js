@@ -1,25 +1,20 @@
-// Landing page behavior: reveal sections on scroll (motion-aware) + footer year.
-// The FAQ uses native <details>, so it needs no JS.
+// Landing page behavior: Polar checkout links, accessible FAQ accordion, footer year.
 
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const reveals = document.querySelectorAll(".reveal");
+const POLAR_CHECKOUT_URL = "https://buy.polar.sh/polar_cl_PLACEHOLDER"; // TODO(#78): replace with the real Polar checkout link
 
-if (reduceMotion || !("IntersectionObserver" in window)) {
-  reveals.forEach((el) => el.classList.add("is-in"));
-} else {
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-in");
-          io.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
-  );
-  reveals.forEach((el) => io.observe(el));
-}
+document.querySelectorAll("a[data-polar-checkout]").forEach((a) => {
+  a.href = POLAR_CHECKOUT_URL;
+  a.target = "_blank";
+  a.rel = "noopener";
+});
+
+document.querySelectorAll(".acc-q").forEach((q) => {
+  q.addEventListener("click", () => {
+    const acc = q.parentElement;
+    const open = acc.classList.toggle("open");
+    q.setAttribute("aria-expanded", String(open));
+  });
+});
 
 const year = document.getElementById("year");
 if (year) year.textContent = String(new Date().getFullYear());
