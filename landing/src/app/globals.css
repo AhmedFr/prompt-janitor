@@ -198,11 +198,6 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .acc.open .acc-a { max-height: 360px; }
 .acc-a div { padding: 0 2px 22px; }
 
-/* ---------- featured on ---------- */
-.featured { text-align: center; }
-.featured .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 22px; }
-.badge-slot { width: 150px; height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-tint); display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 13px; }
-
 /* ---------- footer CTA ---------- */
 .footer-cta { text-align: center; }
 .footer-cta .ficon { width: 76px; height: 76px; border-radius: 19px; margin: 0 auto 22px; color: #fff; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #36a3ff, #0a6fff); box-shadow: 0 14px 34px rgba(10,111,255,.35), inset 0 1px 0 rgba(255,255,255,.5); }

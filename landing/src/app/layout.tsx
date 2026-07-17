@@ -14,7 +14,19 @@ export const metadata: Metadata = {
     canonical: "./",
     types: { "application/rss+xml": "/rss.xml" },
   },
-  openGraph: { type: "website", siteName: "Prompt Janitor" },
+  openGraph: {
+    type: "website",
+    siteName: "Prompt Janitor",
+    images: [
+      {
+        url: "/shots/dashboard.png",
+        width: 924,
+        height: 540,
+        alt: "Prompt Janitor overview with health grades",
+      },
+    ],
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = { themeColor: "#0a84ff" };
@@ -29,7 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <AnalyticsClicks />
       </body>
-      {process.env.NODE_ENV === "production" && <GoogleAnalytics gaId={GA_ID} />}
+      {process.env.NODE_ENV === "production" && process.env.VERCEL_ENV !== "preview" && (
+        <GoogleAnalytics gaId={GA_ID} />
+      )}
     </html>
   );
 }

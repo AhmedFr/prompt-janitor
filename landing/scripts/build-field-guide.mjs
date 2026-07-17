@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Generates landing/field-guide.html from docs/standards/prompting-standards.md.
+// Generates landing/public/field-guide.html from docs/standards/prompting-standards.md.
 //
-// This is a *committed transformation*: the generated field-guide.html is
-// checked into git so the landing page works even if this script or the
-// source markdown ever move. Re-run this script (`pnpm run build:guide` from
-// landing/) whenever docs/standards/prompting-standards.md changes, and
-// commit the regenerated landing/field-guide.html alongside it.
+// This is a *build-generated* artifact: field-guide.html is produced into
+// public/ at build time (`pnpm run build:guide` from landing/, wired into the
+// build pipeline) and is gitignored — it is not committed. Vercel must read
+// docs/standards/prompting-standards.md from outside the landing/ root
+// directory for this to work (see the repo root include setting).
 //
 // Bump EDITION_VERSION / EDITION_DATE below when the standards content
 // changes meaningfully — they're fixed strings (not "generated at build
