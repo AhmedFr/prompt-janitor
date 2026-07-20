@@ -15,13 +15,15 @@ const ONBOARDED_KEY = "pj-onboarded";
 export function App() {
   const [route, setRoute] = useState<Route>("overview");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
 
-  const navigate = (next: Route, fileId?: string) => {
+  const navigate = (next: Route, target?: string) => {
     setRoute(next);
-    if (fileId !== undefined) setDetailId(fileId);
+    if (next === "detail" && target !== undefined) setDetailId(target);
+    if (next === "settings") setSettingsTab(target);
   };
 
   const finishOnboarding = () => {
@@ -42,7 +44,7 @@ export function App() {
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
         {route === "rules" && <Rules />}
-        {route === "settings" && <Settings navigate={navigate} />}
+        {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
       </main>
       {showOnboarding && <Onboarding onDone={finishOnboarding} />}
     </div>

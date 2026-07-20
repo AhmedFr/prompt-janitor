@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Grade } from "@/components/Grade";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
 import { Sparkline } from "@/components/Sparkline";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
+import { VerdictHero, useVerdictHero } from "@/components/VerdictHero";
 import { isTauri, type Overview as OverviewData } from "@/lib/ipc";
 import { relativeTime } from "@/lib/format";
 import { pickAndScan, rescan } from "@/lib/scan-actions";
@@ -80,7 +80,12 @@ export function Overview({ navigate }: OverviewProps) {
               <div className="muted">Loading…</div>
             </Card>
           ) : data?.has_data ? (
-            <RealOverview data={data} navigate={navigate} />
+            <RealOverview
+              data={data}
+              navigate={navigate}
+              scanning={scanning}
+              onScanNow={() => void runScan(() => rescan(data.scan_folder ?? ""))}
+            />
           ) : (
             <EmptyState scanning={scanning} progress={progress} onPick={() => void runScan(pickAndScan)} />
           )}
@@ -98,7 +103,18 @@ const SORTS: [SortMode, string][] = [
   ["new", "Newest"],
 ];
 
-function RealOverview({ data, navigate }: { data: OverviewData; navigate: Navigate }) {
+function RealOverview({
+  data,
+  navigate,
+  scanning,
+  onScanNow,
+}: {
+  data: OverviewData;
+  navigate: Navigate;
+  scanning: boolean;
+  onScanNow: () => void;
+}) {
+  const { verdict, autoFixBusy, runAutoFix } = useVerdictHero();
   const [sort, setSort] = useState<SortMode>("crit");
   const worklist = useMemo(() => {
     const rank: Record<string, number> = { hi: 0, mid: 1, lo: 2 };
@@ -115,55 +131,15 @@ function RealOverview({ data, navigate }: { data: OverviewData; navigate: Naviga
 
   return (
     <>
-      <Card padded>
-        <div className="row between wrap" style={{ gap: 18 }}>
-          <div className="row" style={{ gap: 16 }}>
-            <Grade grade={data.overall_grade} size="xl" />
-            <div>
-              <div className="ov-title">Overall health</div>
-              <div className="muted" style={{ marginTop: 2 }}>
-                {data.file_count} prompt files · {data.project_count} projects
-              </div>
-              {data.scan_folder && (
-                <div className="path faint" style={{ marginTop: 2 }}>
-                  {data.scan_folder}
-                </div>
-              )}
-            </div>
-          </div>
-          {data.trend.length > 1 && (
-            <div style={{ width: 200 }}>
-              <div className="row between" style={{ fontSize: 12 }}>
-                <span className="muted">Health trend</span>
-                {data.trend_delta !== 0 && (
-                  <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
-                    {data.trend_delta > 0 ? "+" : ""}
-                    {data.trend_delta} this week
-                  </span>
-                )}
-              </div>
-              <div style={{ marginTop: 6 }}>
-                <Sparkline data={data.trend} height={42} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bar" style={{ marginTop: 16 }}>
-          <i style={{ width: `${data.overall_score}%` }} />
-        </div>
-        <div className="row" style={{ gap: 18, marginTop: 12, fontSize: 12 }}>
-          <span className="row" style={{ gap: 6 }}>
-            <SeverityDot level="hi" /> {data.critical} critical
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <SeverityDot level="mid" /> {data.warnings} warnings
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <SeverityDot level="lo" /> {data.nits} nits
-          </span>
-        </div>
-      </Card>
+      <VerdictHero
+        data={data}
+        verdict={verdict}
+        scanning={scanning}
+        autoFixBusy={autoFixBusy}
+        onScanNow={onScanNow}
+        onAutoFix={() => void runAutoFix()}
+        navigate={navigate}
+      />
 
       <div className="row between wrap" style={{ margin: "22px 0 12px", gap: 10 }}>
         <div className="ov-section">
@@ -197,6 +173,23 @@ function RealOverview({ data, navigate }: { data: OverviewData; navigate: Naviga
           ))}
         </div>
       </Card>
+
+      {data.trend.length > 1 && (
+        <Card padded style={{ marginTop: 22 }}>
+          <div className="row between" style={{ fontSize: 12 }}>
+            <span className="muted">Health trend</span>
+            {data.trend_delta !== 0 && (
+              <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                {data.trend_delta > 0 ? "+" : ""}
+                {data.trend_delta} this week
+              </span>
+            )}
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <Sparkline data={data.trend} height={42} />
+          </div>
+        </Card>
+      )}
     </>
   );
 }

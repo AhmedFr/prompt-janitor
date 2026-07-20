@@ -116,6 +116,13 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="7" cy="17" r="0.5" />
     </>
   ),
+  lock: (
+    <>
+      <rect x="5.5" y="11" width="13" height="9" rx="2" />
+      <path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
+      <circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, ...rest }: IconProps) {
