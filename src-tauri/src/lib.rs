@@ -13,6 +13,7 @@ mod ipc;
 mod license;
 mod notify;
 mod query;
+mod repo_root;
 pub mod rules;
 mod scan;
 pub mod scanner;

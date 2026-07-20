@@ -1,0 +1,1 @@
+export { BrushCleaningIcon } from "./BrushCleaningIcon";
