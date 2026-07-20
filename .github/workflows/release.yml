@@ -1,0 +1,65 @@
+name: Release
+
+# Builds the macOS app and attaches it to a draft GitHub release whenever a
+# v* tag is pushed. Publish the draft manually after checking the artifacts.
+#
+# Unsigned builds work out of the box. Code signing + notarization activate
+# automatically once these repo secrets exist (Apple Developer Program):
+#   APPLE_CERTIFICATE             base64 of the Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD    password for the .p12
+#   APPLE_SIGNING_IDENTITY        e.g. "Developer ID Application: Name (TEAMID)"
+#   APPLE_ID / APPLE_PASSWORD     Apple ID + app-specific password (notarization)
+#   APPLE_TEAM_ID                 the 10-character team id
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: macOS universal
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Prompt Janitor ${{ github.ref_name }}"
+          releaseBody: "Download the .dmg below. See commit history for changes."
+          releaseDraft: true
+          args: --target universal-apple-darwin
