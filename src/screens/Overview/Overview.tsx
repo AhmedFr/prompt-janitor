@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
 import { Sparkline } from "@/components/Sparkline";
+import { Heatmap, bucketFiles } from "@/components/Heatmap";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { VerdictHero, useVerdictHero } from "@/components/VerdictHero";
-import { isTauri, type Overview as OverviewData } from "@/lib/ipc";
+import { useVerdictHero, verdictSentence } from "@/components/VerdictHero";
+import { isTauri, type FileRow, type Overview as OverviewData } from "@/lib/ipc";
 import { relativeTime } from "@/lib/format";
 import { pickAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
@@ -24,7 +25,7 @@ export interface OverviewProps {
 }
 
 export function Overview({ navigate }: OverviewProps) {
-  const { data, loading, refetch } = useOverview();
+  const { data, files, loading, refetch } = useOverview();
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
 
@@ -80,12 +81,7 @@ export function Overview({ navigate }: OverviewProps) {
               <div className="muted">Loading…</div>
             </Card>
           ) : data?.has_data ? (
-            <RealOverview
-              data={data}
-              navigate={navigate}
-              scanning={scanning}
-              onScanNow={() => void runScan(() => rescan(data.scan_folder ?? ""))}
-            />
+            <RealOverview data={data} files={files} navigate={navigate} />
           ) : (
             <EmptyState scanning={scanning} progress={progress} onPick={() => void runScan(pickAndScan)} />
           )}
@@ -95,68 +91,103 @@ export function Overview({ navigate }: OverviewProps) {
   );
 }
 
-type SortMode = "crit" | "proj" | "new";
+const SEVERITY_RANK: Record<string, number> = { hi: 0, mid: 1, lo: 2 };
 
-const SORTS: [SortMode, string][] = [
-  ["crit", "Critical first"],
-  ["proj", "By project"],
-  ["new", "Newest"],
-];
+/** Top 5 worklist items by severity — the "Biggest wins" section. */
+const BIGGEST_WINS_COUNT = 5;
 
 function RealOverview({
   data,
+  files,
   navigate,
-  scanning,
-  onScanNow,
 }: {
   data: OverviewData;
+  files: FileRow[];
   navigate: Navigate;
-  scanning: boolean;
-  onScanNow: () => void;
 }) {
   const { verdict, autoFixBusy, runAutoFix } = useVerdictHero();
-  const [sort, setSort] = useState<SortMode>("crit");
-  const worklist = useMemo(() => {
-    const rank: Record<string, number> = { hi: 0, mid: 1, lo: 2 };
-    const items = [...data.worklist];
-    if (sort === "proj") {
-      items.sort((a, b) => a.project.localeCompare(b.project) || rank[a.severity] - rank[b.severity]);
-    } else if (sort === "new") {
-      items.sort((a, b) => Number(b.modified ?? "0") - Number(a.modified ?? "0"));
-    } else {
-      items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-    }
-    return items;
-  }, [data.worklist, sort]);
+  const { legend } = useMemo(() => bucketFiles(files), [files]);
+  const failing = files.filter((f) => f.grade === "F").length;
+  const poor = files.filter((f) => f.grade === "D").length;
+  const wins = useMemo(
+    () =>
+      [...data.worklist]
+        .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
+        .slice(0, BIGGEST_WINS_COUNT),
+    [data.worklist],
+  );
 
   return (
     <>
-      <VerdictHero
-        data={data}
-        verdict={verdict}
-        scanning={scanning}
-        autoFixBusy={autoFixBusy}
-        onScanNow={onScanNow}
-        onAutoFix={() => void runAutoFix()}
-        navigate={navigate}
-      />
+      <Card padded>
+        <div className="ov-hero">
+          <div className={`ov-hero__grade grade-bg--${data.overall_grade.toLowerCase()}`}>
+            {data.overall_grade}
+          </div>
+          <div className="grow">
+            <div className="ov-hero__title">{verdictSentence(data.overall_grade, verdict.fixesToA)}</div>
+            <div className="muted ov-hero__meta">
+              {data.file_count} files · {data.project_count} projects · <strong>{data.overall_score}</strong>/100
+              {data.trend_delta !== 0 && (
+                <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", marginLeft: 8 }}>
+                  ▲ {data.trend_delta > 0 ? "+" : ""}
+                  {data.trend_delta} this week
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="ov-hero__legend">
+            {legend.map((l) => (
+              <span key={l.grade} className="ov-legend__item">
+                <i className={`grade-bg--${l.grade.toLowerCase()}`} /> {l.count}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <Heatmap files={files} onSelect={(id) => navigate("detail", id)} />
+        </div>
+        <div className="faint ov-hero__caption">
+          Each square is one file, sorted best → worst.
+          {failing > 0 && (
+            <>
+              {" "}
+              <span style={{ color: "var(--red)" }}>{failing} failing</span>
+            </>
+          )}
+          {poor > 0 && (
+            <>
+              {" "}
+              and <span style={{ color: "var(--grade-d)" }}>{poor} poor</span> files pull the average down.
+            </>
+          )}
+        </div>
+      </Card>
+
+      {verdict.autofixCount > 0 && (
+        <Card padded className="ov-autofix">
+          <span className="ov-autofix__ico">
+            <Icon name="wand" />
+          </span>
+          <div className="grow">
+            <div style={{ fontWeight: 600 }}>{verdict.autofixCount} issues can be fixed automatically</div>
+            <div className="faint" style={{ fontSize: 12 }}>
+              Safe rewrites only · you review a diff before anything is written
+            </div>
+          </div>
+          <Button variant="primary" size="sm" disabled={autoFixBusy} onClick={() => void runAutoFix()}>
+            <Icon name="wand" /> Auto-fix {verdict.autofixCount}
+          </Button>
+        </Card>
+      )}
 
       <div className="row between wrap" style={{ margin: "22px 0 12px", gap: 10 }}>
-        <div className="ov-section">
-          Needs attention <span className="faint tnum">· {data.worklist.length}</span>
-        </div>
-        <div className="seg">
-          {SORTS.map(([key, label]) => (
-            <button key={key} className={sort === key ? "on" : ""} onClick={() => setSort(key)}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <div className="ov-section">Biggest wins</div>
       </div>
 
       <Card>
         <div className="ov-list">
-          {worklist.map((item, i) => (
+          {wins.map((item, i) => (
             <button key={i} className="ov-row" onClick={() => navigate("detail", item.file_id)}>
               <SeverityDot level={item.severity} />
               <div className="grow">

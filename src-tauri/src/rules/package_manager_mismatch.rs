@@ -97,6 +97,9 @@ impl Rule for PackageManagerMismatch {
     fn why(&self) -> &'static str {
         "The instruction names a package manager this repo doesn't use — checked against the lockfile actually on disk."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let Some(actual) = detect_manager(ctx) else {
             return Vec::new(); // no lockfile, or ambiguous — don't guess

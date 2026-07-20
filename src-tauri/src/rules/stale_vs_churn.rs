@@ -48,6 +48,9 @@ impl Rule for StaleVsChurn {
     fn why(&self) -> &'static str {
         "This file hasn't changed in over 6 months while the repository shows recent activity — worth a quick review to confirm it still matches reality."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let Some(repo_root) = ctx.repo_root else {
             return Vec::new();

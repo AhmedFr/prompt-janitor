@@ -123,6 +123,13 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
     </>
   ),
+  barChart: (
+    <>
+      <line x1="6" y1="19" x2="6" y2="10" />
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <line x1="18" y1="19" x2="18" y2="13" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, ...rest }: IconProps) {

@@ -5,6 +5,7 @@ import { Overview } from "@/screens/Overview";
 import { Prompts } from "@/screens/Prompts";
 import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
+import { Analytics } from "@/screens/Analytics";
 import { Rules } from "@/screens/Rules";
 import { Settings } from "@/screens/Settings";
 import { isTauri } from "@/lib/ipc";
@@ -16,6 +17,7 @@ export function App() {
   const [route, setRoute] = useState<Route>("overview");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
+  const [promptsTarget, setPromptsTarget] = useState<string | undefined>(undefined);
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
@@ -24,6 +26,7 @@ export function App() {
     setRoute(next);
     if (next === "detail" && target !== undefined) setDetailId(target);
     if (next === "settings") setSettingsTab(target);
+    if (next === "prompts") setPromptsTarget(target);
   };
 
   const finishOnboarding = () => {
@@ -37,12 +40,13 @@ export function App() {
       <a href="#main-content" className="skip-link">
         Skip to content
       </a>
-      <Sidebar active={route} onNavigate={(r) => navigate(r)} onReplay={() => setShowOnboarding(true)} />
+      <Sidebar active={route} onNavigate={navigate} onReplay={() => setShowOnboarding(true)} />
       <main id="main-content" className="app-content" tabIndex={-1}>
         {route === "overview" && <Overview navigate={navigate} />}
-        {route === "prompts" && <Prompts navigate={navigate} />}
+        {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
+        {route === "analytics" && <Analytics navigate={navigate} />}
         {route === "rules" && <Rules />}
         {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
       </main>

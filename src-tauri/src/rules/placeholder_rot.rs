@@ -40,6 +40,9 @@ impl Rule for PlaceholderRot {
     fn why(&self) -> &'static str {
         "TODOs and unfilled placeholders mean the agent is reading a draft, not a finished instruction."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         pattern()
             .find_iter(content)

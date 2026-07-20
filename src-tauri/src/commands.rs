@@ -461,9 +461,10 @@ pub fn apply_fix(
     file_id: String,
     edits: Vec<crate::apply::FixEdit>,
     commit: bool,
+    origin: String,
 ) -> Result<crate::apply::ApplyResult, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    apply_fix_with_conn(&conn, &file_id, &edits, commit)
+    apply_fix_with_conn(&conn, &file_id, &edits, commit, &origin)
 }
 
 /// The body of [`apply_fix`], taking a `&Connection` directly rather than a
@@ -473,6 +474,7 @@ fn apply_fix_with_conn(
     file_id: &str,
     edits: &[crate::apply::FixEdit],
     commit: bool,
+    origin: &str,
 ) -> Result<crate::apply::ApplyResult, String> {
     if !entitlement_of(conn).paid {
         return Err(PAID_GATE.to_string());
@@ -522,6 +524,11 @@ fn apply_fix_with_conn(
     } else {
         None
     };
+
+    // Only recorded once the apply is guaranteed to stick — the git-commit
+    // branch above can still roll everything back and return early, in which
+    // case we must not log an event for a fix that never actually landed.
+    query::record_fix_events(conn, file_id, origin, edits.len()).map_err(|e| e.to_string())?;
 
     Ok(crate::apply::ApplyResult { git_ref })
 }
@@ -581,6 +588,14 @@ pub fn list_files(db: tauri::State<'_, AppDb>) -> Result<Vec<query::FileRow>, St
     query::list_files(&conn).map_err(|e| e.to_string())
 }
 
+/// Every project with its rolled-up counts and detected logo.
+#[tauri::command]
+#[specta::specta]
+pub fn list_projects(db: tauri::State<'_, AppDb>) -> Result<Vec<query::ProjectRow>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::list_projects(&conn).map_err(|e| e.to_string())
+}
+
 /// One file's source + issues for the Detail screen.
 #[tauri::command]
 #[specta::specta]
@@ -590,6 +605,18 @@ pub fn get_file_detail(
 ) -> Result<Option<query::FileDetail>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::get_file_detail(&conn, &file_id).map_err(|e| e.to_string())
+}
+
+/// Everything the Analytics page needs, windowed to the trailing
+/// `range_days`.
+#[tauri::command]
+#[specta::specta]
+pub fn get_analytics(
+    db: tauri::State<'_, AppDb>,
+    range_days: u32,
+) -> Result<query::Analytics, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_analytics(&conn, range_days).map_err(|e| e.to_string())
 }
 
 /// The weekly Scans digest.
@@ -657,7 +684,7 @@ mod tests {
             from: "x".to_string(),
             to: "y".to_string(),
         }];
-        let result = apply_fix_with_conn(&conn, "f", &edits, false);
+        let result = apply_fix_with_conn(&conn, "f", &edits, false, "manual");
 
         assert_eq!(result.unwrap_err(), PAID_GATE);
     }

@@ -82,13 +82,15 @@ export const commands = {
 	 *  commit it onto a `prompt-janitor/fix-*` branch. A failed commit rolls the
 	 *  whole operation back so nothing is left half-applied.
 	 */
-	applyFix: (fileId: string, edits: FixEdit[], commit: boolean) => typedError<ApplyResult, string>(__TAURI_INVOKE("apply_fix", { fileId, edits, commit })),
+	applyFix: (fileId: string, edits: FixEdit[], commit: boolean, origin: string) => typedError<ApplyResult, string>(__TAURI_INVOKE("apply_fix", { fileId, edits, commit, origin })),
 	/**  Restore a file to its most recent pre-fix snapshot and drop that snapshot. */
 	undoFix: (fileId: string) => typedError<null, string>(__TAURI_INVOKE("undo_fix", { fileId })),
 	/**  Whether a file has a pre-fix snapshot available to undo. */
 	hasBackup: (fileId: string) => typedError<boolean, string>(__TAURI_INVOKE("has_backup", { fileId })),
 	/**  Every scanned file for the Prompts table. */
 	listFiles: () => typedError<FileRow[], string>(__TAURI_INVOKE("list_files")),
+	/**  Every project with its rolled-up counts and detected logo. */
+	listProjects: () => typedError<ProjectRow[], string>(__TAURI_INVOKE("list_projects")),
 	/**  One file's source + issues for the Detail screen. */
 	getFileDetail: (fileId: string) => typedError<{
 	id: string,
@@ -101,7 +103,14 @@ export const commands = {
 	issues: IssueDetail[],
 	/**  Score change since the previous scan of this file, if any. */
 	delta: number | null,
+	/**  Per-dimension scores, always length 5 in `Dimension::ALL` order. */
+	dimensions: DimensionScore[],
 } | null, string>(__TAURI_INVOKE("get_file_detail", { fileId })),
+	/**
+	 *  Everything the Analytics page needs, windowed to the trailing
+	 *  `range_days`.
+	 */
+	getAnalytics: (rangeDays: number) => typedError<Analytics, string>(__TAURI_INVOKE("get_analytics", { rangeDays })),
 	/**  The weekly Scans digest. */
 	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
 	/**
@@ -124,6 +133,32 @@ export type AiConfig = {
 	model: string,
 	/**  Whether an API key is stored. */
 	has_key: boolean,
+};
+
+/**
+ *  Everything the Analytics page needs in one round trip (#88 data-viz
+ *  epic). `issues_fixed_*` are lifetime totals (all of `fix_events`); every
+ *  other field is a live snapshot except `trend`, which is windowed to the
+ *  trailing `range_days`.
+ */
+export type Analytics = {
+	overall_score: number,
+	overall_grade: Grade,
+	/**
+	 *  Latest overall-history score minus the earliest within the window
+	 *  (0 if the window has fewer than two points).
+	 */
+	overall_delta: number,
+	files_tracked: number,
+	project_count: number,
+	issues_fixed_total: number,
+	issues_fixed_auto: number,
+	issues_fixed_manual: number,
+	open_issues: number,
+	open_critical: number,
+	grade_distribution: GradeCount[],
+	trend: TrendPoint[],
+	common_issues: CommonIssue[],
 };
 
 /**
@@ -151,6 +186,15 @@ export type ApplyTemplateResult = {
 	path: string,
 };
 
+/**
+ *  One title from the "most common issues" leaderboard, with how many
+ *  distinct files it appears in.
+ */
+export type CommonIssue = {
+	title: string,
+	files_affected: number,
+};
+
 /**  An item in the digest's "needs your eyes" list. */
 export type DigestItem = {
 	/**  "regressed" | "improved" | "new". */
@@ -158,6 +202,12 @@ export type DigestItem = {
 	file_id: string,
 	title: string,
 	detail: string,
+};
+
+/**  One dimension's rolled-up score for a file (drives the radar chart, #88). */
+export type DimensionScore = {
+	dimension: string,
+	score: number,
 };
 
 /**  The current entitlement state (whether the paid tier is unlocked). */
@@ -179,6 +229,8 @@ export type FileDetail = {
 	issues: IssueDetail[],
 	/**  Score change since the previous scan of this file, if any. */
 	delta: number | null,
+	/**  Per-dimension scores, always length 5 in `Dimension::ALL` order. */
+	dimensions: DimensionScore[],
 };
 
 /**  A row in the Prompts table. */
@@ -191,6 +243,16 @@ export type FileRow = {
 	 */
 	path: string,
 	project: string,
+	/**
+	 *  Owning project's id (its absolute repo-root path) — used to group
+	 *  files without colliding same-named projects.
+	 */
+	project_id: string,
+	/**
+	 *  File classification (e.g. `CLAUDE.md`, `AGENTS.md`, `.cursorrules`) —
+	 *  drives the provider icon in the UI.
+	 */
+	kind: string,
 	grade: Grade,
 	score: number,
 	issue_count: number,
@@ -218,6 +280,16 @@ export type FixSuggestion = {
 
 /**  Letter grade. */
 export type Grade = "A" | "B" | "C" | "D" | "F";
+
+/**
+ *  One grade's share of `files_tracked`, always emitted for all five grades
+ *  (zero-filled) so the Analytics distribution chart never has to guess at
+ *  missing buckets.
+ */
+export type GradeCount = {
+	grade: Grade,
+	count: number,
+};
 
 /**  One issue in the Detail view. */
 export type IssueDetail = {
@@ -269,6 +341,20 @@ export type Overview = {
 	trend_delta: number,
 	/**  Most recent scan finish time (epoch seconds string). */
 	last_scan: string | null,
+};
+
+/**  A project rollup for the sidebar and the Prompts group headers. */
+export type ProjectRow = {
+	id: string,
+	name: string,
+	grade: Grade,
+	score: number,
+	file_count: number,
+	issue_count: number,
+	/**  Base64 `data:` URI of the project's logo, if one was detected. */
+	logo: string | null,
+	/**  Most recent file mtime in the project (epoch seconds string). */
+	modified: string | null,
 };
 
 /**  A rule (built-in or custom) with its current enabled state. */
@@ -336,6 +422,13 @@ export type TemplateInfo = {
 	 *  writing it to disk is a paid action.
 	 */
 	preview: string,
+};
+
+/**  One point on the Analytics overall-score trend line. */
+export type TrendPoint = {
+	/**  Epoch-seconds string (matches `grade_history.recorded_at`). */
+	t: string,
+	score: number,
 };
 
 export type WorklistItem = {

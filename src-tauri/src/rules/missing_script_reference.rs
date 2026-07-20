@@ -60,6 +60,9 @@ impl Rule for MissingScriptReference {
     fn why(&self) -> &'static str {
         "The named script isn't in package.json's scripts — the agent will run it and fail."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
         let Some(resolution_root) = ctx.resolution_root else {
             return Vec::new();

@@ -51,6 +51,13 @@ const detail: FileDetail = {
       fix_to: "current model",
     },
   ],
+  dimensions: [
+    { dimension: "Consistency", score: 62 },
+    { dimension: "Format", score: 30 },
+    { dimension: "Clarity", score: 71 },
+    { dimension: "Structure", score: 55 },
+    { dimension: "Examples", score: 20 },
+  ],
 };
 
 function setup(entitled: boolean) {
@@ -67,6 +74,17 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("Detail file scorecard", () => {
+  it("renders the dimension radar scorecard with the weakest-two dimensions", async () => {
+    setup(true);
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("File scorecard")).toBeInTheDocument();
+    expect(screen.getByText("C · 71")).toBeInTheDocument();
+    expect(screen.getByText("Weakest on Examples & Format")).toBeInTheDocument();
+  });
+});
 
 describe("Detail toolbar Auto-fix", () => {
   it("opens the checkout instead of calling apply_fix when the user isn't entitled", async () => {
@@ -89,7 +107,9 @@ describe("Detail toolbar Auto-fix", () => {
     const button = await screen.findByRole("button", { name: /Auto-fix 1/ });
     fireEvent.click(button);
 
-    await waitFor(() => expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false));
+    await waitFor(() =>
+      expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "auto"),
+    );
     expect(openExternal).not.toHaveBeenCalled();
   });
 
@@ -102,5 +122,20 @@ describe("Detail toolbar Auto-fix", () => {
     fireEvent.click(button);
 
     expect(await screen.findByText(/PAID_GATE: auto-fix requires a license/)).toBeInTheDocument();
+  });
+});
+
+describe("Detail per-issue Apply fix", () => {
+  it("calls apply_fix with origin 'manual', not 'auto'", async () => {
+    setup(true);
+    applyFix.mockResolvedValue({ status: "ok", data: { git_ref: null } });
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    const button = await screen.findByRole("button", { name: /Apply fix/ });
+    fireEvent.click(button);
+
+    await waitFor(() =>
+      expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "manual"),
+    );
   });
 });

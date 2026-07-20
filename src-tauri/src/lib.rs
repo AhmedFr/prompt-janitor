@@ -12,6 +12,7 @@ pub mod engine;
 mod ipc;
 mod license;
 mod notify;
+mod project_logo;
 mod query;
 mod repo_root;
 pub mod rules;

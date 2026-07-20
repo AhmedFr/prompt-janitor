@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { commands, isTauri, type FileRow } from "@/lib/ipc";
+import { commands, isTauri, type Analytics } from "@/lib/ipc";
 
-/** Fetches the scanned files and refetches whenever a scan finishes. */
-export function useFiles() {
-  const [files, setFiles] = useState<FileRow[]>([]);
+/**
+ * Loads the Analytics payload windowed to the trailing `rangeDays`,
+ * refetching whenever a scan finishes or the caller switches ranges.
+ */
+export function useAnalytics(rangeDays: number) {
+  const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
@@ -12,12 +15,13 @@ export function useFiles() {
       setLoading(false);
       return;
     }
-    const res = await commands.listFiles();
-    if (res.status === "ok") setFiles(res.data);
+    const res = await commands.getAnalytics(rangeDays);
+    if (res.status === "ok") setData(res.data);
     setLoading(false);
-  }, []);
+  }, [rangeDays]);
 
   useEffect(() => {
+    setLoading(true);
     void refetch();
   }, [refetch]);
 
@@ -29,5 +33,5 @@ export function useFiles() {
     };
   }, [refetch]);
 
-  return { files, loading, refetch };
+  return { data, loading };
 }

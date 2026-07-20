@@ -62,6 +62,9 @@ impl Rule for DuplicateRules {
     fn why(&self) -> &'static str {
         "The same guidance stated twice always eventually drifts out of sync — say it once."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let mut first_seen: HashMap<String, u32> = HashMap::new();
         let mut findings = Vec::new();

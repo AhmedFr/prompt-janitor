@@ -120,6 +120,32 @@ const MIGRATIONS: &[&str] = &[
     "
     ALTER TABLE grade_history ADD COLUMN issue_signature TEXT;
     ",
+    // 5: projects.logo — a base64 data: URI of a logo detected in the project
+    // root at scan time (NULL when none found). Lets the UI show a real
+    // project mark instead of a generic folder.
+    "
+    ALTER TABLE projects ADD COLUMN logo TEXT;
+    ",
+    // 6: issues.dimension — the quality dimension (Clarity|Consistency|
+    // Structure|Examples|Format) a rule's finding speaks to, powering the
+    // per-file dimension radar (#88 data-viz epic). NULL for rows written
+    // before this migration; `Dimension::from_db` treats an unknown value as
+    // `Consistency`.
+    "
+    ALTER TABLE issues ADD COLUMN dimension TEXT;
+    ",
+    // 7: fix_events — a durable, append-only log of every applied fix
+    // (one row per edit), tagged with its origin ('auto' | 'manual'). Lets
+    // the Analytics page show a real "issues fixed" count broken down by how
+    // the fix was applied (#88 data-viz epic).
+    "
+    CREATE TABLE fix_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id TEXT NOT NULL,
+        origin  TEXT NOT NULL,     -- 'auto' | 'manual'
+        applied_at TEXT NOT NULL
+    );
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -246,5 +272,14 @@ mod tests {
             })
             .unwrap();
         assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn migration_adds_project_logo_column() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // A column that only exists after migration 5.
+        conn.execute("UPDATE projects SET logo = 'x' WHERE 1=0", [])
+            .expect("logo column should exist");
     }
 }

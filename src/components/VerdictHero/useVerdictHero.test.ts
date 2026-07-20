@@ -14,7 +14,18 @@ function issue(title: string, severity: IssueDetail["severity"]): IssueDetail {
 }
 
 function fileDetail(id: string, name: string, score: number, issues: IssueDetail[]): FileDetail {
-  return { id, name, project: "p", path: `/${name}`, grade: "C", score, content: "", issues, delta: null };
+  return {
+    id,
+    name,
+    project: "p",
+    path: `/${name}`,
+    grade: "C",
+    score,
+    content: "",
+    issues,
+    delta: null,
+    dimensions: [],
+  };
 }
 
 describe("applyFixesSequentially", () => {
