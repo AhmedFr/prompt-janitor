@@ -28,6 +28,8 @@ export default defineConfig({
     // own vitest configs and toolchains; don't let this project's default
     // test glob pick up their test files. `.claude/**` holds nested git
     // worktrees (duplicate repo checkouts) that must not be scanned either.
-    exclude: [...configDefaults.exclude, "landing/**", "fulfillment/**", ".claude/**"],
+    // benchmark/fixtures ships deliberately-broken tests the benchmark agent
+    // must repair; they are exercised by the harness, never by this suite.
+    exclude: [...configDefaults.exclude, "landing/**", "fulfillment/**", ".claude/**", "benchmark/**"],
   },
 });
