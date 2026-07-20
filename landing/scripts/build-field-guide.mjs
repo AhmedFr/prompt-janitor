@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Generates landing/field-guide.html from docs/standards/prompting-standards.md.
+// Generates landing/public/field-guide.html from docs/standards/prompting-standards.md.
 //
-// This is a *committed transformation*: the generated field-guide.html is
-// checked into git so the landing page works even if this script or the
-// source markdown ever move. Re-run this script (`pnpm run build:guide` from
-// landing/) whenever docs/standards/prompting-standards.md changes, and
-// commit the regenerated landing/field-guide.html alongside it.
+// This is a *build-generated* artifact: field-guide.html is produced into
+// public/ at build time (`pnpm run build:guide` from landing/, wired into the
+// build pipeline) and is gitignored — it is not committed. Vercel must read
+// docs/standards/prompting-standards.md from outside the landing/ root
+// directory for this to work (see the repo root include setting).
 //
 // Bump EDITION_VERSION / EDITION_DATE below when the standards content
 // changes meaningfully — they're fixed strings (not "generated at build
@@ -17,7 +17,8 @@ import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_MD = path.resolve(__dirname, "../../docs/standards/prompting-standards.md");
-const OUTPUT_HTML = path.resolve(__dirname, "../field-guide.html");
+const OUTPUT_HTML = path.resolve(__dirname, "../public/field-guide.html");
+const GLOBALS_CSS = path.resolve(__dirname, "../src/app/globals.css");
 
 const EDITION_VERSION = "v1.0";
 const EDITION_DATE = "July 2026";
@@ -147,6 +148,7 @@ function renderToc(sections) {
 
 function build() {
   const md = readFileSync(SOURCE_MD, "utf8");
+  const css = readFileSync(GLOBALS_CSS, "utf8");
   const sections = parseStandardsMarkdown(md);
   const totalCount = sections.reduce((n, s) => n + s.standards.length, 0);
 
@@ -176,7 +178,7 @@ function build() {
       content="The 25 standards your AI instruction files are graded against — Prompt Janitor Pro bonus."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/src/styles.css" />
+    <style>${css}</style>
     <style>
       body { background: var(--bg); }
       .fg-topbar {

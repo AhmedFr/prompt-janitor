@@ -1,5 +1,10 @@
 import type { Grade } from "@/lib/ipc";
 
+/** Pick the singular or plural form for a count — for nouns, verbs ("this"/"these"), etc. */
+export function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
+  return n === 1 ? singular : pluralForm;
+}
+
 /**
  * The one-sentence verdict per grade. `{n}` (B only) is the computed number
  * of fixes needed for the overall score to reach an A (≥ 90).

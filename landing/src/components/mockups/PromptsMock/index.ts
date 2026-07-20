@@ -1,0 +1,1 @@
+export { PromptsMock } from "./PromptsMock";
