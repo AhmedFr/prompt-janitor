@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Grade } from "@/components/Grade";
 import { Icon } from "@/components/Icon";
 import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
+import { TemplatePicker, useTemplatePicker } from "@/components/TemplatePicker";
 import { isTauri } from "@/lib/ipc";
 import { relativeTime } from "@/lib/format";
 import type { Navigate } from "@/App/App.types";
@@ -17,6 +19,8 @@ export interface PromptsProps {
 export function Prompts({ navigate }: PromptsProps) {
   const { files, loading } = useFiles();
   const [filter, setFilter] = useState<Filter>("all");
+  const [showTemplates, setShowTemplates] = useState(false);
+  const templatePicker = useTemplatePicker();
 
   const shown = files.filter((f) => {
     if (filter === "all") return true;
@@ -37,6 +41,12 @@ export function Prompts({ navigate }: PromptsProps) {
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Prompts</h1>
+        <span className="toolbar-spacer" />
+        {isTauri && (
+          <Button size="sm" onClick={() => setShowTemplates(true)}>
+            <Icon name="plus" /> Start from a template
+          </Button>
+        )}
       </header>
 
       <div className="scroll-area">
@@ -51,7 +61,13 @@ export function Prompts({ navigate }: PromptsProps) {
             </Card>
           ) : files.length === 0 ? (
             <Card padded>
-              <div className="muted">No prompts yet — scan a folder from the Overview tab.</div>
+              <div className="muted" style={{ marginBottom: 14 }}>
+                No prompts yet — scan a folder from the Overview tab, or start from a ready-made
+                instruction file below.
+              </div>
+              <Button variant="primary" size="sm" onClick={() => setShowTemplates(true)}>
+                <Icon name="plus" /> Start from a template
+              </Button>
             </Card>
           ) : (
             <>
@@ -115,6 +131,17 @@ export function Prompts({ navigate }: PromptsProps) {
           )}
         </div>
       </div>
+
+      {showTemplates && (
+        <TemplatePicker
+          templates={templatePicker.templates}
+          entitled={templatePicker.entitled}
+          loading={templatePicker.loading}
+          onApply={templatePicker.applyTemplate}
+          onClose={() => setShowTemplates(false)}
+          navigate={navigate}
+        />
+      )}
     </section>
   );
 }
