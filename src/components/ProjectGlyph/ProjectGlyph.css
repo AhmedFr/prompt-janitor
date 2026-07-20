@@ -1,0 +1,17 @@
+.project-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  flex: 0 0 auto;
+}
+.project-glyph--logo {
+  object-fit: cover;
+  background: var(--group);
+}
+.project-glyph--folder { --tint: var(--grade-c); color: var(--tint); background: color-mix(in srgb, var(--tint) 14%, transparent); }
+.grade-tint--a { --tint: var(--grade-a); }
+.grade-tint--b { --tint: var(--grade-b); }
+.grade-tint--c { --tint: var(--grade-c); }
+.grade-tint--d { --tint: var(--grade-d); }
+.grade-tint--f { --tint: var(--grade-f); }

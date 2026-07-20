@@ -1,65 +1,41 @@
-.p-tbl {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.p-tbl th {
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 9px 14px;
-  border-bottom: 0.5px solid var(--sep-strong);
-}
-
-.p-tbl td {
-  padding: 10px 14px;
-  border-bottom: 0.5px solid var(--sep);
-  font-size: 13px;
-}
-
-.p-tbl tbody tr {
-  cursor: pointer;
-}
-
-.p-tbl tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.p-tbl tbody tr:hover {
-  background: var(--group);
-}
-
-.p-file-ico {
+.p-controls {
   display: flex;
-  width: 15px;
-  height: 15px;
-  color: var(--text-3);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
-
-.p-chev {
-  width: 24px;
-  color: var(--text-3);
-}
-
-.p-chev svg {
-  display: block;
-}
-
-.p-chip {
+.p-select, .p-search {
   font-size: 12px;
-  padding: 4px 11px;
-  border-radius: var(--r-pill);
+  padding: 5px 9px;
+  border-radius: var(--r-ctrl);
   border: 0.5px solid var(--sep-strong);
   background: #fff;
-  color: var(--text-2);
-  cursor: pointer;
+  color: var(--text);
 }
+.p-search { min-width: 140px; }
 
-.p-chip--on {
-  background: var(--blue);
-  color: #fff;
-  border-color: transparent;
+.p-chip {
+  font-size: 12px; padding: 4px 11px; border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong); background: #fff; color: var(--text-2); cursor: pointer;
 }
+.p-chip--on { background: var(--blue); color: #fff; border-color: transparent; }
+
+.p-group { margin-bottom: 20px; border-radius: var(--r-card); transition: box-shadow 0.3s ease; }
+.p-group--hl { box-shadow: 0 0 0 2px var(--blue); }
+.p-group__head { display: flex; align-items: center; gap: 9px; padding: 4px 4px 10px; }
+.p-group__name { font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+
+.p-row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 10px 14px; border: none; background: transparent; text-align: left;
+  border-bottom: 0.5px solid var(--sep); cursor: pointer;
+}
+.p-row:last-child { border-bottom: none; }
+.p-row:hover { background: var(--group); }
+.p-row__main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.p-row__name { font-size: 13px; font-weight: 500; }
+.p-row__path { font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-row__issues { font-size: 12px; color: var(--text-3); }
+.p-row__issues--bad { color: var(--red); font-weight: 500; }
+.p-row__age { width: 34px; text-align: right; }

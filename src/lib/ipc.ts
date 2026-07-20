@@ -6,8 +6,10 @@ export type {
   Overview,
   WorklistItem,
   FileRow,
+  ProjectRow,
   FileDetail,
   IssueDetail,
+  DimensionScore,
   ScansDigest,
   DigestItem,
   RuleInfo,
@@ -22,6 +24,12 @@ export type {
   Severity,
   Source,
   Grade,
+  TemplateInfo,
+  ApplyTemplateResult,
+  Analytics,
+  GradeCount,
+  TrendPoint,
+  CommonIssue,
 } from "./bindings";
 
 /** True when running inside the Tauri runtime (vs. a plain browser dev server). */

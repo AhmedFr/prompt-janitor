@@ -18,7 +18,34 @@ It scans your folders on a schedule, grades each prompt file **A–F** against b
 
 ## Pricing model
 
-Scanning & grading are **free forever**. A one-time purchase unlocks **AI auto-fix & rewrites**.
+**Diagnosis free. Treatment paid.**
+
+- **Free forever:** scanning, scheduling, and grading — including the built-in
+  natural-language standards catalog, evaluated on your own compute (local Ollama
+  or BYO API key). Unlimited scans, every finding shown.
+- **Pro (one-time purchase):** AI auto-fix & rewrites, custom natural-language
+  rules, starter template packs, the Prompt-File Field Guide, and 12 months of
+  feature updates (optional renewal afterwards — never required to keep using
+  the app).
+
+Full offer design: [`docs/superpowers/specs/2026-07-02-lifetime-offer-design.md`](docs/superpowers/specs/2026-07-02-lifetime-offer-design.md).
+
+### Minting license keys (vendor only)
+
+Licenses are Ed25519-signed payloads verified offline against the public key embedded in
+`src-tauri/src/license.rs`. The vendor keypair and customer keys are produced with the
+`license-tool` binary:
+
+```sh
+cd src-tauri
+cargo run --bin license-tool -- keygen                 # once: writes pj-vendor-key.secret,
+                                                       # prints the PUBKEY array for license.rs
+cargo run --bin license-tool -- mint --key pj-vendor-key.secret --email buyer@example.com
+cargo run --bin license-tool -- verify "PJ1.…"         # sanity-check against the embedded key
+```
+
+Store the private key in a password manager and delete the file — `*.secret` is gitignored,
+and the key can never be recovered or rotated transparently for existing customers.
 
 ## Development
 

@@ -7,13 +7,14 @@ import { SourceBadge } from "@/components/SourceBadge";
 import { isTauri } from "@/lib/ipc";
 import { useRules } from "./useRules";
 
-type Pack = "all" | "anthropic" | "openai" | "karpathy" | "custom";
+type Pack = "all" | "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
 type Sev = "hi" | "mid" | "lo";
 
 const PACKS: [Pack, string][] = [
   ["all", "All"],
   ["anthropic", "Anthropic"],
   ["openai", "OpenAI"],
+  ["cursor", "Cursor"],
   ["karpathy", "Karpathy"],
   ["custom", "Custom"],
 ];

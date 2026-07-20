@@ -1,0 +1,1 @@
+export { DetailMock } from "./DetailMock";

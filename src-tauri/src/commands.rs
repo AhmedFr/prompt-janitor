@@ -219,51 +219,56 @@ pub fn add_nl_rule(
         .map_err(|e| e.to_string())
 }
 
-/// Evaluate every enabled natural-language rule against a file via the
-/// configured provider. Errors gracefully when no provider is set.
+/// Evaluate the built-in NL standards (free — needs only a configured
+/// provider) plus, for licensed users, the custom NL rules. Persists
+/// violations as issues and rescores the file (offer spec §5: the license
+/// gates treatment, not diagnosis).
 #[tauri::command]
 #[specta::specta]
 pub async fn evaluate_nl_rules(
     db: tauri::State<'_, AppDb>,
     file_id: String,
-) -> Result<Vec<crate::ai_rules::NlVerdict>, String> {
-    let (paid, creds, content, rules) = {
+) -> Result<crate::ai_rules::NlEvalResult, String> {
+    let (creds, content, rules) = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let detail = query::get_file_detail(&conn, &file_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "File not found".to_string())?;
-        let rules = query::enabled_nl_rules(&conn).map_err(|e| e.to_string())?;
-        (
-            entitlement_of(&conn).paid,
-            crate::ai::load_credentials(&conn),
-            detail.content,
-            rules,
-        )
+        let include_custom = entitlement_of(&conn).paid;
+        let rules = query::enabled_nl_rules(&conn, include_custom).map_err(|e| e.to_string())?;
+        (crate::ai::load_credentials(&conn), detail.content, rules)
     };
 
-    if !paid {
-        return Err(PAID_GATE.to_string());
-    }
     if creds.provider == "none" || creds.key.is_empty() {
         return Err(
-            "Connect an AI provider in Settings → AI to evaluate natural-language rules."
+            "Connect an AI provider in Settings → AI to evaluate the prompting standards."
                 .to_string(),
         );
     }
 
     let mut verdicts = Vec::new();
-    for (rule_id, title, instruction, severity) in rules {
+    for rule in rules {
         let (violates, explanation) =
-            crate::ai_rules::evaluate(&creds, &instruction, &content).await?;
+            crate::ai_rules::evaluate(&creds, &rule.instruction, &content).await?;
         verdicts.push(crate::ai_rules::NlVerdict {
-            rule_id,
-            title,
-            severity,
+            rule_id: rule.id,
+            title: rule.title,
+            severity: rule.severity,
+            source: rule.source,
             violates,
             explanation,
         });
     }
-    Ok(verdicts)
+
+    let (score, grade) = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        query::apply_nl_verdicts(&conn, &file_id, &verdicts).map_err(|e| e.to_string())?
+    };
+    Ok(crate::ai_rules::NlEvalResult {
+        verdicts,
+        score,
+        grade,
+    })
 }
 
 /// Delete a custom rule.
@@ -456,23 +461,39 @@ pub fn apply_fix(
     file_id: String,
     edits: Vec<crate::apply::FixEdit>,
     commit: bool,
+    origin: String,
 ) -> Result<crate::apply::ApplyResult, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    apply_fix_with_conn(&conn, &file_id, &edits, commit, &origin)
+}
+
+/// The body of [`apply_fix`], taking a `&Connection` directly rather than a
+/// Tauri `State` so it can be exercised in tests.
+fn apply_fix_with_conn(
+    conn: &rusqlite::Connection,
+    file_id: &str,
+    edits: &[crate::apply::FixEdit],
+    commit: bool,
+    origin: &str,
+) -> Result<crate::apply::ApplyResult, String> {
+    if !entitlement_of(conn).paid {
+        return Err(PAID_GATE.to_string());
+    }
 
     let path: String = conn
-        .query_row("SELECT path FROM files WHERE id = ?1", [&file_id], |r| {
+        .query_row("SELECT path FROM files WHERE id = ?1", [file_id], |r| {
             r.get(0)
         })
         .map_err(|e| e.to_string())?;
 
     let content =
         std::fs::read_to_string(&path).map_err(|e| format!("Couldn't read the file: {e}"))?;
-    let updated = crate::apply::apply_edits(&content, &edits)?;
+    let updated = crate::apply::apply_edits(&content, edits)?;
 
     let stamp = now_stamp();
     conn.execute(
         "INSERT INTO backups (file_id, pre_fix_content, applied_at, git_ref) VALUES (?1, ?2, ?3, NULL)",
-        rusqlite::params![&file_id, &content, &stamp],
+        rusqlite::params![file_id, &content, &stamp],
     )
     .map_err(|e| e.to_string())?;
     let backup_id = conn.last_insert_rowid();
@@ -503,6 +524,11 @@ pub fn apply_fix(
     } else {
         None
     };
+
+    // Only recorded once the apply is guaranteed to stick — the git-commit
+    // branch above can still roll everything back and return early, in which
+    // case we must not log an event for a fix that never actually landed.
+    query::record_fix_events(conn, file_id, origin, edits.len()).map_err(|e| e.to_string())?;
 
     Ok(crate::apply::ApplyResult { git_ref })
 }
@@ -562,6 +588,14 @@ pub fn list_files(db: tauri::State<'_, AppDb>) -> Result<Vec<query::FileRow>, St
     query::list_files(&conn).map_err(|e| e.to_string())
 }
 
+/// Every project with its rolled-up counts and detected logo.
+#[tauri::command]
+#[specta::specta]
+pub fn list_projects(db: tauri::State<'_, AppDb>) -> Result<Vec<query::ProjectRow>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::list_projects(&conn).map_err(|e| e.to_string())
+}
+
 /// One file's source + issues for the Detail screen.
 #[tauri::command]
 #[specta::specta]
@@ -573,10 +607,85 @@ pub fn get_file_detail(
     query::get_file_detail(&conn, &file_id).map_err(|e| e.to_string())
 }
 
+/// Everything the Analytics page needs, windowed to the trailing
+/// `range_days`.
+#[tauri::command]
+#[specta::specta]
+pub fn get_analytics(
+    db: tauri::State<'_, AppDb>,
+    range_days: u32,
+) -> Result<query::Analytics, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    query::get_analytics(&conn, range_days).map_err(|e| e.to_string())
+}
+
 /// The weekly Scans digest.
 #[tauri::command]
 #[specta::specta]
 pub fn get_scans_digest(db: tauri::State<'_, AppDb>) -> Result<query::ScansDigest, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     query::get_scans_digest(&conn).map_err(|e| e.to_string())
+}
+
+/// Every starter template pack (#75): free to browse and preview — the
+/// one-click write is the paid action, gated in `apply_template`.
+#[tauri::command]
+#[specta::specta]
+pub fn list_templates() -> Vec<crate::templates::TemplateInfo> {
+    crate::templates::all()
+}
+
+/// Write a starter template into `dest_dir` (paid). Never overwrites an
+/// existing same-named file.
+#[tauri::command]
+#[specta::specta]
+pub fn apply_template(
+    db: tauri::State<'_, AppDb>,
+    template_id: String,
+    dest_dir: String,
+) -> Result<crate::templates::ApplyTemplateResult, String> {
+    let paid = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        entitlement_of(&conn).paid
+    };
+    if !paid {
+        return Err(PAID_GATE.to_string());
+    }
+    crate::templates::apply(&template_id, &dest_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A freshly migrated in-memory DB with no license key set — i.e. a free,
+    /// unentitled user.
+    fn free_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn apply_fix_is_paid_gated_for_a_free_user() {
+        let conn = free_conn();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('f', 'p', '/p/f.md', 'md')",
+            [],
+        )
+        .unwrap();
+
+        let edits = vec![crate::apply::FixEdit {
+            from: "x".to_string(),
+            to: "y".to_string(),
+        }];
+        let result = apply_fix_with_conn(&conn, "f", &edits, false, "manual");
+
+        assert_eq!(result.unwrap_err(), PAID_GATE);
+    }
 }

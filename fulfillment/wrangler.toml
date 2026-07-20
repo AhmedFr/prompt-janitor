@@ -1,0 +1,20 @@
+name = "pj-fulfillment"
+main = "src/index.ts"
+compatibility_date = "2026-07-06"
+
+# Deliberately no `nodejs_compat` flag: the worker uses only Workers-native
+# APIs (fetch, WebCrypto, KV) plus the pure-JS `standardwebhooks` dependency —
+# no Buffer, no node:* imports.
+
+# KV namespace for webhook idempotency (webhook-id -> processed marker, ~30 day TTL).
+# Create with `wrangler kv namespace create FULFILLMENT_KV` and paste the returned id
+# below (see README.md "Deploy" section).
+[[kv_namespaces]]
+binding = "FULFILLMENT_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Secrets (never committed — set with `wrangler secret put <NAME>`):
+#   POLAR_WEBHOOK_SECRET   Standard Webhooks secret from the Polar webhook endpoint config
+#   LICENSE_SIGNING_KEY    base64url(32-byte Ed25519 seed) — same format the vendor
+#                          `license-tool keygen` command writes to disk
+#   RESEND_API_KEY         Resend API key with permission to send from the sender domain

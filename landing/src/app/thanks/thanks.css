@@ -1,0 +1,20 @@
+.thanks-hero { text-align: center; padding: 96px 0 0; }
+.thanks-check {
+  width: 72px; height: 72px; border-radius: 20px; margin: 0 auto 26px; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #3fce75, #1f9e4c);
+  box-shadow: 0 14px 34px rgba(47,180,87,.35), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.thanks-check svg { width: 36px; height: 36px; }
+.thanks-hero h1 { font-size: clamp(38px, 6vw, 60px); font-weight: 700; letter-spacing: -.03em; }
+.thanks-hero .lead { font-size: clamp(17px, 2vw, 19px); color: var(--ink-2); max-width: 520px; margin: 20px auto 0; }
+.steps { max-width: 640px; margin: 48px auto 0; display: flex; flex-direction: column; gap: 16px; text-align: left; }
+.step { display: flex; gap: 16px; align-items: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow-sm); padding: 20px 22px; }
+.step .n {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px; background: var(--blue-tint); color: var(--blue-press);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--display); font-size: 14.5px;
+}
+.step p { margin: 0; font-size: 16px; color: var(--ink-2); }
+.step code { font-family: var(--mono); font-size: .92em; background: var(--bg-tint); padding: 1px 6px; border-radius: 5px; color: var(--ink); }
+.thanks-note { max-width: 640px; margin: 30px auto 0; font-size: 14.5px; color: var(--ink-3); text-align: left; }
+.thanks-note a { color: var(--blue-press); text-decoration: underline; }

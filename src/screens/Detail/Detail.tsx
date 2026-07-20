@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScoreRing } from "@/components/ScoreRing";
+import { RadarChart } from "@/components/RadarChart";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { commands, isTauri, type FileDetail, type FixSuggestion } from "@/lib/ipc";
+import { commands, isTauri, type DimensionScore, type FileDetail, type FixSuggestion } from "@/lib/ipc";
+import { openExternal } from "@/lib/open-external";
+import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE } from "@/lib/monetization";
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
@@ -21,6 +23,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
   const { detail, loading, aiReady, entitled, reload } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!detail || detail.issues.length === 0) {
@@ -32,17 +35,26 @@ export function Detail({ fileId, navigate }: DetailProps) {
   }, [detail]);
 
   const fixable = detail?.issues.filter((i) => i.fix_from && i.fix_to).length ?? 0;
+  // Auto-fix across the whole file is a paid feature, same as VerdictHero's
+  // cross-file Auto-fix and the per-issue AI rewrite below.
+  const autoFixLocked = !entitled;
 
   // Apply every deterministic (static) fix on the file in one snapshot.
   const runAutoFix = async () => {
     if (!detail) return;
+    if (autoFixLocked) {
+      void openExternal(POLAR_CHECKOUT_URL);
+      return;
+    }
     const edits = detail.issues
       .filter((i) => i.fix_from && i.fix_to)
       .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
     if (edits.length === 0) return;
     setAutoBusy(true);
-    const r = await runApply(detail.id, edits, false);
+    setAutoError(null);
+    const r = await runApply(detail.id, edits, false, "auto");
     if (r.ok) await reload();
+    else setAutoError(r.message);
     setAutoBusy(false);
   };
 
@@ -61,9 +73,14 @@ export function Detail({ fileId, navigate }: DetailProps) {
             size="sm"
             disabled={autoBusy}
             onClick={() => void runAutoFix()}
-            title="Apply every deterministic fix on this file"
+            title={
+              autoFixLocked
+                ? "Auto-fix is a Pro feature — get a license"
+                : "Apply every deterministic fix on this file"
+            }
           >
-            <Icon name="wand" /> {autoBusy ? "Fixing…" : `Auto-fix ${fixable}`}
+            <Icon name={autoFixLocked ? "lock" : "wand"} />{" "}
+            {autoBusy ? "Fixing…" : `Auto-fix ${fixable}`}
           </Button>
         )}
       </header>
@@ -83,19 +100,50 @@ export function Detail({ fileId, navigate }: DetailProps) {
               <div className="muted">Select a file from the Prompts tab.</div>
             </Card>
           ) : (
-            <DetailBody
-              detail={detail}
-              selectedIndex={selectedIndex}
-              onSelect={setSelectedIndex}
-              aiReady={aiReady}
-              entitled={entitled}
-              onReload={reload}
-            />
+            <>
+              {(autoError || (autoFixLocked && fixable > 0)) && (
+                <div
+                  className="row wrap"
+                  style={{ gap: 10, marginBottom: 14, alignItems: "center" }}
+                >
+                  {autoError ? (
+                    <span className="faint" style={{ fontSize: 12, color: "var(--red)", maxWidth: 620 }}>
+                      {autoError}
+                    </span>
+                  ) : (
+                    <span className="faint" style={{ fontSize: 12 }}>
+                      ✦ Auto-fix across a whole file is a paid feature — {FOUNDER_PRICE}, or add a
+                      license in <strong>Settings → License</strong>.
+                    </span>
+                  )}
+                </div>
+              )}
+              <DetailBody
+                detail={detail}
+                selectedIndex={selectedIndex}
+                onSelect={setSelectedIndex}
+                aiReady={aiReady}
+                entitled={entitled}
+                onReload={reload}
+              />
+            </>
           )}
         </div>
       </div>
     </section>
   );
+}
+
+/** The two lowest-scoring dimension names, joined with " & " for the
+ * scorecard's "Weakest on …" line. Ties are broken by the dimensions'
+ * original (fixed) order. */
+function weakestTwo(dims: DimensionScore[]): string {
+  return [...dims]
+    .map((d, i) => ({ ...d, i }))
+    .sort((a, b) => a.score - b.score || a.i - b.i)
+    .slice(0, 2)
+    .map((d) => d.dimension)
+    .join(" & ");
 }
 
 function DetailBody({
@@ -188,11 +236,17 @@ function DetailBody({
         </Card>
 
         <div className="d-scorecard">
-          <Card
-            padded
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, width: "100%" }}
-          >
-            <ScoreRing score={detail.score} grade={detail.grade} size={120} />
+          <Card padded className="d-scorecard-card">
+            <div className="row between">
+              <span style={{ fontSize: 13, fontWeight: 600 }}>File scorecard</span>
+              <span className={`d-scorecard-grade grade-fg--${detail.grade.toLowerCase()}`}>
+                {detail.grade} · {detail.score}
+              </span>
+            </div>
+            <RadarChart data={detail.dimensions} grade={detail.grade} />
+            <div className="faint" style={{ fontSize: 12 }}>
+              Weakest on {weakestTwo(detail.dimensions)}
+            </div>
             {detail.delta != null && detail.delta !== 0 && (
               <div className="faint" style={{ fontSize: 12 }}>
                 <span style={{ color: detail.delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
@@ -240,7 +294,13 @@ function DetailBody({
         />
       )}
 
-      {aiReady && entitled && <NlRulesPanel fileId={detail.id} />}
+      {aiReady && (
+        <NlRulesPanel
+          fileId={detail.id}
+          content={detail.content}
+          onApplied={() => void onReload()}
+        />
+      )}
     </>
   );
 }
@@ -294,7 +354,7 @@ function IssuePanel({
     if (!fix) return;
     setAction("applying");
     setStatus(null);
-    const r = await runApply(fileId, [{ from: fix.from, to: fix.to }], commitGit);
+    const r = await runApply(fileId, [{ from: fix.from, to: fix.to }], commitGit, "manual");
     setStatus(r.message);
     if (r.ok) {
       setCanUndo(true);
@@ -382,17 +442,26 @@ function IssuePanel({
       )}
 
       {!paidAi && (
-        <div className="faint" style={{ fontSize: 12, marginTop: 12 }}>
+        <div className="row" style={{ gap: 10, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           {!entitled ? (
             <>
-              ✦ AI auto-fix &amp; rewrites are a paid feature — add a license in{" "}
-              <strong>Settings → License</strong>.
+              <Button
+                size="sm"
+                onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
+                title={FOUNDER_PRICE}
+              >
+                <Icon name="sparkles" /> {GET_PRO_LABEL}
+              </Button>
+              <span className="faint" style={{ fontSize: 12 }}>
+                ✦ AI auto-fix &amp; rewrites are a paid feature — {FOUNDER_PRICE}, or add a license
+                in <strong>Settings → License</strong>.
+              </span>
             </>
           ) : (
-            <>
+            <span className="faint" style={{ fontSize: 12 }}>
               Connect an AI provider in <strong>Settings → AI</strong> to generate a tailored
               rewrite.
-            </>
+            </span>
           )}
         </div>
       )}

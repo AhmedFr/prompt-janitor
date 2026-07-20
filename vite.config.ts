@@ -1,7 +1,7 @@
-/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { configDefaults } from "vitest/config";
 
 // Tauri expects a fixed dev port and leaves the console for the Rust side.
 export default defineConfig({
@@ -24,5 +24,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // landing/ and fulfillment/ are self-contained pnpm packages with their
+    // own vitest configs and toolchains; don't let this project's default
+    // test glob pick up their test files. `.claude/**` holds nested git
+    // worktrees (duplicate repo checkouts) that must not be scanned either.
+    exclude: [...configDefaults.exclude, "landing/**", "fulfillment/**", ".claude/**"],
   },
 });

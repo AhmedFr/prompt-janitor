@@ -27,6 +27,9 @@ impl Rule for Contradiction {
     fn why(&self) -> &'static str {
         "Conflicting directives make the model guess. Give one clear instruction with a measurable bound."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Consistency
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let mut findings = Vec::new();
         for (i, line) in content.lines().enumerate() {

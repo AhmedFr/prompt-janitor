@@ -21,6 +21,9 @@ impl Rule for MissingFewShot {
     fn why(&self) -> &'static str {
         "One or two worked examples reduce ambiguity far more than extra prose."
     }
+    fn dimension(&self) -> crate::engine::Dimension {
+        crate::engine::Dimension::Examples
+    }
     fn check(&self, content: &str) -> Vec<Finding> {
         let lower = content.to_lowercase();
         if EXAMPLE_HINTS.iter().any(|h| lower.contains(h)) {

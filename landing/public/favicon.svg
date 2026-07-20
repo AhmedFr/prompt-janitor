@@ -1,11 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Prompt Janitor">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Brand mark: Lucide "brush-cleaning" (lucide.dev, ISC) on the app's blue gradient tile. -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#36a3ff" />
-      <stop offset="1" stop-color="#0a6fff" />
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#36a3ff"/>
+      <stop offset="1" stop-color="#0a6fff"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="15" fill="url(#g)" />
-  <text x="32" y="44" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
-    font-size="30" font-weight="700" fill="#ffffff">PJ</text>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <g transform="translate(12 12) scale(1.6667)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m16 22-1-4"/>
+    <path d="M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1"/>
+    <path d="M19 14H5l-1.973 6.767A1 1 0 0 0 4 22h16a1 1 0 0 0 .973-1.233z"/>
+    <path d="m8 22 1-4"/>
+  </g>
 </svg>
