@@ -23,6 +23,7 @@ pub enum Severity {
 pub enum Source {
     Anthropic,
     Openai,
+    Cursor,
     Karpathy,
     Custom,
 }
@@ -54,6 +55,7 @@ impl Source {
         match self {
             Source::Anthropic => "anthropic",
             Source::Openai => "openai",
+            Source::Cursor => "cursor",
             Source::Karpathy => "karpathy",
             Source::Custom => "custom",
         }
@@ -129,6 +131,13 @@ const PENALTY_LO: u32 = 3;
 const CAP_MID: u32 = 30;
 const CAP_LO: u32 = 15;
 
+/// Roll severity counts up into a 0–100 score (same math as `score_for_issues`).
+pub fn score_for_counts(hi: u32, mid: u32, lo: u32) -> u32 {
+    let mid_pen = (mid * PENALTY_MID).min(CAP_MID);
+    let lo_pen = (lo * PENALTY_LO).min(CAP_LO);
+    100u32.saturating_sub(hi * PENALTY_HI + mid_pen + lo_pen)
+}
+
 /// Roll a set of issues up into a 0–100 score.
 pub fn score_for_issues(issues: &[Issue]) -> u32 {
     let mut hi = 0;
@@ -136,13 +145,12 @@ pub fn score_for_issues(issues: &[Issue]) -> u32 {
     let mut lo = 0;
     for issue in issues {
         match issue.severity {
-            Severity::Hi => hi += PENALTY_HI,
-            Severity::Mid => mid += PENALTY_MID,
-            Severity::Lo => lo += PENALTY_LO,
+            Severity::Hi => hi += 1,
+            Severity::Mid => mid += 1,
+            Severity::Lo => lo += 1,
         }
     }
-    let penalty = hi + mid.min(CAP_MID) + lo.min(CAP_LO);
-    100u32.saturating_sub(penalty)
+    score_for_counts(hi, mid, lo)
 }
 
 /// Map a 0–100 score to a letter grade. Bands are tunable (spec §5).
@@ -260,6 +268,11 @@ mod tests {
                 fix: None,
             }]
         }
+    }
+
+    #[test]
+    fn cursor_source_roundtrips() {
+        assert_eq!(Source::Cursor.as_str(), "cursor");
     }
 
     #[test]

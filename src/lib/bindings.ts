@@ -43,10 +43,12 @@ export const commands = {
 	/**  Add a natural-language custom rule (paid; evaluated by the AI provider). */
 	addNlRule: (title: string, instruction: string, severity: string) => typedError<null, string>(__TAURI_INVOKE("add_nl_rule", { title, instruction, severity })),
 	/**
-	 *  Evaluate every enabled natural-language rule against a file via the
-	 *  configured provider. Errors gracefully when no provider is set.
+	 *  Evaluate the built-in NL standards (free — needs only a configured
+	 *  provider) plus, for licensed users, the custom NL rules. Persists
+	 *  violations as issues and rescores the file (offer spec §5: the license
+	 *  gates treatment, not diagnosis).
 	 */
-	evaluateNlRules: (fileId: string) => typedError<NlVerdict[], string>(__TAURI_INVOKE("evaluate_nl_rules", { fileId })),
+	evaluateNlRules: (fileId: string) => typedError<NlEvalResult, string>(__TAURI_INVOKE("evaluate_nl_rules", { fileId })),
 	/**  Delete a custom rule. */
 	deleteCustomRule: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_custom_rule", { id })),
 	/**
@@ -213,11 +215,19 @@ export type LicenseInfo = {
 	plan: string,
 };
 
+/**  Result of an NL evaluation run: the verdicts plus the file's new score. */
+export type NlEvalResult = {
+	verdicts: NlVerdict[],
+	score: number,
+	grade: string,
+};
+
 /**  The provider's verdict on one NL rule for one file. */
 export type NlVerdict = {
 	rule_id: string,
 	title: string,
 	severity: string,
+	source: string,
 	violates: boolean,
 	explanation: string,
 };
@@ -289,7 +299,7 @@ export type Severity =
 "lo";
 
 /**  Where a rule's authority comes from (drives the source badge). */
-export type Source = "anthropic" | "openai" | "karpathy" | "custom";
+export type Source = "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
 
 export type WorklistItem = {
 	file_id: string,

@@ -49,6 +49,7 @@ fn severity_from_db(s: &str) -> Severity {
 fn source_from_db(s: &str) -> Source {
     match s {
         "openai" => Source::Openai,
+        "cursor" => Source::Cursor,
         "karpathy" => Source::Karpathy,
         "custom" => Source::Custom,
         _ => Source::Anthropic,
@@ -499,6 +500,24 @@ pub fn seed_rules(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Seed the built-in NL standards catalog. Idempotent — preserves toggles.
+pub fn seed_builtin_nl_rules(conn: &Connection) -> rusqlite::Result<()> {
+    for rule in crate::rules::builtin_nl_rules() {
+        conn.execute(
+            "INSERT OR IGNORE INTO rules(id, source, severity, title, description, enabled, kind)
+             VALUES(?1, ?2, ?3, ?4, ?5, 1, 'nl')",
+            params![
+                rule.id,
+                rule.source.as_str(),
+                rule.severity.as_str(),
+                rule.title,
+                rule.instruction,
+            ],
+        )?;
+    }
+    Ok(())
+}
+
 /// The built-in rules with their enabled state (defaults to on if unseeded).
 pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
     let mut enabled = std::collections::HashMap::new();
@@ -526,6 +545,20 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             pattern: None,
         })
         .collect();
+
+    for rule in crate::rules::builtin_nl_rules() {
+        out.push(RuleInfo {
+            id: rule.id.to_string(),
+            title: rule.title.to_string(),
+            description: rule.instruction.to_string(),
+            source: rule.source,
+            severity: rule.severity,
+            enabled: enabled.get(rule.id).copied().unwrap_or(true),
+            custom: false,
+            nl: true,
+            pattern: Some(rule.instruction.to_string()),
+        });
+    }
 
     let mut stmt = conn.prepare(
         "SELECT id, title, expr, severity, enabled, kind FROM custom_rules
@@ -612,25 +645,109 @@ pub fn add_nl_rule(
     Ok(id)
 }
 
-/// A natural-language rule ready to evaluate: (id, title, instruction, severity).
+/// A natural-language rule ready to evaluate.
+pub struct NlRuleRow {
+    pub id: String,
+    pub title: String,
+    pub instruction: String,
+    pub severity: String,
+    pub source: String,
+}
+
+/// Enabled NL rules: the built-in catalog (free — provider-gated only), plus
+/// the user's custom NL rules when `include_custom` (licensed).
 pub fn enabled_nl_rules(
     conn: &Connection,
-) -> rusqlite::Result<Vec<(String, String, String, String)>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, expr, severity FROM custom_rules
-         WHERE kind = 'nl' AND enabled = 1 ORDER BY id",
+    include_custom: bool,
+) -> rusqlite::Result<Vec<NlRuleRow>> {
+    let mut enabled = std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare("SELECT id, enabled FROM rules WHERE kind = 'nl'")?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? != 0))
+        })?;
+        for row in rows {
+            let (id, on) = row?;
+            enabled.insert(id, on);
+        }
+    }
+    let mut out: Vec<NlRuleRow> = crate::rules::builtin_nl_rules()
+        .into_iter()
+        .filter(|r| enabled.get(r.id).copied().unwrap_or(true))
+        .map(|r| NlRuleRow {
+            id: r.id.to_string(),
+            title: r.title.to_string(),
+            instruction: r.instruction.to_string(),
+            severity: r.severity.as_str().to_string(),
+            source: r.source.as_str().to_string(),
+        })
+        .collect();
+
+    if include_custom {
+        let mut stmt = conn.prepare(
+            "SELECT id, title, expr, severity FROM custom_rules
+             WHERE kind = 'nl' AND enabled = 1 ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(NlRuleRow {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                instruction: r.get(2)?,
+                severity: r.get(3)?,
+                source: "custom".to_string(),
+            })
+        })?;
+        for row in rows {
+            out.push(row?);
+        }
+    }
+    Ok(out)
+}
+
+/// Persist NL verdicts for a file: replace prior NL-sourced issues (tagged by
+/// non-NULL rule_id), insert current violations, and rescore the file with the
+/// unchanged formula. Returns `(score, grade_letter)`.
+pub fn apply_nl_verdicts(
+    conn: &Connection,
+    file_id: &str,
+    verdicts: &[crate::ai_rules::NlVerdict],
+) -> rusqlite::Result<(u32, String)> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "DELETE FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
+        [file_id],
     )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-                r.get::<_, String>(3)?,
-            ))
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(rows)
+    for v in verdicts.iter().filter(|v| v.violates) {
+        tx.execute(
+            "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to)
+             VALUES(?1, ?2, NULL, ?3, ?4, ?5, ?6, NULL, NULL)",
+            params![file_id, v.rule_id, v.severity, v.source, v.title, v.explanation],
+        )?;
+    }
+
+    let (mut hi, mut mid, mut lo) = (0u32, 0u32, 0u32);
+    {
+        let mut stmt = tx.prepare("SELECT severity FROM issues WHERE file_id = ?1")?;
+        let rows = stmt.query_map([file_id], |r| r.get::<_, String>(0))?;
+        for row in rows {
+            match row?.as_str() {
+                "hi" => hi += 1,
+                "mid" => mid += 1,
+                _ => lo += 1,
+            }
+        }
+    }
+    let score = crate::engine::score_for_counts(hi, mid, lo);
+    let grade = crate::engine::grade_for_score(score);
+    tx.execute(
+        "UPDATE files
+         SET score = ?1, grade = ?2,
+             issue_count = (SELECT COUNT(*) FROM issues WHERE file_id = ?3)
+         WHERE id = ?3",
+        params![score as i64, grade.letter(), file_id],
+    )?;
+    tx.commit()?;
+    Ok((score, grade.letter().to_string()))
 }
 
 /// Delete a custom rule.
@@ -726,6 +843,11 @@ pub fn active_rules(conn: &Connection) -> Vec<Box<dyn Rule>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_from_db_parses_cursor() {
+        assert_eq!(source_from_db("cursor"), Source::Cursor);
+    }
 
     #[test]
     fn empty_db_has_no_data() {
@@ -919,5 +1041,148 @@ mod tests {
 
         delete_custom_rule(&conn, &id).unwrap();
         assert!(!list_rules(&conn).unwrap().iter().any(|r| r.custom));
+    }
+
+    #[test]
+    fn nl_seed_is_idempotent_and_preserves_toggles() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rules WHERE kind = 'nl'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 25);
+
+        set_rule(&conn, "anthropic-clarity", false).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap(); // re-seed must not resurrect or duplicate
+        let count_again: i64 = conn
+            .query_row("SELECT COUNT(*) FROM rules WHERE kind = 'nl'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(count_again, 25);
+        let enabled: i64 = conn
+            .query_row(
+                "SELECT enabled FROM rules WHERE id = 'anthropic-clarity'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(enabled, 0);
+    }
+
+    #[test]
+    fn enabled_nl_rules_unions_catalog_and_custom_by_entitlement() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        add_nl_rule(&conn, "No Slack", "VIOLATES if it mentions Slack.", "mid").unwrap();
+        set_rule(&conn, "anthropic-clarity", false).unwrap();
+
+        let free = enabled_nl_rules(&conn, false).unwrap();
+        assert_eq!(free.len(), 24, "24 enabled built-ins, no custom");
+        assert!(free.iter().all(|r| !r.id.starts_with("custom-nl-")));
+        assert!(!free.iter().any(|r| r.id == "anthropic-clarity"));
+        assert!(free.iter().any(|r| r.source == "cursor"));
+
+        let paid = enabled_nl_rules(&conn, true).unwrap();
+        assert_eq!(paid.len(), 25, "24 built-ins + 1 custom");
+        assert!(paid
+            .iter()
+            .any(|r| r.id.starts_with("custom-nl-") && r.source == "custom"));
+    }
+
+    #[test]
+    fn nl_verdicts_persist_as_issues_and_rescore() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES('f', 'p', 'f', 'CLAUDE.md', 'A', 100, 1, NULL)",
+            [],
+        )
+        .unwrap();
+        // one pre-existing deterministic issue (hi): baseline 100-15 = 85
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why) VALUES('f', 'hi', 'anthropic', 'Det', 'w')",
+            [],
+        )
+        .unwrap();
+
+        let verdicts = vec![
+            crate::ai_rules::NlVerdict {
+                rule_id: "anthropic-clarity".into(),
+                title: "Vague directives".into(),
+                severity: "mid".into(),
+                source: "anthropic".into(),
+                violates: true,
+                explanation: "Too vague.".into(),
+            },
+            crate::ai_rules::NlVerdict {
+                rule_id: "cursor-scoped".into(),
+                title: "Bloated, unscoped content".into(),
+                severity: "mid".into(),
+                source: "cursor".into(),
+                violates: false,
+                explanation: "Fine.".into(),
+            },
+        ];
+
+        // hi=1, mid=1 → 100 - 15 - 7 = 78 → C
+        let (score, grade) = apply_nl_verdicts(&conn, "f", &verdicts).unwrap();
+        assert_eq!((score, grade.as_str()), (78, "C"));
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM issues WHERE file_id='f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(
+            n, 2,
+            "1 deterministic + 1 violating NL (pass verdicts add nothing)"
+        );
+
+        // Re-running must replace, not duplicate.
+        let (score2, _) = apply_nl_verdicts(&conn, "f", &verdicts).unwrap();
+        assert_eq!(score2, 78);
+        let n2: i64 = conn
+            .query_row("SELECT COUNT(*) FROM issues WHERE file_id='f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(n2, 2);
+        let (fscore, fcount): (i64, i64) = conn
+            .query_row(
+                "SELECT score, issue_count FROM files WHERE id='f'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((fscore, fcount), (78, 2));
+    }
+
+    #[test]
+    fn list_rules_includes_the_nl_catalog() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        seed_builtin_nl_rules(&conn).unwrap();
+        let rules = list_rules(&conn).unwrap();
+        let clarity = rules
+            .iter()
+            .find(|r| r.id == "anthropic-clarity")
+            .expect("catalog rule listed");
+        assert!(clarity.nl);
+        assert!(!clarity.custom);
+        assert!(clarity
+            .pattern
+            .as_deref()
+            .unwrap_or("")
+            .starts_with("The file VIOLATES"));
     }
 }
