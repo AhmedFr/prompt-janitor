@@ -1,0 +1,10 @@
+# Makes fulfillment/ its own pnpm workspace root, independent of the app at
+# the repo root (same pattern as landing/pnpm-workspace.yaml) — so `pnpm
+# install` here resolves and locks only this package's dependencies.
+#
+# esbuild/workerd/sharp ship native binaries via postinstall that wrangler
+# needs at dev/deploy time.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
