@@ -277,3 +277,62 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .philosophy { text-align: center; }
 .philosophy blockquote { font-family: var(--display); font-weight: 600; letter-spacing: -.02em; font-size: clamp(24px, 3.4vw, 36px); line-height: 1.25; color: var(--ink); max-width: 22ch; margin: 18px auto 0; }
 .philosophy .who { margin: 22px auto 0; color: var(--ink-2); font-size: 17px; max-width: 560px; }
+
+/* ---------- app UI mockups (CSS recreations of the app, not screenshots) ---------- */
+.mk-win { background: #fff; font-size: 12.5px; line-height: 1.45; text-align: left; }
+.mk-titlebar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; background: #ececef; border-bottom: 1px solid var(--line); }
+.mk-dot { width: 11px; height: 11px; border-radius: 50%; }
+.mk-dot.r { background: #ff5f57; } .mk-dot.y { background: #febc2e; } .mk-dot.g { background: #28c840; }
+.mk-title { margin-left: 8px; font-size: 11.5px; color: var(--ink-3); }
+.mk-body { display: grid; grid-template-columns: 150px 1fr; min-height: 346px; }
+.mk-side { background: #f1f1f4; border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+.mk-side-brand { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; padding: 4px 6px 10px; }
+.mk-side-brand svg { width: 14px; height: 14px; color: var(--blue); flex: 0 0 14px; }
+.mk-item { font-size: 12.5px; color: var(--ink-2); padding: 6px 10px; border-radius: 7px; }
+.mk-item.on { background: var(--blue); color: #fff; }
+.mk-content { padding: 18px; }
+.mk-pad { padding: 16px 18px; }
+.mk-ovhead { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; }
+.mk-ring { position: relative; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 84px; background: conic-gradient(var(--grade-b) 78%, #e9e9ee 0); }
+.mk-ring::after { content: ""; position: absolute; width: 62px; height: 62px; border-radius: 50%; background: #fff; }
+.mk-ring span { position: relative; z-index: 1; font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--grade-b); }
+.mk-ring.sm { width: 56px; height: 56px; flex: 0 0 56px; }
+.mk-ring.sm::after { width: 40px; height: 40px; }
+.mk-ring.sm span { font-size: 19px; }
+.mk-score { font-family: var(--display); font-weight: 700; font-size: 24px; }
+.mk-score span { color: var(--ink-3); font-size: 14px; font-weight: 500; }
+.mk-bar { height: 8px; border-radius: 99px; background: #e6e6ea; overflow: hidden; margin: 8px 0 10px; max-width: 260px; }
+.mk-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #36a3ff, #0a84ff); }
+.mk-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.mk-pill { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-pill); }
+.mk-pill.hi { background: rgba(255, 59, 48, 0.12); color: #d8281e; }
+.mk-pill.mid { background: rgba(245, 158, 11, 0.16); color: #b9740a; }
+.mk-pill.lo { background: rgba(52, 199, 89, 0.14); color: #1f9b46; }
+.mk-list { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mk-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #fff; font-size: 12.5px; }
+.mk-row + .mk-row { border-top: 1px solid var(--line); }
+.mk-grow { flex: 1; font-weight: 500; }
+.mk-file { font-family: var(--mono); font-size: 12px; }
+.mk-num { font-family: var(--display); font-weight: 600; color: var(--ink-2); }
+.mk-code { font-family: var(--mono); font-size: 11.5px; background: var(--bg-tint); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin-bottom: 12px; color: var(--ink-2); }
+.mk-code > div { display: flex; gap: 10px; padding: 2px 4px; }
+.mk-code .mk-ln { color: var(--ink-3); width: 18px; text-align: right; flex: 0 0 18px; }
+.mk-code .flag { background: rgba(255, 59, 48, 0.1); border-radius: 4px; }
+.mk-issue { border: 1px solid var(--line); border-left: 3px solid var(--red); border-radius: 9px; padding: 10px 12px; }
+.mk-issue-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12.5px; }
+.mk-issue p { margin: 6px 0 8px; font-size: 12px; color: var(--ink-2); }
+.mk-fix { font-size: 12px; background: rgba(47, 180, 87, 0.1); border: 1px solid rgba(47, 180, 87, 0.3); color: #1d7a3e; border-radius: 7px; padding: 6px 9px; }
+.mk-composer { display: flex; gap: 8px; margin-top: 12px; }
+.mk-input { flex: 1; border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 10px; color: var(--ink-3); font-size: 12px; background: #fff; }
+.mk-addbtn { background: var(--blue); color: #fff; font-weight: 600; font-size: 12px; padding: 7px 12px; border-radius: 8px; white-space: nowrap; }
+.mk-pop-stage { display: flex; justify-content: center; padding: 34px 0; background: var(--bg-tint); }
+.mk-pop { width: 250px; background: #fff; border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow-md); padding: 14px 16px; font-size: 12.5px; text-align: left; }
+.mk-pop-brand { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 12.5px; margin-bottom: 12px; }
+.mk-pop-brand svg { width: 14px; height: 14px; color: var(--blue); flex: 0 0 14px; }
+.mk-pop-grade { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.mk-lastscan { font-size: 11.5px; color: var(--ink-3); }
+.mk-scanbtn { display: block; text-align: center; background: var(--blue); color: #fff; font-weight: 600; font-size: 12.5px; padding: 7px 0; border-radius: 8px; margin-top: 12px; }
+@media (max-width: 640px) {
+  .mk-side { display: none; }
+  .mk-body { grid-template-columns: 1fr; }
+}

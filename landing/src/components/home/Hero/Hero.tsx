@@ -1,4 +1,5 @@
 import { WaitlistForm } from "@/components/WaitlistForm";
+import { OverviewMock } from "@/components/mockups/OverviewMock";
 
 export function Hero() {
   return (
@@ -13,7 +14,7 @@ export function Hero() {
         <p className="lead">
           Prompt Janitor scans every <span style={{ fontFamily: "var(--mono)", fontSize: ".92em" }}>AGENTS.md</span> and{" "}
           <span style={{ fontFamily: "var(--mono)", fontSize: ".92em" }}>CLAUDE.md</span> on your Mac, grades them A–F
-          against the industry's own standards, and flags what's rotting — before your agents trip on it.
+          against the industry's own standards, and flags what's rotting before your agents trip on it.
         </p>
         <WaitlistForm source="hero" />
         <div className="trust">
@@ -39,12 +40,12 @@ export function Hero() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="5 12.5 10 17.5 19 7" />
             </svg>{" "}
-            Founder pricing locked: $69
+            Early-bird pricing locked: $19
           </span>
         </div>
         <div className="hero-shot">
           <div className="shot-frame">
-            <img src="/shots/dashboard.png" alt="Prompt Janitor overview with health grades" />
+            <OverviewMock />
           </div>
         </div>
       </div>
