@@ -1,6 +1,7 @@
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/home/Hero";
+import { Outcomes } from "@/components/home/Outcomes";
 import { EvidenceStrip } from "@/components/home/EvidenceStrip";
 import { TagStrip } from "@/components/home/TagStrip";
 import { FeatureRows } from "@/components/home/FeatureRows";
@@ -18,6 +19,7 @@ export default function Home() {
       <Nav />
       <main id="main">
         <Hero />
+        <Outcomes />
         <EvidenceStrip />
         <TagStrip />
         <FeatureRows />

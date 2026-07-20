@@ -91,26 +91,31 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 @media (max-width: 640px) { .nav-links a:not(.btn) { display: none; } }
 
 /* ---------- hero ---------- */
-.hero { position: relative; text-align: center; padding: 76px 0 0; overflow: hidden; }
+.hero { position: relative; padding: 72px 0 56px; overflow: hidden; }
 .hero::before {
-  content: ""; position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
-  width: 1100px; height: 720px; z-index: -1; pointer-events: none;
+  content: ""; position: absolute; top: -140px; left: 50%; transform: translateX(-50%);
+  width: 1200px; height: 700px; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(520px 360px at 30% 20%, rgba(10,132,255,.18), transparent 60%),
-    radial-gradient(560px 420px at 75% 30%, rgba(140,90,220,.14), transparent 60%),
-    radial-gradient(700px 500px at 50% 70%, rgba(47,180,87,.10), transparent 65%);
+    radial-gradient(560px 380px at 24% 22%, rgba(10,132,255,.16), transparent 60%),
+    radial-gradient(720px 520px at 78% 40%, rgba(10,132,255,.07), transparent 65%);
   filter: blur(8px);
 }
-.hero h1 { font-size: clamp(46px, 7vw, 88px); font-weight: 700; letter-spacing: -.03em; }
-.hero .lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink-2); max-width: 600px; margin: 24px auto 0; }
-.hero .cta { display: flex; justify-content: center; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
-.trust { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-top: 22px; color: var(--ink-2); font-size: 14.5px; }
+.hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
+.hero h1 { font-size: clamp(38px, 4.6vw, 62px); font-weight: 700; letter-spacing: -.03em; text-wrap: balance; margin-top: 16px; }
+.hero .lead { font-size: clamp(17px, 1.9vw, 20px); color: var(--ink-2); max-width: 46ch; margin: 22px 0 0; }
+.hero .wl-form { justify-content: flex-start; margin-top: 28px; }
+.hero .wl-msg { text-align: left; }
+.trust { display: flex; gap: 16px 22px; flex-wrap: wrap; margin-top: 20px; color: var(--ink-2); font-size: 14.5px; }
 .trust span { display: inline-flex; align-items: center; gap: 7px; }
 .trust svg { width: 15px; height: 15px; color: var(--green); }
-
-.hero-shot { margin-top: 56px; position: relative; }
-.shot-frame { border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-screen); background: #e9e9eb; }
-.shot-frame img { width: 100%; }
+.hero-frame {
+  border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow-screen);
+  background: #fff; transform: perspective(1600px) rotateY(-7deg) rotateX(1.5deg); transform-origin: left center;
+}
+@media (max-width: 920px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+  .hero-frame { transform: none; }
+}
 
 /* ---------- feature tag strip ---------- */
 .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 760px; margin: 0 auto; }
@@ -335,4 +340,24 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 @media (max-width: 640px) {
   .mk-side { display: none; }
   .mk-body { grid-template-columns: 1fr; }
+}
+
+/* ---------- outcomes ---------- */
+.oc-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
+.oc-card { grid-column: span 2; background: var(--bg-tint); border-radius: var(--r-md); padding: 26px 24px; }
+.oc-card h3 { font-size: 20px; margin-top: 2px; }
+.oc-card p { color: var(--ink-2); font-size: 15px; margin: 8px 0 0; }
+.oc-lead { grid-column: span 4; background: linear-gradient(135deg, rgba(10, 132, 255, 0.1), rgba(10, 132, 255, 0.03)); }
+.oc-lead h3 { font-size: 24px; }
+.oc-lead p { max-width: 60ch; font-size: 15.5px; }
+.oc-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; }
+.oc-stat { font-family: var(--display); font-weight: 700; font-size: clamp(36px, 4vw, 52px); letter-spacing: -0.03em; color: var(--blue-press); font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+.oc-flag { display: inline-block; margin-top: 12px; font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--blue-tint); color: var(--blue-press); }
+.oc-note { text-align: center; margin-top: 24px; font-size: 13.5px; color: var(--ink-3); }
+.oc-note a { color: var(--blue-press); text-decoration: underline; }
+@media (max-width: 920px) {
+  .oc-card, .oc-lead { grid-column: span 3; }
+}
+@media (max-width: 620px) {
+  .oc-card, .oc-lead { grid-column: span 6; }
 }
