@@ -28,3 +28,7 @@ target/
 *.log
 *.local
 coverage/
+
+# Crawled vendor docs (regenerate with scripts/standards-crawler)
+docs/standards/sources/
+scripts/standards-crawler/.venv/
