@@ -90,6 +90,62 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_files_project ON files(project_id);
     CREATE INDEX idx_issues_file ON issues(file_id);
     ",
+    // 2: rules.kind (deterministic|nl) + issues.rule_id (tags NL-sourced issues).
+    "
+    ALTER TABLE rules ADD COLUMN kind TEXT NOT NULL DEFAULT 'deterministic';
+    ALTER TABLE issues ADD COLUMN rule_id TEXT;
+    ",
+    // 3: files.content_hash — lets a rescan tell whether a file's content
+    // changed since NL verdicts were last recorded, so an unchanged file can
+    // carry its AI-standards issues forward instead of losing them on every
+    // scheduled rescan (#85). NULL for rows written before this migration;
+    // that's treated as "unknown", which conservatively means no carry-forward.
+    //
+    // One-time UX consequence: existing rows get content_hash = NULL, which
+    // reads as "unknown" rather than "matches" — so the very first rescan
+    // after upgrading to this version cannot confirm any file is unchanged
+    // and drops every file's previously-recorded AI-standards issues (they
+    // return once the user re-runs "Check standards" on that file). This is
+    // a one-time reset on upgrade, not a recurring loss; every rescan after
+    // that first one carries verdicts forward normally.
+    "
+    ALTER TABLE files ADD COLUMN content_hash TEXT;
+    ",
+    // 4: grade_history.issue_signature — lets apply_nl_verdicts's dedupe (see
+    // its doc comment) distinguish "genuinely unchanged rescore" from "the
+    // net score happens to match, but a different rule is now violated"
+    // (#94 P2). NULL for rows written before this migration or by the
+    // full-rescan path (scan.rs), which always appends a history row
+    // unconditionally and has no need for the dedupe.
+    "
+    ALTER TABLE grade_history ADD COLUMN issue_signature TEXT;
+    ",
+    // 5: projects.logo — a base64 data: URI of a logo detected in the project
+    // root at scan time (NULL when none found). Lets the UI show a real
+    // project mark instead of a generic folder.
+    "
+    ALTER TABLE projects ADD COLUMN logo TEXT;
+    ",
+    // 6: issues.dimension — the quality dimension (Clarity|Consistency|
+    // Structure|Examples|Format) a rule's finding speaks to, powering the
+    // per-file dimension radar (#88 data-viz epic). NULL for rows written
+    // before this migration; `Dimension::from_db` treats an unknown value as
+    // `Consistency`.
+    "
+    ALTER TABLE issues ADD COLUMN dimension TEXT;
+    ",
+    // 7: fix_events — a durable, append-only log of every applied fix
+    // (one row per edit), tagged with its origin ('auto' | 'manual'). Lets
+    // the Analytics page show a real "issues fixed" count broken down by how
+    // the fix was applied (#88 data-viz epic).
+    "
+    CREATE TABLE fix_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_id TEXT NOT NULL,
+        origin  TEXT NOT NULL,     -- 'auto' | 'manual'
+        applied_at TEXT NOT NULL
+    );
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -142,5 +198,88 @@ mod tests {
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(version_again, MIGRATIONS.len() as i64);
+    }
+
+    #[test]
+    fn migration_2_adds_kind_and_rule_id() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // rules.kind exists and defaults to 'deterministic'
+        conn.execute(
+            "INSERT INTO rules(id, source, severity, title) VALUES('x', 'anthropic', 'hi', 'X')",
+            [],
+        )
+        .unwrap();
+        let kind: String = conn
+            .query_row("SELECT kind FROM rules WHERE id = 'x'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(kind, "deterministic");
+        // issues.rule_id exists and is nullable (issues.file_id has a FK to
+        // files(id), which is enforced by default in this build, so a
+        // parent project + file row is required first)
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('f', 'p', '/p/f.md', 'md')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO issues(file_id, severity, source, title, why) VALUES('f', 'hi', 'custom', 'T', 'W')",
+            [],
+        )
+        .unwrap();
+        let rule_id: Option<String> = conn
+            .query_row("SELECT rule_id FROM issues LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rule_id, None);
+    }
+
+    #[test]
+    fn migration_3_adds_content_hash() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, content_hash) VALUES('f', 'p', '/p/f.md', 'md', 'abc123')",
+            [],
+        )
+        .unwrap();
+        let hash: Option<String> = conn
+            .query_row("SELECT content_hash FROM files WHERE id = 'f'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(hash.as_deref(), Some("abc123"));
+
+        // Rows written before this migration have no hash — treated as
+        // "unknown", never as a match.
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('g', 'p', '/p/g.md', 'md')",
+            [],
+        )
+        .unwrap();
+        let missing: Option<String> = conn
+            .query_row("SELECT content_hash FROM files WHERE id = 'g'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn migration_adds_project_logo_column() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // A column that only exists after migration 5.
+        conn.execute("UPDATE projects SET logo = 'x' WHERE 1=0", [])
+            .expect("logo column should exist");
     }
 }

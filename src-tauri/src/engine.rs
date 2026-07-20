@@ -5,6 +5,8 @@
 //! A–F [`Grade`]. The concrete rules live in their own module (#8); this file is
 //! just the framework + the scoring math.
 
+use std::path::Path;
+
 /// Issue severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
@@ -23,6 +25,7 @@ pub enum Severity {
 pub enum Source {
     Anthropic,
     Openai,
+    Cursor,
     Karpathy,
     Custom,
 }
@@ -35,6 +38,50 @@ pub enum Grade {
     C,
     D,
     F,
+}
+
+/// The quality dimension a rule's finding speaks to — drives the per-file
+/// radar chart (#88 data-viz epic).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
+pub enum Dimension {
+    Clarity,
+    Consistency,
+    Structure,
+    Examples,
+    Format,
+}
+
+impl Dimension {
+    /// String form used for persistence and the frontend.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Clarity => "Clarity",
+            Self::Consistency => "Consistency",
+            Self::Structure => "Structure",
+            Self::Examples => "Examples",
+            Self::Format => "Format",
+        }
+    }
+
+    /// Parse a persisted dimension string. Unknown/legacy rows (written
+    /// before this column existed) default to `Consistency`.
+    pub fn from_db(s: &str) -> Dimension {
+        match s {
+            "Clarity" => Self::Clarity,
+            "Structure" => Self::Structure,
+            "Examples" => Self::Examples,
+            "Format" => Self::Format,
+            _ => Self::Consistency,
+        }
+    }
+
+    pub const ALL: [Dimension; 5] = [
+        Self::Clarity,
+        Self::Consistency,
+        Self::Structure,
+        Self::Examples,
+        Self::Format,
+    ];
 }
 
 impl Severity {
@@ -54,6 +101,7 @@ impl Source {
         match self {
             Source::Anthropic => "anthropic",
             Source::Openai => "openai",
+            Source::Cursor => "cursor",
             Source::Karpathy => "karpathy",
             Source::Custom => "custom",
         }
@@ -91,6 +139,7 @@ pub struct Issue {
     /// 1-based line number, if the issue is tied to a specific line.
     pub line: Option<u32>,
     pub fix: Option<Fix>,
+    pub dimension: Dimension,
 }
 
 /// Result of evaluating a file against the active rules.
@@ -109,6 +158,49 @@ pub struct Finding {
     pub fix: Option<Fix>,
 }
 
+/// Everything a rule may need beyond raw text: where the file lives and what
+/// project (if any) it belongs to. Repo-grounded rules use this to check
+/// facts (does this path exist? does this script exist in package.json?).
+///
+/// Filesystem probing driven by this context must stay cheap — `stat`/
+/// `exists` calls and small bounded reads, never scanning the whole repo —
+/// and must degrade gracefully: when a field is `None` (repo root couldn't
+/// be determined, mtime is unavailable, …), any rule that needs it simply
+/// doesn't fire rather than guessing.
+pub struct RuleContext<'a> {
+    pub content: &'a str,
+    /// Absolute path of the file being evaluated, if known.
+    pub file_path: Option<&'a Path>,
+    /// The git worktree root that owns `file_path`, if one could be
+    /// determined. Used by rules that reason about repo-wide activity
+    /// (e.g. `stale-vs-churn`'s git-activity signal).
+    pub repo_root: Option<&'a Path>,
+    /// The *nearest* project root that owns `file_path` — the nearest
+    /// ancestor with a manifest (`package.json`, `Cargo.toml`, …), bounded
+    /// by the git worktree root. Used by rules that resolve manifest-
+    /// relative facts (scripts, lockfiles, sibling paths) so a monorepo
+    /// package resolves against its own manifest rather than the repo
+    /// root's.
+    pub resolution_root: Option<&'a Path>,
+    /// The file's last-modified time, seconds since the Unix epoch.
+    pub modified_unix: Option<i64>,
+}
+
+impl<'a> RuleContext<'a> {
+    /// A context carrying only file content — used by content-only rules
+    /// and by callers (tests, the old `evaluate` API) that have no repo
+    /// context available.
+    pub fn content_only(content: &'a str) -> Self {
+        Self {
+            content,
+            file_path: None,
+            repo_root: None,
+            resolution_root: None,
+            modified_unix: None,
+        }
+    }
+}
+
 /// A check that inspects prompt text and reports findings.
 pub trait Rule: Send + Sync {
     fn id(&self) -> &'static str;
@@ -116,8 +208,22 @@ pub trait Rule: Send + Sync {
     fn source(&self) -> Source;
     fn severity(&self) -> Severity;
     fn why(&self) -> &'static str;
-    /// Inspect `content` and return any findings.
-    fn check(&self, content: &str) -> Vec<Finding>;
+    /// The quality dimension this rule's findings speak to.
+    fn dimension(&self) -> Dimension;
+
+    /// Inspect `content` and return any findings. Content-only rules
+    /// implement this. Defaults to a no-op so repo-grounded rules (which
+    /// implement [`Rule::check_ctx`] instead) don't need a dummy override.
+    fn check(&self, _content: &str) -> Vec<Finding> {
+        Vec::new()
+    }
+
+    /// Inspect with the full evaluation context (file path, repo root,
+    /// mtime). Defaults to `check(ctx.content)`, so existing content-only
+    /// rules keep working unchanged.
+    fn check_ctx(&self, ctx: &RuleContext<'_>) -> Vec<Finding> {
+        self.check(ctx.content)
+    }
 }
 
 // Penalty weights, calibrated so the design's focal file (api-worker/CLAUDE.md:
@@ -129,6 +235,13 @@ const PENALTY_LO: u32 = 3;
 const CAP_MID: u32 = 30;
 const CAP_LO: u32 = 15;
 
+/// Roll severity counts up into a 0–100 score (same math as `score_for_issues`).
+pub fn score_for_counts(hi: u32, mid: u32, lo: u32) -> u32 {
+    let mid_pen = (mid * PENALTY_MID).min(CAP_MID);
+    let lo_pen = (lo * PENALTY_LO).min(CAP_LO);
+    100u32.saturating_sub(hi * PENALTY_HI + mid_pen + lo_pen)
+}
+
 /// Roll a set of issues up into a 0–100 score.
 pub fn score_for_issues(issues: &[Issue]) -> u32 {
     let mut hi = 0;
@@ -136,13 +249,12 @@ pub fn score_for_issues(issues: &[Issue]) -> u32 {
     let mut lo = 0;
     for issue in issues {
         match issue.severity {
-            Severity::Hi => hi += PENALTY_HI,
-            Severity::Mid => mid += PENALTY_MID,
-            Severity::Lo => lo += PENALTY_LO,
+            Severity::Hi => hi += 1,
+            Severity::Mid => mid += 1,
+            Severity::Lo => lo += 1,
         }
     }
-    let penalty = hi + mid.min(CAP_MID) + lo.min(CAP_LO);
-    100u32.saturating_sub(penalty)
+    score_for_counts(hi, mid, lo)
 }
 
 /// Map a 0–100 score to a letter grade. Bands are tunable (spec §5).
@@ -157,10 +269,20 @@ pub fn grade_for_score(score: u32) -> Grade {
 }
 
 /// Run every rule over `content` and produce a full evaluation.
+///
+/// Content-only convenience wrapper around [`evaluate_ctx`] — kept so existing
+/// call sites and tests that only have raw text don't need a repo context.
 pub fn evaluate(content: &str, rules: &[Box<dyn Rule>]) -> Evaluation {
+    evaluate_ctx(&RuleContext::content_only(content), rules)
+}
+
+/// Run every rule over `ctx` and produce a full evaluation. Repo-grounded
+/// rules use `ctx`'s file path / repo root / mtime; content-only rules just
+/// read `ctx.content`.
+pub fn evaluate_ctx(ctx: &RuleContext<'_>, rules: &[Box<dyn Rule>]) -> Evaluation {
     let mut issues = Vec::new();
     for rule in rules {
-        for finding in rule.check(content) {
+        for finding in rule.check_ctx(ctx) {
             issues.push(Issue {
                 rule_id: rule.id().to_string(),
                 severity: rule.severity(),
@@ -169,6 +291,7 @@ pub fn evaluate(content: &str, rules: &[Box<dyn Rule>]) -> Evaluation {
                 why: finding.why,
                 line: finding.line,
                 fix: finding.fix,
+                dimension: rule.dimension(),
             });
         }
     }
@@ -193,6 +316,7 @@ mod tests {
             why: "w".into(),
             line: None,
             fix: None,
+            dimension: Dimension::Clarity,
         }
     }
 
@@ -253,6 +377,9 @@ mod tests {
         fn why(&self) -> &'static str {
             "because"
         }
+        fn dimension(&self) -> Dimension {
+            Dimension::Clarity
+        }
         fn check(&self, _content: &str) -> Vec<Finding> {
             vec![Finding {
                 line: Some(1),
@@ -260,6 +387,23 @@ mod tests {
                 fix: None,
             }]
         }
+    }
+
+    #[test]
+    fn cursor_source_roundtrips() {
+        assert_eq!(Source::Cursor.as_str(), "cursor");
+    }
+
+    #[test]
+    fn every_dimension_has_a_str_roundtrip() {
+        for d in Dimension::ALL {
+            assert_eq!(Dimension::from_db(d.as_str()), d);
+        }
+    }
+
+    #[test]
+    fn dimension_all_has_five_entries() {
+        assert_eq!(Dimension::ALL.len(), 5);
     }
 
     #[test]

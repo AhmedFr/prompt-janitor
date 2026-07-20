@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { openExternal } from "@/lib/open-external";
+import { POLAR_CHECKOUT_URL, GET_LICENSE_LABEL } from "@/lib/monetization";
 import type { LicenseTabProps } from "./LicenseTab.types";
 
 const fieldStyle = { display: "block", marginTop: 12 } as const;
@@ -64,6 +66,15 @@ export function LicenseTab({ entitlement, onActivate, onRemove }: LicenseTabProp
           </div>
         ) : (
           <>
+            <div style={{ marginTop: 16 }}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
+              >
+                <Icon name="sparkles" /> {GET_LICENSE_LABEL}
+              </Button>
+            </div>
             <label style={fieldStyle}>
               <span style={labelStyle}>License key</span>
               <input

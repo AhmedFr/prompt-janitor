@@ -1,0 +1,123 @@
+{
+  "version": "0.1.0",
+  "updated": "2026-06-11",
+  "readiness": {
+    "percent": 82,
+    "label": "Code complete — blocked on human actions to ship v1"
+  },
+  "phases": [
+    { "name": "Phase 0", "title": "Scaffold", "done": 5, "total": 5, "state": "done", "note": "Tauri + React shell, tokens, component library, SQLite + typed IPC, CI" },
+    { "name": "Phase 1", "title": "Vertical slice", "done": 7, "total": 7, "state": "done", "note": "Scanner, rules engine, scoring, persisted scans, Overview / Prompts / Detail screens" },
+    { "name": "Phase 2", "title": "Scheduler, history & menu-bar", "done": 6, "total": 6, "state": "done", "note": "Background scheduler, watch mode, sparklines, tray, notifications, onboarding" },
+    { "name": "Phase 3", "title": "Rules & standards", "done": 5, "total": 5, "state": "done", "note": "Rule packs, Rules screen, pattern rules, Settings, pack import" },
+    { "name": "Phase 4", "title": "AI fix engine (paid)", "done": 5, "total": 5, "state": "done", "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate" },
+    { "name": "Phase 5", "title": "Ship & polish", "done": 2, "total": 5, "state": "active", "note": "A11y + landing shipped. Open: release pipeline (#29 — PR up), license vendor tool (#67 — PR up), this dashboard (#68 — PR up)" }
+  ],
+  "actions": {
+    "blocking": [
+      {
+        "title": "Review & merge the three open PRs",
+        "detail": "PR #69 license vendor CLI (issue #67), PR #70 release workflow + version bump script (issue #29), PR #71 this dashboard (issue #68). All tests green; each PR body lists what was verified.",
+        "kind": "review"
+      },
+      {
+        "title": "Mint the production license keypair",
+        "detail": "After merging PR #69: cd src-tauri && cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The current embedded key's private seed was discarded after minting your own dev pro key, so no customer keys can be minted today — and re-keygening invalidates that dev key (mint yourself a fresh one). Only you should ever hold this key.",
+        "kind": "external"
+      },
+      {
+        "title": "Decide: public repo or external hosting for downloads",
+        "detail": "The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.",
+        "kind": "vision"
+      },
+      {
+        "title": "Manual QA on your Mac (I run headless — cannot do this)",
+        "detail": "Full pass: onboarding → pick a real folder → scan → Overview/Prompts/Detail → Settings each tab → AI fix with your real API key → apply fix → undo → git-branch commit option → tray menu → notifications → activate a license minted with the new keypair.",
+        "kind": "testing"
+      },
+      {
+        "title": "Tag and publish the first release",
+        "detail": "After the above: pnpm bump <version> if desired, git tag v0.1.0 && git push origin v0.1.0, wait for the Release workflow, check the draft release's DMG installs and launches, then publish the draft and verify the landing page download link resolves.",
+        "kind": "external"
+      }
+    ],
+    "marketing": [
+      {
+        "title": "Apple Developer Program — signing & notarization",
+        "detail": "Without it the DMG triggers Gatekeeper warnings (right-click → Open still works; acceptable for early adopters, fatal for broad marketing). Enroll ($99/yr), create a Developer ID Application cert, then add repo secrets: APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID. The release workflow picks them up automatically — no code change needed.",
+        "kind": "external"
+      },
+      {
+        "title": "Set the Pro price & pick a payment provider",
+        "detail": "Landing shows 'One-time license' with no number. Pick a price, set up Gumroad / Lemon Squeezy / Polar, and decide license delivery: manually mint per sale with license-tool (fine at first), or automate via webhook later. Then update the landing pricing section.",
+        "kind": "vision"
+      },
+      {
+        "title": "Real screenshots / demo GIF for the landing page",
+        "detail": "The landing uses abstract visuals. Capture the real app (Overview with a scanned repo, Detail with an AI fix) — needs your GUI session and a presentable real-world folder.",
+        "kind": "external"
+      },
+      {
+        "title": "Pick launch channels & write the announce post",
+        "detail": "Product Hunt, Hacker News (Show HN), X, r/ClaudeAI / r/cursor. Your voice, your call on positioning: 'linter for your prompt files' vs 'janitor for AI config sprawl'.",
+        "kind": "vision"
+      }
+    ],
+    "decisions": [
+      {
+        "title": "Version number for launch",
+        "detail": "Ship as v0.1.0 (honest early-access) or v1.0.0 (marketing-friendly)? The bump script handles either.",
+        "kind": "vision"
+      },
+      {
+        "title": "Auto-update: in v1 or after?",
+        "detail": "Tauri's updater needs its own signing keypair and an update manifest endpoint. Recommendation: ship v1 without it, add in v1.1 — early users will re-download.",
+        "kind": "vision"
+      },
+      {
+        "title": "Windows / Linux support",
+        "detail": "Everything is Tauri so it's mostly build-matrix work, but tray/notification/QA effort is real. Post-v1 unless the market pulls for it.",
+        "kind": "vision"
+      }
+    ]
+  },
+  "features": [
+    { "name": "Folder scanner (.gitignore-aware, 8 prompt-file kinds)", "tier": "free", "status": "shipped" },
+    { "name": "Rules engine + A–F scoring", "tier": "free", "status": "shipped" },
+    { "name": "Built-in rule packs (Anthropic, OpenAI, community) + toggles", "tier": "free", "status": "shipped" },
+    { "name": "Pattern-based custom rules", "tier": "free", "status": "shipped" },
+    { "name": "Background scheduler + on-save watch mode", "tier": "free", "status": "shipped" },
+    { "name": "Menu-bar tray + native notifications (digest & regression)", "tier": "free", "status": "shipped" },
+    { "name": "Grade history, sparklines & scan digest", "tier": "free", "status": "shipped" },
+    { "name": "Onboarding wizard & full Settings (7 tabs)", "tier": "free", "status": "shipped" },
+    { "name": "AI provider config — BYO key (Anthropic / OpenAI)", "tier": "pro", "status": "shipped" },
+    { "name": "AI rewrite suggestions", "tier": "pro", "status": "shipped" },
+    { "name": "Apply fix with backup, undo & optional git branch", "tier": "pro", "status": "shipped" },
+    { "name": "Natural-language custom rules (AI-evaluated)", "tier": "pro", "status": "shipped" },
+    { "name": "Offline Ed25519 license gate", "tier": "pro", "status": "shipped" },
+    { "name": "License vendor CLI (keygen / mint / verify)", "tier": "infra", "status": "pr", "note": "PR for #67 awaiting review" },
+    { "name": "Release pipeline (universal macOS DMG on tag)", "tier": "infra", "status": "pr", "note": "PR for #29 awaiting review" },
+    { "name": "Landing page + Pages deploy", "tier": "infra", "status": "shipped" },
+    { "name": "A11y pass (keyboard, reduced-motion, axe test)", "tier": "infra", "status": "shipped" },
+    { "name": "Signed & notarized DMG", "tier": "infra", "status": "blocked", "note": "Needs your Apple Developer secrets" }
+  ],
+  "health": [
+    { "name": "TypeScript", "result": "clean" },
+    { "name": "ESLint", "result": "clean" },
+    { "name": "Vitest", "result": "5/5 passing" },
+    { "name": "cargo test", "result": "59/59 passing" },
+    { "name": "clippy -D warnings", "result": "clean" },
+    { "name": "cargo fmt", "result": "clean" }
+  ],
+  "backlog": [
+    { "ref": "#50", "title": "Rich floating menu-bar popover panel", "note": "UX upgrade over the current tray menu" },
+    { "ref": "#45", "title": "Group prompts by project with auto-detected logos", "note": "Design-heavy; post-v1" },
+    { "ref": "—", "title": "Auto-update via Tauri updater", "note": "Needs updater keypair — see Decisions" }
+  ],
+  "recent": [
+    "2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)",
+    "2026-06-11 — Found & fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)",
+    "2026-06-11 — Found & fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)",
+    "2026-06-11 — This dashboard created (PR #71)"
+  ]
+}

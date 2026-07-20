@@ -5,7 +5,7 @@ import type { IconName } from "./Icon.types";
 const ALL: IconName[] = [
   "logo", "dashboard", "prompts", "scans", "rules", "settings", "search", "plus",
   "refresh", "chevronRight", "chevronDown", "sparkles", "folder", "bell", "clock",
-  "check", "x", "arrowUp", "arrowDown", "wand",
+  "check", "x", "arrowUp", "arrowDown", "wand", "lock",
 ];
 
 const meta = {

@@ -2,9 +2,13 @@ import type { NavItem } from "./Sidebar.types";
 
 /** Primary sidebar destinations. `detail` is intentionally excluded — it opens from Prompts. */
 export const NAV_ITEMS: NavItem[] = [
-  { route: "overview", label: "Overview" },
-  { route: "prompts", label: "Prompts" },
-  { route: "scans", label: "Scans" },
-  { route: "rules", label: "Rules" },
-  { route: "settings", label: "Settings" },
+  { route: "overview", label: "Overview", icon: "dashboard" },
+  { route: "prompts", label: "Prompts", icon: "prompts" },
+  { route: "scans", label: "Scans", icon: "scans" },
+  { route: "analytics", label: "Analytics", icon: "barChart" },
+  { route: "rules", label: "Rules", icon: "rules" },
+  { route: "settings", label: "Settings", icon: "settings" },
 ];
+
+/** How many projects the "recent" list shows before it stops (newest first). */
+export const RECENT_PROJECTS_LIMIT = 6;

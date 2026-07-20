@@ -10,12 +10,15 @@ storybook-static/
 src-tauri/target/
 src-tauri/gen/
 target/
+.wrangler/
 
 # Env / secrets
 .env
 .env.*
 !.env.example
 *.secret
+.dev.vars
+.dev.vars.*
 
 # macOS
 .DS_Store
@@ -29,3 +32,10 @@ target/
 *.log
 *.local
 coverage/
+
+# Crawled vendor docs (regenerate with scripts/standards-crawler)
+docs/standards/sources/
+scripts/standards-crawler/.venv/
+
+# Playwright MCP browser snapshots (local dev cruft)
+.playwright-mcp/

@@ -116,6 +116,20 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="7" cy="17" r="0.5" />
     </>
   ),
+  lock: (
+    <>
+      <rect x="5.5" y="11" width="13" height="9" rx="2" />
+      <path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
+      <circle cx="12" cy="15.5" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
+  barChart: (
+    <>
+      <line x1="6" y1="19" x2="6" y2="10" />
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <line x1="18" y1="19" x2="18" y2="13" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, ...rest }: IconProps) {

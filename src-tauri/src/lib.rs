@@ -12,12 +12,15 @@ pub mod engine;
 mod ipc;
 pub mod license;
 mod notify;
+mod project_logo;
 mod query;
+mod repo_root;
 pub mod rules;
 mod scan;
 pub mod scanner;
 mod scheduler;
 mod store;
+pub mod templates;
 mod tray;
 mod vcs;
 
@@ -39,6 +42,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");
@@ -46,6 +50,7 @@ pub fn run() {
             let db_path = dir.join("prompt-janitor.db");
             let conn = store::open_and_migrate(&db_path).expect("initialize database");
             query::seed_rules(&conn).ok();
+            query::seed_builtin_nl_rules(&conn).ok();
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),
