@@ -37,7 +37,7 @@ export function EvidenceStrip() {
           </div>
         </div>
         <p className="ev-caveat">
-          Early numbers from our first controlled runs (N=5) — not yet statistically significant, and we say so. The
+          Early numbers from our first controlled runs (N=5), not yet statistically significant, and we say so. The
           full powered benchmark runs next, and we're publishing everything, methodology included.
         </p>
         <a className="ev-link" href="/blog/what-a-bad-prompt-actually-costs">

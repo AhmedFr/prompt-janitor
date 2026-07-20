@@ -7,14 +7,14 @@ export function Pricing() {
         <div className="section-head">
           <h2>Diagnosis free. Treatment paid.</h2>
           <p>
-            We grade your prompt files against the industry's own standards — free, unlimited, on your machine, with your compute.
-            Grading against YOUR standards, and fixing anything — that's Pro.
+            We grade your prompt files against the industry's own standards: free, unlimited, on your machine, with your compute.
+            Grading against YOUR standards, and fixing anything: that's Pro.
           </p>
         </div>
         <div className="price-grid">
           <div className="price-card">
             <div className="price-top">
-              <div className="plan-name">Free — Diagnosis</div>
+              <div className="plan-name">Free · Diagnosis</div>
               <div className="price-amount">
                 <span className="now">$0</span>
               </div>
@@ -28,7 +28,7 @@ export function Pricing() {
                       <polyline points="5 12.5 10 17.5 19 7" />
                     </svg>
                   </span>{" "}
-                  <span>Unlimited scanning — scheduling, watch mode, notifications, history &amp; trends. No scan caps, ever</span>
+                  <span>Unlimited scanning: scheduling, watch mode, notifications, history &amp; trends. No scan caps, ever</span>
                 </li>
                 <li>
                   <span className="ck" aria-hidden="true">
@@ -36,7 +36,7 @@ export function Pricing() {
                       <polyline points="5 12.5 10 17.5 19 7" />
                     </svg>
                   </span>{" "}
-                  <span>All deterministic fact rules, with source-cited findings — never hidden or blurred</span>
+                  <span>All deterministic fact rules, with source-cited findings, never hidden or blurred</span>
                 </li>
                 <li>
                   <span className="ck" aria-hidden="true">
@@ -45,7 +45,7 @@ export function Pricing() {
                     </svg>
                   </span>{" "}
                   <span>
-                    Built-in <b>25-standard AI catalog</b> evaluation — free when you bring compute (local Ollama or your own API key)
+                    Built-in <b>25-standard AI catalog</b> evaluation, free when you bring compute (local Ollama or your own API key)
                   </span>
                 </li>
                 <li>
@@ -58,13 +58,13 @@ export function Pricing() {
                 </li>
               </ul>
               <WaitlistForm source="pricing-free" compact buttonLabel="Join the waitlist" />
-              <p className="price-note">Launching soon — the waitlist gets the download first. No payment, no account.</p>
+              <p className="price-note">Launching soon: the waitlist gets the download first. No payment, no account.</p>
             </div>
           </div>
 
           <div className="price-card pro">
             <div className="price-top">
-              <div className="plan-name">Pro — Treatment</div>
+              <div className="plan-name">Pro · Treatment</div>
               <div className="price-amount">
                 <span className="now">$19</span>
                 <span className="was">$30</span>
@@ -81,7 +81,7 @@ export function Pricing() {
                     </svg>
                   </span>{" "}
                   <span>
-                    AI rewrites + <b>Apply fix / Auto-fix</b> — backup, undo, optional git branch
+                    AI rewrites + <b>Apply fix / Auto-fix</b>: backup, undo, optional git branch
                   </span>
                 </li>
                 <li>
@@ -90,7 +90,7 @@ export function Pricing() {
                       <polyline points="5 12.5 10 17.5 19 7" />
                     </svg>
                   </span>{" "}
-                  <span>Custom rules in plain English — your standards, enforced on every scan</span>
+                  <span>Custom rules in plain English: your standards, enforced on every scan</span>
                 </li>
                 <li>
                   <span className="ck" aria-hidden="true">
@@ -99,7 +99,7 @@ export function Pricing() {
                     </svg>
                   </span>{" "}
                   <span>
-                    Starter template packs — A-grade <span style={{ fontFamily: "var(--mono)", fontSize: ".9em" }}>CLAUDE.md</span>,{" "}
+                    Starter template packs: A-grade <span style={{ fontFamily: "var(--mono)", fontSize: ".9em" }}>CLAUDE.md</span>,{" "}
                     <span style={{ fontFamily: "var(--mono)", fontSize: ".9em" }}>AGENTS.md</span> &amp;{" "}
                     <span style={{ fontFamily: "var(--mono)", fontSize: ".9em" }}>.cursorrules</span> per stack
                   </span>
@@ -111,7 +111,7 @@ export function Pricing() {
                     </svg>
                   </span>{" "}
                   <span>
-                    Bonus: <b>Prompt-File Field Guide (PDF)</b> — the 25 standards, explained
+                    Bonus: <b>Prompt-File Field Guide (PDF)</b>: the 25 standards, explained
                   </span>
                 </li>
                 <li>

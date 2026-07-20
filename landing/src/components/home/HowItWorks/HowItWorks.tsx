@@ -11,8 +11,8 @@ export function HowItWorks() {
             <span className="n" aria-hidden="true">1</span>
             <h4>Scan</h4>
             <p>
-              Point it at your projects. It finds every prompt file — <code>CLAUDE.md</code>, <code>AGENTS.md</code>,{" "}
-              <code>.cursorrules</code> — and rescans on a schedule.
+              Point it at your projects. It finds every prompt file (<code>CLAUDE.md</code>, <code>AGENTS.md</code>,{" "}
+              <code>.cursorrules</code>) and rescans on a schedule.
             </p>
           </div>
           <div className="how-step">
@@ -27,7 +27,7 @@ export function HowItWorks() {
             <span className="n" aria-hidden="true">3</span>
             <h4>Treat</h4>
             <p>
-              Pro rewrites the weak parts with AI — apply with a backup, one-click undo, and an optional git branch so
+              Pro rewrites the weak parts with AI: apply with a backup, one-click undo, and an optional git branch so
               changes stay reviewable.
             </p>
           </div>

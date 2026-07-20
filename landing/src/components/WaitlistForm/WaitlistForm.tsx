@@ -21,7 +21,7 @@ export function WaitlistForm({ source, buttonLabel = "Join the waitlist", compac
 
     if (!EMAIL_RE.test(email)) {
       setStatus("err");
-      setMessage("That email doesn't look right — mind checking it?");
+      setMessage("That email doesn't look right. Mind checking it?");
       return;
     }
 
@@ -36,11 +36,11 @@ export function WaitlistForm({ source, buttonLabel = "Join the waitlist", compac
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       sendGAEvent("event", "waitlist_submit", { source });
       setStatus("ok");
-      setMessage("You're on the list — confirmation email on its way ✅");
+      setMessage("You're on the list, confirmation email on its way ✅");
       form.reset();
     } catch {
       setStatus("err");
-      setMessage(`Something went wrong — email us instead: ${CONTACT_EMAIL}`);
+      setMessage(`Something went wrong. Email us instead: ${CONTACT_EMAIL}`);
     }
   }
 

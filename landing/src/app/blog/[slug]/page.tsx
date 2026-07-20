@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
   return {
-    title: `${post.title} — Prompt Janitor`,
+    title: `${post.title} · Prompt Janitor`,
     description: post.description,
     openGraph: { type: "article" },
   };

@@ -5,7 +5,7 @@ export function MiniCards() {
         <div className="cards2">
           <div className="card">
             <h4>Custom rules, plain English</h4>
-            <p>House rules live right alongside the built-ins — type the intent, pick a severity, done.</p>
+            <p>House rules live right alongside the built-ins: type the intent, pick a severity, done.</p>
             <div className="minirow">
               <span className="sev hi"></span>
               <span className="grow">No hard-coded model names</span>

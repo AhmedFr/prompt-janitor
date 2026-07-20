@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { getAllPosts } from "@/lib/blog";
 
 export const metadata: Metadata = {
-  title: "Blog — Prompt Janitor",
+  title: "Blog · Prompt Janitor",
   description: "Field notes on prompt files, agent context, and measuring what actually works.",
 };
 

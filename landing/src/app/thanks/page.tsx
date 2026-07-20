@@ -4,8 +4,8 @@ import { Footer } from "@/components/Footer";
 import "./thanks.css";
 
 export const metadata: Metadata = {
-  title: "You're in. — Prompt Janitor",
-  description: "Thanks for grabbing Prompt Janitor Pro. Your license key is on its way — here's how to activate it.",
+  title: "You're in · Prompt Janitor",
+  description: "Thanks for grabbing Prompt Janitor Pro. Your license key is on its way. Here's how to activate it.",
   robots: { index: false },
 };
 
@@ -22,7 +22,7 @@ export default function Thanks() {
               </svg>
             </div>
             <h1>You're in.</h1>
-            <p className="lead">Your license key is on its way to your inbox — sent within a minute of purchase.</p>
+            <p className="lead">Your license key is on its way to your inbox, sent within a minute of purchase.</p>
 
             <div className="steps">
               <div className="step">
@@ -38,7 +38,7 @@ export default function Thanks() {
                   2
                 </span>
                 <p>
-                  In the app: <b>Settings → License</b>, paste the key, and hit <b>Activate</b>. Verified offline — no account needed.
+                  In the app: <b>Settings → License</b>, paste the key, and hit <b>Activate</b>. Verified offline, no account needed.
                 </p>
               </div>
               <div className="step">
@@ -52,7 +52,7 @@ export default function Thanks() {
             </div>
 
             <p className="thanks-note">
-              Didn't get it? Check spam, or reach out and we'll sort it — <a href="mailto:support@promptjanitor.app">support@promptjanitor.app</a>.
+              Didn't get it? Check spam, or reach out and we'll sort it: <a href="mailto:support@promptjanitor.app">support@promptjanitor.app</a>.
             </p>
             <p className="thanks-note">
               And remember: <b>30-day letter-grade guarantee.</b> If your prompt-file health doesn't go up a full letter grade within 30

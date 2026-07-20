@@ -6,9 +6,9 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Prompt Janitor — Grade every prompt on your Mac",
+  title: "Prompt Janitor · Grade every prompt on your Mac",
   description:
-    "Prompt Janitor scans every AGENTS.md and CLAUDE.md on your Mac and grades them A–F against the industry's own standards — free, forever, on your machine. Fixing them is Pro: a one-time purchase, no subscription.",
+    "Prompt Janitor scans every AGENTS.md and CLAUDE.md on your Mac and grades them A–F against the industry's own standards. Free, forever, on your machine. Fixing them is Pro: a one-time purchase, no subscription.",
   icons: { icon: "/favicon.svg" },
   alternates: {
     canonical: "./",
