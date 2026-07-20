@@ -66,10 +66,10 @@ export function Pricing() {
             <div className="price-top">
               <div className="plan-name">Pro — Treatment</div>
               <div className="price-amount">
-                <span className="now">$69</span>
-                <span className="was">$99</span>
+                <span className="now">$19</span>
+                <span className="was">$30</span>
               </div>
-              <div className="badge-offer">Founder pricing · one-time</div>
+              <div className="badge-offer">Early-bird pricing · one-time</div>
             </div>
             <div className="price-body">
               <p className="plist-intro">Everything in Free, plus:</p>
@@ -123,9 +123,11 @@ export function Pricing() {
                   <span>12 months of feature updates</span>
                 </li>
               </ul>
-              <WaitlistForm source="pricing-pro" compact buttonLabel="Join — lock in $69" />
+              <WaitlistForm source="pricing-pro" compact buttonLabel="Join and lock in $19" />
               <p className="price-note">
-                Founder pricing is locked for waitlist members at launch.
+                $19 is the launch sale price; it goes to $30 afterwards. Waitlist members lock in the sale price.
+                <br />
+                This pricing isn't definitive and may still change before launch.
                 <br />
                 One-time purchase: perpetual license + 12 months of updates · $29/yr optional renewal, never required.
               </p>

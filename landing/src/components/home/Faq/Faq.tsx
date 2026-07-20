@@ -10,7 +10,7 @@ interface FaqItem {
 const ITEMS: FaqItem[] = [
   {
     q: "When does it launch?",
-    a: "Soon — Prompt Janitor is in pre-launch. Join the waitlist and you'll get the download link the moment it ships, with founder pricing ($69 instead of $99) locked in.",
+    a: "Soon. Prompt Janitor is in pre-launch: join the waitlist and you'll get the download link the moment it ships, with the launch sale price ($19 instead of $30) locked in. Pricing isn't definitive yet and may change before launch.",
   },
   {
     q: "What happens when I join the waitlist?",

@@ -8,7 +8,7 @@ describe("buildEmails", () => {
     expect(confirm.to).toEqual(["dev@example.com"]);
     expect(confirm.from).toBe(FROM_EMAIL);
     expect(confirm.subject).toContain("waitlist");
-    expect(confirm.text).toContain("$69");
+    expect(confirm.text).toContain("$19");
     expect(confirm.text).toContain("https://promptjanitor.app");
 
     expect(notify.to).toEqual([OWNER_EMAIL]);

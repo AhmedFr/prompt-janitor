@@ -47,8 +47,8 @@ export default async function BlogPostPage({ params }: Props) {
             <div className="post-cta">
               <h3 style={{ fontSize: 26 }}>Prompt Janitor is launching soon</h3>
               <p className="muted" style={{ margin: "12px 0 0" }}>
-                Scan, grade, and fix every prompt file on your Mac. Waitlist members lock in founder pricing — $69
-                instead of $99.
+                Scan, grade, and fix every prompt file on your Mac. Waitlist members lock in the launch sale price: $19
+                instead of $30.
               </p>
               <WaitlistForm source={`blog-${post.slug}`} />
             </div>

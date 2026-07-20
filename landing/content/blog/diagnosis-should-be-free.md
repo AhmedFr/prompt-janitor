@@ -31,7 +31,7 @@ This isn't generosity; it's a position:
 
 ## What you pay for: treatment
 
-Diagnosis tells you the file is a D. Treatment is the work of making it an A — and that's Pro: AI rewrites of the weak parts, one-click apply with backup and undo, your own standards enforced in plain English, starter templates per stack. A one-time $69 purchase (founder pricing), perpetual license, no subscription. If your prompt health doesn't rise a full letter grade in 30 days, full refund.
+Diagnosis tells you the file is a D. Treatment is the work of making it an A, and that's Pro: AI rewrites of the weak parts, one-click apply with backup and undo, your own standards enforced in plain English, starter templates per stack. A one-time $19 purchase at launch ($30 afterwards; pricing isn't final yet), perpetual license, no subscription. If your prompt health doesn't rise a full letter grade in 30 days, full refund.
 
 Free tells you the truth. Pro fixes it. We think that's the only honest way to build this category.
 

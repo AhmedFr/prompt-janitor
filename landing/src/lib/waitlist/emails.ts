@@ -18,7 +18,7 @@ export function buildEmails(email: string, source: string): EmailPayload[] {
       "Thanks for joining the Prompt Janitor waitlist. Here's what happens next:",
       "",
       "1. You'll get exactly one email when the app ships — the download link, nothing else.",
-      "2. Founder pricing is locked in for you: Pro for $69 instead of $99. One-time, no subscription.",
+      "2. The launch sale price is locked in for you: Pro for $19 instead of $30. One-time, no subscription. (Pricing isn't final yet and may change before launch.)",
       `3. Meanwhile, we publish field notes on prompt health: ${SITE_URL}/blog`,
       "",
       "No drip campaigns, no spam. Reply to this email any time — a human reads it.",
