@@ -16,6 +16,7 @@ target/
 .env
 .env.*
 !.env.example
+*.secret
 .dev.vars
 .dev.vars.*
 
