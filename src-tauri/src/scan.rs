@@ -5,8 +5,40 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 
-use crate::engine::{evaluate, grade_for_score, score_for_issues, Grade, Severity};
+use crate::engine::{
+    evaluate_ctx, grade_for_score, score_for_issues, Grade, RuleContext, Severity,
+};
+use crate::repo_root::{find_repo_root, resolution_root};
 use crate::scanner;
+
+/// Per-scan memo of repo-root / resolution-root lookups, keyed by the
+/// file's parent directory. Every file scan does a handful of `stat` calls
+/// to find its roots; a project with many prompt files in the same
+/// directory (or the same monorepo package) would otherwise redo that walk
+/// once per file.
+#[derive(Default)]
+struct RootCache {
+    repo_root: HashMap<std::path::PathBuf, Option<std::path::PathBuf>>,
+    resolution_root: HashMap<std::path::PathBuf, Option<std::path::PathBuf>>,
+}
+
+impl RootCache {
+    fn repo_root_for(&mut self, file_path: &Path) -> Option<std::path::PathBuf> {
+        let parent = file_path.parent()?;
+        self.repo_root
+            .entry(parent.to_path_buf())
+            .or_insert_with(|| find_repo_root(file_path))
+            .clone()
+    }
+
+    fn resolution_root_for(&mut self, file_path: &Path) -> Option<std::path::PathBuf> {
+        let parent = file_path.parent()?;
+        self.resolution_root
+            .entry(parent.to_path_buf())
+            .or_insert_with(|| resolution_root(file_path))
+            .clone()
+    }
+}
 
 /// Summary of a completed scan, returned to the frontend.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
@@ -54,9 +86,20 @@ pub fn run_scan(
 
     let mut project_scores: HashMap<String, Vec<u32>> = HashMap::new();
     let (mut critical, mut warnings, mut nits) = (0u32, 0u32, 0u32);
+    let mut roots = RootCache::default();
 
     for (i, file) in files.iter().enumerate() {
-        let mut issues = evaluate(&file.content, &rules).issues;
+        let file_path = Path::new(&file.path);
+        let repo_root = roots.repo_root_for(file_path);
+        let resolution_root = roots.resolution_root_for(file_path);
+        let ctx = RuleContext {
+            content: &file.content,
+            file_path: Some(file_path),
+            repo_root: repo_root.as_deref(),
+            resolution_root: resolution_root.as_deref(),
+            modified_unix: file.modified_unix,
+        };
+        let mut issues = evaluate_ctx(&ctx, &rules).issues;
         issues.extend(crate::query::custom_issues(conn, &file.content));
         let score = score_for_issues(&issues);
         let grade = grade_for_score(score);
@@ -152,11 +195,13 @@ mod tests {
     use super::*;
     use std::fs;
 
+    // #74 narrowed the model rule to clearly-deprecated ids only, so this
+    // fixture names a retired model (claude-2) to keep the 5-issue count.
     const FOCAL: &str = "\
 # API Worker assistant
 
 You are an assistant.
-Always use gpt-4 for completions.
+Always use claude-2 for completions.
 Be concise but also very thorough and detailed.
 
 [no examples provided]
@@ -164,6 +209,7 @@ Be concise but also very thorough and detailed.
 
     const CLEAN: &str = "\
 You are a senior Rust reviewer for the service.
+Focus on correctness, idiomatic ownership, and clear error handling.
 Respond in JSON.
 For example:
 ```
