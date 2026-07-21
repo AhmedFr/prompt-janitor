@@ -692,7 +692,12 @@ For example:
         fs::write(&nested, "x").unwrap();
         let mut roots = RootCache::default();
         let (_, name, _) = resolve_project(&nested, &mut roots);
-        let repo_name = dir.path().file_name().unwrap().to_string_lossy().into_owned();
+        let repo_name = dir
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
         assert_eq!(name, repo_name);
 
         // Outside any repo/manifest: fall back to the immediate parent folder.

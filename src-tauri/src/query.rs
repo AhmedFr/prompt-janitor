@@ -1839,7 +1839,11 @@ mod tests {
     fn list_projects_rolls_up_counts() {
         let conn = Connection::open_in_memory().unwrap();
         crate::store::migrate(&conn).unwrap();
-        conn.execute("INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a','a','/a','D',52)", []).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a','a','/a','D',52)",
+            [],
+        )
+        .unwrap();
         conn.execute("INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at) VALUES('/a/CLAUDE.md','/a','/a/CLAUDE.md','CLAUDE.md','D',52,5,'100')", []).unwrap();
         conn.execute("INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at) VALUES('/a/AGENTS.md','/a','/a/AGENTS.md','AGENTS.md','F',40,6,'200')", []).unwrap();
         let projects = list_projects(&conn).unwrap();
@@ -1940,7 +1944,7 @@ mod tests {
         let range_days: u32 = 7;
         let old = now - (range_days as i64 + 5) * 86400;
         let inside_early = now - 3 * 86400;
-        let inside_late = now - 1 * 86400;
+        let inside_late = now - 86400;
         conn.execute(
             "INSERT INTO grade_history(scope, scope_id, score, recorded_at)
              VALUES('overall', 'overall', 50, ?1)",
