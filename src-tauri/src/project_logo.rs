@@ -27,7 +27,11 @@ const EXTS: &[(&str, &str)] = &[
 /// Return a `data:` URI for the project's logo, or `None`.
 pub fn detect_logo(root: &Path) -> Option<String> {
     for dir in DIRS {
-        let base = if dir.is_empty() { root.to_path_buf() } else { root.join(dir) };
+        let base = if dir.is_empty() {
+            root.to_path_buf()
+        } else {
+            root.join(dir)
+        };
         for name in NAMES {
             for (ext, mime) in EXTS {
                 let candidate = base.join(format!("{name}.{ext}"));
@@ -68,7 +72,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("logo.png"), b"png").unwrap();
         fs::write(dir.path().join("logo.svg"), b"<svg/>").unwrap();
-        assert!(detect_logo(dir.path()).unwrap().starts_with("data:image/svg+xml"));
+        assert!(detect_logo(dir.path())
+            .unwrap()
+            .starts_with("data:image/svg+xml"));
     }
 
     #[test]
@@ -82,7 +88,11 @@ mod tests {
     #[test]
     fn skips_oversize_file() {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("logo.png"), vec![0u8; (MAX_BYTES + 1) as usize]).unwrap();
+        fs::write(
+            dir.path().join("logo.png"),
+            vec![0u8; (MAX_BYTES + 1) as usize],
+        )
+        .unwrap();
         assert!(detect_logo(dir.path()).is_none());
     }
 

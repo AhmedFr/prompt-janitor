@@ -1,4 +1,6 @@
 # Makes landing/ its own pnpm workspace root, independent of the app at the
-# repo root. esbuild ships its native binary via a postinstall that Vite needs.
+# repo root. esbuild ships its native binary via a postinstall that Vite needs;
+# sharp (pulled in by next) does the same for its libvips binaries.
 allowBuilds:
   esbuild: true
+  sharp: true
