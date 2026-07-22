@@ -349,7 +349,10 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .oc-card { grid-column: span 2; background: var(--bg-tint); border-radius: var(--r-md); padding: 26px 24px; }
 .oc-card h3 { font-size: 20px; margin-top: 2px; }
 .oc-card p { color: var(--ink-2); font-size: 15px; margin: 8px 0 0; }
-.oc-lead { grid-column: span 4; background: linear-gradient(135deg, rgba(10, 132, 255, 0.1), rgba(10, 132, 255, 0.03)); }
+.oc-lead { grid-column: span 4; position: relative; overflow: hidden; }
+.oc-wash { position: absolute; inset: 0; pointer-events: none; }
+.oc-body { position: relative; }
+.oc-spark { display: block; width: 220px; height: 44px; margin-top: 14px; }
 .oc-lead h3 { font-size: 24px; }
 .oc-lead p { max-width: 60ch; font-size: 15.5px; }
 .oc-kicker { font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; }
