@@ -49,7 +49,7 @@ export function WaitlistForm({ source, buttonLabel = "Join the waitlist", compac
     <form className={compact ? "wl-form compact" : "wl-form"} onSubmit={onSubmit} noValidate>
       <input type="email" name="email" required placeholder="you@example.com" aria-label="Email address" autoComplete="email" />
       <input type="text" name="website" className="wl-hp" tabIndex={-1} autoComplete="off" aria-hidden="true" />
-      <DitherButton className="btn-dither" type="submit" disabled={status === "busy"} color="blue" variant="gradient" bloom="low">
+      <DitherButton className="btn-dither" type="submit" disabled={status === "busy"} color="blue" variant="solid" bloom="low">
         {buttonLabel}
       </DitherButton>
       <p className={status === "ok" ? "wl-msg ok" : status === "err" ? "wl-msg err" : "wl-msg"} role="status" aria-live="polite">
