@@ -172,7 +172,9 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .price-card { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-md); overflow: hidden; }
 .price-card.pro { border-color: rgba(10,132,255,.4); box-shadow: 0 16px 44px rgba(10,111,255,.16), 0 2px 8px rgba(15,17,21,.05); }
 .plan-name { font-family: var(--display); font-weight: 600; font-size: 19px; }
-.price-top { padding: 30px 30px 26px; text-align: center; background: linear-gradient(180deg, #f7fbff, #fff); border-bottom: 1px solid var(--line); }
+.price-top { position: relative; overflow: hidden; padding: 30px 30px 26px; text-align: center; border-bottom: 1px solid var(--line); }
+.price-wash { position: absolute; inset: 0; pointer-events: none; }
+.price-top-body { position: relative; }
 .price-icon { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 16px; color: #fff; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #36a3ff, #0a6fff); box-shadow: 0 8px 20px rgba(10,111,255,.35), inset 0 1px 0 rgba(255,255,255,.5); }
 .price-icon svg { width: 34px; height: 34px; }
 .price-amount { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 6px; }
@@ -206,7 +208,9 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .acc-a div { padding: 0 2px 22px; }
 
 /* ---------- footer CTA ---------- */
-.footer-cta { text-align: center; }
+.footer-cta { text-align: center; position: relative; overflow: hidden; }
+.fcta-wash { position: absolute; inset: auto 0 0 0; height: 320px; pointer-events: none; z-index: -1; }
+.ev-spark { display: block; width: 100%; height: 36px; margin-top: 12px; }
 .footer-cta .ficon { width: 76px; height: 76px; border-radius: 19px; margin: 0 auto 22px; color: #fff; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #36a3ff, #0a6fff); box-shadow: 0 14px 34px rgba(10,111,255,.35), inset 0 1px 0 rgba(255,255,255,.5); }
 .footer-cta .ficon svg { width: 40px; height: 40px; }
 .footer-cta h2 { font-size: clamp(38px, 6vw, 66px); font-weight: 700; letter-spacing: -.03em; }

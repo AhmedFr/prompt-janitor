@@ -1,3 +1,5 @@
+import { Sparkline } from "@/components/dither-kit/sparkline";
+
 export function EvidenceStrip() {
   return (
     <section className="section tint evidence" id="evidence">
@@ -18,6 +20,7 @@ export function EvidenceStrip() {
               <br />
               with one defective prompt
             </div>
+            <Sparkline data={[8, 10, 9, 13, 18, 25, 36]} color="red" variant="gradient" animate={false} className="ev-spark" aria-hidden="true" />
           </div>
           <div className="ev-stat">
             <div className="n">+0.8</div>
@@ -26,6 +29,7 @@ export function EvidenceStrip() {
               <br />
               to finish the same task
             </div>
+            <Sparkline data={[1.2, 1.5, 1.4, 1.8, 2.0]} color="orange" variant="gradient" animate={false} className="ev-spark" aria-hidden="true" />
           </div>
           <div className="ev-stat">
             <div className="n">−0.4</div>
@@ -34,6 +38,7 @@ export function EvidenceStrip() {
               <br />
               after the prompt was fixed
             </div>
+            <Sparkline data={[2.2, 2.0, 1.6, 1.1, 0.8]} color="green" variant="gradient" animate={false} className="ev-spark" aria-hidden="true" />
           </div>
         </div>
         <p className="ev-caveat">
