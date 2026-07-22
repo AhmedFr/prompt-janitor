@@ -81,6 +81,9 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 .btn.ghost:hover { background: #fafafa; }
 .btn.sm { padding: 8px 16px; font-size: 14px; }
 .btn svg { width: 17px; height: 17px; }
+.btn-dither { font: inherit; font-size: 15.5px; font-weight: 600; padding: 12px 22px; border-radius: var(--r-sm); color: #fff; border: none; cursor: pointer; }
+.btn-dither:disabled { opacity: .6; cursor: default; }
+.wl-form.compact .btn-dither { flex: 1 1 100%; }
 
 /* ---------- nav ---------- */
 .nav {
@@ -97,14 +100,8 @@ h1, h2, h3, h4 { font-family: var(--display); font-weight: 600; letter-spacing: 
 
 /* ---------- hero ---------- */
 .hero { position: relative; padding: 72px 0 56px; overflow: hidden; }
-.hero::before {
-  content: ""; position: absolute; top: -140px; left: 50%; transform: translateX(-50%);
-  width: 1200px; height: 700px; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(560px 380px at 24% 22%, rgba(10,132,255,.16), transparent 60%),
-    radial-gradient(720px 520px at 78% 40%, rgba(10,132,255,.07), transparent 65%);
-  filter: blur(8px);
-}
+.hero-wash { position: absolute; inset: 0 0 auto 0; height: 420px; z-index: -1; pointer-events: none; }
+.htags { display: flex; flex-wrap: wrap; gap: 10px; font-family: var(--mono); font-size: 12.5px; font-weight: 500; letter-spacing: .05em; color: var(--blue-press); }
 .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; }
 .hero h1 { font-size: clamp(38px, 4.6vw, 62px); font-weight: 700; letter-spacing: -.03em; text-wrap: balance; margin-top: 16px; }
 .hero .lead { font-size: clamp(17px, 1.9vw, 20px); color: var(--ink-2); max-width: 46ch; margin: 22px 0 0; }

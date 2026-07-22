@@ -1,17 +1,23 @@
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { OverviewMock } from "@/components/mockups/OverviewMock";
+import { DitherGradient } from "@/components/dither-kit/gradient";
 
 export function Hero() {
   return (
     <header className="hero" id="hero">
+      <DitherGradient from="blue" direction="down" cell={3} opacity={0.3} className="hero-wash" aria-hidden="true" />
       <div className="wrap hero-grid">
         <div className="hero-copy">
-          <div className="eyebrow">macOS app · runs 100% locally · launching soon</div>
-          <h1>Know in 10 seconds if your prompts are good enough.</h1>
+          <div className="htags" aria-label="macOS app, runs 100 percent locally, launching soon">
+            <span className="htag">[macOS]</span>
+            <span className="htag">[100% LOCAL]</span>
+            <span className="htag">[LAUNCHING SOON]</span>
+          </div>
+          <h1>Flaky agents aren&rsquo;t a model problem. They&rsquo;re a prompt problem.</h1>
           <p className="lead">
-            Prompt Janitor scans every <span style={{ fontFamily: "var(--mono)", fontSize: ".92em" }}>AGENTS.md</span> and{" "}
-            <span style={{ fontFamily: "var(--mono)", fontSize: ".92em" }}>CLAUDE.md</span> on your Mac, grades them A–F
-            against the industry's own standards, and flags what's rotting before your agents trip on it.
+            The <span className="mono-inline">CLAUDE.md</span> you wrote six weeks ago is sabotaging today&rsquo;s runs.
+            Prompt Janitor hunts down every rotting prompt file on your Mac, grades it A&ndash;F, and hands you the fix
+            &mdash; dependable agents, fewer retries, fewer tokens.
           </p>
           <WaitlistForm source="hero" />
           <div className="trust">
