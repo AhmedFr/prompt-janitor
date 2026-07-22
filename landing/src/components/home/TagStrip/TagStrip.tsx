@@ -3,8 +3,11 @@ export function TagStrip() {
     <section className="section">
       <div className="wrap">
         <div className="section-head">
-          <h2>Visibility you've never had</h2>
-          <p>Until now there was no single place to see how good your prompts actually are. Prompt Janitor is that layer.</p>
+          <h2>Right now, you&rsquo;re flying blind.</h2>
+          <p>
+            No linter, no review, no grade for the files your agents read on every single run. Prompt Janitor is the
+            missing instrument panel.
+          </p>
         </div>
         <div className="tags">
           <span className="tag">

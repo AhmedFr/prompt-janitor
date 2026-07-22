@@ -1,4 +1,5 @@
 import { WaitlistForm } from "@/components/WaitlistForm";
+import { DitherGradient } from "@/components/dither-kit/gradient";
 
 export function Pricing() {
   return (
@@ -14,11 +15,14 @@ export function Pricing() {
         <div className="price-grid">
           <div className="price-card">
             <div className="price-top">
-              <div className="plan-name">Free · Diagnosis</div>
-              <div className="price-amount">
-                <span className="now">$0</span>
+              <DitherGradient from="green" direction="up" cell={3} opacity={0.12} className="price-wash" aria-hidden="true" />
+              <div className="price-top-body">
+                <div className="plan-name">Free · Diagnosis</div>
+                <div className="price-amount">
+                  <span className="now">$0</span>
+                </div>
+                <div className="badge-offer free">Free forever · no scan caps</div>
               </div>
-              <div className="badge-offer free">Free forever · no scan caps</div>
             </div>
             <div className="price-body">
               <ul className="plist">
@@ -64,12 +68,15 @@ export function Pricing() {
 
           <div className="price-card pro">
             <div className="price-top">
-              <div className="plan-name">Pro · Treatment</div>
-              <div className="price-amount">
-                <span className="now">$19</span>
-                <span className="was">$30</span>
+              <DitherGradient from="blue" direction="up" cell={3} opacity={0.14} className="price-wash" aria-hidden="true" />
+              <div className="price-top-body">
+                <div className="plan-name">Pro · Treatment</div>
+                <div className="price-amount">
+                  <span className="now">$19</span>
+                  <span className="was">$30</span>
+                </div>
+                <div className="badge-offer">Early-bird pricing · one-time</div>
               </div>
-              <div className="badge-offer">Early-bird pricing · one-time</div>
             </div>
             <div className="price-body">
               <p className="plist-intro">Everything in Free, plus:</p>

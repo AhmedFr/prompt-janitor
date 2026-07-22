@@ -15,7 +15,7 @@ export function Audience() {
               </svg>
             </div>
             <h4>Solo developers</h4>
-            <p>Keep your one CLAUDE.md sharp without thinking about it.</p>
+            <p>Your one CLAUDE.md drifts while you ship. Keep it sharp without thinking about it.</p>
           </div>
           <div className="acard">
             <div className="ico" aria-hidden="true">
@@ -27,7 +27,7 @@ export function Audience() {
               </svg>
             </div>
             <h4>Eng teams &amp; leads</h4>
-            <p>One view of every repo's prompt health across the org.</p>
+            <p>You can&rsquo;t review every repo&rsquo;s prompt files. Now you don&rsquo;t have to.</p>
           </div>
           <div className="acard">
             <div className="ico" aria-hidden="true">
@@ -36,7 +36,7 @@ export function Audience() {
               </svg>
             </div>
             <h4>AI engineers</h4>
-            <p>Hold your agent prompts to a measurable standard.</p>
+            <p>Vibes aren&rsquo;t a standard. Hold your agent prompts to a measurable one.</p>
           </div>
           <div className="acard">
             <div className="ico" aria-hidden="true">
@@ -47,7 +47,7 @@ export function Audience() {
               </svg>
             </div>
             <h4>Agencies</h4>
-            <p>Audit client prompt files and prove the quality.</p>
+            <p>Prove the quality of client prompt files &mdash; with grades, not promises.</p>
           </div>
           <div className="acard">
             <div className="ico" aria-hidden="true">
@@ -56,7 +56,7 @@ export function Audience() {
               </svg>
             </div>
             <h4>Indie hackers</h4>
-            <p>Ship faster knowing your prompts won't quietly rot.</p>
+            <p>Ship fast without your prompts quietly rotting under you.</p>
           </div>
           <div className="acard">
             <div className="ico" aria-hidden="true">
