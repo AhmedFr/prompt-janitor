@@ -1,5 +1,6 @@
 import { DitherGradient } from "@/components/dither-kit/gradient";
 import { Sparkline } from "@/components/dither-kit/sparkline";
+import { Receipt, ClipboardCheck, Route, ChartLine, MessagesSquare } from "lucide-react";
 
 export function Outcomes() {
   return (
@@ -16,6 +17,9 @@ export function Outcomes() {
           <div className="oc-card oc-lead">
             <DitherGradient from="blue" direction="left" cell={3} opacity={0.16} className="oc-wash" aria-hidden="true" />
             <div className="oc-body">
+              <div className="oc-ico" aria-hidden="true">
+                <Receipt />
+              </div>
               <div className="oc-kicker">The defect tax</div>
               <div className="oc-stat">+36.8k tokens</div>
               <h3>One missing example = +36.8k tokens. Per task.</h3>
@@ -29,22 +33,33 @@ export function Outcomes() {
             </div>
           </div>
           <div className="oc-card">
+            <div className="oc-ico" aria-hidden="true">
+              <ClipboardCheck />
+            </div>
             <div className="oc-kicker">Human involvement</div>
             <h3>Stop babysitting the output</h3>
             <p>
               In the same runs, the fixed prompt left 0.4 fewer major issues per task for a human to clean up. The point of an
               agent is that you review once, not line by line.
             </p>
+            <Sparkline data={[2.2, 2.0, 1.6, 1.1, 0.8]} color="green" variant="gradient" animate={false} className="oc-spark2" aria-hidden="true" />
           </div>
           <div className="oc-card">
+            <div className="oc-ico" aria-hidden="true">
+              <Route />
+            </div>
             <div className="oc-kicker">Fewer round-trips</div>
             <h3>Stop watching agents wander</h3>
             <p>
               Ambiguous context makes agents wander: 0.8 extra turns per task with the defective prompt. Clear roles, examples,
               and output contracts get to done sooner.
             </p>
+            <Sparkline data={[2.6, 2.4, 2.0, 1.5, 1.2]} color="orange" variant="gradient" animate={false} className="oc-spark2" aria-hidden="true" />
           </div>
           <div className="oc-card">
+            <div className="oc-ico" aria-hidden="true">
+              <ChartLine />
+            </div>
             <div className="oc-kicker">Trends &amp; analytics</div>
             <h3>Watch the waste shrink</h3>
             <p>
@@ -54,6 +69,9 @@ export function Outcomes() {
             <span className="oc-flag">Impact view on the roadmap</span>
           </div>
           <div className="oc-card">
+            <div className="oc-ico" aria-hidden="true">
+              <MessagesSquare />
+            </div>
             <div className="oc-kicker">Chat analysis</div>
             <h3>Learn from your real sessions</h3>
             <p>
