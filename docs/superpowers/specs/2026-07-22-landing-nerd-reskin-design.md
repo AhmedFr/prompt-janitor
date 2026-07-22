@@ -17,14 +17,19 @@ Make the pre-launch landing site (`landing/`) shareable for waitlist growth:
 
 ## Constraints
 
-- Stack stays as-is: Next.js, hand-rolled `globals.css`. **No Tailwind, no shadcn, no
-  @dither-kit/cli** (the kit requires a stack the landing doesn't have; we hand-roll the
-  aesthetic in CSS/SVG).
+- **Adopt the real dither stack** (owner decision, supersedes the earlier hand-rolled-CSS
+  approach): add Tailwind CSS v4 + shadcn/ui scaffolding to `landing/`, then install
+  dither-kit components via `npx @dither-kit/cli add <component>` (equivalently
+  `npx shadcn@latest add https://tripwire.sh/r/<component>.json`).
+- **Incremental migration, not a rewrite**: Tailwind v4 coexists with the existing
+  `globals.css`. Existing layout/section CSS stays; dither-kit components and Tailwind
+  utilities are used where the vibe matters. Full utility-class migration of legacy CSS
+  is explicitly out of scope.
 - No new font downloads: IBM Plex Mono is already imported; SF Pro system stack stays for
   headlines/body.
-- No structural/layout changes to sections; no new deps; existing tests must keep passing.
+- No structural/layout changes to sections; existing tests must keep passing.
 - Palette unchanged (white bg, ink, blue accent, grade colors) so app screenshots still
-  match the site.
+  match the site; dither-kit chart colors mapped to the existing tokens.
 
 ## 1. Copy changes (component by component)
 
@@ -86,39 +91,52 @@ Body copy adjusted minimally to fit the new headline; facts unchanged.
 - Eyebrows/kickers/labels (`.eyebrow`, `.oc-kicker`, `.plist-intro`, footer col heads)
   switch to mono uppercase with letter-spacing.
 
-## 3. Dither layer (hand-rolled CSS/SVG)
+## 3. Dither layer (Tailwind + shadcn + dither-kit)
 
-- 3–4 Bayer ordered-dither patterns as inline SVG data-URIs, defined once as CSS custom
-  properties (density steps sparse → dense), tintable via `background-color` +
-  pattern overlay.
-- Applied to:
-  - Hero background wash — replaces the blurred radial gradients with a dithered blue
-    fade (the single biggest vibe shift).
-  - `oc-lead` outcome card background.
-  - Section dividers between major blocks.
-  - `.tint` section backgrounds (subtle sparse dot field).
-  - Pricing card header (`.price-top`).
-  - Hero mockup progress bars/ring: dithered fills instead of smooth gradients.
-- Buttons: primary keeps solid blue with a dithered hover/edge texture; ghost buttons get
-  a 1px hard border; border-radius reduced from pill to small on buttons and form inputs.
+Setup (one-time):
+- Add Tailwind CSS v4 (`@tailwindcss/postcss`) and shadcn/ui init (`components.json`,
+  `cn` util, CSS variables mapped to the existing palette tokens) to `landing/`.
+- Install dither-kit components into `landing/src/components/dither-kit/` via the CLI.
+
+Component usage:
+- **`DitherGradient`** — hero background wash (replaces the blurred radial gradients;
+  the single biggest vibe shift), `oc-lead` outcome card background, pricing card header
+  (`.price-top`), FooterCta backdrop. Tinted blue from existing tokens.
+- **`DitherButton`** — primary CTAs (hero waitlist submit, pricing buttons, FooterCta);
+  ghost/secondary buttons get a 1px hard border and reduced radius via Tailwind classes.
+- **Dithered charts** (`Sparkline`, `BarChart` / `AreaChart`) — EvidenceStrip stats gain
+  small dithered sparklines; Outcomes lead card gets a dithered bar/area visual of the
+  token-cost benchmark; hero mockup ring/progress bars re-rendered with dithered fills.
+- **`DitherAvatar`** — optional garnish (e.g. blog byline / footer), only if it earns
+  its place.
+- Subtle static dither texture on `.tint` section backgrounds and section dividers may
+  still use a small CSS/SVG pattern where a canvas component is overkill.
+- Charts respect `prefers-reduced-motion` (disable entrance animations/sparkles).
 
 ## 4. Out of scope
 
 - Dark mode, blog article content, thanks page redesign (inherits token changes only),
-  actual @dither-kit components, any layout/structure changes, pricing/FAQ copy changes.
+  any layout/structure changes, pricing/FAQ copy changes, full Tailwind migration of the
+  legacy `globals.css` (follow-up if ever needed).
 
 ## 5. Files touched
 
-`landing/src/app/globals.css`, `Hero.tsx`, `Outcomes.tsx`, `TagStrip.tsx`,
-`FeatureRows.tsx`, `Audience.tsx`, `FooterCta.tsx`, plus `.num`/mono class touches in
-`EvidenceStrip.tsx`, `Pricing.tsx`, `HowItWorks.tsx`, `MiniCards.tsx`, mockup components,
-blog list/post styles.
+- Setup: `landing/package.json`, PostCSS config, `components.json`, `globals.css`
+  (Tailwind import + shadcn CSS variables), `landing/src/lib/utils.ts` (`cn`),
+  `landing/src/components/dither-kit/*` (CLI-generated, committed).
+- Copy: `Hero.tsx`, `Outcomes.tsx`, `TagStrip.tsx`, `FeatureRows.tsx`, `Audience.tsx`,
+  `FooterCta.tsx`.
+- Styling touches: `.num`/mono classes in `EvidenceStrip.tsx`, `Pricing.tsx`,
+  `HowItWorks.tsx`, `MiniCards.tsx`, mockup components, blog list/post styles;
+  dither-kit component swaps per section 3.
 
 ## 6. Acceptance
 
 - Page reads pain → fix in every section headline.
 - All numerals render in mono with tabular figures.
-- Dither textures visible in hero wash, lead outcome card, tint sections, pricing header,
-  mockup fills — at normal zoom, without harming text readability or a11y contrast.
-- `pnpm --dir landing test` (vitest) and `pnpm --dir landing build` pass.
-- No new runtime dependencies.
+- Dither-kit washes/charts/buttons visible in hero, lead outcome card, evidence stats,
+  pricing header, CTAs — without harming text readability or a11y contrast.
+- `pnpm --dir landing test` (vitest) and `pnpm --dir landing build` pass with the new
+  Tailwind/PostCSS pipeline.
+- New dependencies limited to the dither stack (tailwindcss, shadcn scaffolding,
+  dither-kit peer deps such as motion/d3 as required by the CLI).
