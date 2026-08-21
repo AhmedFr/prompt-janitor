@@ -152,6 +152,20 @@ pub struct SessionMeta {
     pub model: Option<String>,
 }
 
+/// A `tool_result` whose `tool_use` was indexed in an earlier pass, so the
+/// indexer had no pending invocation to attach it to. The store resolves it
+/// against the already-persisted row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrphanResult {
+    pub harness: String,
+    pub session_id: String,
+    pub tool_use_id: String,
+    /// Result timestamp in epoch millis; the store subtracts the stored
+    /// tool_use ts to get the duration.
+    pub end_ms: i64,
+    pub is_error: bool,
+}
+
 /// Per-log-file byte offsets already indexed. Persisted in `sessions.byte_offset`.
 #[derive(Debug, Clone, Default)]
 pub struct UsageCursor {
@@ -165,7 +179,13 @@ pub struct UsageBatch {
     /// Sessions whose log shrank/rotated: their cursor + rows must be reset
     /// before the batch is applied.
     pub reset_sessions: Vec<String>,
+    /// Results whose `tool_use` predates this batch; resolved against rows
+    /// already in the store.
+    pub orphan_results: Vec<OrphanResult>,
     pub skipped_lines: u64,
+    /// Logs that could not be opened or read this sweep; their cursors are
+    /// left untouched so the next sweep retries them.
+    pub failed_files: u64,
 }
 
 #[cfg(test)]
