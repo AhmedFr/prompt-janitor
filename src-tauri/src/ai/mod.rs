@@ -5,6 +5,7 @@
 
 mod anthropic;
 mod openai;
+mod openrouter;
 pub mod provider;
 
 use crate::query::get_setting;

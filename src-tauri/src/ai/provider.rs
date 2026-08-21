@@ -22,13 +22,17 @@ pub trait LlmProvider: Sync {
     ) -> CompletionFuture<'a>;
 }
 
-static PROVIDERS: &[&dyn LlmProvider] = &[&super::anthropic::Anthropic, &super::openai::OpenAi];
+static PROVIDERS: &[&dyn LlmProvider] = &[
+    &super::anthropic::Anthropic,
+    &super::openai::OpenAi,
+    &super::openrouter::OpenRouter,
+];
 
 pub fn provider_for(id: &str) -> Option<&'static dyn LlmProvider> {
     PROVIDERS.iter().copied().find(|p| p.id() == id)
 }
 
-// Not called within this task; part of the seam Task 2 (provider selection UI) consumes.
+// Exercised by tests; not yet called by production code (Task 2 frontend seam).
 #[allow(dead_code)]
 pub fn provider_ids() -> Vec<&'static str> {
     PROVIDERS.iter().map(|p| p.id()).collect()
@@ -56,5 +60,12 @@ mod tests {
             provider_for("openai").unwrap().default_model(),
             "gpt-4o-mini"
         );
+    }
+
+    #[test]
+    fn openrouter_is_registered() {
+        let p = provider_for("openrouter").expect("openrouter registered");
+        assert_eq!(p.default_model(), "anthropic/claude-sonnet-4.6");
+        assert_eq!(provider_ids(), vec!["anthropic", "openai", "openrouter"]);
     }
 }
