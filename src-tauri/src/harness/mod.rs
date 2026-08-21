@@ -1,6 +1,7 @@
 //! Agent-harness plugin seam. Each harness (Claude Code, later Cursor/Codex…)
 //! lives in its own module and is registered in [`all`].
 
+pub mod claude_code;
 pub mod model;
 
 use model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
