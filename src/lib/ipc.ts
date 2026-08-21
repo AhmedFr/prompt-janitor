@@ -30,6 +30,21 @@ export type {
   GradeCount,
   TrendPoint,
   CommonIssue,
+  SetupView,
+  ArtifactView,
+  ProjectSetup,
+  HarnessInfo,
+  UsageStat,
+  EffectiveRule,
+  UsageOverview,
+  UsageSeries,
+  UsagePoint,
+  KindTotal,
+  ProjectSessions,
+  TargetRate,
+  ArtifactKind,
+  Layer,
+  InvocationKind,
 } from "./bindings";
 
 /** True when running inside the Tauri runtime (vs. a plain browser dev server). */

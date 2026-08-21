@@ -767,3 +767,48 @@ mod tests {
         assert!(ent.email.is_none());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Harness setup + usage (read models in `harness_query`)
+// ---------------------------------------------------------------------------
+
+/// Everything the Setup screen renders: harnesses, the global layer, and each
+/// project with its own artifacts.
+#[tauri::command]
+#[specta::specta]
+pub fn get_setup(db: tauri::State<'_, AppDb>) -> Result<crate::harness_query::SetupView, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::setup_view(&conn).map_err(|e| e.to_string())
+}
+
+/// The rule files that apply inside `project_path`, in harness load order.
+#[tauri::command]
+#[specta::specta]
+pub fn get_effective_rules(
+    db: tauri::State<'_, AppDb>,
+    project_path: String,
+) -> Result<Vec<crate::harness_query::EffectiveRule>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::effective_rules(&conn, &project_path).map_err(|e| e.to_string())
+}
+
+/// Usage aggregates for the Analytics screen, anchored to the current clock.
+#[tauri::command]
+#[specta::specta]
+pub fn get_usage_overview(
+    db: tauri::State<'_, AppDb>,
+) -> Result<crate::harness_query::UsageOverview, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::harness_query::usage_overview(&conn, now).map_err(|e| e.to_string())
+}
+
+/// Every harness we know of, detected or not.
+#[tauri::command]
+#[specta::specta]
+pub fn list_harnesses(
+    db: tauri::State<'_, AppDb>,
+) -> Result<Vec<crate::harness_query::HarnessInfo>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::list_harnesses(&conn).map_err(|e| e.to_string())
+}

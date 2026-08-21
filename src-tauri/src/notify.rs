@@ -66,6 +66,7 @@ mod tests {
             scan_count: 1,
             trend: Vec::new(),
             needs_attention: items,
+            skipped_lines: 0,
         }
     }
 

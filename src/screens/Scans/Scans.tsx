@@ -107,6 +107,12 @@ function DigestBody({ digest, navigate }: { digest: ScansDigest; navigate: Navig
         </Card>
       )}
 
+      {digest.skipped_lines > 0 && (
+        <div className="muted" style={{ marginTop: 16, fontSize: 12 }}>
+          {digest.skipped_lines} log lines skipped while indexing
+        </div>
+      )}
+
       <div className="row between" style={{ marginTop: 16 }}>
         <span className="faint" style={{ fontSize: 12 }}>
           {digest.scan_count} scans recorded

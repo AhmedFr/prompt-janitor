@@ -123,6 +123,17 @@ export const commands = {
 	 *  existing same-named file.
 	 */
 	applyTemplate: (templateId: string, destDir: string) => typedError<ApplyTemplateResult, string>(__TAURI_INVOKE("apply_template", { templateId, destDir })),
+	/**
+	 *  Everything the Setup screen renders: harnesses, the global layer, and each
+	 *  project with its own artifacts.
+	 */
+	getSetup: () => typedError<SetupView, string>(__TAURI_INVOKE("get_setup")),
+	/**  The rule files that apply inside `project_path`, in harness load order. */
+	getEffectiveRules: (projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { projectPath })),
+	/**  Usage aggregates for the Analytics screen, anchored to the current clock. */
+	getUsageOverview: () => typedError<UsageOverview, string>(__TAURI_INVOKE("get_usage_overview")),
+	/**  Every harness we know of, detected or not. */
+	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
 };
 
 /* Types */
@@ -186,6 +197,28 @@ export type ApplyTemplateResult = {
 	path: string,
 };
 
+export type ArtifactKind = "rule" | "skill" | "agent" | "command" | "hook" | "mcp_server" | "plugin" | "settings";
+
+/**
+ *  An inventoried artifact, with its grade (when the file grader saw it) and
+ *  its usage (when anything ever invoked it).
+ */
+export type ArtifactView = {
+	id: number,
+	harness: string,
+	layer: Layer,
+	kind: ArtifactKind,
+	name: string,
+	path: string,
+	plugin_name: string | null,
+	description: string | null,
+	bytes: number,
+	grade: string | null,
+	score: number | null,
+	file_id: string | null,
+	usage: UsageStat | null,
+};
+
 /**
  *  One title from the "most common issues" leaderboard, with how many
  *  distinct files it appears in.
@@ -208,6 +241,15 @@ export type DigestItem = {
 export type DimensionScore = {
 	dimension: string,
 	score: number,
+};
+
+/**  One rule file in the stack that applies to a project, in load order. */
+export type EffectiveRule = {
+	layer: Layer,
+	path: string,
+	name: string,
+	grade: string | null,
+	file_id: string | null,
 };
 
 /**  The current entitlement state (whether the paid tier is unlocked). */
@@ -291,6 +333,19 @@ export type GradeCount = {
 	count: number,
 };
 
+/**  One installed agent harness and how much of it we know about. */
+export type HarnessInfo = {
+	id: string,
+	display_name: string,
+	detected: boolean,
+	last_scan_at: string | null,
+	project_count: number,
+	/**  Top-level sessions only — sub-agent transcripts are not user sessions. */
+	session_count: number,
+};
+
+export type InvocationKind = "skill" | "agent" | "mcp" | "builtin";
+
 /**  One issue in the Detail view. */
 export type IssueDetail = {
 	line: number | null,
@@ -301,6 +356,14 @@ export type IssueDetail = {
 	fix_from: string | null,
 	fix_to: string | null,
 };
+
+export type KindTotal = {
+	kind: InvocationKind,
+	total: number,
+	avg_turn_tokens: number | null,
+};
+
+export type Layer = "global" | "project" | "plugin";
 
 /**  What a valid license unlocks, shown in Settings. */
 export type LicenseInfo = {
@@ -357,6 +420,24 @@ export type ProjectRow = {
 	modified: string | null,
 };
 
+export type ProjectSessions = {
+	path: string,
+	name: string,
+	sessions: number,
+};
+
+/**  A project the harness has seen, and everything configured inside it. */
+export type ProjectSetup = {
+	harness: string,
+	path: string,
+	/**  Last path component — what the UI labels the project with. */
+	name: string,
+	exists: boolean,
+	session_count: number,
+	last_session_at: string | null,
+	artifacts: ArtifactView[],
+};
+
 /**  A rule (built-in or custom) with its current enabled state. */
 export type RuleInfo = {
 	id: string,
@@ -394,6 +475,20 @@ export type ScansDigest = {
 	scan_count: number,
 	trend: number[],
 	needs_attention: DigestItem[],
+	/**
+	 *  Log lines the latest scan's harness pass could not parse, summed over
+	 *  every harness that reported. Zero is the normal case; a non-zero count
+	 *  is the honest caveat on the usage numbers.
+	 */
+	skipped_lines: number,
+};
+
+/**  Everything the Setup screen renders in one round trip. */
+export type SetupView = {
+	harnesses: HarnessInfo[],
+	/**  Global + plugin layers: the artifacts that apply everywhere. */
+	global: ArtifactView[],
+	projects: ProjectSetup[],
 };
 
 /**  Issue severity. */
@@ -407,6 +502,12 @@ export type Severity =
 
 /**  Where a rule's authority comes from (drives the source badge). */
 export type Source = "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
+
+export type TargetRate = {
+	target: string,
+	total: number,
+	error_rate: number | null,
+};
 
 /**  One starter template: metadata plus its full content for the free preview. */
 export type TemplateInfo = {
@@ -429,6 +530,47 @@ export type TrendPoint = {
 	/**  Epoch-seconds string (matches `grade_history.recorded_at`). */
 	t: string,
 	score: number,
+};
+
+/**  What the Analytics usage tab renders. */
+export type UsageOverview = {
+	/**  Top 8 targets by volume over the last 90 days, bucketed by day. */
+	top: UsageSeries[],
+	/**
+	 *  All-time totals per invocation kind, in `skill, agent, mcp, builtin`
+	 *  order.
+	 */
+	by_kind: KindTotal[],
+	/**  Top-level sessions per project. */
+	sessions_per_project: ProjectSessions[],
+	/**  All-time error rate per MCP server, busiest first. */
+	mcp_error_rates: TargetRate[],
+};
+
+/**  One day's invocations of a target. */
+export type UsagePoint = {
+	/**  `YYYY-MM-DD`. */
+	day: string,
+	count: number,
+	errors: number,
+};
+
+/**  A target's daily usage over the reporting window. */
+export type UsageSeries = {
+	kind: InvocationKind,
+	target: string,
+	points: UsagePoint[],
+};
+
+/**  The rollup row for one artifact (`usage_stats`). */
+export type UsageStat = {
+	total: number,
+	sessions: number,
+	last_used: string | null,
+	error_rate: number | null,
+	avg_turn_tokens: number | null,
+	count_30d: number,
+	count_prev_30d: number,
 };
 
 export type WorklistItem = {

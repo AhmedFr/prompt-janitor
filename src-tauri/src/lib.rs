@@ -10,6 +10,7 @@ mod apply;
 mod commands;
 pub mod engine;
 pub mod harness;
+mod harness_query;
 mod harness_scan;
 mod harness_store;
 mod ipc;

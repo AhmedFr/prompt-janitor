@@ -529,10 +529,22 @@ pub struct ScansDigest {
     pub scan_count: u32,
     pub trend: Vec<u32>,
     pub needs_attention: Vec<DigestItem>,
+    /// Log lines the latest scan's harness pass could not parse, summed over
+    /// every harness that reported. Zero is the normal case; a non-zero count
+    /// is the honest caveat on the usage numbers.
+    pub skipped_lines: u32,
 }
 
 /// Aggregate the recent scan history into a digest.
 pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
+    // Diagnostics are per scan, so only the most recent one describes what the
+    // user is looking at now.
+    let skipped_lines = conn.query_row(
+        "SELECT COALESCE(SUM(skipped_lines), 0) FROM scan_diagnostics
+          WHERE scan_id = (SELECT MAX(id) FROM scans)",
+        [],
+        |r| r.get::<_, i64>(0),
+    )? as u32;
     let file_count =
         conn.query_row("SELECT COUNT(*) FROM files", [], |r| r.get::<_, i64>(0))? as u32;
     if file_count == 0 {
@@ -545,6 +557,7 @@ pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
             scan_count: 0,
             trend: Vec::new(),
             needs_attention: Vec::new(),
+            skipped_lines,
         });
     }
 
@@ -636,6 +649,7 @@ pub fn get_scans_digest(conn: &Connection) -> rusqlite::Result<ScansDigest> {
         scan_count,
         trend,
         needs_attention,
+        skipped_lines,
     })
 }
 
@@ -1455,6 +1469,36 @@ mod tests {
         assert!(digest.regressed >= 1);
         assert!(digest.net_health < 0, "net_health: {}", digest.net_health);
         assert!(digest.needs_attention.iter().any(|i| i.kind == "regressed"));
+    }
+
+    /// Only the latest scan's diagnostics reach the digest, summed across
+    /// every harness that reported one.
+    #[test]
+    fn digest_sums_skipped_lines_of_the_latest_scan_only() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("CLAUDE.md"), "You are an assistant.\n").unwrap();
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        assert_eq!(get_scans_digest(&conn).unwrap().skipped_lines, 0);
+
+        conn.execute(
+            "INSERT INTO scan_diagnostics(scan_id, harness, skipped_lines)
+             VALUES((SELECT max(id) FROM scans), 'claude_code', 3)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO scan_diagnostics(scan_id, harness, skipped_lines)
+             VALUES((SELECT max(id) FROM scans), 'other', 4)",
+            [],
+        )
+        .unwrap();
+        assert_eq!(get_scans_digest(&conn).unwrap().skipped_lines, 7);
+
+        // A newer scan that skipped nothing supersedes the old diagnostics.
+        crate::scan::run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        assert_eq!(get_scans_digest(&conn).unwrap().skipped_lines, 0);
     }
 
     #[test]

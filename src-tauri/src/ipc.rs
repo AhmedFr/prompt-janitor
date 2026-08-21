@@ -43,6 +43,10 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::get_scans_digest,
         crate::commands::list_templates,
         crate::commands::apply_template,
+        crate::commands::get_setup,
+        crate::commands::get_effective_rules,
+        crate::commands::get_usage_overview,
+        crate::commands::list_harnesses,
     ])
 }
 
