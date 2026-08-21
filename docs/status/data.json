@@ -40,11 +40,11 @@
     },
     {
       "name": "Phase 4",
-      "title": "AI fix engine (paid)",
+      "title": "AI fix engine (paid) (gates open while monetisation is paused, 2026-08)",
       "done": 5,
       "total": 5,
       "state": "done",
-      "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate"
+      "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate (gates open while monetisation is paused, 2026-08)"
     },
     {
       "name": "Phase 5",
@@ -173,7 +173,7 @@
       "status": "shipped"
     },
     {
-      "name": "AI provider config — BYO key (Anthropic / OpenAI)",
+      "name": "AI provider config — BYO key (Anthropic / OpenAI / OpenRouter)",
       "tier": "pro",
       "status": "shipped"
     },
@@ -195,7 +195,8 @@
     {
       "name": "Offline Ed25519 license gate",
       "tier": "pro",
-      "status": "shipped"
+      "status": "shipped",
+      "note": "Gates open while monetisation is paused (2026-08) — every feature is unlocked regardless of license"
     },
     {
       "name": "License vendor CLI (keygen / mint / verify)",
@@ -237,11 +238,11 @@
     },
     {
       "name": "Vitest",
-      "result": "5/5 passing"
+      "result": "110/110 passing (22 files)"
     },
     {
       "name": "cargo test",
-      "result": "166/166 passing"
+      "result": "173/173 passing"
     },
     {
       "name": "clippy -D warnings",

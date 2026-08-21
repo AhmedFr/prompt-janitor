@@ -1,5 +1,6 @@
-//! AI provider seam. Phase 4 ships the BYO-key providers (Anthropic / OpenAI);
-//! a local SLM (Ollama) can slot in behind [`complete`] later.
+//! AI provider seam. Phase 4 ships the BYO-key providers (Anthropic / OpenAI /
+//! OpenRouter), each registered as an [`provider::LlmProvider`] behind
+//! `provider.rs`; a local SLM (Ollama) can slot in behind [`complete`] later.
 //!
 //! The API key is stored in settings and never returned to the frontend.
 
@@ -13,7 +14,7 @@ use crate::query::get_setting;
 /// Public view of the AI config (no secret key).
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct AiConfig {
-    /// "anthropic", "openai", or "none".
+    /// A provider id from `provider::provider_ids()`, or "none".
     pub provider: String,
     pub model: String,
     /// Whether an API key is stored.
@@ -65,6 +66,7 @@ pub fn config_view(conn: &rusqlite::Connection) -> AiConfig {
     }
 }
 
+/// Run a single completion with the configured provider.
 pub(crate) async fn complete(
     creds: &AiCredentials,
     system: &str,
