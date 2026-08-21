@@ -1667,6 +1667,9 @@ impl Harness for ClaudeCode {
 > - `store_usage`: for each session id in `batch.reset_sessions`, first `DELETE FROM invocations WHERE session_id=?` and overwrite (not add) that session's `turns/input_tokens/output_tokens/started_at/ended_at`. Otherwise upsert as written. `log_path` comes from `SessionMeta.log_path`; `byte_offset` = `cursor.offsets[&log_path]`. Invocations insert with `INSERT OR IGNORE` (unique on `(harness, session_id, tool_use_id)`), including the `tool_use_id` column. The `UPDATE harness_projects …` recount is restricted to `WHERE harness = ?` for harnesses present in the batch.
 > - `rebuild_usage_stats` groups by `(harness, kind, target, artifact_id)`; the table's identity is the unique index on `(harness, kind, target, coalesce(artifact_id,-1))`. The test's `SELECT … WHERE kind='mcp' AND target='playwright'` still returns one row.
 > - `link_invocations_to_artifacts` only touches rows `WHERE artifact_id IS NULL` (unchanged) — with stable ids this is now incremental.
+> - `store_usage` applies `batch.orphan_results`: for each, `UPDATE invocations SET is_error = ?, duration_ms = ? - <epoch_ms(ts)> WHERE harness=? AND session_id=? AND tool_use_id=?` — compute `epoch_ms(ts)` in Rust by selecting the row's `ts` first (helper `claude_code::log_index::epoch_ms` is `pub(super)`; expose a `pub fn epoch_ms` re-export in `harness::model` or move the function to `harness/time.rs` — choose `harness/time.rs` with `pub fn epoch_ms` and `pub fn iso_from_epoch`, and have both `log_index.rs` and `harness_store.rs` import from there). Test: seed an invocation with `duration_ms NULL`, apply an orphan, assert duration and error updated.
+> - A session id may appear in `reset_sessions` without a matching `sessions` entry (log truncated to empty): still delete its invocations and zero its counters.
+> - `input_tokens`/`turn_tokens` include cache tokens (controller ruling in Task 8).
 > - Tests run on a connection from `crate::store::test_conn()` (added in PR A: in-memory + migrate + `PRAGMA foreign_keys=ON`).
 
 **Files:**
@@ -2177,7 +2180,7 @@ Replace `set_scan_folder`/`get_scan_folder` with `set_extra_scan_folders(db, fol
 
 ### Task 12: Read models + IPC commands
 
-> **Amendment:** `ArtifactView.usage` is looked up by `usage_stats.artifact_id = artifacts.id` (one row per linked artifact); targets with no artifact (`artifact_id IS NULL`) appear only in the Analytics usage overview.
+> **Amendment:** aggregates over `duration_ms` must filter `duration_ms >= 0` (clock skew can produce negatives). `ArtifactView.usage` is looked up by `usage_stats.artifact_id = artifacts.id` (one row per linked artifact); targets with no artifact (`artifact_id IS NULL`) appear only in the Analytics usage overview.
 
 **Files:**
 - Create: `src-tauri/src/harness_query.rs`
