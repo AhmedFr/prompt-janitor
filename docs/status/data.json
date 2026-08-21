@@ -57,10 +57,10 @@
     {
       "name": "Phase 7",
       "title": "Setup inventory & usage evidence",
-      "done": 0,
+      "done": 1,
       "total": 6,
       "state": "active",
-      "note": "Spec + plans + process skill landed (#107). Next: phase 0 (#108), harness core (#109), Claude Code harness (#110), persistence/IPC (#111), UI (#112), detail/settings/docs (#113)"
+      "note": "Spec + plans + process skill landed (#107); harness core landed (#109). Next: phase 0 (#108), Claude Code harness (#110), persistence/IPC (#111), UI (#112), detail/settings/docs (#113)"
     }
   ],
   "actions": {
@@ -271,6 +271,7 @@
     }
   ],
   "recent": [
+    "2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture",
     "2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)",
     "2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused",
     "2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)",

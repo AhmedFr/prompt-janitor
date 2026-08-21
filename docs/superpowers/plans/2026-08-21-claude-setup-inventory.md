@@ -72,12 +72,12 @@ pub struct Artifact {
 pub struct ProjectRef { pub harness: String, pub path: String, pub exists: bool, pub log_dir: Option<String> }
 pub enum InvocationKind { Skill, Agent, Mcp, Builtin }
 pub struct Invocation {
-    pub harness: String, pub session_id: String, pub project_path: String,
+    pub harness: String, pub session_id: String, pub tool_use_id: String, pub project_path: String,
     pub ts: String /* RFC3339 */, pub tool_name: String, pub kind: InvocationKind,
     pub target: String, pub duration_ms: Option<i64>, pub is_error: bool, pub turn_tokens: Option<i64>,
 }
 pub struct SessionMeta {
-    pub harness: String, pub id: String, pub project_path: String,
+    pub harness: String, pub id: String, pub project_path: String, pub log_path: String,
     pub started_at: Option<String>, pub ended_at: Option<String>, pub turns: i64,
     pub input_tokens: i64, pub output_tokens: i64, pub model: Option<String>,
 }
@@ -1220,6 +1220,12 @@ pub fn parse_line(line: &str) -> Option<LogRecord> {
 
 ### Task 8: Log indexer with byte-offset tailing
 
+> **Amendments (after branch review A — these override the code blocks below where they differ):**
+> - `Invocation` has a `tool_use_id: String` field (set from the `tool_use` block id) and `SessionMeta` has `log_path: String` (set to `log_path.to_string_lossy()`).
+> - `IndexedFile` gains `pub reset: bool` — true when `from_offset > len` (file shrank) so the indexer restarted at 0.
+> - `index_all` must skip non-`.jsonl` entries and sibling directories inside project log dirs (the fixture now has a `memory/` dir and a `.DS_Store`); `UsageBatch` gains `pub reset_sessions: Vec<String>` listing session ids that were re-read from 0.
+> - Update the tests accordingly (assert `tool_use_id` values `t1..t5`, `log_path`, and that `reset` is true after the shrink).
+
 **Files:**
 - Create: `src-tauri/src/harness/claude_code/log_index.rs`
 
@@ -1240,6 +1246,7 @@ Semantics:
 - `project_path` = first `cwd` seen, else `fallback_project`.
 - If the file is shorter than `from_offset` (truncated/rotated), restart from 0.
 - Lines that fail `parse_line` increment `skipped_lines`.
+- `Invocation.tool_use_id` = the `tool_use` block id (`t1`…); `SessionMeta.log_path` = `log_path` as given. `IndexedFile.reset: bool` is true when the file was shorter than `from_offset` (restart from 0) — the store uses it to wipe that session's prior rows before re-inserting.
 - Resume must begin on a line boundary: read from `from_offset`, and only advance `new_offset` past fully-read lines (a trailing partial line without `\n` is not consumed).
 
 - [ ] **Step 1: Failing tests**
@@ -1655,6 +1662,13 @@ impl Harness for ClaudeCode {
 
 ### Task 10: Persistence + usage rollup (`harness_store.rs`)
 
+> **Amendments (after branch review A — these override the code blocks below where they differ):**
+> - Artifact ids are stable: `replace_artifacts` does `INSERT … ON CONFLICT(harness, layer, coalesce(project_path,''), kind, name, path) DO UPDATE SET description, bytes, hash, seen_at, plugin_name, file_id` (SQLite supports `ON CONFLICT` targeting a unique *index* with an expression only via a matching partial/expression index — the migration creates `CREATE UNIQUE INDEX idx_artifacts_identity ON artifacts(harness, layer, coalesce(project_path,''), kind, name, path)`; use `INSERT … ON CONFLICT(harness, layer, coalesce(project_path,''), kind, name, path) DO UPDATE …`), then `DELETE FROM artifacts WHERE harness=? AND <scope predicate> AND seen_at <> ?now`. Never delete-then-insert.
+> - `store_usage`: for each session id in `batch.reset_sessions`, first `DELETE FROM invocations WHERE session_id=?` and overwrite (not add) that session's `turns/input_tokens/output_tokens/started_at/ended_at`. Otherwise upsert as written. `log_path` comes from `SessionMeta.log_path`; `byte_offset` = `cursor.offsets[&log_path]`. Invocations insert with `INSERT OR IGNORE` (unique on `(harness, session_id, tool_use_id)`), including the `tool_use_id` column. The `UPDATE harness_projects …` recount is restricted to `WHERE harness = ?` for harnesses present in the batch.
+> - `rebuild_usage_stats` groups by `(harness, kind, target, artifact_id)`; the table's identity is the unique index on `(harness, kind, target, coalesce(artifact_id,-1))`. The test's `SELECT … WHERE kind='mcp' AND target='playwright'` still returns one row.
+> - `link_invocations_to_artifacts` only touches rows `WHERE artifact_id IS NULL` (unchanged) — with stable ids this is now incremental.
+> - Tests run on a connection from `crate::store::test_conn()` (added in PR A: in-memory + migrate + `PRAGMA foreign_keys=ON`).
+
 **Files:**
 - Create: `src-tauri/src/harness_store.rs`
 - Modify: `src-tauri/src/lib.rs` (`mod harness_store;`)
@@ -1664,10 +1678,12 @@ impl Harness for ClaudeCode {
 ```rust
 pub fn upsert_harness(conn, id: &str, display_name: &str, detected: bool, now: &str) -> rusqlite::Result<()>;
 pub fn upsert_projects(conn, projects: &[ProjectRef]) -> rusqlite::Result<()>;
-/// Replaces all artifacts of `harness` within `scope` (global → layer in ('global','plugin'); project → that path). Returns rows written.
+/// Upserts artifacts of `harness` within `scope` (global → layer in ('global','plugin'); project → that path) on the unique tuple
+/// (harness, layer, coalesce(project_path,''), kind, name, path) — ids are STABLE across scans — then deletes rows in scope whose
+/// `seen_at <> now`. Returns rows upserted.
 pub fn replace_artifacts(conn, harness: &str, scope: &Scope, artifacts: &[Artifact], now: &str) -> rusqlite::Result<usize>;
 pub fn load_cursor(conn, harness: &str) -> rusqlite::Result<UsageCursor>;      // from sessions.log_path/byte_offset
-pub fn store_usage(conn, batch: &UsageBatch, cursor: &UsageCursor) -> rusqlite::Result<()>;  // upsert sessions (MIN started, MAX ended, += turns/tokens, offset), insert invocations, refresh project session counts
+pub fn store_usage(conn, batch: &UsageBatch, cursor: &UsageCursor) -> rusqlite::Result<()>;  // for sessions flagged reset: DELETE that session's invocations and SET counters; else upsert sessions (MIN started, MAX ended, += turns/tokens, log_path, offset from cursor[log_path]); INSERT OR IGNORE invocations on (harness, session_id, tool_use_id); refresh session counts for the touched harness's projects only
 pub fn link_invocations_to_artifacts(conn, harness: &str) -> rusqlite::Result<usize>;  // sets artifact_id where NULL
 pub fn rebuild_usage_stats(conn, harness: &str, now_epoch_secs: i64) -> rusqlite::Result<()>;
 pub fn record_diagnostics(conn, scan_id: i64, harness: &str, skipped: u64) -> rusqlite::Result<()>;
@@ -1675,7 +1691,7 @@ pub fn record_diagnostics(conn, scan_id: i64, harness: &str, skipped: u64) -> ru
 
 Linking rule (`link_invocations_to_artifacts`): for `kind='skill'` target `"plugin:skill"` → artifact `(kind='skill', plugin_name=plugin, name=skill)`; bare `skill` → prefer `(layer='project', project_path = invocation.project_path)`, then `layer='global'`, then `layer='plugin'`. `agent` → `kind='agent'` same precedence on `name`. `mcp` → `kind='mcp_server'`, same precedence. `builtin` → never linked.
 
-`rebuild_usage_stats`: `DELETE` for harness, then `INSERT … SELECT` grouped by `(kind, target)`: `total = count(*)`, `sessions = count(distinct session_id)`, `last_used = max(ts)`, `error_rate = avg(is_error)`, `avg_turn_tokens = avg(turn_tokens)`, `count_30d = sum(ts >= now-30d)`, `count_prev_30d = sum(ts between now-60d and now-30d)`, `artifact_id = max(artifact_id)`. Compare RFC3339 strings lexicographically against ISO strings built from `now_epoch_secs` (write a small `iso_from_epoch(secs) -> String` helper using the inverse of `epoch_ms`; put it in `harness_store.rs` with a unit test: `iso_from_epoch(0) == "1970-01-01T00:00:00.000Z"`).
+`rebuild_usage_stats`: `DELETE` for harness, then `INSERT … SELECT` grouped by `(kind, target, artifact_id)` (unique index on `(harness, kind, target, coalesce(artifact_id,-1))`): `total = count(*)`, `sessions = count(distinct session_id)`, `last_used = max(ts)`, `error_rate = avg(is_error)`, `avg_turn_tokens = avg(turn_tokens)`, `count_30d = sum(ts >= now-30d)`, `count_prev_30d = sum(ts between now-60d and now-30d)`. Compare RFC3339 strings lexicographically against ISO strings built from `now_epoch_secs` (write a small `iso_from_epoch(secs) -> String` helper using the inverse of `epoch_ms`; put it in `harness_store.rs` with a unit test: `iso_from_epoch(0) == "1970-01-01T00:00:00.000Z"`).
 
 - [ ] **Step 1: Failing tests** (in `harness_store.rs`)
 
@@ -2160,6 +2176,8 @@ Replace `set_scan_folder`/`get_scan_folder` with `set_extra_scan_folders(db, fol
 ---
 
 ### Task 12: Read models + IPC commands
+
+> **Amendment:** `ArtifactView.usage` is looked up by `usage_stats.artifact_id = artifacts.id` (one row per linked artifact); targets with no artifact (`artifact_id IS NULL`) appear only in the Analytics usage overview.
 
 **Files:**
 - Create: `src-tauri/src/harness_query.rs`

@@ -127,6 +127,7 @@ impl InvocationKind {
 pub struct Invocation {
     pub harness: String,
     pub session_id: String,
+    pub tool_use_id: String,
     pub project_path: String,
     pub ts: String,
     pub tool_name: String,
@@ -142,6 +143,7 @@ pub struct SessionMeta {
     pub harness: String,
     pub id: String,
     pub project_path: String,
+    pub log_path: String,
     pub started_at: Option<String>,
     pub ended_at: Option<String>,
     pub turns: i64,
@@ -160,6 +162,9 @@ pub struct UsageCursor {
 pub struct UsageBatch {
     pub sessions: Vec<SessionMeta>,
     pub invocations: Vec<Invocation>,
+    /// Sessions whose log shrank/rotated: their cursor + rows must be reset
+    /// before the batch is applied.
+    pub reset_sessions: Vec<String>,
     pub skipped_lines: u64,
 }
 
