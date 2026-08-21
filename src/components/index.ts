@@ -7,6 +7,8 @@ export { ScoreRing } from "./ScoreRing";
 export { Icon } from "./Icon";
 export { Button } from "./Button";
 export { Card } from "./Card";
+export { UsageBadge } from "./UsageBadge";
+export { ArtifactCard } from "./ArtifactCard";
 
 export type { GradeLetter, GradeSize, GradeProps } from "./Grade";
 export type { SourceId, SourceMeta, SourceBadgeProps } from "./SourceBadge";
@@ -16,3 +18,5 @@ export type { ScoreRingProps } from "./ScoreRing";
 export type { IconName, IconProps } from "./Icon";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export type { CardProps } from "./Card";
+export type { UsageBadgeProps } from "./UsageBadge";
+export type { ArtifactCardProps } from "./ArtifactCard";
