@@ -90,7 +90,9 @@ impl Harness for ClaudeCode {
         let Ok(dirs) = std::fs::read_dir(home.projects_dir()) else {
             return Vec::new();
         };
-        for d in dirs.flatten().filter(|d| d.path().is_dir()) {
+        let mut dirs: Vec<_> = dirs.flatten().filter(|d| d.path().is_dir()).collect();
+        dirs.sort_by_key(|d| d.file_name());
+        for d in dirs {
             let slug_name = d.file_name().to_string_lossy().into_owned();
             let path = cwd_from_logs(&d.path())
                 .or_else(|| {
@@ -175,5 +177,38 @@ mod tests {
         assert!(!h.detect());
         assert!(h.projects().is_empty());
         assert!(h.inventory(&Scope::Global).is_empty());
+    }
+
+    #[test]
+    fn two_slug_dirs_resolving_to_the_same_cwd_dedupe_to_the_alphabetically_first() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let target = root.join("target");
+        std::fs::create_dir_all(&target).unwrap();
+        let projects = root.join("projects");
+        std::fs::create_dir_all(&projects).unwrap();
+
+        let cwd_line = format!(r#"{{"type":"other","cwd":"{}"}}"#, target.to_string_lossy());
+        for slug in ["-aaa-first", "-zzz-second"] {
+            let dir = projects.join(slug);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("0001-session.jsonl"), &cwd_line).unwrap();
+        }
+
+        let home = ClaudeHome::at(root);
+        let h = ClaudeCode::with_home(home.clone());
+        let ps = h.projects();
+        assert_eq!(ps.len(), 1);
+        assert_eq!(ps[0].path, target.to_string_lossy());
+        assert!(ps[0].exists);
+        assert_eq!(
+            ps[0].log_dir,
+            Some(
+                home.projects_dir()
+                    .join("-aaa-first")
+                    .to_string_lossy()
+                    .into_owned()
+            )
+        );
     }
 }
