@@ -63,7 +63,7 @@ export function Overview({ navigate }: OverviewProps) {
             <Button size="sm" onClick={() => void runScan(pickAndScan)} disabled={scanning}>
               <Icon name="folder" /> Change folder…
             </Button>
-            <Button size="sm" onClick={() => void runScan(() => rescan(data.scan_folder ?? ""))} disabled={scanning}>
+            <Button size="sm" onClick={() => void runScan(() => rescan())} disabled={scanning}>
               <Icon name="refresh" /> {scanning ? "Scanning…" : "Scan now"}
             </Button>
           </>

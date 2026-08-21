@@ -126,9 +126,26 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Resul
     Ok(())
 }
 
+/// What the Overview labels as the scan's scope. A detected harness means the
+/// scan already covers everything it knows about; otherwise the scope is
+/// whatever folder the user added by hand (the first one, if several).
+fn scan_scope_label(conn: &Connection) -> rusqlite::Result<Option<String>> {
+    let detected: i64 = conn.query_row(
+        "SELECT count(*) FROM harnesses WHERE detected = 1",
+        [],
+        |r| r.get(0),
+    )?;
+    if detected > 0 {
+        return Ok(Some("everything".to_string()));
+    }
+    Ok(get_setting(conn, "extra_scan_folders")?
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .and_then(|v| v.into_iter().next()))
+}
+
 /// Everything the Overview screen needs.
 pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
-    let scan_folder = get_setting(conn, "scan_folder")?;
+    let scan_folder = scan_scope_label(conn)?;
     let last_scan = conn.query_row("SELECT MAX(finished_at) FROM scans", [], |r| {
         r.get::<_, Option<String>>(0)
     })?;

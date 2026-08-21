@@ -173,12 +173,37 @@ fn resolve_project(path: &Path, roots: &mut RootCache) -> (String, String, Strin
 
 /// Walk `root`, grade every prompt file, and persist the results. Calls
 /// `on_progress(done, total)` after each file. Returns a summary.
+///
+/// Thin wrapper over [`run_scan_all`] for the single-root case. Now that the
+/// app always scans every harness root at once, only the tests take this
+/// path.
+#[cfg(test)]
 pub fn run_scan(
     conn: &Connection,
     root: &Path,
+    on_progress: impl FnMut(u32, u32),
+) -> rusqlite::Result<ScanSummary> {
+    run_scan_all(conn, &[root.to_path_buf()], &[], on_progress)
+}
+
+/// Walk every root in `roots`, add the explicitly named `extra_files` (a
+/// harness's global rule file, say), grade the union, and persist the
+/// results. Calls `on_progress(done, total)` after each file.
+///
+/// Roots may overlap (a project nested inside a manual folder), so the file
+/// list is de-duplicated by path before grading — one row per file, whichever
+/// root found it.
+pub fn run_scan_all(
+    conn: &Connection,
+    roots: &[std::path::PathBuf],
+    extra_files: &[std::path::PathBuf],
     mut on_progress: impl FnMut(u32, u32),
 ) -> rusqlite::Result<ScanSummary> {
-    let files = scanner::scan_folder(root);
+    let mut files: Vec<scanner::PromptFile> =
+        roots.iter().flat_map(|r| scanner::scan_folder(r)).collect();
+    files.extend(scanner::scan_files(extra_files));
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    files.dedup_by(|a, b| a.path == b.path);
     let total = files.len() as u32;
     let rules = crate::query::active_rules(conn);
     let now = now_epoch();
@@ -709,5 +734,26 @@ For example:
             let (_, name, _) = resolve_project(&f, &mut RootCache::default());
             assert_eq!(name, "scripts");
         }
+    }
+
+    #[test]
+    fn run_scan_all_covers_multiple_roots_and_extra_files() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let g = tempfile::tempdir().unwrap();
+        fs::write(a.path().join("CLAUDE.md"), FOCAL).unwrap();
+        fs::write(b.path().join("AGENTS.md"), CLEAN).unwrap();
+        fs::write(g.path().join("CLAUDE.md"), CLEAN).unwrap();
+        let summary = run_scan_all(
+            &conn,
+            &[a.path().to_path_buf(), b.path().to_path_buf()],
+            &[g.path().join("CLAUDE.md")],
+            |_, _| {},
+        )
+        .unwrap();
+        assert_eq!(summary.files_scanned, 3);
+        assert_eq!(summary.projects, 3);
     }
 }

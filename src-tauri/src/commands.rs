@@ -2,7 +2,7 @@
 //! tauri-specta can generate typed TypeScript bindings.
 
 use crate::query::{self, Overview};
-use crate::scan::{run_scan, ScanSummary};
+use crate::scan::ScanSummary;
 use crate::store::AppDb;
 
 /// A small status payload proving the typed store ↔ frontend round-trip.
@@ -54,46 +54,74 @@ pub struct ScanProgress {
     pub total: u32,
 }
 
-/// Run a scan of `root`, persist results, and emit `scan-progress`/`scan-done`.
-/// Shared by the `scan_now` command and the background scheduler.
-pub fn scan_and_emit(
-    app: &tauri::AppHandle,
-    root: &std::path::Path,
-) -> Result<ScanSummary, String> {
+/// Run a full scan and emit `scan-phase` / `scan-progress` / `scan-done`.
+///
+/// Two phases: every detected harness is inventoried and its usage indexed,
+/// then every rule file is graded — across the harness's project roots, its
+/// global layer, and any extra folders the user added by hand. Shared by the
+/// `scan_now` command, the tray, and the background scheduler.
+pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     use tauri::{Emitter, Manager};
 
     let db = app.state::<AppDb>();
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let summary = run_scan(&conn, root, |done, total| {
+    let now_secs = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+
+    let _ = app.emit("scan-phase", "harness");
+    let harnesses = crate::harness::all();
+    let outcome = crate::harness_scan::run_harness_scan(&conn, &harnesses, now_secs)
+        .map_err(|e| e.to_string())?;
+
+    let mut roots = outcome.roots.clone();
+    roots.extend(
+        extra_scan_folders(&conn)
+            .into_iter()
+            .map(std::path::PathBuf::from),
+    );
+
+    let _ = app.emit("scan-phase", "files");
+    let summary = crate::scan::run_scan_all(&conn, &roots, &outcome.extra_files, |done, total| {
         let _ = app.emit("scan-progress", ScanProgress { done, total });
     })
     .map_err(|e| e.to_string())?;
+
+    if let Ok(Some(scan_id)) = crate::harness_store::last_scan_id(&conn) {
+        for h in &harnesses {
+            let _ = crate::harness_store::record_diagnostics(
+                &conn,
+                scan_id,
+                h.id(),
+                outcome.skipped_lines,
+            );
+        }
+    }
+
     let _ = app.emit("scan-done", &summary);
     crate::notify::after_scan(app, &conn);
     Ok(summary)
 }
 
-/// Scan `path`, grade + persist every prompt file, and return a summary.
-/// Emits `scan-progress` per file and `scan-done` at the end.
-#[tauri::command]
-#[specta::specta]
-pub fn scan_now(app: tauri::AppHandle, path: String) -> Result<ScanSummary, String> {
-    scan_and_emit(&app, &std::path::PathBuf::from(&path))
+/// Folders the user added by hand, on top of what the harnesses report.
+/// Stored as a JSON array of strings; a malformed value reads as empty.
+pub(crate) fn extra_scan_folders(conn: &rusqlite::Connection) -> Vec<String> {
+    query::get_setting(conn, "extra_scan_folders")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .unwrap_or_default()
 }
 
-/// Scan the currently configured folder, if any. Used by the tray.
-pub fn scan_configured_folder(app: &tauri::AppHandle) {
-    use tauri::Manager;
-    let folder = {
-        let db = app.state::<AppDb>();
-        let Ok(conn) = db.conn.lock() else {
-            return;
-        };
-        query::get_setting(&conn, "scan_folder").ok().flatten()
-    };
-    if let Some(folder) = folder {
-        let _ = scan_and_emit(app, &std::path::PathBuf::from(folder));
-    }
+/// Scan everything, grade + persist every prompt file, and return a summary.
+/// Emits `scan-phase`, `scan-progress` per file, and `scan-done` at the end.
+#[tauri::command]
+#[specta::specta]
+pub fn scan_now(app: tauri::AppHandle) -> Result<ScanSummary, String> {
+    scan_and_emit(&app)
+}
+
+/// Fire-and-forget full scan. Used by the tray and the scheduler.
+pub fn scan_everything(app: &tauri::AppHandle) {
+    let _ = scan_and_emit(app);
 }
 
 /// Aggregated data for the Overview screen.
@@ -104,20 +132,24 @@ pub fn get_overview(db: tauri::State<'_, AppDb>) -> Result<Overview, String> {
     query::get_overview(&conn).map_err(|e| e.to_string())
 }
 
-/// Persist the folder to scan.
+/// Persist the extra folders to scan on top of the harness's own projects.
 #[tauri::command]
 #[specta::specta]
-pub fn set_scan_folder(db: tauri::State<'_, AppDb>, path: String) -> Result<(), String> {
+pub fn set_extra_scan_folders(
+    db: tauri::State<'_, AppDb>,
+    folders: Vec<String>,
+) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::set_setting(&conn, "scan_folder", &path).map_err(|e| e.to_string())
+    let json = serde_json::to_string(&folders).map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "extra_scan_folders", &json).map_err(|e| e.to_string())
 }
 
-/// The currently configured scan folder, if any.
+/// The extra folders currently configured (empty when none).
 #[tauri::command]
 #[specta::specta]
-pub fn get_scan_folder(db: tauri::State<'_, AppDb>) -> Result<Option<String>, String> {
+pub fn get_extra_scan_folders(db: tauri::State<'_, AppDb>) -> Result<Vec<String>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::get_setting(&conn, "scan_folder").map_err(|e| e.to_string())
+    Ok(extra_scan_folders(&conn))
 }
 
 /// Persist the scan schedule ("1h", "6h", "1d", "save", or "manual").

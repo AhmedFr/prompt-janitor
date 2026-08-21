@@ -39,6 +39,19 @@ const DEFAULT_PATTERNS: &[&str] = &[
 /// Directory names that are always pruned.
 const PRUNED_DIRS: &[&str] = &[".git", "node_modules", "vendor"];
 
+/// Is `rel` inside a `tests/fixtures` tree? Fixture trees hold deliberately
+/// broken prompt files (this repo's own `tests/fixtures/**/CLAUDE.md` among
+/// them); grading them would report a project's test data as real defects.
+fn is_fixture_path(rel: &Path) -> bool {
+    let parts: Vec<String> = rel
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    parts
+        .windows(2)
+        .any(|w| w[0] == "tests" && w[1] == "fixtures")
+}
+
 fn default_globset() -> GlobSet {
     let mut builder = GlobSetBuilder::new();
     for pattern in DEFAULT_PATTERNS {
@@ -74,13 +87,39 @@ fn modified_unix(entry: &ignore::DirEntry) -> Option<i64> {
         .map(|d| d.as_secs() as i64)
 }
 
+/// Read an explicit list of prompt files (e.g. a harness's global rule file).
+///
+/// Unlike [`scan_folder`] these are named, not discovered, so no glob or
+/// ignore filtering applies. Paths that cannot be read (missing, binary) are
+/// skipped silently.
+pub fn scan_files(paths: &[std::path::PathBuf]) -> Vec<PromptFile> {
+    paths
+        .iter()
+        .filter_map(|p| {
+            let content = std::fs::read_to_string(p).ok()?;
+            let modified_unix = std::fs::metadata(p)
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64);
+            Some(PromptFile {
+                path: p.to_string_lossy().into_owned(),
+                kind: classify(p),
+                content,
+                modified_unix,
+            })
+        })
+        .collect()
+}
+
 /// Walk `root` and return every prompt file found, with contents.
 ///
-/// Respects `.gitignore`, prunes `.git`/`node_modules`/`vendor`, and skips
-/// files that cannot be read as UTF-8 text.
+/// Respects `.gitignore`, prunes `.git`/`node_modules`/`vendor` and any
+/// `tests/fixtures` tree, and skips files that cannot be read as UTF-8 text.
 pub fn scan_folder(root: &Path) -> Vec<PromptFile> {
     let globset = default_globset();
     let mut found = Vec::new();
+    let prune_root = root.to_path_buf();
 
     let walker = WalkBuilder::new(root)
         .hidden(false)
@@ -89,10 +128,15 @@ pub fn scan_folder(root: &Path) -> Vec<PromptFile> {
         // Apply .gitignore even when the folder isn't a git repo, so behavior
         // is predictable across both repos and loose folders.
         .require_git(false)
-        .filter_entry(|entry| {
+        .filter_entry(move |entry| {
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
             let name = entry.file_name().to_string_lossy();
-            !(is_dir && PRUNED_DIRS.contains(&name.as_ref()))
+            if is_dir && PRUNED_DIRS.contains(&name.as_ref()) {
+                return false;
+            }
+            let path = entry.path();
+            let rel = path.strip_prefix(&prune_root).unwrap_or(path);
+            !is_fixture_path(rel)
         })
         .build();
 
@@ -165,5 +209,39 @@ mod tests {
         let found = scan_folder(root);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].kind, "AGENTS.md");
+    }
+
+    #[test]
+    fn scan_files_reads_explicit_paths_and_skips_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = dir.path().join("CLAUDE.md");
+        fs::write(&f, "# global").unwrap();
+        let found = scan_files(&[f.clone(), dir.path().join("missing.md")]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].kind, "CLAUDE.md");
+        assert_eq!(found[0].content, "# global");
+    }
+
+    #[test]
+    fn prunes_test_fixture_trees() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(root.join("CLAUDE.md"), "# real").unwrap();
+        fs::create_dir_all(root.join("tests/fixtures/claude_home")).unwrap();
+        fs::write(
+            root.join("tests/fixtures/claude_home/CLAUDE.md"),
+            "# fixture",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("src-tauri/tests/fixtures/nested")).unwrap();
+        fs::write(
+            root.join("src-tauri/tests/fixtures/nested/AGENTS.md"),
+            "# fixture",
+        )
+        .unwrap();
+
+        let found = scan_folder(root);
+        assert_eq!(found.len(), 1, "found: {found:#?}");
+        assert!(!found.iter().any(|f| f.path.contains("fixtures")));
     }
 }

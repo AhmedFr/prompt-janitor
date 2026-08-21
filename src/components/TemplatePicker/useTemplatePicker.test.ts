@@ -8,7 +8,6 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
 
 const listTemplates = vi.hoisted(() => vi.fn());
 const getEntitlement = vi.hoisted(() => vi.fn());
-const getScanFolder = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
 const listFiles = vi.hoisted(() => vi.fn());
 const applyTemplate = vi.hoisted(() => vi.fn());
@@ -18,7 +17,7 @@ vi.mock("@/lib/ipc", async () => {
   return {
     ...actual,
     isTauri: true,
-    commands: { listTemplates, getEntitlement, getScanFolder, scanNow, listFiles, applyTemplate },
+    commands: { listTemplates, getEntitlement, scanNow, listFiles, applyTemplate },
   };
 });
 
@@ -37,7 +36,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   listTemplates.mockResolvedValue(catalog);
   getEntitlement.mockResolvedValue({ status: "ok", data: { paid: true, email: null, plan: null } });
-  getScanFolder.mockResolvedValue({ status: "ok", data: "/demo" });
   scanNow.mockResolvedValue({ status: "ok", data: {} });
 });
 
@@ -85,7 +83,7 @@ describe("useTemplatePicker", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     const outcome = await act(() => result.current.applyTemplate("rust-claude"));
-    expect(scanNow).toHaveBeenCalledWith("/demo");
+    expect(scanNow).toHaveBeenCalledWith();
     expect(outcome).toEqual({ status: "done", path: "/demo/project/CLAUDE.md", fileId: "f1" });
   });
 

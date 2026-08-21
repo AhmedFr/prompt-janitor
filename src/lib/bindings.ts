@@ -9,16 +9,16 @@ export const commands = {
 	/**  Liveness check. */
 	ping: () => __TAURI_INVOKE<string>("ping"),
 	/**
-	 *  Scan `path`, grade + persist every prompt file, and return a summary.
-	 *  Emits `scan-progress` per file and `scan-done` at the end.
+	 *  Scan everything, grade + persist every prompt file, and return a summary.
+	 *  Emits `scan-phase`, `scan-progress` per file, and `scan-done` at the end.
 	 */
-	scanNow: (path: string) => typedError<ScanSummary, string>(__TAURI_INVOKE("scan_now", { path })),
+	scanNow: () => typedError<ScanSummary, string>(__TAURI_INVOKE("scan_now")),
 	/**  Aggregated data for the Overview screen. */
 	getOverview: () => typedError<Overview, string>(__TAURI_INVOKE("get_overview")),
-	/**  Persist the folder to scan. */
-	setScanFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("set_scan_folder", { path })),
-	/**  The currently configured scan folder, if any. */
-	getScanFolder: () => typedError<string | null, string>(__TAURI_INVOKE("get_scan_folder")),
+	/**  Persist the extra folders to scan on top of the harness's own projects. */
+	setExtraScanFolders: (folders: string[]) => typedError<null, string>(__TAURI_INVOKE("set_extra_scan_folders", { folders })),
+	/**  The extra folders currently configured (empty when none). */
+	getExtraScanFolders: () => typedError<string[], string>(__TAURI_INVOKE("get_extra_scan_folders")),
 	/**  Persist the scan schedule ("1h", "6h", "1d", "save", or "manual"). */
 	setSchedule: (value: string) => typedError<null, string>(__TAURI_INVOKE("set_schedule", { value })),
 	/**  The current scan schedule (defaults to "6h"). */

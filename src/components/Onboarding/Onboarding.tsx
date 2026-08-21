@@ -48,8 +48,8 @@ export function Onboarding({ onDone }: OnboardingProps) {
   const runFirstScan = async () => {
     if (!folder) return;
     setStep("scanning");
-    await commands.setScanFolder(folder);
-    const res = await commands.scanNow(folder);
+    await commands.setExtraScanFolders([folder]);
+    const res = await commands.scanNow();
     if (res.status === "ok") {
       setSummary(res.data);
       setStep("reveal");
