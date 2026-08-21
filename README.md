@@ -18,6 +18,8 @@ It scans your folders on a schedule, grades each prompt file **A–F** against b
 
 ## Pricing model
 
+**Monetisation paused (2026-08):** all features are currently open; the tiers below describe the intended offer.
+
 **Diagnosis free. Treatment paid.**
 
 - **Free forever:** scanning, scheduling, and grading — including the built-in

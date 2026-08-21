@@ -32,8 +32,7 @@ pub fn provider_for(id: &str) -> Option<&'static dyn LlmProvider> {
     PROVIDERS.iter().copied().find(|p| p.id() == id)
 }
 
-// Exercised by tests; not yet called by production code (Task 2 frontend seam).
-#[allow(dead_code)]
+/// Ids of all registered providers, used e.g. to validate `set_ai_config`.
 pub fn provider_ids() -> Vec<&'static str> {
     PROVIDERS.iter().map(|p| p.id()).collect()
 }

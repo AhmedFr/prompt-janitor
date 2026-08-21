@@ -321,11 +321,25 @@ pub fn set_ai_config(
     model: String,
 ) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::set_setting(&conn, "ai_provider", &provider).map_err(|e| e.to_string())?;
-    if !api_key.is_empty() {
-        query::set_setting(&conn, "ai_key", &api_key).map_err(|e| e.to_string())?;
+    set_ai_config_with_conn(&conn, &provider, &api_key, &model)
+}
+
+/// The body of [`set_ai_config`], taking a `&Connection` directly rather than
+/// a Tauri `State` so it can be exercised in tests.
+fn set_ai_config_with_conn(
+    conn: &rusqlite::Connection,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<(), String> {
+    if provider != "none" && !crate::ai::provider::provider_ids().contains(&provider) {
+        return Err(format!("Unknown AI provider: {provider}"));
     }
-    query::set_setting(&conn, "ai_model", &model).map_err(|e| e.to_string())?;
+    query::set_setting(conn, "ai_provider", provider).map_err(|e| e.to_string())?;
+    if !api_key.is_empty() {
+        query::set_setting(conn, "ai_key", api_key).map_err(|e| e.to_string())?;
+    }
+    query::set_setting(conn, "ai_model", model).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -691,19 +705,32 @@ mod tests {
         }];
         let result = apply_fix_with_conn(&conn, "f", &edits, false, "manual");
 
-        assert_ne!(result.unwrap_err(), PAID_GATE);
+        assert!(result.unwrap_err().contains("Couldn't read the file"));
     }
-}
 
-#[cfg(test)]
-mod entitlement_tests {
-    use rusqlite::Connection;
+    #[test]
+    fn set_ai_config_rejects_an_unknown_provider() {
+        let conn = free_conn();
+        let result = set_ai_config_with_conn(&conn, "not-a-real-provider", "", "");
+        assert_eq!(
+            result.unwrap_err(),
+            "Unknown AI provider: not-a-real-provider"
+        );
+    }
+
+    #[test]
+    fn set_ai_config_allows_none_and_registered_providers() {
+        let conn = free_conn();
+        assert!(set_ai_config_with_conn(&conn, "none", "", "").is_ok());
+        for id in crate::ai::provider::provider_ids() {
+            assert!(set_ai_config_with_conn(&conn, id, "", "").is_ok());
+        }
+    }
 
     #[test]
     fn entitlement_is_open_without_a_license() {
-        let conn = Connection::open_in_memory().unwrap();
-        crate::store::migrate(&conn).unwrap();
-        let ent = super::entitlement_of(&conn);
+        let conn = free_conn();
+        let ent = entitlement_of(&conn);
         assert!(ent.paid);
         assert_eq!(ent.plan.as_deref(), Some("open"));
         assert!(ent.email.is_none());

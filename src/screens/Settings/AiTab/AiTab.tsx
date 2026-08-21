@@ -51,6 +51,17 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
 
   const off = provider === "none";
 
+  // Model ids are provider-specific (e.g. "claude-sonnet-4-6" vs.
+  // "anthropic/claude-sonnet-4.6" on OpenRouter). If the field still holds
+  // the outgoing provider's default, carry the switch forward to the new
+  // provider's default too; a model the user typed themselves is left alone.
+  const switchProvider = (key: string) => {
+    if (model === DEFAULT_MODELS[provider]) {
+      setModel(DEFAULT_MODELS[key] ?? "");
+    }
+    setProvider(key);
+  };
+
   return (
     <>
       <h2 className="set-sec">AI provider</h2>
@@ -65,7 +76,7 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
             <button
               key={key}
               className={provider === key ? "on" : ""}
-              onClick={() => setProvider(key)}
+              onClick={() => switchProvider(key)}
             >
               {label}
             </button>
@@ -82,13 +93,18 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
                 value={apiKey}
                 placeholder={hasKey ? "•••••••• stored — leave blank to keep" : "Paste your API key"}
                 onChange={(e) => setApiKey(e.target.value)}
+                aria-describedby={provider === "openrouter" ? "ai-openrouter-hint" : undefined}
               />
-              {provider === "openrouter" && (
-                <span className="faint" style={{ fontSize: 12, marginTop: 4, display: "block" }}>
-                  Keys at openrouter.ai/keys — model ids look like vendor/model.
-                </span>
-              )}
             </label>
+            {provider === "openrouter" && (
+              <span
+                id="ai-openrouter-hint"
+                className="faint"
+                style={{ fontSize: 12, marginTop: 4, display: "block" }}
+              >
+                Keys at openrouter.ai/keys — model ids look like vendor/model.
+              </span>
+            )}
             <label style={fieldStyle}>
               <span style={labelStyle}>Model</span>
               <input

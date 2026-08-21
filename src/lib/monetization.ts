@@ -7,7 +7,9 @@ export const POLAR_CHECKOUT_URL = "https://buy.polar.sh/polar_cl_PLACEHOLDER"; /
 /** Price line shown next to purchase CTAs. */
 export const FOUNDER_PRICE = "$69 founder pricing";
 
-/** Primary purchase CTA (Settings → License). */
+/** Primary purchase CTA (Settings → License). Intentionally unused while
+ * gates are open — nothing renders a purchase CTA right now — kept ready
+ * for when monetisation resumes. */
 export const GET_LICENSE_LABEL = `Get a license — ${FOUNDER_PRICE}`;
 
 /** Compact purchase CTA used inline (Detail issue panel, locked actions). */
