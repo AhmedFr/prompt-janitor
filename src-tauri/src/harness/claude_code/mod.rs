@@ -1,3 +1,4 @@
+pub mod inventory;
 pub mod paths;
 pub mod slug;
 #[cfg(test)]
