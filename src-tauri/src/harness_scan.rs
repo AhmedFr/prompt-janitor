@@ -83,31 +83,46 @@ fn user_homes() -> Vec<PathBuf> {
 ///
 /// The folders the user added by hand go through here too: a picked `$HOME`
 /// is exactly as unwalkable as a slug that resolved to one.
+///
+/// Every comparison below — home match, ancestor-of-harness-home, nested-under-
+/// another-root, dedupe — is judged on the CANONICAL form of each candidate: a
+/// root reached through a symlink has to be judged as what it points at,
+/// `~/shortcut -> ~` is the home directory under another name, and a
+/// path-prefix test can't see through the link. But the ORIGINAL path string
+/// is what gets returned. `artifacts.file_id` for a project's rule files is
+/// built from that same original, non-canonicalized project path; if the
+/// walker were pointed at the canonical root instead, the files it stores
+/// would carry canonical ids and the `artifacts.file_id = files.id` join
+/// would break for any project reached through a symlink. When two candidates
+/// canonicalize to the same path, the first occurrence (by input order) wins.
 pub(crate) fn scan_roots(candidates: Vec<PathBuf>, home_roots: &[PathBuf]) -> Vec<PathBuf> {
     let homes = user_homes();
-    let mut kept: Vec<PathBuf> = candidates
+    let mut kept: Vec<(PathBuf, PathBuf)> = candidates
         .into_iter()
-        // A root reached through a symlink has to be judged as what it points
-        // at: `~/shortcut -> ~` is the home directory under another name, and
-        // every comparison below is a path-prefix test that the link defeats.
-        .map(|r| r.canonicalize().unwrap_or(r))
-        .filter(|r| {
+        .map(|r| {
+            let canonical = r.canonicalize().unwrap_or_else(|_| r.clone());
+            (r, canonical)
+        })
+        .filter(|(_, canonical)| {
             // The filesystem root has no parent.
-            r.parent().is_some()
-                && !homes.contains(r)
-                && !home_roots.iter().any(|h| h.starts_with(r))
+            canonical.parent().is_some()
+                && !homes.contains(canonical)
+                && !home_roots.iter().any(|h| h.starts_with(canonical))
         })
         .collect();
-    kept.sort();
-    kept.dedup();
-    let mut out: Vec<PathBuf> = Vec::new();
-    for root in kept {
-        if out.iter().any(|outer| root.starts_with(outer)) {
+    // Stable sort on the canonical form: candidates that resolve to the same
+    // path stay in their original relative order, so the dedup below keeps
+    // the first occurrence.
+    kept.sort_by(|(_, a), (_, b)| a.cmp(b));
+    kept.dedup_by(|(_, a), (_, b)| a == b);
+    let mut out: Vec<(PathBuf, PathBuf)> = Vec::new();
+    for (original, canonical) in kept {
+        if out.iter().any(|(_, outer)| canonical.starts_with(outer)) {
             continue;
         }
-        out.push(root);
+        out.push((original, canonical));
     }
-    out
+    out.into_iter().map(|(original, _)| original).collect()
 }
 
 /// How many of `inventory`'s artifacts were read out of `project` itself.
@@ -400,6 +415,66 @@ mod tests {
         assert_eq!(n, 0);
     }
 
+    /// End-to-end: a project reached through a symlink must still leave the
+    /// file grader able to join `artifacts.file_id` back to `files.id` for its
+    /// rule file. `fixture_home()` canonicalizes its tempdir root before
+    /// anything is derived from it, so that fixture alone can never exercise
+    /// the mismatch (its project paths are already canonical) — this test
+    /// builds its own home with a project reachable only via a symlink, which
+    /// is exactly the shape a real macOS run hits every time: `$TMPDIR` sits
+    /// under `/var`, itself a symlink to `/private/var`.
+    #[cfg(unix)]
+    #[test]
+    fn artifacts_for_a_symlinked_project_join_back_to_their_files_row() {
+        let tmp = tempfile::tempdir().unwrap();
+        let user_home = tmp.path().canonicalize().unwrap();
+        let root = user_home.join(".claude");
+        std::fs::create_dir_all(root.join("projects")).unwrap();
+        std::fs::write(root.join("CLAUDE.md"), "# global\n").unwrap();
+        let home = ClaudeHome::at(root);
+
+        let real = user_home.join("real/app");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join("CLAUDE.md"), "# rules\n").unwrap();
+        let link = user_home.join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        register_project(&home, &link);
+
+        let conn = conn();
+        let hs = boxed(&home);
+        let out = run_harness_scan(&conn, &hs, 1_785_628_800).unwrap();
+        assert_eq!(
+            out.roots,
+            vec![link.clone()],
+            "root kept as the symlink path"
+        );
+
+        crate::scan::run_scan_all(&conn, &out.roots, &out.extra_files, |_, _| {}).unwrap();
+
+        let dangling: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM artifacts a
+                 WHERE a.kind='rule' AND a.file_id IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM files f WHERE f.id = a.file_id)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            dangling, 0,
+            "every rule artifact must join back to a files row"
+        );
+
+        let graded: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM files WHERE id = ?1",
+                [link.join("CLAUDE.md").to_string_lossy()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(graded, 1, "the project's rule file was actually graded");
+    }
+
     #[test]
     fn nested_roots_collapse_into_the_outermost_one() {
         let roots = vec![
@@ -584,6 +659,24 @@ mod tests {
             scan_roots(vec![link], std::slice::from_ref(&home.root)).is_empty(),
             "a symlink to the harness home is still the harness home"
         );
+    }
+
+    /// A project reached through a symlink is judged (for the home/ancestor
+    /// checks) by what the link resolves to, but it must survive as a kept
+    /// root — and come back out as the SYMLINK path, not the resolved one:
+    /// `artifacts.file_id` for that project's rule files is built from the
+    /// same non-canonicalized path, and the walker has to be pointed at it so
+    /// the files it stores carry matching ids.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_project_root_is_kept_and_returned_as_the_symlink_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real/app");
+        std::fs::create_dir_all(&real).unwrap();
+        let link = tmp.path().join("link");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+
+        assert_eq!(scan_roots(vec![link.clone()], &[]), vec![link]);
     }
 
     fn session_turns(conn: &Connection) -> i64 {
