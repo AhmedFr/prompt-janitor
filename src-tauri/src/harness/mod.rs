@@ -22,7 +22,7 @@ pub trait Harness: Send + Sync {
 }
 
 pub fn all() -> Vec<Box<dyn Harness>> {
-    Vec::new()
+    vec![Box::new(claude_code::ClaudeCode::new())]
 }
 
 pub fn detected() -> Vec<Box<dyn Harness>> {
@@ -32,8 +32,10 @@ pub fn detected() -> Vec<Box<dyn Harness>> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn registry_is_empty_until_a_harness_is_added() {
-        // Task 8 turns this into a Claude Code assertion.
-        assert_eq!(super::all().len(), 0);
+    fn registry_lists_claude_code_first() {
+        assert_eq!(
+            super::all().iter().map(|h| h.id()).collect::<Vec<_>>(),
+            vec!["claude_code"]
+        );
     }
 }
