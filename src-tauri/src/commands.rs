@@ -366,10 +366,12 @@ fn entitlement_of(conn: &rusqlite::Connection) -> crate::license::Entitlement {
             email: Some(info.email),
             plan: Some(info.plan),
         },
+        // Monetisation is paused: every feature is open. A stored key still
+        // surfaces its email/plan so nothing is lost when gates return.
         None => crate::license::Entitlement {
-            paid: false,
+            paid: true,
             email: None,
-            plan: None,
+            plan: Some("open".to_string()),
         },
     }
 }
@@ -667,7 +669,10 @@ mod tests {
     }
 
     #[test]
-    fn apply_fix_is_paid_gated_for_a_free_user() {
+    fn apply_fix_is_not_paid_gated_for_a_free_user() {
+        // Monetisation is paused: a free/unentitled user is never turned away
+        // by the paid gate. This DB row points at a file that doesn't exist
+        // on disk, so the call still fails — just not with PAID_GATE.
         let conn = free_conn();
         conn.execute(
             "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
@@ -686,6 +691,21 @@ mod tests {
         }];
         let result = apply_fix_with_conn(&conn, "f", &edits, false, "manual");
 
-        assert_eq!(result.unwrap_err(), PAID_GATE);
+        assert_ne!(result.unwrap_err(), PAID_GATE);
+    }
+}
+
+#[cfg(test)]
+mod entitlement_tests {
+    use rusqlite::Connection;
+
+    #[test]
+    fn entitlement_is_open_without_a_license() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let ent = super::entitlement_of(&conn);
+        assert!(ent.paid);
+        assert_eq!(ent.plan.as_deref(), Some("open"));
+        assert!(ent.email.is_none());
     }
 }

@@ -1,3 +1,4 @@
+// Monetisation paused (2026-08): constants kept for when gates return.
 // Single home for the purchase link + price copy, so every Pro CTA in the app
 // stays consistent and there is exactly one place to update.
 
