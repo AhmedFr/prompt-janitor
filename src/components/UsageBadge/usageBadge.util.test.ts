@@ -30,4 +30,10 @@ describe("formatUsage", () => {
     expect(formatUsage(stat({ last_used: "2026-05-01T00:00:00.000Z" }), now).tone).toBe("stale");
     expect(formatUsage(stat({ last_used: "2026-05-01T00:00:00.000Z" }), now).label).toMatch(/last 3mo ago$/);
   });
+  it("omits the last-used suffix and stays 'used' toned when last_used is unknown", () => {
+    expect(formatUsage(stat({ total: 3, sessions: 2, last_used: null }), now)).toEqual({
+      label: "used 3× · 2 sessions",
+      tone: "used",
+    });
+  });
 });

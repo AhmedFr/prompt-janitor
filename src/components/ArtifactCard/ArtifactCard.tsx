@@ -25,6 +25,7 @@ export function ArtifactCard({ artifact, onOpen }: ArtifactCardProps) {
         {description && <span className="artifact-card__description">{description}</span>}
       </span>
       <span className="artifact-card__meta">
+        {/* DB only writes A–F; IPC type is a loose string. */}
         {kind === "rule" && grade && <Grade grade={grade as GradeLetter} size="sm" />}
         <UsageBadge usage={usage} />
       </span>

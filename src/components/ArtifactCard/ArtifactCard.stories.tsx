@@ -88,6 +88,25 @@ export const McpServerErrorProne: Story = {
   },
 };
 
+export const AgentStale: Story = {
+  args: {
+    artifact: artifact({
+      kind: "agent",
+      name: "code-reviewer",
+      description: "Reviews diffs for correctness and style before merge.",
+      usage: {
+        total: 9,
+        sessions: 4,
+        last_used: "2026-04-22T00:00:00.000Z",
+        error_rate: 0,
+        avg_turn_tokens: null,
+        count_30d: 0,
+        count_prev_30d: 0,
+      },
+    }),
+  },
+};
+
 export const PluginNeverUsed: Story = {
   args: {
     artifact: artifact({
