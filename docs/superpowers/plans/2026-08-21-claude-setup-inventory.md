@@ -1686,6 +1686,7 @@ impl Harness for ClaudeCode {
 > - `store_usage` persists `SessionMeta.parent_session_id` and `SessionMeta.last_message_id` (v8 columns `parent_session_id`, `last_message_id`, index `idx_sessions_parent`).
 > - `load_cursor` fills both `offsets` **and** `last_message_ids` (`SELECT log_path, byte_offset, last_message_id FROM sessions WHERE harness = ?`), so a restart resumes the per-message turn dedupe.
 > - Sub-agent transcripts are sessions too, so `harness_projects.session_count` and every "sessions" count roll up only top-level ones: `WHERE parent_session_id IS NULL`. Invocations are counted from all of them.
+> - child session ids are `<parent>/<stem>`.
 
 **Files:**
 - Create: `src-tauri/src/harness_store.rs`

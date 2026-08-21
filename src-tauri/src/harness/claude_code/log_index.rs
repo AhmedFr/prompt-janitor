@@ -288,6 +288,20 @@ fn index_one(
         return;
     };
     indexed.session.parent_session_id = parent.map(str::to_string);
+    // A sub-agent transcript's file stem (`agent-<id>`) is only unique within
+    // its parent session; `sessions.id` is a bare PRIMARY KEY, so two parents
+    // with same-stem transcripts would collide. Namespace the child id by its
+    // parent and carry that same id through every row from this file.
+    if let Some(p) = parent {
+        let child_id = format!("{p}/{}", indexed.session.id);
+        for inv in &mut indexed.invocations {
+            inv.session_id = child_id.clone();
+        }
+        for o in &mut indexed.orphan_results {
+            o.session_id = child_id.clone();
+        }
+        indexed.session.id = child_id;
+    }
     let advanced = indexed.new_offset != from || from == 0;
     cursor.offsets.insert(key.clone(), indexed.new_offset);
     // A range with no assistant record leaves the seed alone: the next pass
@@ -661,7 +675,7 @@ mod tests {
         let child = batch
             .sessions
             .iter()
-            .find(|s| s.id == "agent-abc")
+            .find(|s| s.id == "0001-session/agent-abc")
             .expect("sub-agent session");
         assert_eq!(child.parent_session_id.as_deref(), Some("0001-session"));
         assert_eq!(
@@ -678,7 +692,7 @@ mod tests {
         let inv: Vec<_> = batch
             .invocations
             .iter()
-            .filter(|i| i.session_id == "agent-abc")
+            .filter(|i| i.session_id == "0001-session/agent-abc")
             .collect();
         assert_eq!(inv.len(), 1);
         assert_eq!(
@@ -702,6 +716,18 @@ mod tests {
                 .offsets
                 .get(&log_of(&home).to_string_lossy().into_owned()),
             Some(&0)
+        );
+        let subagent_log = home
+            .projects_dir()
+            .join(slug::encode(&home.root.join("work/app")))
+            .join("0001-session/subagents/agent-abc.jsonl");
+        let offset = cursor
+            .offsets
+            .get(&subagent_log.to_string_lossy().into_owned())
+            .expect("sub-agent transcript has a cursor entry");
+        assert_ne!(
+            *offset, 0,
+            "untouched sub-agent transcript keeps its offset"
         );
     }
 }
