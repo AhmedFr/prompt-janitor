@@ -1,0 +1,1 @@
+{"model":"opus","hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"echo hi"}]}]},"enabledPlugins":{"superpowers@claude-plugins-official":true},"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp"]}}}

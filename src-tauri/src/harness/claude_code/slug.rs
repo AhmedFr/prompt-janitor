@@ -30,6 +30,10 @@ pub fn decode_slug_fs(slug: &str) -> Option<PathBuf> {
     decode_slug(slug, &|p| p.is_dir())
 }
 
+pub fn encode(path: &Path) -> String {
+    path.to_string_lossy().replace('/', "-")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -37,6 +41,11 @@ mod tests {
 
     fn fs_with<'a>(existing: &'a [&'a str]) -> impl Fn(&Path) -> bool + 'a {
         move |p| existing.iter().any(|e| Path::new(e) == p)
+    }
+
+    #[test]
+    fn encode_replaces_separators_with_dashes() {
+        assert_eq!(encode(Path::new("/Users/a/code/app")), "-Users-a-code-app");
     }
 
     #[test]
