@@ -146,6 +146,90 @@ const MIGRATIONS: &[&str] = &[
         applied_at TEXT NOT NULL
     );
     ",
+    // v8 — harness inventory + usage analytics (2026-08 spec)
+    "
+    CREATE TABLE harnesses (
+        id           TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        detected     INTEGER NOT NULL DEFAULT 0,
+        last_scan_at TEXT
+    );
+    CREATE TABLE harness_projects (
+        harness         TEXT NOT NULL,
+        path            TEXT NOT NULL,
+        exists_on_disk  INTEGER NOT NULL DEFAULT 1,
+        log_dir         TEXT,
+        last_session_at TEXT,
+        session_count   INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (harness, path)
+    );
+    CREATE TABLE artifacts (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        harness      TEXT NOT NULL,
+        layer        TEXT NOT NULL,
+        project_path TEXT,
+        kind         TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        path         TEXT NOT NULL,
+        plugin_name  TEXT,
+        description  TEXT,
+        bytes        INTEGER NOT NULL DEFAULT 0,
+        hash         TEXT NOT NULL,
+        seen_at      TEXT NOT NULL,
+        file_id      TEXT,
+        UNIQUE (harness, layer, project_path, kind, name, path)
+    );
+    CREATE TABLE sessions (
+        id            TEXT PRIMARY KEY,
+        harness       TEXT NOT NULL,
+        project_path  TEXT NOT NULL,
+        log_path      TEXT NOT NULL,
+        started_at    TEXT,
+        ended_at      TEXT,
+        turns         INTEGER NOT NULL DEFAULT 0,
+        input_tokens  INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        model         TEXT,
+        byte_offset   INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE invocations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        harness      TEXT NOT NULL,
+        session_id   TEXT NOT NULL,
+        project_path TEXT NOT NULL,
+        ts           TEXT NOT NULL,
+        tool_name    TEXT NOT NULL,
+        kind         TEXT NOT NULL,
+        target       TEXT NOT NULL,
+        artifact_id  INTEGER REFERENCES artifacts(id) ON DELETE SET NULL,
+        duration_ms  INTEGER,
+        is_error     INTEGER NOT NULL DEFAULT 0,
+        turn_tokens  INTEGER
+    );
+    CREATE INDEX idx_invocations_session ON invocations(session_id);
+    CREATE INDEX idx_invocations_target ON invocations(harness, kind, target, ts);
+    CREATE INDEX idx_invocations_project ON invocations(project_path, ts);
+    CREATE TABLE usage_stats (
+        harness         TEXT NOT NULL,
+        kind            TEXT NOT NULL,
+        target          TEXT NOT NULL,
+        artifact_id     INTEGER,
+        total           INTEGER NOT NULL,
+        sessions        INTEGER NOT NULL,
+        last_used       TEXT,
+        error_rate      REAL NOT NULL,
+        avg_turn_tokens REAL,
+        count_30d       INTEGER NOT NULL,
+        count_prev_30d  INTEGER NOT NULL,
+        PRIMARY KEY (harness, kind, target)
+    );
+    CREATE TABLE scan_diagnostics (
+        scan_id       INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+        harness       TEXT NOT NULL,
+        skipped_lines INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (scan_id, harness)
+    );
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -281,5 +365,29 @@ mod tests {
         // A column that only exists after migration 5.
         conn.execute("UPDATE projects SET logo = 'x' WHERE 1=0", [])
             .expect("logo column should exist");
+    }
+
+    #[test]
+    fn harness_tables_exist_after_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        for table in [
+            "harnesses",
+            "harness_projects",
+            "artifacts",
+            "sessions",
+            "invocations",
+            "usage_stats",
+            "scan_diagnostics",
+        ] {
+            let n: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?1",
+                    [table],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "missing table {table}");
+        }
     }
 }
