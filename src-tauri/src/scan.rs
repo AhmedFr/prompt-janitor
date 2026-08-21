@@ -186,6 +186,44 @@ pub fn run_scan(
     run_scan_all(conn, &[root.to_path_buf()], &[], on_progress)
 }
 
+/// The summary a no-op scan reports: what is already persisted, with
+/// `files_scanned = 0`. A `scans` row is still written — the scan did happen,
+/// it just had nothing to walk — so the scheduler's "when did we last scan"
+/// clock keeps ticking instead of re-firing every tick.
+fn summarize_existing(conn: &Connection) -> rusqlite::Result<ScanSummary> {
+    let count_sev = |sev: &str| -> rusqlite::Result<u32> {
+        conn.query_row(
+            "SELECT COUNT(*) FROM issues WHERE severity = ?1",
+            [sev],
+            |r| r.get::<_, i64>(0),
+        )
+        .map(|n| n as u32)
+    };
+    let projects =
+        conn.query_row("SELECT COUNT(*) FROM projects", [], |r| r.get::<_, i64>(0))? as u32;
+    let overall_score = conn
+        .query_row("SELECT AVG(score) FROM files", [], |r| {
+            r.get::<_, Option<f64>>(0)
+        })?
+        .map(|avg| avg as u32)
+        .unwrap_or(100);
+
+    conn.execute(
+        "INSERT INTO scans(started_at, finished_at, files_scanned) VALUES(?1, ?1, 0)",
+        params![now_epoch()],
+    )?;
+
+    Ok(ScanSummary {
+        files_scanned: 0,
+        projects,
+        critical: count_sev("hi")?,
+        warnings: count_sev("mid")?,
+        nits: count_sev("lo")?,
+        overall_score,
+        overall_grade: grade_for_score(overall_score),
+    })
+}
+
 /// Walk every root in `roots`, add the explicitly named `extra_files` (a
 /// harness's global rule file, say), grade the union, and persist the
 /// results. Calls `on_progress(done, total)` after each file.
@@ -199,6 +237,15 @@ pub fn run_scan_all(
     extra_files: &[std::path::PathBuf],
     mut on_progress: impl FnMut(u32, u32),
 ) -> rusqlite::Result<ScanSummary> {
+    // Nothing to walk — no harness detected and no extra folders. Grading an
+    // empty file list would wipe every prior result, turning a first launch
+    // before detection (or a temporarily unreadable home) into "you have no
+    // prompts". Record the scan so the scheduler keeps its cadence, but leave
+    // `files`/`issues`/`projects` exactly as they are.
+    if roots.is_empty() && extra_files.is_empty() {
+        return summarize_existing(conn);
+    }
+
     let mut files: Vec<scanner::PromptFile> =
         roots.iter().flat_map(|r| scanner::scan_folder(r)).collect();
     files.extend(scanner::scan_files(extra_files));
@@ -218,12 +265,12 @@ pub fn run_scan_all(
 
     let mut project_scores: HashMap<String, Vec<u32>> = HashMap::new();
     let (mut critical, mut warnings, mut nits) = (0u32, 0u32, 0u32);
-    let mut roots = RootCache::default();
+    let mut root_cache = RootCache::default();
 
     for (i, file) in files.iter().enumerate() {
         let file_path = Path::new(&file.path);
-        let repo_root = roots.repo_root_for(file_path);
-        let resolution_root = roots.resolution_root_for(file_path);
+        let repo_root = root_cache.repo_root_for(file_path);
+        let resolution_root = root_cache.resolution_root_for(file_path);
         let ctx = RuleContext {
             content: &file.content,
             file_path: Some(file_path),
@@ -256,7 +303,7 @@ pub fn run_scan_all(
         }
         let score = score_for_counts(hi, mid, lo);
         let grade = grade_for_score(score);
-        let (project_id, project_name, project_root) = resolve_project(file_path, &mut roots);
+        let (project_id, project_name, project_root) = resolve_project(file_path, &mut root_cache);
         let issue_count = issues.len() + carried_nl.len();
 
         let logo = crate::project_logo::detect_logo(Path::new(&project_root));
@@ -755,5 +802,43 @@ For example:
         .unwrap();
         assert_eq!(summary.files_scanned, 3);
         assert_eq!(summary.projects, 3);
+    }
+
+    #[test]
+    fn empty_root_set_keeps_prior_results() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), FOCAL).unwrap();
+        let seeded = run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        assert_eq!(seeded.files_scanned, 1);
+
+        // No harness detected and no extra folders: nothing to walk. The last
+        // good grades must survive rather than being wiped to an empty app.
+        let summary = run_scan_all(&conn, &[], &[], |_, _| {}).unwrap();
+        assert_eq!(summary.files_scanned, 0);
+        assert_eq!(summary.projects, 1);
+        assert_eq!(summary.critical, seeded.critical);
+        assert_eq!(summary.warnings, seeded.warnings);
+        assert_eq!(summary.nits, seeded.nits);
+        assert_eq!(summary.overall_score, seeded.overall_score);
+
+        let files: i64 = conn
+            .query_row("SELECT count(*) FROM files", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(files, 1, "an empty root set must not wipe the graded files");
+        let issues: i64 = conn
+            .query_row("SELECT count(*) FROM issues", [], |r| r.get(0))
+            .unwrap();
+        assert!(issues > 0);
+        let projects: i64 = conn
+            .query_row("SELECT count(*) FROM projects", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(projects, 1);
+        // The scan still counts as a scan, so the scheduler does not spin.
+        let scans: i64 = conn
+            .query_row("SELECT count(*) FROM scans", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(scans, 2);
     }
 }

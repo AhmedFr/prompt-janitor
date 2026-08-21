@@ -38,6 +38,19 @@ pub fn parse_schedule(value: &str) -> Schedule {
     }
 }
 
+/// The schedule actually in force this tick.
+///
+/// On-save mode is driven by a filesystem watcher, and only the user's extra
+/// folders are watched. With none configured no event can ever arrive, so
+/// "on save" would silently mean "never" — fall back to the 6h default so a
+/// harness-only setup still gets refreshed.
+fn effective_schedule(schedule: &str, watch_roots_empty: bool) -> Schedule {
+    match parse_schedule(schedule) {
+        Schedule::OnSave if watch_roots_empty => parse_schedule("6h"),
+        other => other,
+    }
+}
+
 fn now_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -73,7 +86,7 @@ pub fn start(app: AppHandle) {
                     .ok()
                     .flatten()
                     .unwrap_or_else(|| "6h".to_string());
-                let watch_roots = crate::commands::extra_scan_folders(&conn);
+                let watch_roots = crate::query::extra_scan_folders(&conn);
                 let last = conn
                     .query_row("SELECT MAX(finished_at) FROM scans", [], |r| {
                         r.get::<_, Option<String>>(0)
@@ -116,7 +129,7 @@ pub fn start(app: AppHandle) {
                 change_at = now_secs();
             }
 
-            let due = match parse_schedule(&schedule_str) {
+            let due = match effective_schedule(&schedule_str, watched.is_empty()) {
                 Schedule::Manual => false,
                 Schedule::Interval(d) => now_secs().saturating_sub(last_scan) >= d.as_secs(),
                 Schedule::OnSave => {
@@ -178,5 +191,17 @@ mod tests {
         assert_eq!(parse_schedule("save"), Schedule::OnSave);
         assert_eq!(parse_schedule("manual"), Schedule::Manual);
         assert_eq!(parse_schedule("nonsense"), Schedule::Manual);
+    }
+
+    #[test]
+    fn on_save_without_watch_roots_falls_back_to_periodic() {
+        // Nothing is watched (no extra folders), so no file event will ever
+        // arrive — on-save would mean "never scan again".
+        assert_eq!(effective_schedule("save", true), parse_schedule("6h"));
+        // With something watched, on-save is honoured.
+        assert_eq!(effective_schedule("save", false), Schedule::OnSave);
+        // Every other schedule is unaffected by the watch set.
+        assert_eq!(effective_schedule("1h", true), parse_schedule("1h"));
+        assert_eq!(effective_schedule("manual", true), Schedule::Manual);
     }
 }

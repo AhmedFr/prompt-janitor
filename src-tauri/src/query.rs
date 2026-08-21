@@ -126,6 +126,18 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Resul
     Ok(())
 }
 
+/// Folders the user added by hand, on top of what the harnesses report.
+/// Stored as a JSON array of strings; a missing or malformed value reads as
+/// empty. The single source of truth for that decoding — the scan, the
+/// scheduler and the Overview all read it through here.
+pub fn extra_scan_folders(conn: &Connection) -> Vec<String> {
+    get_setting(conn, "extra_scan_folders")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .unwrap_or_default()
+}
+
 /// What the Overview labels as the scan's scope. A detected harness means the
 /// scan already covers everything it knows about; otherwise the scope is
 /// whatever folder the user added by hand (the first one, if several).
@@ -138,9 +150,7 @@ fn scan_scope_label(conn: &Connection) -> rusqlite::Result<Option<String>> {
     if detected > 0 {
         return Ok(Some("everything".to_string()));
     }
-    Ok(get_setting(conn, "extra_scan_folders")?
-        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
-        .and_then(|v| v.into_iter().next()))
+    Ok(extra_scan_folders(conn).into_iter().next())
 }
 
 /// Everything the Overview screen needs.
