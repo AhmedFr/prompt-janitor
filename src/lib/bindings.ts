@@ -128,8 +128,8 @@ export const commands = {
 	 *  project with its own artifacts.
 	 */
 	getSetup: () => typedError<SetupView, string>(__TAURI_INVOKE("get_setup")),
-	/**  The rule files that apply inside `project_path`, in harness load order. */
-	getEffectiveRules: (projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { projectPath })),
+	/**  The rule files `harness` loads inside `project_path`, in load order. */
+	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**  Usage aggregates for the Analytics screen, anchored to the current clock. */
 	getUsageOverview: () => typedError<UsageOverview, string>(__TAURI_INVOKE("get_usage_overview")),
 	/**  Every harness we know of, detected or not. */

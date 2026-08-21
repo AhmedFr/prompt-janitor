@@ -120,6 +120,26 @@ pub fn replace_artifacts(
     Ok(n)
 }
 
+/// How many artifacts the store already holds for `harness` within `scope`.
+/// The scan asks before rewriting a scope that inventoried to nothing: an
+/// existing project that suddenly has no artifacts was almost certainly
+/// unreadable this pass, and a rewrite would delete a live inventory.
+pub fn count_artifacts(conn: &Connection, harness: &str, scope: &Scope) -> rusqlite::Result<i64> {
+    match scope {
+        Scope::Global => conn.query_row(
+            "SELECT count(*) FROM artifacts WHERE harness = ?1 AND layer IN ('global','plugin')",
+            params![harness],
+            |r| r.get(0),
+        ),
+        Scope::Project(p) => conn.query_row(
+            "SELECT count(*) FROM artifacts
+              WHERE harness = ?1 AND layer = 'project' AND project_path = ?2",
+            params![harness, p],
+            |r| r.get(0),
+        ),
+    }
+}
+
 /// Where the last sweep stopped in every known log, plus the last assistant
 /// `message.id` seen in it — a message split across two passes must not be
 /// counted twice, so the dedupe seed has to survive a restart.
@@ -164,6 +184,11 @@ pub fn store_usage(
         .chain(batch.invocations.iter().map(|i| i.harness.as_str()))
         .chain(batch.orphan_results.iter().map(|o| o.harness.as_str()))
         .collect();
+    // Every harness this pass touched, including ones reached only through a
+    // reset: wiping a session changes its project's counts too, so the recount
+    // at the end has to cover them.
+    let mut recount_harnesses: BTreeSet<String> =
+        harnesses.iter().map(|h| (*h).to_string()).collect();
 
     for id in &batch.reset_sessions {
         let incoming = batch.sessions.iter().find(|s| &s.id == id);
@@ -187,6 +212,7 @@ pub fn store_usage(
                 }),
         };
         let Some(harness) = harness else { continue };
+        recount_harnesses.insert(harness.clone());
         tx.execute(
             "DELETE FROM invocations WHERE harness = ?1 AND session_id = ?2",
             params![harness, id],
@@ -237,7 +263,9 @@ pub fn store_usage(
                output_tokens = sessions.output_tokens + excluded.output_tokens,
                model             = COALESCE(sessions.model, excluded.model),
                log_path          = excluded.log_path,
-               byte_offset       = excluded.byte_offset,
+               -- Two sessions can share a log; the one indexed second must not
+               -- rewind the cursor to where its own range happened to end.
+               byte_offset       = max(excluded.byte_offset, sessions.byte_offset),
                parent_session_id = COALESCE(excluded.parent_session_id, sessions.parent_session_id),
                last_message_id   = COALESCE(excluded.last_message_id, sessions.last_message_id)"
         ))?;
@@ -345,7 +373,7 @@ pub fn store_usage(
                                      AND s.project_path = harness_projects.path)
              WHERE harness = ?1",
         )?;
-        for harness in &harnesses {
+        for harness in &recount_harnesses {
             recount.execute(params![harness])?;
         }
     }
@@ -843,6 +871,89 @@ mod tests {
             .unwrap();
         assert_eq!((turns, input, offset, last), (0, 0, 0, None));
         assert_eq!(count(&conn, "SELECT count(*) FROM invocations"), 0);
+    }
+
+    /// A batch that carries nothing but a reset still changed the world: the
+    /// session it wiped belonged to a project whose rollup is now stale.
+    #[test]
+    fn a_reset_only_batch_recounts_the_projects_it_touched() {
+        let conn = test_conn();
+        upsert_projects(
+            &conn,
+            &[ProjectRef {
+                harness: "claude_code".into(),
+                path: "/p".into(),
+                exists: true,
+                log_dir: None,
+            }],
+        )
+        .unwrap();
+        let first = UsageBatch {
+            sessions: vec![SessionMeta {
+                harness: "claude_code".into(),
+                id: "s1".into(),
+                project_path: "/p".into(),
+                log_path: "/logs/s1.jsonl".into(),
+                ended_at: Some("2026-08-01T10:00:20.000Z".into()),
+                turns: 3,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        store_usage(&conn, &first, &UsageCursor::default()).unwrap();
+        // A stale rollup, as a scan that never recounted would leave it.
+        conn.execute(
+            "UPDATE harness_projects SET session_count = 99 WHERE path = '/p'",
+            [],
+        )
+        .unwrap();
+
+        let reset_only = UsageBatch {
+            reset_sessions: vec!["s1".into()],
+            ..Default::default()
+        };
+        store_usage(&conn, &reset_only, &UsageCursor::default()).unwrap();
+
+        let (n, last): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT session_count, last_session_at FROM harness_projects WHERE path = '/p'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(n, 1, "the recount must reach a reset-only harness");
+        assert_eq!(last, None, "the wiped session no longer dates the project");
+    }
+
+    /// Sessions share a log, and a pass that read less of it than an earlier
+    /// one must not rewind the cursor — the skipped bytes would be re-indexed.
+    #[test]
+    fn a_merge_never_rewinds_the_stored_byte_offset() {
+        let conn = test_conn();
+        let session = || SessionMeta {
+            harness: "claude_code".into(),
+            id: "s1".into(),
+            project_path: "/p".into(),
+            log_path: "/logs/s1.jsonl".into(),
+            turns: 1,
+            ..Default::default()
+        };
+        let at = |offset: u64| {
+            let mut c = UsageCursor::default();
+            c.offsets.insert("/logs/s1.jsonl".into(), offset);
+            c
+        };
+        let batch = || UsageBatch {
+            sessions: vec![session()],
+            ..Default::default()
+        };
+        store_usage(&conn, &batch(), &at(500)).unwrap();
+        store_usage(&conn, &batch(), &at(100)).unwrap();
+
+        assert_eq!(
+            count(&conn, "SELECT byte_offset FROM sessions WHERE id='s1'"),
+            500
+        );
     }
 
     /// A reset only touches its own harness: a same-named session elsewhere

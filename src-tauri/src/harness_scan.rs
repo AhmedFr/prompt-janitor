@@ -1,10 +1,16 @@
-//! One harness-driven scan: detect → projects → inventory → usage → rollup.
-//! Returns the project roots + loose rule files the file grader should scan.
+//! One harness-driven scan, split so the slow part holds no database lock:
+//! [`prepare`] (reads the DB) → [`index`] (parses logs, touches no DB) →
+//! [`commit`] (writes everything back). [`run_harness_scan`] runs the three in
+//! a row for callers that already hold the connection.
+//!
+//! The outcome carries what the *file* grader still has to do: the project
+//! roots to walk and the loose rule files (the global `CLAUDE.md`) to read.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
+use crate::harness::model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
 use crate::harness::{Harness, Scope};
 use crate::harness_store as hs;
 
@@ -13,83 +19,259 @@ pub struct HarnessScanOutcome {
     pub roots: Vec<PathBuf>,
     pub extra_files: Vec<PathBuf>,
     pub skipped_lines: u64,
+    /// The same total, attributed to the harness that skipped the lines — a
+    /// single number cannot say which log parser is struggling.
+    pub skipped_lines_by_harness: Vec<(String, u64)>,
     pub failed_files: u64,
     pub harness_count: u32,
     pub project_count: u32,
+    /// Project scopes whose inventory came back empty while the database still
+    /// held artifacts for them: an unreadable directory, not an emptied one.
+    pub skipped_scopes: u32,
 }
 
-/// Run one full harness pass: for every registered harness, record whether it
-/// is detected and — when it is — refresh its projects, its artifact
-/// inventory (global + per existing project), and its usage index, then
-/// rebuild the usage rollup.
+/// Everything one harness contributes to a scan, gathered before the usage
+/// index runs so [`index`] can run without the database lock.
+pub struct PreparedHarness {
+    pub id: String,
+    pub display_name: String,
+    pub detected: bool,
+    pub home_root: Option<PathBuf>,
+    pub projects: Vec<ProjectRef>,
+    pub global_inventory: Vec<Artifact>,
+    /// `(project path, artifacts)` for every project that exists on disk and
+    /// does not own the harness home itself.
+    pub project_inventories: Vec<(String, Vec<Artifact>)>,
+    pub cursor: UsageCursor,
+}
+
+/// `<project>/.claude == <harness home>` — the project *is* the directory the
+/// harness keeps its home in (the user's home, for Claude Code). Its project
+/// layer would just be the global layer again, filed under a project path.
+fn owns_the_harness_home(project: &str, home_root: Option<&Path>) -> bool {
+    home_root.and_then(Path::parent) == Some(Path::new(project))
+}
+
+/// The user's home directory, as written and as canonicalised — a project path
+/// read off a log may be either.
+fn user_homes() -> Vec<PathBuf> {
+    let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+        return Vec::new();
+    };
+    let canonical = home.canonicalize().ok().filter(|c| c != &home);
+    let mut out = vec![home];
+    out.extend(canonical);
+    out
+}
+
+/// The roots the file walker may descend from, sorted and deduplicated.
 ///
-/// The outcome carries what the *file* grader still has to do: the project
-/// roots to walk and the loose rule files (the global `CLAUDE.md`) to read.
+/// A slug can resolve to something far too broad to walk — the user's home
+/// itself, or the directory the harness home sits in — and the walker would
+/// then recurse over the entire disk. Such roots are dropped here, and so is
+/// any root nested inside another (the walker reaches it from the parent).
+/// The project rows themselves are kept regardless: their usage history has to
+/// keep resolving.
+fn scan_roots(candidates: Vec<PathBuf>, home_roots: &[PathBuf]) -> Vec<PathBuf> {
+    let homes = user_homes();
+    let mut kept: Vec<PathBuf> = candidates
+        .into_iter()
+        .filter(|r| {
+            // The filesystem root has no parent.
+            r.parent().is_some()
+                && !homes.contains(r)
+                && !home_roots.iter().any(|h| h.starts_with(r))
+        })
+        .collect();
+    kept.sort();
+    kept.dedup();
+    let mut out: Vec<PathBuf> = Vec::new();
+    for root in kept {
+        if out.iter().any(|outer| root.starts_with(outer)) {
+            continue;
+        }
+        out.push(root);
+    }
+    out
+}
+
+/// Step 1 — read each harness off the filesystem and pick up its usage cursor.
+/// The only database access is [`hs::load_cursor`].
+pub fn prepare(
+    conn: &Connection,
+    harnesses: &[Box<dyn Harness>],
+) -> rusqlite::Result<Vec<PreparedHarness>> {
+    let mut out = Vec::with_capacity(harnesses.len());
+    for h in harnesses {
+        // `detect()` hits the filesystem — ask once.
+        let detected = h.detect();
+        let home_root = h.home_root();
+        let mut prepared = PreparedHarness {
+            id: h.id().to_string(),
+            display_name: h.display_name().to_string(),
+            detected,
+            home_root: home_root.clone(),
+            projects: Vec::new(),
+            global_inventory: Vec::new(),
+            project_inventories: Vec::new(),
+            cursor: UsageCursor::default(),
+        };
+        if detected {
+            prepared.projects = h.projects();
+            prepared.global_inventory = h.inventory(&Scope::Global);
+            // A project recorded in the harness's history may no longer exist
+            // on disk; inventory and grading both skip it, but the row stays so
+            // its usage history keeps resolving.
+            prepared.project_inventories = prepared
+                .projects
+                .iter()
+                .filter(|p| p.exists && !owns_the_harness_home(&p.path, home_root.as_deref()))
+                .map(|p| (p.path.clone(), h.inventory(&Scope::Project(p.path.clone()))))
+                .collect();
+            prepared.cursor = hs::load_cursor(conn, h.id())?;
+        }
+        out.push(prepared);
+    }
+    Ok(out)
+}
+
+/// Step 2 — parse the logs. The expensive step, and the reason for the split:
+/// it reads no database and so needs no lock.
+pub fn index(
+    harnesses: &[Box<dyn Harness>],
+    prepared: Vec<PreparedHarness>,
+) -> Vec<(PreparedHarness, UsageBatch)> {
+    prepared
+        .into_iter()
+        .map(|mut p| {
+            let batch = match harnesses.iter().find(|h| h.id() == p.id) {
+                Some(h) if p.detected => h.index_usage(&mut p.cursor),
+                _ => UsageBatch::default(),
+            };
+            (p, batch)
+        })
+        .collect()
+}
+
+/// Step 3 — write the pass back: harness rows, projects, inventory, usage, and
+/// the rebuilt rollup, then report what the file grader still has to do.
+pub fn commit(
+    conn: &Connection,
+    indexed: &[(PreparedHarness, UsageBatch)],
+    now_epoch_secs: i64,
+) -> rusqlite::Result<HarnessScanOutcome> {
+    let now = now_epoch_secs.to_string();
+    let mut out = HarnessScanOutcome::default();
+    let home_roots: Vec<PathBuf> = indexed
+        .iter()
+        .filter(|(p, _)| p.detected)
+        .filter_map(|(p, _)| p.home_root.clone())
+        .collect();
+    let mut candidate_roots: Vec<PathBuf> = Vec::new();
+
+    for (p, batch) in indexed {
+        hs::upsert_harness(conn, &p.id, &p.display_name, p.detected, &now)?;
+        if !p.detected {
+            continue;
+        }
+        out.harness_count += 1;
+
+        hs::upsert_projects(conn, &p.projects)?;
+        out.project_count += p.projects.len() as u32;
+        candidate_roots.extend(
+            p.projects
+                .iter()
+                .filter(|proj| proj.exists)
+                .map(|proj| PathBuf::from(&proj.path)),
+        );
+
+        out.extra_files.extend(
+            p.global_inventory
+                .iter()
+                .filter(|a| a.kind == crate::harness::model::ArtifactKind::Rule)
+                .map(|a| PathBuf::from(&a.path)),
+        );
+        hs::replace_artifacts(conn, &p.id, &Scope::Global, &p.global_inventory, &now)?;
+
+        for (path, artifacts) in &p.project_inventories {
+            let scope = Scope::Project(path.clone());
+            // Nothing found where the database already holds something means
+            // the directory could not be read, not that it was emptied —
+            // rewriting the scope would delete a live inventory.
+            if artifacts.is_empty() && hs::count_artifacts(conn, &p.id, &scope)? > 0 {
+                out.skipped_scopes += 1;
+                continue;
+            }
+            hs::replace_artifacts(conn, &p.id, &scope, artifacts, &now)?;
+        }
+
+        out.skipped_lines += batch.skipped_lines;
+        out.skipped_lines_by_harness
+            .push((p.id.clone(), batch.skipped_lines));
+        out.failed_files += batch.failed_files;
+        hs::store_usage(conn, batch, &p.cursor)?;
+        hs::link_invocations_to_artifacts(conn, &p.id)?;
+        hs::rebuild_usage_stats(conn, &p.id, now_epoch_secs)?;
+    }
+
+    out.roots = scan_roots(candidate_roots, &home_roots);
+    Ok(out)
+}
+
+/// [`prepare`] → [`index`] → [`commit`] in one call, under whatever lock the
+/// caller already holds. The app runs the three steps separately so the log
+/// parsing happens unlocked; tests, which have the connection to themselves,
+/// want the convenience.
+#[cfg(test)]
 pub fn run_harness_scan(
     conn: &Connection,
     harnesses: &[Box<dyn Harness>],
     now_epoch_secs: i64,
 ) -> rusqlite::Result<HarnessScanOutcome> {
-    let now = now_epoch_secs.to_string();
-    let mut out = HarnessScanOutcome::default();
-    for h in harnesses {
-        // `detect()` hits the filesystem — ask once.
-        let detected = h.detect();
-        hs::upsert_harness(conn, h.id(), h.display_name(), detected, &now)?;
-        if !detected {
-            continue;
-        }
-        out.harness_count += 1;
-
-        let projects = h.projects();
-        hs::upsert_projects(conn, &projects)?;
-        out.project_count += projects.len() as u32;
-
-        let global = h.inventory(&Scope::Global);
-        out.extra_files.extend(
-            global
-                .iter()
-                .filter(|a| a.kind == crate::harness::model::ArtifactKind::Rule)
-                .map(|a| PathBuf::from(&a.path)),
-        );
-        hs::replace_artifacts(conn, h.id(), &Scope::Global, &global, &now)?;
-
-        // A project recorded in the harness's history may no longer exist on
-        // disk; inventory and grading both skip it, but the row stays so its
-        // usage history keeps resolving.
-        for p in projects.iter().filter(|p| p.exists) {
-            let scope = Scope::Project(p.path.clone());
-            hs::replace_artifacts(conn, h.id(), &scope, &h.inventory(&scope), &now)?;
-            out.roots.push(PathBuf::from(&p.path));
-        }
-
-        let mut cursor = hs::load_cursor(conn, h.id())?;
-        let batch = h.index_usage(&mut cursor);
-        out.skipped_lines += batch.skipped_lines;
-        out.failed_files += batch.failed_files;
-        hs::store_usage(conn, &batch, &cursor)?;
-        hs::link_invocations_to_artifacts(conn, h.id())?;
-        hs::rebuild_usage_stats(conn, h.id(), now_epoch_secs)?;
-    }
-    out.roots.sort();
-    out.roots.dedup();
-    Ok(out)
+    let prepared = prepare(conn, harnesses)?;
+    let indexed = index(harnesses, prepared);
+    commit(conn, &indexed, now_epoch_secs)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::harness::claude_code::test_support::fixture_home;
-    use crate::harness::claude_code::ClaudeCode;
+    use crate::harness::claude_code::{paths::ClaudeHome, slug, ClaudeCode};
     use rusqlite::Connection;
+    use std::path::Path;
+
+    fn boxed(home: &ClaudeHome) -> Vec<Box<dyn Harness>> {
+        vec![Box::new(ClaudeCode::with_home(home.clone()))]
+    }
+
+    /// Registers `project` with the harness by writing the log directory the
+    /// real thing would have left behind: `<home>/projects/<slug>/…jsonl`
+    /// carrying the project as its `cwd`.
+    fn register_project(home: &ClaudeHome, project: &Path) {
+        let dir = home.projects_dir().join(slug::encode(project));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("0001-session.jsonl"),
+            format!(
+                r#"{{"type":"other","cwd":"{}"}}"#,
+                project.to_string_lossy()
+            ),
+        )
+        .unwrap();
+    }
+
+    fn conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn
+    }
 
     #[test]
     fn orchestrates_inventory_usage_and_reports_roots() {
         let (_g, home) = fixture_home();
-        let conn = Connection::open_in_memory().unwrap();
-        crate::store::migrate(&conn).unwrap();
-        let hs: Vec<Box<dyn crate::harness::Harness>> =
-            vec![Box::new(ClaudeCode::with_home(home.clone()))];
+        let conn = conn();
+        let hs = boxed(&home);
         let out = run_harness_scan(&conn, &hs, 1_785_628_800).unwrap();
         assert_eq!(out.harness_count, 1);
         assert_eq!(out.project_count, 2);
@@ -111,5 +293,146 @@ mod tests {
             )
             .unwrap();
         assert_eq!(det, 1);
+    }
+
+    /// A slug that resolves to the directory holding the harness home is the
+    /// user's home wearing a project's clothes. Walking it would sweep the
+    /// whole disk, so it is never a scan root — but the project row stays, so
+    /// its sessions keep resolving.
+    #[test]
+    fn a_root_containing_the_harness_home_is_dropped_but_still_recorded() {
+        let (_g, home) = fixture_home();
+        register_project(&home, &home.root);
+        let conn = conn();
+        let out = run_harness_scan(&conn, &boxed(&home), 1_785_628_800).unwrap();
+
+        assert!(!out.roots.contains(&home.root), "roots: {:?}", out.roots);
+        assert_eq!(out.roots, vec![home.root.join("work/app")]);
+        assert_eq!(out.project_count, 3, "every project is still recorded");
+        let n: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM harness_projects WHERE path = ?1",
+                [home.root.to_string_lossy()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 1);
+    }
+
+    /// `<project>/.claude == <harness home>`: the "project layer" would just be
+    /// the global layer again, filed under a project path.
+    #[test]
+    fn a_project_that_owns_the_harness_home_gets_no_project_layer() {
+        let tmp = tempfile::tempdir().unwrap();
+        let user_home = tmp.path().canonicalize().unwrap();
+        let root = user_home.join(".claude");
+        std::fs::create_dir_all(root.join("projects")).unwrap();
+        std::fs::write(root.join("CLAUDE.md"), "# global\n").unwrap();
+        let home = ClaudeHome::at(root);
+        register_project(&home, &user_home);
+
+        let conn = conn();
+        let out = run_harness_scan(&conn, &boxed(&home), 1_785_628_800).unwrap();
+
+        assert_eq!(out.project_count, 1);
+        assert!(out.roots.is_empty(), "roots: {:?}", out.roots);
+        let n: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM artifacts WHERE layer = 'project'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn nested_roots_collapse_into_the_outermost_one() {
+        let roots = vec![
+            PathBuf::from("/work/app/sub"),
+            PathBuf::from("/work/app"),
+            PathBuf::from("/work/apple"),
+        ];
+        assert_eq!(
+            scan_roots(roots, &[]),
+            vec![PathBuf::from("/work/app"), PathBuf::from("/work/apple")]
+        );
+    }
+
+    #[test]
+    fn the_filesystem_root_is_never_a_scan_root() {
+        assert!(scan_roots(vec![PathBuf::from("/")], &[]).is_empty());
+    }
+
+    #[test]
+    fn the_users_home_is_never_a_scan_root() {
+        let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+            return; // no HOME in this environment; nothing to assert
+        };
+        let kept = home.join("code/project");
+        assert_eq!(scan_roots(vec![home, kept.clone()], &[]), vec![kept]);
+    }
+
+    #[test]
+    fn diagnostics_are_reported_per_harness() {
+        let (_g, home) = fixture_home();
+        let out = run_harness_scan(&conn(), &boxed(&home), 1_785_628_800).unwrap();
+        assert_eq!(
+            out.skipped_lines_by_harness,
+            vec![("claude_code".to_string(), 1)]
+        );
+        assert_eq!(out.skipped_lines, 1);
+    }
+
+    /// An existing project whose inventory comes back empty is far more likely
+    /// unreadable than emptied, so the stored artifacts stay put.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_project_keeps_the_artifacts_already_stored() {
+        use std::os::unix::fs::PermissionsExt;
+        let (_g, home) = fixture_home();
+        let project = home.root.join("work/locked");
+        std::fs::create_dir_all(project.join(".claude/skills/deploy")).unwrap();
+        std::fs::write(project.join("CLAUDE.md"), "# locked\n").unwrap();
+        std::fs::write(
+            project.join(".claude/skills/deploy/SKILL.md"),
+            "---\nname: deploy\n---\n",
+        )
+        .unwrap();
+        register_project(&home, &project);
+
+        let conn = conn();
+        let first = run_harness_scan(&conn, &boxed(&home), 1_785_628_800).unwrap();
+        assert_eq!(first.skipped_scopes, 0);
+        let before = project_artifact_count(&conn, &project.to_string_lossy());
+        assert!(before > 0, "the first pass should have stored something");
+
+        let mode = std::fs::metadata(&project).unwrap().permissions().mode();
+        std::fs::set_permissions(&project, std::fs::Permissions::from_mode(0o000)).unwrap();
+        // Root (and a filesystem that ignores modes) reads straight through
+        // 0o000; there is nothing to assert then.
+        if std::fs::read_dir(&project).is_ok() {
+            std::fs::set_permissions(&project, std::fs::Permissions::from_mode(mode)).unwrap();
+            return;
+        }
+        let out = run_harness_scan(&conn, &boxed(&home), 1_785_628_801);
+        std::fs::set_permissions(&project, std::fs::Permissions::from_mode(mode)).unwrap();
+
+        let out = out.unwrap();
+        assert_eq!(out.skipped_scopes, 1);
+        assert_eq!(
+            project_artifact_count(&conn, &project.to_string_lossy()),
+            before,
+            "an unreadable directory must not wipe the inventory"
+        );
+    }
+
+    fn project_artifact_count(conn: &Connection, path: &str) -> i64 {
+        conn.query_row(
+            "SELECT count(*) FROM artifacts WHERE layer = 'project' AND project_path = ?1",
+            [path],
+            |r| r.get(0),
+        )
+        .unwrap()
     }
 }

@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-21",
+  "updated": "2026-08-22",
   "readiness": {
     "percent": 82,
     "label": "Code complete — blocked on human actions to ship v1"
@@ -57,10 +57,10 @@
     {
       "name": "Phase 7",
       "title": "Setup inventory & usage evidence",
-      "done": 2,
+      "done": 3,
       "total": 6,
       "state": "active",
-      "note": "Spec + plans + process skill landed (#107); harness core landed (#109); Claude Code harness landed (#110). Next: phase 0 (#108), persistence/IPC (#111), UI (#112), detail/settings/docs (#113)"
+      "note": "Spec + plans + process skill landed (#107); harness core landed (#109); Claude Code harness landed (#110); persistence, orchestrator and IPC read models landed (#111). Next: phase 0 (#108), UI (#112), detail/settings/docs (#113)"
     }
   ],
   "actions": {
@@ -238,11 +238,11 @@
     },
     {
       "name": "Vitest",
-      "result": "110/110 passing (22 files)"
+      "result": "118/118 passing (24 files)"
     },
     {
       "name": "cargo test",
-      "result": "173/173 passing"
+      "result": "260/260 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -271,6 +271,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard",
     "2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)",
     "2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture",
     "2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)",

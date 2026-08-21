@@ -267,18 +267,24 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
         global.extend(row?);
     }
 
-    // Project artifacts in one pass, bucketed by path — one statement instead
-    // of one per project.
-    let mut per_project: HashMap<String, Vec<ArtifactView>> = HashMap::new();
+    // Project artifacts in one pass, bucketed by (harness, path) — one
+    // statement instead of one per project. The path alone is not a key: two
+    // harnesses can have seen the same directory, and each owns only what it
+    // inventoried there.
+    let mut per_project: HashMap<(String, String), Vec<ArtifactView>> = HashMap::new();
     let mut proj_stmt = conn.prepare(&format!(
         "{ARTIFACT_COLUMNS} WHERE a.project_path IS NOT NULL ORDER BY {order}, a.name"
     ))?;
     for row in proj_stmt.query_map([], |r| {
-        Ok((r.get::<_, String>(12)?, artifact_row(r, &usage)?))
+        Ok((
+            r.get::<_, String>(1)?,
+            r.get::<_, String>(12)?,
+            artifact_row(r, &usage)?,
+        ))
     })? {
-        let (path, view) = row?;
+        let (harness, path, view) = row?;
         if let Some(view) = view {
-            per_project.entry(path).or_default().push(view);
+            per_project.entry((harness, path)).or_default().push(view);
         }
     }
 
@@ -300,7 +306,9 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
         let (harness, path, exists, session_count, last_session_at) = row?;
         projects.push(ProjectSetup {
             name: last_component(&path),
-            artifacts: per_project.remove(&path).unwrap_or_default(),
+            artifacts: per_project
+                .remove(&(harness.clone(), path.clone()))
+                .unwrap_or_default(),
             harness,
             path,
             exists,
@@ -338,23 +346,27 @@ pub fn list_harnesses(conn: &Connection) -> rusqlite::Result<Vec<HarnessInfo>> {
     rows.collect()
 }
 
-/// The rule files that apply inside `project_path`, in the order the harness
-/// loads them: the global layer first, then the project's own, with `CLAUDE.md`
-/// ahead of `AGENTS.md` at each layer.
+/// The rule files `harness` loads inside `project_path`, in load order: the
+/// global layer first, then the project's own, with `CLAUDE.md` ahead of
+/// `AGENTS.md` at each layer.
+///
+/// Scoped to one harness — a directory can be a project of several, and each
+/// merges only its own stack.
 pub fn effective_rules(
     conn: &Connection,
+    harness: &str,
     project_path: &str,
 ) -> rusqlite::Result<Vec<EffectiveRule>> {
     let mut st = conn.prepare(
         "SELECT a.layer, a.path, a.name, f.grade, f.id
            FROM artifacts a LEFT JOIN files f ON f.id = a.file_id
-          WHERE a.kind = 'rule'
-            AND (a.layer = 'global' OR (a.layer = 'project' AND a.project_path = ?1))
+          WHERE a.kind = 'rule' AND a.harness = ?1
+            AND (a.layer = 'global' OR (a.layer = 'project' AND a.project_path = ?2))
           ORDER BY CASE a.layer WHEN 'global' THEN 0 ELSE 1 END,
                    CASE a.name WHEN 'CLAUDE.md' THEN 0 WHEN 'AGENTS.md' THEN 1 ELSE 2 END,
                    a.name",
     )?;
-    let rows = st.query_map(params![project_path], |r| {
+    let rows = st.query_map(params![harness, project_path], |r| {
         // A layer outside the model is dropped, not defaulted — but a genuine
         // read error still propagates.
         let Some(layer) = Layer::parse(&r.get::<_, String>(0)?) else {
@@ -583,12 +595,58 @@ mod tests {
     #[test]
     fn effective_rules_orders_global_before_project() {
         let (conn, home) = seeded();
-        let r = effective_rules(&conn, &home.root.join("work/app").to_string_lossy()).unwrap();
+        let r = effective_rules(
+            &conn,
+            "claude_code",
+            &home.root.join("work/app").to_string_lossy(),
+        )
+        .unwrap();
         assert_eq!(
             r.iter()
                 .map(|x| (x.layer, x.name.as_str()))
                 .collect::<Vec<_>>(),
             vec![(Layer::Global, "CLAUDE.md"), (Layer::Project, "CLAUDE.md")]
+        );
+    }
+
+    /// Two harnesses can both know a path; each loads only its own rule stack.
+    #[test]
+    fn effective_rules_are_scoped_to_one_harness() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        assert!(effective_rules(&conn, "other", &app).unwrap().is_empty());
+        assert!(!effective_rules(&conn, "claude_code", &app)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// A project path is only unique within a harness: a second harness that
+    /// has seen the same directory must not inherit the first one's artifacts.
+    #[test]
+    fn setup_view_buckets_project_artifacts_per_harness() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        conn.execute(
+            "INSERT INTO harnesses(id, display_name, detected) VALUES('other', 'Other', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO harness_projects(harness, path, exists_on_disk)
+             VALUES('other', ?1, 1)",
+            [&app],
+        )
+        .unwrap();
+
+        let v = setup_view(&conn).unwrap();
+        let rows: Vec<_> = v.projects.iter().filter(|p| p.path == app).collect();
+        assert_eq!(rows.len(), 2);
+        let claude = rows.iter().find(|p| p.harness == "claude_code").unwrap();
+        let other = rows.iter().find(|p| p.harness == "other").unwrap();
+        assert!(!claude.artifacts.is_empty());
+        assert!(
+            other.artifacts.is_empty(),
+            "a harness that inventoried nothing there owns nothing there"
         );
     }
 

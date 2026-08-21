@@ -2201,6 +2201,8 @@ Replace `set_scan_folder`/`get_scan_folder` with `set_extra_scan_folders(db, fol
 > **Amendment (branch review B):** `HarnessInfo.session_count`, `ProjectSetup.session_count` and `sessions_per_project` count **top-level sessions only** (`WHERE parent_session_id IS NULL`); sub-agent transcripts would otherwise inflate every count. Invocation-level aggregates keep counting sub-agent rows.
 >
 > **Amendment:** aggregates over `duration_ms` must filter `duration_ms >= 0` (clock skew can produce negatives). `ArtifactView.usage` is looked up by `usage_stats.artifact_id = artifacts.id` (one row per linked artifact); targets with no artifact (`artifact_id IS NULL`) appear only in the Analytics usage overview.
+>
+> **Amendment (branch review C):** a project path is only unique *within* a harness. `effective_rules` takes the harness — `effective_rules(conn, harness: &str, project_path: &str)`, command `get_effective_rules(db, harness: String, project_path: String)` — and `setup_view` buckets project artifacts by `(harness, path)`, so a directory two harnesses have both seen does not hand one's artifacts to the other.
 
 **Files:**
 - Create: `src-tauri/src/harness_query.rs`
@@ -2223,11 +2225,11 @@ Replace `set_scan_folder`/`get_scan_folder` with `set_extra_scan_folders(db, fol
 #[derive(serde::Serialize, specta::Type)] pub struct TargetRate { pub target: String, pub total: u32, pub error_rate: f64 }
 
 pub fn setup_view(conn) -> rusqlite::Result<SetupView>;
-pub fn effective_rules(conn, project_path: &str) -> rusqlite::Result<Vec<EffectiveRule>>;   // global rules first, then project (CLAUDE.md before AGENTS.md)
+pub fn effective_rules(conn, harness: &str, project_path: &str) -> rusqlite::Result<Vec<EffectiveRule>>;   // global rules first, then project (CLAUDE.md before AGENTS.md)
 pub fn usage_overview(conn, now_epoch_secs: i64) -> rusqlite::Result<UsageOverview>;
 ```
 
-Commands: `get_setup(db) -> SetupView`, `get_effective_rules(db, project_path: String) -> Vec<EffectiveRule>`, `get_usage_overview(db) -> UsageOverview`, `list_harnesses(db) -> Vec<HarnessInfo>`.
+Commands: `get_setup(db) -> SetupView`, `get_effective_rules(db, harness: String, project_path: String) -> Vec<EffectiveRule>`, `get_usage_overview(db) -> UsageOverview`, `list_harnesses(db) -> Vec<HarnessInfo>`.
 
 Also: `query::ScansDigest` gains `pub skipped_lines: u32` = `SELECT COALESCE(SUM(skipped_lines),0) FROM scan_diagnostics WHERE scan_id = (SELECT MAX(id) FROM scans)`; add a Rust test in `query.rs` that inserts a scan + diagnostics row and asserts the sum, and in `src/screens/Scans/Scans.tsx` render the muted line "N log lines skipped while indexing" when `skipped_lines > 0` (Vitest case in `Scans.test.tsx`).
 
@@ -2257,7 +2259,7 @@ Also: `query::ScansDigest` gains `pub skipped_lines: u32` = `SELECT COALESCE(SUM
     #[test]
     fn effective_rules_orders_global_before_project() {
         let (conn, home) = seeded();
-        let r = effective_rules(&conn, &home.root.join("work/app").to_string_lossy()).unwrap();
+        let r = effective_rules(&conn, "claude_code", &home.root.join("work/app").to_string_lossy()).unwrap();
         assert_eq!(r.iter().map(|x| (x.layer, x.name.as_str())).collect::<Vec<_>>(), vec![(Layer::Global, "CLAUDE.md"), (Layer::Project, "CLAUDE.md")]);
     }
 
@@ -2419,6 +2421,8 @@ export function formatUsage(usage: UsageStat | null, now: Date): { label: string
 
 ### Task 16: Detail — merge position + referenced artifacts
 
+> **Amendment (branch review C):** `getEffectiveRules` now takes the harness first — `getEffectiveRules(harness, projectPath)`. `useFileDetail` has the harness on the `ProjectSetup` row it already reads from `getSetup()`; pass it through.
+
 **Files:**
 - Modify: `src/screens/Detail/useFileDetail.ts`, `src/screens/Detail/Detail.tsx`, `src/screens/Detail/Detail.test.tsx`
 - Create: `src/screens/Detail/MergePosition/{index.ts,MergePosition.tsx,MergePosition.types.ts,MergePosition.test.tsx,MergePosition.stories.tsx}`
@@ -2435,6 +2439,8 @@ export function formatUsage(usage: UsageStat | null, now: Date): { label: string
 ---
 
 ### Task 17: Settings → Harness tab
+
+> **Amendment (branch review C):** the scan now reports diagnostics per harness (`HarnessScanOutcome.skipped_lines_by_harness`, persisted per harness in `scan_diagnostics`). `HarnessInfo` may later carry `failed_files` alongside them so this tab can say which harness's logs would not parse; it does not yet.
 
 **Files:**
 - Create: `src/screens/Settings/HarnessTab/{index.ts,HarnessTab.tsx,HarnessTab.types.ts,HarnessTab.test.tsx,HarnessTab.stories.tsx,useHarnessTab.ts}`

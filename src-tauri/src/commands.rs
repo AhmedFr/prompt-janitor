@@ -61,8 +61,10 @@ pub struct ScanProgress {
 /// global layer, and any extra folders the user added by hand. Shared by the
 /// `scan_now` command, the tray, and the background scheduler.
 ///
-/// The database guard is dropped between the phases so the UI can still read
-/// while the (slower) file phase has not started; each phase takes it again.
+/// The harness phase runs in three steps so its slowest part holds no lock:
+/// `prepare` reads the usage cursors, the guard is dropped while every session
+/// log is parsed, and `commit` takes it again to write the pass back. The file
+/// phase continues under that same guard.
 pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     use tauri::{Emitter, Manager};
 
@@ -71,14 +73,19 @@ pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     let harnesses = crate::harness::all();
 
     let _ = app.emit("scan-phase", "harness");
-    let outcome = {
+    let prepared = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
-        crate::harness_scan::run_harness_scan(&conn, &harnesses, now_secs)
-            .map_err(|e| e.to_string())?
+        crate::harness_scan::prepare(&conn, &harnesses).map_err(|e| e.to_string())?
     };
+    // Unlocked: parsing hundreds of megabytes of session logs must not block
+    // every read the UI makes while it runs.
+    let indexed = crate::harness_scan::index(&harnesses, prepared);
+
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let outcome =
+        crate::harness_scan::commit(&conn, &indexed, now_secs).map_err(|e| e.to_string())?;
 
     let _ = app.emit("scan-phase", "files");
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
     let mut roots = outcome.roots.clone();
     roots.extend(
@@ -92,16 +99,12 @@ pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     })
     .map_err(|e| e.to_string())?;
 
-    // Only harnesses that actually ran contribute diagnostics; an undetected
-    // harness skipped no lines because it read nothing.
+    // Each harness owns its own diagnostics: a single total cannot say which
+    // log parser is struggling. Only harnesses that actually ran are listed —
+    // an undetected one skipped no lines because it read nothing.
     if let Ok(Some(scan_id)) = crate::harness_store::last_scan_id(&conn) {
-        for h in harnesses.iter().filter(|h| h.detect()) {
-            let _ = crate::harness_store::record_diagnostics(
-                &conn,
-                scan_id,
-                h.id(),
-                outcome.skipped_lines,
-            );
+        for (harness, skipped) in &outcome.skipped_lines_by_harness {
+            let _ = crate::harness_store::record_diagnostics(&conn, scan_id, harness, *skipped);
         }
     }
 
@@ -781,15 +784,16 @@ pub fn get_setup(db: tauri::State<'_, AppDb>) -> Result<crate::harness_query::Se
     crate::harness_query::setup_view(&conn).map_err(|e| e.to_string())
 }
 
-/// The rule files that apply inside `project_path`, in harness load order.
+/// The rule files `harness` loads inside `project_path`, in load order.
 #[tauri::command]
 #[specta::specta]
 pub fn get_effective_rules(
     db: tauri::State<'_, AppDb>,
+    harness: String,
     project_path: String,
 ) -> Result<Vec<crate::harness_query::EffectiveRule>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    crate::harness_query::effective_rules(&conn, &project_path).map_err(|e| e.to_string())
+    crate::harness_query::effective_rules(&conn, &harness, &project_path).map_err(|e| e.to_string())
 }
 
 /// Usage aggregates for the Analytics screen, anchored to the current clock.
