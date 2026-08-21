@@ -67,6 +67,6 @@ fn fixture_home_is_self_consistent() {
     assert!(slug_dir.join("0001-session.jsonl").is_file());
     assert_eq!(
         slug::decode_slug_fs(slug_dir.file_name().unwrap().to_str().unwrap()),
-        Some(home.root.join("work/app"))
+        Some((home.root.join("work/app"), true))
     );
 }

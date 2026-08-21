@@ -9,15 +9,24 @@ impl ClaudeHome {
     pub fn at(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
     }
-    /// `$CLAUDE_HOME` (tests / power users) else `~/.claude` when present.
+    /// `$CLAUDE_CONFIG_DIR` (Claude Code's own override), else `$CLAUDE_HOME`
+    /// (tests / power users), else `~/.claude` when present.
     pub fn detect() -> Option<Self> {
-        if let Ok(p) = std::env::var("CLAUDE_HOME") {
-            let p = PathBuf::from(p);
-            return p.is_dir().then_some(Self::at(p));
+        Self::detect_from(&|k| std::env::var(k).ok())
+    }
+
+    /// Pure form of [`detect`]: `get` supplies the environment, so the
+    /// precedence rules are testable without mutating the process env.
+    pub fn detect_from(get: &dyn Fn(&str) -> Option<String>) -> Option<Self> {
+        let root = match get("CLAUDE_CONFIG_DIR").or_else(|| get("CLAUDE_HOME")) {
+            Some(p) => PathBuf::from(p),
+            None => PathBuf::from(get("HOME")?).join(".claude"),
+        };
+        if !root.is_dir() {
+            return None;
         }
-        let home = std::env::var_os("HOME").map(PathBuf::from)?;
-        let root = home.join(".claude");
-        root.is_dir().then_some(Self::at(root))
+        // Symlinked/relative homes must compare equal to paths we read off disk.
+        Some(Self::at(root.canonicalize().ok()?))
     }
     pub fn global_rule(&self) -> PathBuf {
         self.root.join("CLAUDE.md")
@@ -67,14 +76,68 @@ mod tests {
         );
     }
 
+    /// Fake environment: only the listed keys are set.
+    fn env<'a>(vars: &'a [(&'a str, String)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |k| {
+            vars.iter()
+                .find(|(name, _)| *name == k)
+                .map(|(_, v)| v.clone())
+        }
+    }
+
+    fn s(p: &Path) -> String {
+        p.to_string_lossy().into_owned()
+    }
+
     #[test]
-    fn detect_honours_claude_home_env() {
-        let dir = tempfile::tempdir().unwrap();
-        std::env::set_var("CLAUDE_HOME", dir.path());
+    fn config_dir_override_wins_over_claude_home_and_home() {
+        let cfg = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let got = ClaudeHome::detect_from(&env(&[
+            ("CLAUDE_CONFIG_DIR", s(cfg.path())),
+            ("CLAUDE_HOME", s(other.path())),
+            ("HOME", s(other.path())),
+        ]));
         assert_eq!(
-            ClaudeHome::detect().map(|h| h.root),
-            Some(dir.path().to_path_buf())
+            got.map(|h| h.root),
+            Some(cfg.path().canonicalize().unwrap())
         );
-        std::env::remove_var("CLAUDE_HOME");
+    }
+
+    #[test]
+    fn claude_home_is_used_when_config_dir_is_unset() {
+        let dir = tempfile::tempdir().unwrap();
+        let got = ClaudeHome::detect_from(&env(&[("CLAUDE_HOME", s(dir.path()))]));
+        assert_eq!(
+            got.map(|h| h.root),
+            Some(dir.path().canonicalize().unwrap())
+        );
+    }
+
+    #[test]
+    fn falls_back_to_dot_claude_under_home() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join(".claude")).unwrap();
+        let got = ClaudeHome::detect_from(&env(&[("HOME", s(dir.path()))]));
+        assert_eq!(
+            got.map(|h| h.root),
+            Some(dir.path().join(".claude").canonicalize().unwrap())
+        );
+    }
+
+    #[test]
+    fn override_that_is_not_a_directory_detects_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("not-a-dir");
+        std::fs::write(&file, "x").unwrap();
+        assert_eq!(
+            ClaudeHome::detect_from(&env(&[("CLAUDE_CONFIG_DIR", s(&file))])),
+            None
+        );
+        assert_eq!(
+            ClaudeHome::detect_from(&env(&[("CLAUDE_HOME", s(&file))])),
+            None
+        );
+        assert_eq!(ClaudeHome::detect_from(&env(&[])), None);
     }
 }
