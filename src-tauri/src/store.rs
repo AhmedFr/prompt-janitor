@@ -193,8 +193,19 @@ const MIGRATIONS: &[&str] = &[
         input_tokens  INTEGER NOT NULL DEFAULT 0,
         output_tokens INTEGER NOT NULL DEFAULT 0,
         model         TEXT,
-        byte_offset   INTEGER NOT NULL DEFAULT 0
+        byte_offset   INTEGER NOT NULL DEFAULT 0,
+        -- Sub-agent transcripts (`<session>/subagents/agent-<id>.jsonl`) are
+        -- sessions of their own; this links them to the session that spawned
+        -- them. NULL for a top-level session, so project/session counts read
+        -- `parent_session_id IS NULL`.
+        parent_session_id TEXT,
+        -- Last assistant `message.id` indexed in this log. Claude Code writes
+        -- one record per content block with a repeated id and repeated usage,
+        -- so the next incremental pass is seeded with this to avoid counting a
+        -- straddling message's turn and tokens twice.
+        last_message_id   TEXT
     );
+    CREATE INDEX idx_sessions_parent ON sessions(harness, parent_session_id);
     CREATE TABLE invocations (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         harness      TEXT NOT NULL,
@@ -414,11 +425,28 @@ mod tests {
                 .unwrap();
             assert_eq!(n, 1, "missing table {table}");
         }
+        // Sub-agent transcripts hang off their parent session, and the turn
+        // dedupe resumes from the last message id.
+        conn.execute(
+            "INSERT INTO sessions(id, harness, project_path, log_path, parent_session_id, last_message_id)
+             VALUES('agent-abc', 'claude_code', '/p', '/p/l.jsonl', '0001-session', 'msg_1')",
+            [],
+        )
+        .unwrap();
+        let row: (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT parent_session_id, last_message_id FROM sessions WHERE id='agent-abc'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(row, (Some("0001-session".into()), Some("msg_1".into())));
         for index in [
             "idx_artifacts_identity",
             "idx_invocations_tool_use",
             "idx_invocations_artifact_ts",
             "idx_usage_stats_identity",
+            "idx_sessions_parent",
         ] {
             let n: i64 = conn
                 .query_row(

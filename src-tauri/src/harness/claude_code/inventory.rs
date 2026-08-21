@@ -17,15 +17,36 @@ pub(super) fn content_hash(bytes: &[u8]) -> String {
     format!("{:x}", h.finalize())
 }
 
+/// Reads one frontmatter key. Plain `key: value` scalars come back as written;
+/// YAML block scalars (`>`, `>-`, `|`, `|-`) — which skills in the wild use for
+/// long descriptions — are folded from the more-indented lines that follow,
+/// space-joined for `>` and newline-joined for `|`.
 pub(super) fn frontmatter_field(content: &str, key: &str) -> Option<String> {
     let rest = content.strip_prefix("---")?;
     let end = rest.find("\n---")?;
-    rest[..end]
-        .lines()
-        .filter_map(|l| l.split_once(':'))
-        .find(|(k, _)| k.trim() == key)
-        .map(|(_, v)| v.trim().to_string())
-        .filter(|v| !v.is_empty())
+    let lines: Vec<&str> = rest[..end].lines().collect();
+    let (i, value) = lines.iter().enumerate().find_map(|(i, l)| {
+        let (k, v) = l.split_once(':')?;
+        (k.trim() == key).then_some((i, v.trim()))
+    })?;
+    let sep = match value {
+        ">" | ">-" => " ",
+        "|" | "|-" => "\n",
+        _ => return Some(value.to_string()).filter(|v| !v.is_empty()),
+    };
+    let indent = |l: &str| l.len() - l.trim_start().len();
+    let key_indent = indent(lines[i]);
+    let mut block: Vec<&str> = Vec::new();
+    for l in &lines[i + 1..] {
+        if l.trim().is_empty() {
+            continue; // blank lines inside a block are not the end of it
+        }
+        if indent(l) <= key_indent {
+            break;
+        }
+        block.push(l.trim());
+    }
+    Some(block.join(sep)).filter(|v| !v.is_empty())
 }
 
 fn first_prose_line(content: &str) -> Option<String> {
@@ -185,6 +206,27 @@ fn settings_file(ctx: &Ctx, out: &mut Vec<Artifact>, f: &Path, include_settings_
     }
 }
 
+/// Emits one `McpServer` artifact per key of the object at `path` (a
+/// slash-free JSON path from the root) in the JSON file `f`.
+fn mcp_servers_at(ctx: &Ctx, out: &mut Vec<Artifact>, f: &Path, path: &[&str]) {
+    let Some((text, bytes)) = read(f) else {
+        return;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return;
+    };
+    let mut node = &json;
+    for key in path {
+        match node.get(key) {
+            Some(next) => node = next,
+            None => return,
+        }
+    }
+    for key in node.as_object().into_iter().flatten().map(|(k, _)| k) {
+        out.push(ctx.artifact(ArtifactKind::McpServer, key.clone(), f, None, &bytes));
+    }
+}
+
 pub fn global_artifacts(home: &ClaudeHome) -> Vec<Artifact> {
     let ctx = Ctx {
         layer: Layer::Global,
@@ -199,10 +241,14 @@ pub fn global_artifacts(home: &ClaudeHome) -> Vec<Artifact> {
     for f in home.settings() {
         settings_file(&ctx, &mut out, &f, true);
     }
+    // Globally-installed MCP servers live in `~/.claude.json`, not in
+    // `settings.json`; the file itself is not an artifact (it also holds
+    // history and telemetry state we have no business listing).
+    settings_file(&ctx, &mut out, &home.user_config(), false);
     out
 }
 
-pub fn project_artifacts(project: &Path) -> Vec<Artifact> {
+pub fn project_artifacts(home: &ClaudeHome, project: &Path) -> Vec<Artifact> {
     let ctx = Ctx {
         layer: Layer::Project,
         project_path: Some(project),
@@ -228,6 +274,14 @@ pub fn project_artifacts(project: &Path) -> Vec<Artifact> {
     if mcp.is_file() {
         settings_file(&ctx, &mut out, &mcp, false);
     }
+    // `claude mcp add` without `--scope project` writes the server into
+    // `~/.claude.json` under this project's absolute path.
+    mcp_servers_at(
+        &ctx,
+        &mut out,
+        &home.user_config(),
+        &["projects", &project.to_string_lossy(), "mcpServers"],
+    );
     out
 }
 
@@ -260,7 +314,8 @@ mod tests {
         assert_eq!(names(&a, K::Command), vec!["ship"]);
         assert_eq!(names(&a, K::Settings), vec!["settings.json"]);
         assert_eq!(names(&a, K::Hook), vec!["SessionStart: echo hi"]);
-        assert_eq!(names(&a, K::McpServer), vec!["playwright"]);
+        // `~/.claude.json`'s top-level `mcpServers` count as global too.
+        assert_eq!(names(&a, K::McpServer), vec!["playwright", "vercel"]);
         let adapt = a.iter().find(|x| x.name == "adapt").unwrap();
         assert_eq!(
             adapt.description.as_deref(),
@@ -273,19 +328,25 @@ mod tests {
     fn project_layer_reads_dot_claude_and_mcp_json() {
         let (_g, home) = fixture_home();
         let project = home.root.join("work/app");
-        let a = project_artifacts(&project);
+        let a = project_artifacts(&home, &project);
         assert!(a.iter().all(|x| x.layer == Layer::Project
             && x.project_path.as_deref() == Some(project.to_str().unwrap())));
         assert_eq!(names(&a, K::Rule), vec!["CLAUDE.md"]);
         assert_eq!(names(&a, K::Skill), vec!["deploy"]);
-        assert_eq!(names(&a, K::McpServer), vec!["github", "supabase"]);
+        // `.mcp.json` + `.claude/settings.json` + this project's entry in
+        // `~/.claude.json`.
+        assert_eq!(
+            names(&a, K::McpServer),
+            vec!["github", "linear", "supabase"]
+        );
     }
 
     #[test]
     fn missing_dirs_yield_nothing_not_errors() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(global_artifacts(&ClaudeHome::at(dir.path())).is_empty());
-        assert!(project_artifacts(dir.path()).is_empty());
+        let home = ClaudeHome::at(dir.path());
+        assert!(global_artifacts(&home).is_empty());
+        assert!(project_artifacts(&home, dir.path()).is_empty());
     }
 
     #[test]
@@ -296,6 +357,23 @@ mod tests {
             Some("Hello there.")
         );
         assert_eq!(frontmatter_field("# no fm", "name"), None);
+    }
+
+    /// YAML block scalars: skills in the wild fold long descriptions over
+    /// several lines, and the value must arrive whole, not as ">".
+    #[test]
+    fn folded_and_literal_block_scalars_are_joined() {
+        let folded = "---\nname: x\ndescription: >\n  Operate Railway.\n  More words.\nother: y\n---\n# body";
+        assert_eq!(
+            frontmatter_field(folded, "description").as_deref(),
+            Some("Operate Railway. More words.")
+        );
+        assert_eq!(frontmatter_field(folded, "other").as_deref(), Some("y"));
+        let literal = "---\ndescription: |-\n  line one\n  line two\n---\n";
+        assert_eq!(
+            frontmatter_field(literal, "description").as_deref(),
+            Some("line one\nline two")
+        );
     }
 
     #[test]

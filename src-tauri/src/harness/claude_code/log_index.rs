@@ -13,7 +13,6 @@ use super::classify::classify;
 use super::inventory::HARNESS_ID;
 use super::log_records::{parse_line, LogRecord};
 use super::paths::ClaudeHome;
-use super::slug;
 use crate::harness::model::{Invocation, OrphanResult, SessionMeta, UsageBatch, UsageCursor};
 
 /// One pass over one log file.
@@ -80,10 +79,13 @@ struct Pending {
 
 /// Reads `log_path` from `from_offset` to the last complete line.
 /// `fallback_project` stands in when no record in the range carries a `cwd`.
+/// `last_message_id` is the last assistant `message.id` of the previous pass:
+/// a message whose blocks straddle the two ranges is counted only once.
 pub fn index_file(
     log_path: &Path,
     from_offset: u64,
     fallback_project: &str,
+    last_message_id: Option<&str>,
 ) -> std::io::Result<IndexedFile> {
     let mut file = File::open(log_path)?;
     let len = file.metadata()?.len();
@@ -109,6 +111,7 @@ pub fn index_file(
     let mut skipped = 0u64;
     let mut offset = start;
     let mut buf: Vec<u8> = Vec::new();
+    let mut prev_message_id: Option<String> = last_message_id.map(str::to_string);
 
     loop {
         buf.clear();
@@ -151,14 +154,30 @@ pub fn index_file(
             LogRecord::Assistant {
                 ts,
                 model,
+                message_id,
                 input_tokens,
                 output_tokens,
                 tool_uses,
                 ..
             } => {
-                session.turns += 1;
-                session.input_tokens += input_tokens;
-                session.output_tokens += output_tokens;
+                // One message = one turn, however many content blocks (and so
+                // however many records) it was written as. The repeats carry
+                // identical `usage`, so adding it per record would multiply the
+                // session's token totals. An id-less record is always its own
+                // turn (older logs, and hand-written fixtures).
+                let new_message = match &message_id {
+                    Some(id) => prev_message_id.as_deref() != Some(id.as_str()),
+                    None => true,
+                };
+                if new_message {
+                    session.turns += 1;
+                    session.input_tokens += input_tokens;
+                    session.output_tokens += output_tokens;
+                }
+                if message_id.is_some() {
+                    session.last_message_id = message_id.clone();
+                }
+                prev_message_id = message_id;
                 if session.model.is_none() {
                     session.model = model;
                 }
@@ -175,6 +194,10 @@ pub fn index_file(
                         target,
                         duration_ms: None,
                         is_error: false,
+                        // The turn's cost, not this block's share of it: two
+                        // tool_use blocks of one message legitimately carry the
+                        // same `turn_tokens`, and rollups must average, never
+                        // sum, this column.
                         turn_tokens: Some(input_tokens + output_tokens),
                     };
                     order.push(tu.id.clone());
@@ -234,8 +257,67 @@ pub fn index_file(
     })
 }
 
-/// Indexes every `projects/*/*.jsonl` from where `cursor` left off, advancing
-/// it in place. Unreadable files are skipped rather than failing the sweep.
+/// `.jsonl` files directly in `dir`, in name order.
+fn log_files(dir: &Path) -> Option<Vec<std::path::PathBuf>> {
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|f| f.path())
+        .filter(|p| p.is_file() && p.extension().and_then(|e| e.to_str()) == Some("jsonl"))
+        .collect();
+    files.sort();
+    Some(files)
+}
+
+/// One log file: index it from the cursor, fold the result into `batch` and
+/// advance the cursor. `parent` is the session that spawned a sub-agent
+/// transcript, `None` for a top-level session.
+fn index_one(
+    path: &Path,
+    fallback: &str,
+    parent: Option<&str>,
+    cursor: &mut UsageCursor,
+    batch: &mut UsageBatch,
+) {
+    let key = path.to_string_lossy().into_owned();
+    let from = cursor.offsets.get(&key).copied().unwrap_or(0);
+    let seed = cursor.last_message_ids.get(&key).cloned();
+    let Ok(mut indexed) = index_file(path, from, fallback, seed.as_deref()) else {
+        // Leave the cursor alone so the next sweep retries this file.
+        batch.failed_files += 1;
+        return;
+    };
+    indexed.session.parent_session_id = parent.map(str::to_string);
+    let advanced = indexed.new_offset != from || from == 0;
+    cursor.offsets.insert(key.clone(), indexed.new_offset);
+    // A range with no assistant record leaves the seed alone: the next pass
+    // still needs the id of the last message actually seen.
+    if let Some(id) = &indexed.session.last_message_id {
+        cursor.last_message_ids.insert(key, id.clone());
+    } else if indexed.reset {
+        cursor.last_message_ids.remove(&key);
+    } else {
+        indexed.session.last_message_id = seed;
+    }
+    batch.skipped_lines += indexed.skipped_lines;
+    if indexed.reset {
+        batch.reset_sessions.push(indexed.session.id.clone());
+    }
+    let has_news = indexed.session.turns > 0
+        || !indexed.invocations.is_empty()
+        || indexed.session.ended_at.is_some()
+        || !indexed.orphan_results.is_empty();
+    if advanced && (from == 0 || has_news) {
+        batch.sessions.push(indexed.session);
+    }
+    batch.invocations.extend(indexed.invocations);
+    batch.orphan_results.extend(indexed.orphan_results);
+}
+
+/// Indexes every `projects/<slug>/*.jsonl` — and every sub-agent transcript at
+/// `projects/<slug>/<session>/subagents/*.jsonl` — from where `cursor` left
+/// off, advancing it in place. Unreadable files are skipped rather than failing
+/// the sweep.
 pub fn index_all(home: &ClaudeHome, cursor: &mut UsageCursor) -> UsageBatch {
     let mut batch = UsageBatch::default();
     let Ok(dirs) = std::fs::read_dir(home.projects_dir()) else {
@@ -246,43 +328,32 @@ pub fn index_all(home: &ClaudeHome, cursor: &mut UsageCursor) -> UsageBatch {
     dirs.sort_by_key(|d| d.file_name());
     for dir in dirs {
         let slug_name = dir.file_name().to_string_lossy().into_owned();
-        let fallback = slug::decode_slug_fs(&slug_name)
-            .map(|(p, _)| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|| slug_name.clone());
-        let Ok(files) = std::fs::read_dir(dir.path()) else {
+        let (fallback, _) = super::resolve_project_path(&dir.path(), &slug_name);
+        let Some(files) = log_files(&dir.path()) else {
             batch.failed_files += 1;
             continue;
         };
-        let mut files: Vec<_> = files.flatten().collect();
-        files.sort_by_key(|f| f.file_name());
-        for f in files {
-            let path = f.path();
-            // Sibling dirs (e.g. `memory/`) and non-log files are not sessions.
-            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
-                continue;
+        for path in files {
+            index_one(&path, &fallback, None, cursor, &mut batch);
+        }
+        // `<session>/subagents/agent-<id>.jsonl`: a sub-agent's own transcript,
+        // kept out of the parent's log entirely.
+        let mut sub_dirs: Vec<_> = std::fs::read_dir(dir.path())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.join("subagents").is_dir())
+            .collect();
+        sub_dirs.sort();
+        for session_dir in sub_dirs {
+            let parent = session_dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy();
+            for path in log_files(&session_dir.join("subagents")).unwrap_or_default() {
+                index_one(&path, &fallback, Some(&parent), cursor, &mut batch);
             }
-            let key = path.to_string_lossy().into_owned();
-            let from = cursor.offsets.get(&key).copied().unwrap_or(0);
-            let Ok(indexed) = index_file(&path, from, &fallback) else {
-                // Leave the cursor alone so the next sweep retries this file.
-                batch.failed_files += 1;
-                continue;
-            };
-            let advanced = indexed.new_offset != from || from == 0;
-            cursor.offsets.insert(key, indexed.new_offset);
-            batch.skipped_lines += indexed.skipped_lines;
-            if indexed.reset {
-                batch.reset_sessions.push(indexed.session.id.clone());
-            }
-            let has_news = indexed.session.turns > 0
-                || !indexed.invocations.is_empty()
-                || indexed.session.ended_at.is_some()
-                || !indexed.orphan_results.is_empty();
-            if advanced && (from == 0 || has_news) {
-                batch.sessions.push(indexed.session);
-            }
-            batch.invocations.extend(indexed.invocations);
-            batch.orphan_results.extend(indexed.orphan_results);
         }
     }
     batch
@@ -333,7 +404,7 @@ mod tests {
         let (_g, home) = fixture_home();
         let app = home.root.join("work/app");
         let log = log_of(&home);
-        let r = index_file(&log, 0, "/fallback").unwrap();
+        let r = index_file(&log, 0, "/fallback", None).unwrap();
         assert_eq!(r.session.id, "0001-session");
         assert_eq!(r.session.project_path, app.to_string_lossy());
         assert_eq!(r.session.log_path, log.to_string_lossy());
@@ -394,8 +465,8 @@ mod tests {
     fn resume_reads_only_new_lines_and_shrink_resets() {
         let (_g, home) = fixture_home();
         let log = log_of(&home);
-        let first = index_file(&log, 0, "/f").unwrap();
-        let again = index_file(&log, first.new_offset, "/f").unwrap();
+        let first = index_file(&log, 0, "/f", None).unwrap();
+        let again = index_file(&log, first.new_offset, "/f", None).unwrap();
         assert!(again.invocations.is_empty());
         assert_eq!(again.new_offset, first.new_offset);
         assert!(!again.reset);
@@ -403,7 +474,7 @@ mod tests {
         let mut f = std::fs::OpenOptions::new().append(true).open(&log).unwrap();
         use std::io::Write;
         writeln!(f, r#"{{"type":"assistant","timestamp":"2026-08-01T10:01:00.000Z","message":{{"model":"m","usage":{{"input_tokens":1,"output_tokens":1}},"content":[{{"type":"tool_use","id":"t9","name":"Read","input":{{}}}}]}}}}"#).unwrap();
-        let tail = index_file(&log, first.new_offset, "/f").unwrap();
+        let tail = index_file(&log, first.new_offset, "/f", None).unwrap();
         assert_eq!(tail.invocations.len(), 1);
         assert_eq!(tail.invocations[0].tool_name, "Read");
         assert_eq!(tail.invocations[0].tool_use_id, "t9");
@@ -412,7 +483,7 @@ mod tests {
         assert!(!tail.reset);
 
         std::fs::write(&log, "").unwrap();
-        let reset = index_file(&log, tail.new_offset, "/f").unwrap();
+        let reset = index_file(&log, tail.new_offset, "/f", None).unwrap();
         assert_eq!(reset.new_offset, 0);
         assert!(reset.reset);
     }
@@ -423,14 +494,14 @@ mod tests {
     fn tool_result_without_a_pending_use_becomes_an_orphan() {
         let (_g, home) = fixture_home();
         let log = log_of(&home);
-        let first = index_file(&log, 0, "/f").unwrap();
+        let first = index_file(&log, 0, "/f", None).unwrap();
         assert!(first.orphan_results.is_empty());
 
         let mut f = std::fs::OpenOptions::new().append(true).open(&log).unwrap();
         use std::io::Write;
         writeln!(f, r#"{{"type":"user","timestamp":"2026-08-01T10:00:25.000Z","message":{{"content":[{{"type":"tool_result","tool_use_id":"t5","content":"ok"}}]}}}}"#).unwrap();
 
-        let tail = index_file(&log, first.new_offset, "/f").unwrap();
+        let tail = index_file(&log, first.new_offset, "/f", None).unwrap();
         assert!(tail.invocations.is_empty());
         assert_eq!(tail.orphan_results.len(), 1);
         let o = &tail.orphan_results[0];
@@ -446,7 +517,96 @@ mod tests {
         let batch = index_all(&home, &mut cursor);
         assert_eq!(batch.orphan_results.len(), 1);
         // Range-scoped ts alone must still surface the session row.
-        assert_eq!(batch.sessions.len(), 1);
+        assert_eq!(
+            batch
+                .sessions
+                .iter()
+                .filter(|s| s.id == "0001-session")
+                .count(),
+            1
+        );
+    }
+
+    /// Claude Code writes one assistant record per content block, all carrying
+    /// the same `message.id` and the same `usage`. The turn and its tokens are
+    /// counted once; every block still becomes an invocation.
+    #[test]
+    fn repeated_message_id_counts_one_turn_but_keeps_both_tool_uses() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("s.jsonl");
+        let rec = |tool: &str, id: &str| {
+            format!(
+                r#"{{"type":"assistant","timestamp":"2026-08-01T10:00:01.000Z","message":{{"id":"msg_1","model":"m","usage":{{"input_tokens":10,"output_tokens":5}},"content":[{{"type":"tool_use","id":"{id}","name":"{tool}","input":{{}}}}]}}}}"#
+            )
+        };
+        std::fs::write(
+            &log,
+            format!("{}\n{}\n", rec("Read", "t1"), rec("Bash", "t2")),
+        )
+        .unwrap();
+
+        let r = index_file(&log, 0, "/f", None).unwrap();
+        assert_eq!(
+            (
+                r.session.turns,
+                r.session.input_tokens,
+                r.session.output_tokens
+            ),
+            (1, 10, 5)
+        );
+        assert_eq!(r.session.last_message_id.as_deref(), Some("msg_1"));
+        assert_eq!(
+            r.invocations
+                .iter()
+                .map(|i| (i.tool_use_id.as_str(), i.turn_tokens))
+                .collect::<Vec<_>>(),
+            vec![("t1", Some(15)), ("t2", Some(15))]
+        );
+    }
+
+    /// A message split across two passes must not be counted twice: the cursor
+    /// carries the last message id seen into the next pass.
+    #[test]
+    fn resumed_pass_seeded_with_the_last_message_id_does_not_recount() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("s.jsonl");
+        let rec = |id: &str| {
+            format!(
+                r#"{{"type":"assistant","timestamp":"2026-08-01T10:00:01.000Z","message":{{"id":"msg_1","model":"m","usage":{{"input_tokens":10,"output_tokens":5}},"content":[{{"type":"tool_use","id":"{id}","name":"Read","input":{{}}}}]}}}}"#
+            )
+        };
+        std::fs::write(&log, format!("{}\n", rec("t1"))).unwrap();
+        let first = index_file(&log, 0, "/f", None).unwrap();
+        assert_eq!(first.session.turns, 1);
+
+        let mut f = std::fs::OpenOptions::new().append(true).open(&log).unwrap();
+        use std::io::Write;
+        writeln!(f, "{}", rec("t2")).unwrap();
+        let tail = index_file(
+            &log,
+            first.new_offset,
+            "/f",
+            first.session.last_message_id.as_deref(),
+        )
+        .unwrap();
+        assert_eq!(
+            (tail.session.turns, tail.session.input_tokens),
+            (0, 0),
+            "same message id as the previous pass: no second turn"
+        );
+        assert_eq!(tail.invocations.len(), 1);
+
+        // index_all threads the same value through the cursor.
+        let home = ClaudeHome::at(dir.path());
+        std::fs::create_dir_all(home.projects_dir().join("-p")).unwrap();
+        std::fs::rename(&log, home.projects_dir().join("-p/s.jsonl")).unwrap();
+        let mut cursor = UsageCursor::default();
+        let batch = index_all(&home, &mut cursor);
+        assert_eq!(batch.sessions[0].turns, 1);
+        assert_eq!(
+            cursor.last_message_ids.values().collect::<Vec<_>>(),
+            vec!["msg_1"]
+        );
     }
 
     /// Invalid UTF-8 must not stall a log forever: the line is read lossily.
@@ -458,7 +618,7 @@ mod tests {
         bytes.extend_from_slice(&[0xFF, 0xFE]);
         bytes.extend_from_slice(b"\"}\nnot json at all\n");
         std::fs::write(&log, &bytes).unwrap();
-        let r = index_file(&log, 0, "/f").unwrap();
+        let r = index_file(&log, 0, "/f", None).unwrap();
         assert_eq!(r.new_offset, bytes.len() as u64);
         assert_eq!(r.skipped_lines, 1);
     }
@@ -468,7 +628,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("s.jsonl");
         std::fs::write(&log, "{\"type\":\"mode\"}\n{\"type\":\"assis").unwrap();
-        let r = index_file(&log, 0, "/f").unwrap();
+        let r = index_file(&log, 0, "/f", None).unwrap();
         assert_eq!(r.new_offset, "{\"type\":\"mode\"}\n".len() as u64);
         assert_eq!(r.skipped_lines, 0);
     }
@@ -478,16 +638,53 @@ mod tests {
         let (_g, home) = fixture_home();
         let mut cursor = UsageCursor::default();
         let batch = index_all(&home, &mut cursor);
-        assert_eq!(batch.sessions.len(), 1);
-        assert_eq!(batch.invocations.len(), 5);
+        // The session log plus the sub-agent transcript beside it.
+        assert_eq!(batch.sessions.len(), 2);
+        assert_eq!(batch.invocations.len(), 6);
         assert_eq!(batch.skipped_lines, 1);
         assert!(batch.reset_sessions.is_empty());
         assert!(batch.orphan_results.is_empty());
         assert_eq!(batch.failed_files, 0);
-        assert_eq!(cursor.offsets.len(), 1);
+        assert_eq!(cursor.offsets.len(), 2);
         let second = index_all(&home, &mut cursor);
         assert!(second.invocations.is_empty());
         assert!(second.reset_sessions.is_empty());
+    }
+
+    /// `projects/<slug>/<session>/subagents/agent-<id>.jsonl` is a session in
+    /// its own right, linked back to the session that spawned it.
+    #[test]
+    fn subagent_transcripts_are_indexed_as_child_sessions() {
+        let (_g, home) = fixture_home();
+        let mut cursor = UsageCursor::default();
+        let batch = index_all(&home, &mut cursor);
+        let child = batch
+            .sessions
+            .iter()
+            .find(|s| s.id == "agent-abc")
+            .expect("sub-agent session");
+        assert_eq!(child.parent_session_id.as_deref(), Some("0001-session"));
+        assert_eq!(
+            child.project_path,
+            home.root.join("work/app").to_string_lossy()
+        );
+        assert_eq!(child.turns, 1);
+        let parent = batch
+            .sessions
+            .iter()
+            .find(|s| s.id == "0001-session")
+            .expect("top-level session");
+        assert_eq!(parent.parent_session_id, None);
+        let inv: Vec<_> = batch
+            .invocations
+            .iter()
+            .filter(|i| i.session_id == "agent-abc")
+            .collect();
+        assert_eq!(inv.len(), 1);
+        assert_eq!(
+            (inv[0].tool_name.as_str(), inv[0].duration_ms),
+            ("Read", Some(200))
+        );
     }
 
     #[test]
@@ -498,9 +695,13 @@ mod tests {
         std::fs::write(log_of(&home), "").unwrap();
         let after = index_all(&home, &mut cursor);
         assert_eq!(after.reset_sessions, vec!["0001-session".to_string()]);
+        // Only the truncated log rewinds; the sub-agent transcript beside it
+        // keeps its offset.
         assert_eq!(
-            cursor.offsets.values().copied().collect::<Vec<_>>(),
-            vec![0]
+            cursor
+                .offsets
+                .get(&log_of(&home).to_string_lossy().into_owned()),
+            Some(&0)
         );
     }
 }

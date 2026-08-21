@@ -54,14 +54,22 @@ defined by each detected harness. For Claude Code:
 | Global | `~/.claude/settings.json`, `settings.local.json` | hooks, permissions, MCP servers, env |
 | Global | `~/.claude/skills/*/SKILL.md`, `agents/*.md`, `commands/*.md` | skills, agents, commands |
 | Global | `~/.claude/plugins/installed_plugins.json`, `plugins/cache/**` | plugins → their bundled skills/agents/MCP |
+| Global | `~/.claude.json` (sibling of `~/.claude`) | globally-installed MCP servers (`mcpServers`) |
 | Project | each dir decoded from `~/.claude/projects/<slug>` that still exists | `CLAUDE.md`, `AGENTS.md`, `.claude/{settings*.json,skills,agents,commands}`, `.mcp.json`, plus existing `.cursorrules` / copilot discovery |
+| Project | `~/.claude.json` → `projects.<abs path>.mcpServers` | MCP servers added for that project without `--scope project` |
 | Usage | `~/.claude/projects/<slug>/*.jsonl` | every tool invocation, incrementally |
+| Usage | `~/.claude/projects/<slug>/<session>/subagents/agent-*.jsonl` | sub-agent transcripts, indexed as child sessions |
 
 A manual "extra folder" remains available in Settings as an escape hatch.
 
 Slug decoding: `-Users-ahmedabouelleil-code-02-personal-aprocy` → `/Users/ahmedabouelleil/code/02-personal/aprocy`.
-Slugs are lossy (`-` may be a path separator or a literal dash); resolve by
-walking path components and preferring the longest existing prefix. Projects
+Slugs are lossy — `-` may be a path separator, a literal dash, or a `.` (both
+`/` and `.` are encoded as `-`, so `~/.claude/worktrees/wt` becomes
+`--claude-worktrees-wt`); resolve by walking path components and preferring the
+longest existing prefix. The slug, not the log's `cwd`, is the project's
+identity: a session's `cwd` may be a subdirectory it was started in, or the
+parent repo of a git worktree, so `cwd` and its ancestors are searched for the
+one that re-encodes to this slug and only then does decoding take over. Projects
 whose path no longer exists are kept with `exists = false` (their usage history
 still counts) but are not scanned for files.
 

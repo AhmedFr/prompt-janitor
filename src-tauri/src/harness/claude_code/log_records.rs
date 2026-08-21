@@ -22,6 +22,11 @@ pub enum LogRecord {
         ts: String,
         cwd: Option<String>,
         model: Option<String>,
+        /// `message.id` — the API message this record belongs to. Claude Code
+        /// writes one record per content block, so a single message appears as
+        /// several contiguous records that all repeat the same id and the same
+        /// `usage`; the indexer counts the turn and its tokens once per id.
+        message_id: Option<String>,
         /// Total context processed for this turn: fresh input plus
         /// `cache_creation_input_tokens` plus `cache_read_input_tokens`.
         /// Cached reads are cheaper but still context the model had to carry,
@@ -78,6 +83,10 @@ pub fn parse_line(line: &str) -> Option<LogRecord> {
                     .pointer("/message/model")
                     .and_then(Value::as_str)
                     .map(str::to_string),
+                message_id: v
+                    .pointer("/message/id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
                 input_tokens: tok("input_tokens")
                     + tok("cache_creation_input_tokens")
                     + tok("cache_read_input_tokens"),
@@ -117,12 +126,13 @@ mod tests {
 
     #[test]
     fn parses_assistant_tool_use_with_usage() {
-        let line = r#"{"type":"assistant","timestamp":"2026-08-01T10:00:01.000Z","cwd":"/p","message":{"model":"m","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":200,"output_tokens":50},"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"adapt"}},{"type":"text","text":"hi"}]}}"#;
+        let line = r#"{"type":"assistant","timestamp":"2026-08-01T10:00:01.000Z","cwd":"/p","message":{"id":"msg_01","model":"m","usage":{"input_tokens":10,"cache_creation_input_tokens":100,"cache_read_input_tokens":200,"output_tokens":50},"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"adapt"}},{"type":"text","text":"hi"}]}}"#;
         match parse_line(line).unwrap() {
             LogRecord::Assistant {
                 ts,
                 cwd,
                 model,
+                message_id,
                 input_tokens,
                 output_tokens,
                 tool_uses,
@@ -131,6 +141,7 @@ mod tests {
                     (ts.as_str(), cwd.as_deref(), model.as_deref()),
                     ("2026-08-01T10:00:01.000Z", Some("/p"), Some("m"))
                 );
+                assert_eq!(message_id.as_deref(), Some("msg_01"));
                 // input is the total context processed: fresh + cache-write + cache-read.
                 assert_eq!((input_tokens, output_tokens), (310, 50));
                 assert_eq!(tool_uses.len(), 1);

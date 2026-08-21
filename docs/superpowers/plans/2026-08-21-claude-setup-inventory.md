@@ -1226,6 +1226,13 @@ pub fn parse_line(line: &str) -> Option<LogRecord> {
 > - `index_all` must skip non-`.jsonl` entries and sibling directories inside project log dirs (the fixture now has a `memory/` dir and a `.DS_Store`); `UsageBatch` gains `pub reset_sessions: Vec<String>` listing session ids that were re-read from 0.
 > - Update the tests accordingly (assert `tool_use_id` values `t1..t5`, `log_path`, and that `reset` is true after the shrink).
 
+> **Amendments (after branch review B — probing the owner's real `~/.claude`; these override everything below where they differ):**
+> - Claude Code writes **one assistant record per content block**, contiguous, all repeating the same `message.id` and the same `usage`. `LogRecord::Assistant` therefore carries `message_id: Option<String>` (from `/message/id`), and `turns` / `input_tokens` / `output_tokens` are counted **once per message id**, not once per record. Every block still becomes an invocation, and two tool_use blocks of one message legitimately share the same `turn_tokens` (it is the turn's cost, so rollups average it, never sum it).
+> - A message can straddle two incremental passes: `index_file(log_path, from_offset, fallback_project, last_message_id: Option<&str>)` is seeded with the previous pass's id. `SessionMeta` gains `last_message_id: Option<String>` and `UsageCursor` gains `last_message_ids: HashMap<log path, String>`, which `index_all` threads through and updates after each file (a range with no assistant record keeps the previous id).
+> - `index_all` also walks `projects/<slug>/<session-uuid>/subagents/agent-<id>.jsonl`. Those are sessions in their own right: `SessionMeta.id` = file stem (`agent-<id>`), new field `parent_session_id = Some("<session-uuid>")` (`None` for top-level), and their invocations carry `session_id = "agent-<id>"`.
+> - The project a log dir belongs to comes from `claude_code::resolve_project_path` (Task 9), not from `decode_slug_fs` alone.
+> - Fixture: assistant records carry `message.id` `m1`..`m5`, and `projects/-FIXTURE-work-app/0001-session/subagents/agent-abc.jsonl` adds a sub-agent session (one `Read` + its result 200 ms later). `index_all` over the fixture now yields 2 sessions and 6 invocations.
+
 **Files:**
 - Create: `src-tauri/src/harness/claude_code/log_index.rs`
 
@@ -1501,6 +1508,8 @@ pub fn index_all(home: &ClaudeHome, cursor: &mut UsageCursor) -> UsageBatch {
 
 `projects()`: every `projects/<slug>` dir → `ProjectRef { path: decoded or slug, exists: decoded.is_some(), log_dir: Some(dir) }`; plus, to be safe against lossy slugs, if any `.jsonl` in the dir has a `cwd` on its first 50 lines, prefer that `cwd` (read via `log_records::parse_line`). De-duplicate by path.
 
+> **Amendment (after branch review B):** "prefer the `cwd`" is wrong on real data — a session's `cwd` can be a subdirectory it was started in, and a git worktree under `<repo>/.claude/worktrees/<wt>` logs the parent repo, so taking `cwd` at face value merges distinct projects into one. The rule is **slug-anchored**: `pub(super) fn resolve_project_path(dir: &Path, slug: &str) -> (String, bool)` reads `cwd_from_logs(dir)`, then walks that `cwd` and its ancestors and returns the first whose `slug::encode` equals `slug`; failing that it falls back to `decode_slug_fs(slug)` (`exists = resolved && is_dir`), and failing that the slug stands in for itself. `projects()` and `log_index::index_all` both use it. `slug::encode` maps **both** `/` and `.` to `-`, and `decode` puts a leading dot back when a run of segments starts empty (`--claude` → `.claude`).
+
 - [ ] **Step 1: Failing tests** in `claude_code/mod.rs`:
 
 ```rust
@@ -1671,6 +1680,12 @@ impl Harness for ClaudeCode {
 > - A session id may appear in `reset_sessions` without a matching `sessions` entry (log truncated to empty): still delete its invocations and zero its counters.
 > - `input_tokens`/`turn_tokens` include cache tokens (controller ruling in Task 8).
 > - Tests run on a connection from `crate::store::test_conn()` (added in PR A: in-memory + migrate + `PRAGMA foreign_keys=ON`).
+>
+> **Amendments (after branch review B):**
+> - Reset wipes must be harness-scoped: `DELETE FROM invocations WHERE harness = ? AND session_id = ?` (a session id is only unique within a harness).
+> - `store_usage` persists `SessionMeta.parent_session_id` and `SessionMeta.last_message_id` (v8 columns `parent_session_id`, `last_message_id`, index `idx_sessions_parent`).
+> - `load_cursor` fills both `offsets` **and** `last_message_ids` (`SELECT log_path, byte_offset, last_message_id FROM sessions WHERE harness = ?`), so a restart resumes the per-message turn dedupe.
+> - Sub-agent transcripts are sessions too, so `harness_projects.session_count` and every "sessions" count roll up only top-level ones: `WHERE parent_session_id IS NULL`. Invocations are counted from all of them.
 
 **Files:**
 - Create: `src-tauri/src/harness_store.rs`
@@ -1958,6 +1973,8 @@ pub fn last_scan_id(conn: &Connection) -> rusqlite::Result<Option<i64>> {
 
 ### Task 11: Orchestrator + multi-root file scan (folder picker retired)
 
+> **Amendment (after branch review B):** the deferred "measure `UsageBatch` memory on the real `~/.claude`" item is dropped — the owner's real tree produces ≈5k invocations per sweep, which is nothing. No measurement step in this task.
+
 **Files:**
 - Create: `src-tauri/src/harness_scan.rs`
 - Modify: `src-tauri/src/scan.rs` (`run_scan` → multi-root), `src-tauri/src/scanner.rs` (`scan_files`), `src-tauri/src/commands.rs` (`scan_now`, `scan_and_emit`, `scan_configured_folder`), `src-tauri/src/scheduler.rs:75`, `src-tauri/src/tray.rs:35`, `src-tauri/src/lib.rs`
@@ -2180,6 +2197,8 @@ Replace `set_scan_folder`/`get_scan_folder` with `set_extra_scan_folders(db, fol
 
 ### Task 12: Read models + IPC commands
 
+> **Amendment (branch review B):** `HarnessInfo.session_count`, `ProjectSetup.session_count` and `sessions_per_project` count **top-level sessions only** (`WHERE parent_session_id IS NULL`); sub-agent transcripts would otherwise inflate every count. Invocation-level aggregates keep counting sub-agent rows.
+>
 > **Amendment:** aggregates over `duration_ms` must filter `duration_ms >= 0` (clock skew can produce negatives). `ArtifactView.usage` is looked up by `usage_stats.artifact_id = artifacts.id` (one row per linked artifact); targets with no artifact (`artifact_id IS NULL`) appear only in the Analytics usage overview.
 
 **Files:**

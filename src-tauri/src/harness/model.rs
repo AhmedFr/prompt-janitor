@@ -150,6 +150,13 @@ pub struct SessionMeta {
     pub input_tokens: i64,
     pub output_tokens: i64,
     pub model: Option<String>,
+    /// Sub-agent transcripts are their own sessions; this points at the session
+    /// that spawned them (`None` for a top-level session).
+    pub parent_session_id: Option<String>,
+    /// Last assistant `message.id` seen in the indexed range. A message can be
+    /// split across passes, so the next pass is seeded with it to avoid
+    /// counting that turn (and its tokens) twice.
+    pub last_message_id: Option<String>,
 }
 
 /// A `tool_result` whose `tool_use` was indexed in an earlier pass, so the
@@ -170,6 +177,9 @@ pub struct OrphanResult {
 #[derive(Debug, Clone, Default)]
 pub struct UsageCursor {
     pub offsets: HashMap<String, u64>,
+    /// Log path → last assistant `message.id` indexed in it. Persisted in
+    /// `sessions.last_message_id`; seeds the next pass's turn dedupe.
+    pub last_message_ids: HashMap<String, String>,
 }
 
 #[derive(Debug, Default)]

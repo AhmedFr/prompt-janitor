@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vercel": { "command": "x" }
+  },
+  "projects": {
+    "<FIXTURE>/work/app": {
+      "mcpServers": {
+        "linear": { "command": "y" }
+      }
+    }
+  }
+}

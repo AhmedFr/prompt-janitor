@@ -71,6 +71,32 @@ fn cwd_from_logs(dir: &Path) -> Option<String> {
     None
 }
 
+/// The project a log directory belongs to, as `(path, exists_on_disk)`.
+///
+/// The slug is the anchor and the logged `cwd` only says where to start
+/// looking: `cwd` can be a subdirectory the session was started in, or — for a
+/// git worktree under `<repo>/.claude/worktrees` — the parent repo, so taking
+/// it at face value merges distinct projects. We walk `cwd` and its ancestors
+/// and keep the first one that re-encodes to this slug. Failing that (a `cwd`
+/// from a different machine, or no logs at all) the slug is decoded against the
+/// disk, and failing that it stands in for itself.
+pub(super) fn resolve_project_path(dir: &Path, slug: &str) -> (String, bool) {
+    if let Some(cwd) = cwd_from_logs(dir) {
+        let mut candidate = Some(Path::new(&cwd));
+        while let Some(p) = candidate {
+            if slug::encode(p) == slug {
+                return (p.to_string_lossy().into_owned(), p.is_dir());
+            }
+            candidate = p.parent();
+        }
+    }
+    if let Some((path, resolved)) = slug::decode_slug_fs(slug) {
+        let exists = resolved && path.is_dir();
+        return (path.to_string_lossy().into_owned(), exists);
+    }
+    (slug.to_string(), false)
+}
+
 impl Harness for ClaudeCode {
     fn id(&self) -> &'static str {
         inventory::HARNESS_ID
@@ -94,12 +120,7 @@ impl Harness for ClaudeCode {
         dirs.sort_by_key(|d| d.file_name());
         for d in dirs {
             let slug_name = d.file_name().to_string_lossy().into_owned();
-            let path = cwd_from_logs(&d.path())
-                .or_else(|| {
-                    slug::decode_slug_fs(&slug_name).map(|(p, _)| p.to_string_lossy().into_owned())
-                })
-                .unwrap_or_else(|| slug_name.clone());
-            let exists = Path::new(&path).is_dir();
+            let (path, exists) = resolve_project_path(&d.path(), &slug_name);
             by_path.entry(path.clone()).or_insert(ProjectRef {
                 harness: inventory::HARNESS_ID.into(),
                 path,
@@ -120,7 +141,7 @@ impl Harness for ClaudeCode {
                 a.extend(plugins::plugin_artifacts(home));
                 a
             }
-            Scope::Project(p) => inventory::project_artifacts(Path::new(p)),
+            Scope::Project(p) => inventory::project_artifacts(home, Path::new(p)),
         }
     }
 
@@ -168,7 +189,8 @@ mod tests {
             .iter()
             .any(|a| a.kind == K::Skill && a.name == "deploy"));
         let mut cursor = Default::default();
-        assert_eq!(h.index_usage(&mut cursor).invocations.len(), 5);
+        // 5 in the session log + 1 in its sub-agent transcript.
+        assert_eq!(h.index_usage(&mut cursor).invocations.len(), 6);
     }
 
     #[test]
@@ -179,36 +201,80 @@ mod tests {
         assert!(h.inventory(&Scope::Global).is_empty());
     }
 
+    /// Writes `projects/<slug>/0001-session.jsonl` carrying `cwd`.
+    fn log_dir_with_cwd(root: &Path, slug: &str, cwd: &Path) -> std::path::PathBuf {
+        let dir = root.join("projects").join(slug);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("0001-session.jsonl"),
+            format!(r#"{{"type":"other","cwd":"{}"}}"#, cwd.to_string_lossy()),
+        )
+        .unwrap();
+        dir
+    }
+
+    /// The slug is the anchor, the log `cwd` only says where to start looking:
+    /// a worktree under `<repo>/.claude/worktrees` keeps its own identity even
+    /// though its sessions log the parent repo as `cwd`.
     #[test]
-    fn two_slug_dirs_resolving_to_the_same_cwd_dedupe_to_the_alphabetically_first() {
+    fn worktree_slug_is_not_collapsed_into_the_parent_repo() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().canonicalize().unwrap();
-        let target = root.join("target");
-        std::fs::create_dir_all(&target).unwrap();
-        let projects = root.join("projects");
-        std::fs::create_dir_all(&projects).unwrap();
+        let repo = root.join("repo");
+        let wt = repo.join(".claude/worktrees/wt");
+        std::fs::create_dir_all(&wt).unwrap();
+        let dir = log_dir_with_cwd(&root, &slug::encode(&wt), &repo);
 
-        let cwd_line = format!(r#"{{"type":"other","cwd":"{}"}}"#, target.to_string_lossy());
-        for slug in ["-aaa-first", "-zzz-second"] {
-            let dir = projects.join(slug);
-            std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join("0001-session.jsonl"), &cwd_line).unwrap();
+        let (path, exists) = resolve_project_path(&dir, &slug::encode(&wt));
+        assert_eq!(path, wt.to_string_lossy());
+        assert!(exists);
+    }
+
+    /// A session started in a subdirectory reports that subdirectory as `cwd`;
+    /// the project is the ancestor the slug names.
+    #[test]
+    fn cwd_below_the_project_root_walks_up_to_the_slugs_directory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let app = root.join("app");
+        std::fs::create_dir_all(app.join("src")).unwrap();
+        let dir = log_dir_with_cwd(&root, &slug::encode(&app), &app.join("src"));
+
+        let (path, exists) = resolve_project_path(&dir, &slug::encode(&app));
+        assert_eq!(path, app.to_string_lossy());
+        assert!(exists);
+    }
+
+    /// Deleted project: nothing on disk to decode against, but a logged `cwd`
+    /// that re-encodes to the slug still names it.
+    #[test]
+    fn cwd_wins_when_the_slug_no_longer_decodes_on_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let gone = root.join("gone/project");
+        let dir = log_dir_with_cwd(&root, &slug::encode(&gone), &gone);
+
+        let (path, exists) = resolve_project_path(&dir, &slug::encode(&gone));
+        assert_eq!(path, gone.to_string_lossy());
+        assert!(!exists, "the directory is gone");
+    }
+
+    #[test]
+    fn projects_are_sorted_by_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        for name in ["zebra", "apple"] {
+            let p = root.join(name);
+            std::fs::create_dir_all(&p).unwrap();
+            log_dir_with_cwd(&root, &slug::encode(&p), &p);
         }
-
-        let home = ClaudeHome::at(root);
-        let h = ClaudeCode::with_home(home.clone());
-        let ps = h.projects();
-        assert_eq!(ps.len(), 1);
-        assert_eq!(ps[0].path, target.to_string_lossy());
-        assert!(ps[0].exists);
+        let ps = ClaudeCode::with_home(ClaudeHome::at(root.clone())).projects();
         assert_eq!(
-            ps[0].log_dir,
-            Some(
-                home.projects_dir()
-                    .join("-aaa-first")
-                    .to_string_lossy()
-                    .into_owned()
-            )
+            ps.iter().map(|p| p.path.as_str()).collect::<Vec<_>>(),
+            vec![
+                root.join("apple").to_string_lossy(),
+                root.join("zebra").to_string_lossy()
+            ]
         );
     }
 }

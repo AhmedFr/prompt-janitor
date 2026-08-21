@@ -1,0 +1,2 @@
+{"type":"assistant","uuid":"sa1","timestamp":"2026-08-01T10:00:30.000Z","cwd":"<FIXTURE>/work/app","sessionId":"agent-abc","message":{"role":"assistant","id":"ms1","model":"claude-fable-5","usage":{"input_tokens":5,"output_tokens":5},"content":[{"type":"tool_use","id":"s1","name":"Read","input":{"file_path":"<FIXTURE>/work/app/CLAUDE.md"}}]}}
+{"type":"user","uuid":"sa2","timestamp":"2026-08-01T10:00:30.200Z","cwd":"<FIXTURE>/work/app","sessionId":"agent-abc","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"s1","content":"# rules"}]}}
