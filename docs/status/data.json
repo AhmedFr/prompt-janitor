@@ -242,7 +242,7 @@
     },
     {
       "name": "cargo test",
-      "result": "260/260 passing"
+      "result": "265/265 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -271,6 +271,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve",
     "2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard",
     "2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)",
     "2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture",

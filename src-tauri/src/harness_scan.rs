@@ -28,6 +28,9 @@ pub struct HarnessScanOutcome {
     /// Project scopes whose inventory came back empty while the database still
     /// held artifacts for them: an unreadable directory, not an emptied one.
     pub skipped_scopes: u32,
+    /// Usage batches dropped because another pass had already committed the
+    /// same bytes while this one was parsing.
+    pub stale_batches: u32,
 }
 
 /// Everything one harness contributes to a scan, gathered before the usage
@@ -42,7 +45,12 @@ pub struct PreparedHarness {
     /// `(project path, artifacts)` for every project that exists on disk and
     /// does not own the harness home itself.
     pub project_inventories: Vec<(String, Vec<Artifact>)>,
+    /// Advanced in place by [`index`] — where the next pass should resume.
     pub cursor: UsageCursor,
+    /// The same cursor as it stood in the database when this pass was
+    /// prepared. [`commit`] re-reads it to tell whether another pass got
+    /// there first.
+    pub stored_cursor: UsageCursor,
 }
 
 /// `<project>/.claude == <harness home>` — the project *is* the directory the
@@ -72,10 +80,17 @@ fn user_homes() -> Vec<PathBuf> {
 /// any root nested inside another (the walker reaches it from the parent).
 /// The project rows themselves are kept regardless: their usage history has to
 /// keep resolving.
-fn scan_roots(candidates: Vec<PathBuf>, home_roots: &[PathBuf]) -> Vec<PathBuf> {
+///
+/// The folders the user added by hand go through here too: a picked `$HOME`
+/// is exactly as unwalkable as a slug that resolved to one.
+pub(crate) fn scan_roots(candidates: Vec<PathBuf>, home_roots: &[PathBuf]) -> Vec<PathBuf> {
     let homes = user_homes();
     let mut kept: Vec<PathBuf> = candidates
         .into_iter()
+        // A root reached through a symlink has to be judged as what it points
+        // at: `~/shortcut -> ~` is the home directory under another name, and
+        // every comparison below is a path-prefix test that the link defeats.
+        .map(|r| r.canonicalize().unwrap_or(r))
         .filter(|r| {
             // The filesystem root has no parent.
             r.parent().is_some()
@@ -93,6 +108,31 @@ fn scan_roots(candidates: Vec<PathBuf>, home_roots: &[PathBuf]) -> Vec<PathBuf> 
         out.push(root);
     }
     out
+}
+
+/// How many of `inventory`'s artifacts were read out of `project` itself.
+///
+/// A project's layer also carries things declared elsewhere — the MCP servers
+/// in `~/.claude.json` are filed under the project they are configured for —
+/// and those keep being listed when the project directory cannot be read at
+/// all. Only an artifact backed by a file inside the project is evidence that
+/// the walk actually worked.
+fn file_derived(project: &Path, inventory: &[Artifact]) -> usize {
+    use crate::harness::model::ArtifactKind as Kind;
+    inventory
+        .iter()
+        .filter(|a| {
+            matches!(
+                a.kind,
+                Kind::Rule
+                    | Kind::Skill
+                    | Kind::Agent
+                    | Kind::Command
+                    | Kind::Settings
+                    | Kind::Hook
+            ) && Path::new(&a.path).starts_with(project)
+        })
+        .count()
 }
 
 /// Step 1 — read each harness off the filesystem and pick up its usage cursor.
@@ -115,6 +155,7 @@ pub fn prepare(
             global_inventory: Vec::new(),
             project_inventories: Vec::new(),
             cursor: UsageCursor::default(),
+            stored_cursor: UsageCursor::default(),
         };
         if detected {
             prepared.projects = h.projects();
@@ -129,6 +170,7 @@ pub fn prepare(
                 .map(|p| (p.path.clone(), h.inventory(&Scope::Project(p.path.clone()))))
                 .collect();
             prepared.cursor = hs::load_cursor(conn, h.id())?;
+            prepared.stored_cursor = prepared.cursor.clone();
         }
         out.push(prepared);
     }
@@ -195,10 +237,14 @@ pub fn commit(
 
         for (path, artifacts) in &p.project_inventories {
             let scope = Scope::Project(path.clone());
-            // Nothing found where the database already holds something means
-            // the directory could not be read, not that it was emptied —
-            // rewriting the scope would delete a live inventory.
-            if artifacts.is_empty() && hs::count_artifacts(conn, &p.id, &scope)? > 0 {
+            // Nothing read *out of the project* where the database already
+            // holds something means the directory could not be read, not that
+            // it was emptied — rewriting the scope would delete a live
+            // inventory. Artifacts declared elsewhere survive an unreadable
+            // project and would otherwise mask the failure.
+            if file_derived(Path::new(path), artifacts) == 0
+                && hs::count_artifacts(conn, &p.id, &scope)? > 0
+            {
                 out.skipped_scopes += 1;
                 continue;
             }
@@ -209,7 +255,15 @@ pub fn commit(
         out.skipped_lines_by_harness
             .push((p.id.clone(), batch.skipped_lines));
         out.failed_files += batch.failed_files;
-        hs::store_usage(conn, batch, &p.cursor)?;
+        // Another pass committed while this one was parsing: it stored the
+        // rows this batch re-read, and merging them on top would count every
+        // session in the overlap twice. The cursor it left behind is ahead of
+        // ours, so the next pass picks up from there.
+        if hs::load_cursor(conn, &p.id)? == p.stored_cursor {
+            hs::store_usage(conn, batch, &p.cursor)?;
+        } else {
+            out.stale_batches += 1;
+        }
         hs::link_invocations_to_artifacts(conn, &p.id)?;
         hs::rebuild_usage_stats(conn, &p.id, now_epoch_secs)?;
     }
@@ -425,6 +479,118 @@ mod tests {
             before,
             "an unreadable directory must not wipe the inventory"
         );
+    }
+
+    /// Two passes prepared from the same starting point: whichever commits
+    /// second re-read bytes the first already stored, so its batch has to be
+    /// dropped rather than merged on top.
+    #[test]
+    fn a_batch_prepared_before_another_pass_committed_is_dropped() {
+        let (_g, home) = fixture_home();
+        let conn = conn();
+        let hs = boxed(&home);
+
+        // Pass A: prepared and parsed, but held back.
+        let a = index(&hs, prepare(&conn, &hs).unwrap());
+        // Pass B: prepared from the same (empty) cursor, but committed first.
+        let b = index(&hs, prepare(&conn, &hs).unwrap());
+        let out_b = commit(&conn, &b, 1_785_628_800).unwrap();
+        assert_eq!(out_b.stale_batches, 0);
+        let turns = session_turns(&conn);
+        assert!(turns > 0, "the first commit should have stored sessions");
+
+        let out_a = commit(&conn, &a, 1_785_628_801).unwrap();
+        assert_eq!(out_a.stale_batches, 1);
+        assert_eq!(
+            session_turns(&conn),
+            turns,
+            "a stale batch must not count its sessions twice"
+        );
+    }
+
+    /// The project layer also lists the MCP servers declared in
+    /// `~/.claude.json`, which keep showing up when the project directory
+    /// itself cannot be read. They are not evidence that the walk worked.
+    #[test]
+    fn an_inventory_of_only_mcp_servers_does_not_wipe_a_project() {
+        use crate::harness::model::{ArtifactKind, Layer};
+        let (_g, home) = fixture_home();
+        let conn = conn();
+        let hs = boxed(&home);
+        assert_eq!(
+            run_harness_scan(&conn, &hs, 1_785_628_800)
+                .unwrap()
+                .skipped_scopes,
+            0
+        );
+        let project = home.root.join("work/app").to_string_lossy().into_owned();
+        let before = project_artifact_count(&conn, &project);
+        assert!(before > 0, "the first pass should have stored something");
+
+        let mcp = Artifact {
+            harness: "claude_code".to_string(),
+            layer: Layer::Project,
+            project_path: Some(project.clone()),
+            kind: ArtifactKind::McpServer,
+            name: "linear".to_string(),
+            path: home
+                .root
+                .join("user.claude.json")
+                .to_string_lossy()
+                .into_owned(),
+            plugin_name: None,
+            description: None,
+            bytes: 0,
+            hash: "h".to_string(),
+        };
+        let mut prepared = prepare(&conn, &hs).unwrap();
+        prepared[0].project_inventories = vec![(project.clone(), vec![mcp])];
+        let indexed: Vec<(PreparedHarness, UsageBatch)> = prepared
+            .into_iter()
+            .map(|p| (p, UsageBatch::default()))
+            .collect();
+        let out = commit(&conn, &indexed, 1_785_628_801).unwrap();
+
+        assert_eq!(out.skipped_scopes, 1);
+        assert_eq!(project_artifact_count(&conn, &project), before);
+    }
+
+    /// A folder the user picked by hand goes through the same sieve: `$HOME`
+    /// is still too broad, and one nested in a root already listed is reached
+    /// from that root.
+    #[test]
+    fn a_hand_picked_extra_folder_is_filtered_like_any_other_root() {
+        let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+            return; // no HOME in this environment; nothing to assert
+        };
+        let kept = home.join("code/project");
+        let nested = kept.join("packages/ui");
+        assert_eq!(
+            scan_roots(vec![kept.clone(), home, nested], &[]),
+            vec![kept]
+        );
+    }
+
+    /// `~/shortcut -> ~/.claude` is the harness home under another name; the
+    /// comparison has to see through the link.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_root_is_resolved_before_it_is_judged() {
+        let (_g, home) = fixture_home();
+        let tmp = tempfile::tempdir().unwrap();
+        let link = tmp.path().join("home-link");
+        std::os::unix::fs::symlink(&home.root, &link).unwrap();
+        assert!(
+            scan_roots(vec![link], std::slice::from_ref(&home.root)).is_empty(),
+            "a symlink to the harness home is still the harness home"
+        );
+    }
+
+    fn session_turns(conn: &Connection) -> i64 {
+        conn.query_row("SELECT coalesce(sum(turns), 0) FROM sessions", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
     }
 
     fn project_artifact_count(conn: &Connection, path: &str) -> i64 {

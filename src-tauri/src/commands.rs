@@ -1,6 +1,8 @@
 //! Tauri commands exposed to the frontend. Each is `#[specta::specta]` so
 //! tauri-specta can generate typed TypeScript bindings.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::query::{self, Overview};
 use crate::scan::ScanSummary;
 use crate::store::AppDb;
@@ -47,6 +49,28 @@ pub fn ping() -> String {
     "pong".to_string()
 }
 
+/// Set while a scan is running. A scan walks every project and rewrites the
+/// database; two overlapping ones interleave their writes and emit two
+/// `scan-done` events for what the user asked once.
+static SCAN_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+/// Holds the single-flight claim for as long as a scan runs and releases it
+/// however that scan ends — including on an early `?`.
+struct ScanGuard;
+
+impl ScanGuard {
+    /// `None` when a scan is already in flight.
+    fn acquire() -> Option<Self> {
+        (!SCAN_IN_PROGRESS.swap(true, Ordering::SeqCst)).then_some(Self)
+    }
+}
+
+impl Drop for ScanGuard {
+    fn drop(&mut self) {
+        SCAN_IN_PROGRESS.store(false, Ordering::SeqCst);
+    }
+}
+
 /// Per-file scan progress, emitted on the `scan-progress` event.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct ScanProgress {
@@ -67,6 +91,10 @@ pub struct ScanProgress {
 /// phase continues under that same guard.
 pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     use tauri::{Emitter, Manager};
+
+    // Before the first event: a refused scan must look like nothing happened,
+    // not like a scan that started and never finished.
+    let _guard = ScanGuard::acquire().ok_or("A scan is already running.")?;
 
     let db = app.state::<AppDb>();
     let now_secs = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
@@ -93,6 +121,15 @@ pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
             .into_iter()
             .map(std::path::PathBuf::from),
     );
+    // A hand-picked folder gets the same sieve as a harness project root: a
+    // picked `$HOME` (or any parent of a harness home) would sweep the whole
+    // disk, and one nested in a root already listed would be walked twice.
+    let home_roots: Vec<std::path::PathBuf> = indexed
+        .iter()
+        .filter(|(p, _)| p.detected)
+        .filter_map(|(p, _)| p.home_root.clone())
+        .collect();
+    let roots = crate::harness_scan::scan_roots(roots, &home_roots);
 
     let summary = crate::scan::run_scan_all(&conn, &roots, &outcome.extra_files, |done, total| {
         let _ = app.emit("scan-progress", ScanProgress { done, total });
@@ -714,6 +751,22 @@ mod tests {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         crate::store::migrate(&conn).unwrap();
         conn
+    }
+
+    /// A scan writes the whole database and ends with one `scan-done`; a
+    /// second one starting while the first runs would interleave both.
+    #[test]
+    fn a_second_scan_is_refused_while_one_is_running() {
+        let first = ScanGuard::acquire().expect("the first scan takes the claim");
+        assert!(
+            ScanGuard::acquire().is_none(),
+            "a scan starting mid-scan must be turned away"
+        );
+        drop(first);
+        assert!(
+            ScanGuard::acquire().is_some(),
+            "the claim is released however the scan ends"
+        );
     }
 
     #[test]
