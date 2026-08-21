@@ -1,17 +1,67 @@
 {
   "version": "0.1.0",
-  "updated": "2026-07-21",
+  "updated": "2026-08-21",
   "readiness": {
     "percent": 82,
     "label": "Code complete — blocked on human actions to ship v1"
   },
   "phases": [
-    { "name": "Phase 0", "title": "Scaffold", "done": 5, "total": 5, "state": "done", "note": "Tauri + React shell, tokens, component library, SQLite + typed IPC, CI" },
-    { "name": "Phase 1", "title": "Vertical slice", "done": 7, "total": 7, "state": "done", "note": "Scanner, rules engine, scoring, persisted scans, Overview / Prompts / Detail screens" },
-    { "name": "Phase 2", "title": "Scheduler, history & menu-bar", "done": 6, "total": 6, "state": "done", "note": "Background scheduler, watch mode, sparklines, tray, notifications, onboarding" },
-    { "name": "Phase 3", "title": "Rules & standards", "done": 5, "total": 5, "state": "done", "note": "Rule packs, Rules screen, pattern rules, Settings, pack import" },
-    { "name": "Phase 4", "title": "AI fix engine (paid)", "done": 5, "total": 5, "state": "done", "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate" },
-    { "name": "Phase 5", "title": "Ship & polish", "done": 2, "total": 5, "state": "active", "note": "A11y + landing shipped. Open: release pipeline (#29 — PR up), license vendor tool (#67 — PR up), this dashboard (#68 — PR up)" }
+    {
+      "name": "Phase 0",
+      "title": "Scaffold",
+      "done": 5,
+      "total": 5,
+      "state": "done",
+      "note": "Tauri + React shell, tokens, component library, SQLite + typed IPC, CI"
+    },
+    {
+      "name": "Phase 1",
+      "title": "Vertical slice",
+      "done": 7,
+      "total": 7,
+      "state": "done",
+      "note": "Scanner, rules engine, scoring, persisted scans, Overview / Prompts / Detail screens"
+    },
+    {
+      "name": "Phase 2",
+      "title": "Scheduler, history & menu-bar",
+      "done": 6,
+      "total": 6,
+      "state": "done",
+      "note": "Background scheduler, watch mode, sparklines, tray, notifications, onboarding"
+    },
+    {
+      "name": "Phase 3",
+      "title": "Rules & standards",
+      "done": 5,
+      "total": 5,
+      "state": "done",
+      "note": "Rule packs, Rules screen, pattern rules, Settings, pack import"
+    },
+    {
+      "name": "Phase 4",
+      "title": "AI fix engine (paid)",
+      "done": 5,
+      "total": 5,
+      "state": "done",
+      "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate"
+    },
+    {
+      "name": "Phase 5",
+      "title": "Ship & polish",
+      "done": 2,
+      "total": 5,
+      "state": "active",
+      "note": "A11y + landing shipped. Open: release pipeline (#29 — PR up), license vendor tool (#67 — PR up), this dashboard (#68 — PR up)"
+    },
+    {
+      "name": "Phase 7",
+      "title": "Setup inventory & usage evidence",
+      "done": 0,
+      "total": 6,
+      "state": "active",
+      "note": "Spec + plans + process skill landed (#107). Next: phase 0 (#108), harness core (#109), Claude Code harness (#110), persistence/IPC (#111), UI (#112), detail/settings/docs (#113)"
+    }
   ],
   "actions": {
     "blocking": [
@@ -82,39 +132,145 @@
     ]
   },
   "features": [
-    { "name": "Folder scanner (.gitignore-aware, 8 prompt-file kinds)", "tier": "free", "status": "shipped" },
-    { "name": "Rules engine + A–F scoring", "tier": "free", "status": "shipped" },
-    { "name": "Built-in rule packs (Anthropic, OpenAI, community) + toggles", "tier": "free", "status": "shipped" },
-    { "name": "Pattern-based custom rules", "tier": "free", "status": "shipped" },
-    { "name": "Background scheduler + on-save watch mode", "tier": "free", "status": "shipped" },
-    { "name": "Menu-bar tray + native notifications (digest & regression)", "tier": "free", "status": "shipped" },
-    { "name": "Grade history, sparklines & scan digest", "tier": "free", "status": "shipped" },
-    { "name": "Onboarding wizard & full Settings (7 tabs)", "tier": "free", "status": "shipped" },
-    { "name": "AI provider config — BYO key (Anthropic / OpenAI)", "tier": "pro", "status": "shipped" },
-    { "name": "AI rewrite suggestions", "tier": "pro", "status": "shipped" },
-    { "name": "Apply fix with backup, undo & optional git branch", "tier": "pro", "status": "shipped" },
-    { "name": "Natural-language custom rules (AI-evaluated)", "tier": "pro", "status": "shipped" },
-    { "name": "Offline Ed25519 license gate", "tier": "pro", "status": "shipped" },
-    { "name": "License vendor CLI (keygen / mint / verify)", "tier": "infra", "status": "pr", "note": "PR for #67 awaiting review" },
-    { "name": "Release pipeline (universal macOS DMG on tag)", "tier": "infra", "status": "pr", "note": "PR for #29 awaiting review" },
-    { "name": "Landing page + Pages deploy", "tier": "infra", "status": "shipped" },
-    { "name": "A11y pass (keyboard, reduced-motion, axe test)", "tier": "infra", "status": "shipped" },
-    { "name": "Signed & notarized DMG", "tier": "infra", "status": "blocked", "note": "Needs your Apple Developer secrets" }
+    {
+      "name": "Folder scanner (.gitignore-aware, 8 prompt-file kinds)",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Rules engine + A–F scoring",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Built-in rule packs (Anthropic, OpenAI, community) + toggles",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Pattern-based custom rules",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Background scheduler + on-save watch mode",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Menu-bar tray + native notifications (digest & regression)",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Grade history, sparklines & scan digest",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "Onboarding wizard & full Settings (7 tabs)",
+      "tier": "free",
+      "status": "shipped"
+    },
+    {
+      "name": "AI provider config — BYO key (Anthropic / OpenAI)",
+      "tier": "pro",
+      "status": "shipped"
+    },
+    {
+      "name": "AI rewrite suggestions",
+      "tier": "pro",
+      "status": "shipped"
+    },
+    {
+      "name": "Apply fix with backup, undo & optional git branch",
+      "tier": "pro",
+      "status": "shipped"
+    },
+    {
+      "name": "Natural-language custom rules (AI-evaluated)",
+      "tier": "pro",
+      "status": "shipped"
+    },
+    {
+      "name": "Offline Ed25519 license gate",
+      "tier": "pro",
+      "status": "shipped"
+    },
+    {
+      "name": "License vendor CLI (keygen / mint / verify)",
+      "tier": "infra",
+      "status": "pr",
+      "note": "PR for #67 awaiting review"
+    },
+    {
+      "name": "Release pipeline (universal macOS DMG on tag)",
+      "tier": "infra",
+      "status": "pr",
+      "note": "PR for #29 awaiting review"
+    },
+    {
+      "name": "Landing page + Pages deploy",
+      "tier": "infra",
+      "status": "shipped"
+    },
+    {
+      "name": "A11y pass (keyboard, reduced-motion, axe test)",
+      "tier": "infra",
+      "status": "shipped"
+    },
+    {
+      "name": "Signed & notarized DMG",
+      "tier": "infra",
+      "status": "blocked",
+      "note": "Needs your Apple Developer secrets"
+    }
   ],
   "health": [
-    { "name": "TypeScript", "result": "clean" },
-    { "name": "ESLint", "result": "clean" },
-    { "name": "Vitest", "result": "5/5 passing" },
-    { "name": "cargo test", "result": "166/166 passing" },
-    { "name": "clippy -D warnings", "result": "clean" },
-    { "name": "cargo fmt", "result": "clean" }
+    {
+      "name": "TypeScript",
+      "result": "clean"
+    },
+    {
+      "name": "ESLint",
+      "result": "clean"
+    },
+    {
+      "name": "Vitest",
+      "result": "5/5 passing"
+    },
+    {
+      "name": "cargo test",
+      "result": "166/166 passing"
+    },
+    {
+      "name": "clippy -D warnings",
+      "result": "clean"
+    },
+    {
+      "name": "cargo fmt",
+      "result": "clean"
+    }
   ],
   "backlog": [
-    { "ref": "#50", "title": "Rich floating menu-bar popover panel", "note": "UX upgrade over the current tray menu" },
-    { "ref": "#45", "title": "Group prompts by project with auto-detected logos", "note": "Design-heavy; post-v1" },
-    { "ref": "—", "title": "Auto-update via Tauri updater", "note": "Needs updater keypair — see Decisions" }
+    {
+      "ref": "#50",
+      "title": "Rich floating menu-bar popover panel",
+      "note": "UX upgrade over the current tray menu"
+    },
+    {
+      "ref": "#45",
+      "title": "Group prompts by project with auto-detected logos",
+      "note": "Design-heavy; post-v1"
+    },
+    {
+      "ref": "—",
+      "title": "Auto-update via Tauri updater",
+      "note": "Needs updater keypair — see Decisions"
+    }
   ],
   "recent": [
+    "2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused",
     "2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)",
     "2026-06-11 — Found & fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)",
     "2026-06-11 — Found & fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)",
