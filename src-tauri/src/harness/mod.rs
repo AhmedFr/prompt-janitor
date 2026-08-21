@@ -3,6 +3,7 @@
 
 pub mod claude_code;
 pub mod model;
+pub mod time;
 
 use model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
 

@@ -14,6 +14,7 @@ use super::inventory::HARNESS_ID;
 use super::log_records::{parse_line, LogRecord};
 use super::paths::ClaudeHome;
 use crate::harness::model::{Invocation, OrphanResult, SessionMeta, UsageBatch, UsageCursor};
+use crate::harness::time::epoch_ms;
 
 /// One pass over one log file.
 ///
@@ -33,43 +34,6 @@ pub struct IndexedFile {
     /// The file was shorter than the cursor (truncated or rotated), so it was
     /// re-read from 0 — the store must wipe this session's prior rows first.
     pub reset: bool,
-}
-
-/// `YYYY-MM-DDTHH:MM:SS(.mmm)Z` → milliseconds since epoch. No tz offsets
-/// (Claude Code always writes UTC `Z`).
-pub(super) fn epoch_ms(ts: &str) -> Option<i64> {
-    let ts = ts.strip_suffix('Z')?;
-    let (date, time) = ts.split_once('T')?;
-    let mut d = date.split('-').map(|x| x.parse::<i64>());
-    let (y, m, day) = (d.next()?.ok()?, d.next()?.ok()?, d.next()?.ok()?);
-    let (hms, ms) = time.split_once('.').unwrap_or((time, "0"));
-    let mut t = hms.split(':').map(|x| x.parse::<i64>());
-    let (h, mi, s) = (t.next()?.ok()?, t.next()?.ok()?, t.next()?.ok()?);
-    // Char-based so a non-ASCII millis field can never split a byte boundary.
-    let ms: i64 = ms
-        .chars()
-        .chain(std::iter::repeat('0'))
-        .take(3)
-        .try_fold(0i64, |a, c| Some(a * 10 + c.to_digit(10)? as i64))?;
-    // The crate builds with `panic = "abort"`, so out-of-range fields must be
-    // rejected rather than allowed to overflow the arithmetic below.
-    if !(1..=9999).contains(&y)
-        || !(1..=12).contains(&m)
-        || !(1..=31).contains(&day)
-        || !(0..=23).contains(&h)
-        || !(0..=59).contains(&mi)
-        || !(0..=60).contains(&s)
-    {
-        return None;
-    }
-    // Days from civil (Howard Hinnant's algorithm).
-    let (y2, m2) = if m <= 2 { (y - 1, m + 9) } else { (y, m - 3) };
-    let era = y2.div_euclid(400);
-    let yoe = y2 - era * 400;
-    let doy = (153 * m2 + 2) / 5 + day - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    let days = era * 146_097 + doe - 719_468;
-    Some((((days * 24 + h) * 60 + mi) * 60 + s) * 1000 + ms)
 }
 
 struct Pending {
@@ -387,30 +351,6 @@ mod tests {
         home.projects_dir()
             .join(slug::encode(&home.root.join("work/app")))
             .join("0001-session.jsonl")
-    }
-
-    #[test]
-    fn epoch_ms_parses_log_timestamps() {
-        assert_eq!(epoch_ms("1970-01-01T00:00:01.500Z"), Some(1500));
-        assert_eq!(
-            epoch_ms("2026-08-01T10:00:00.000Z").map(|v| v % 1000),
-            Some(0)
-        );
-        assert_eq!(epoch_ms("garbage"), None);
-    }
-
-    /// Non-ASCII digits in the millis field must not be byte-sliced.
-    #[test]
-    fn epoch_ms_rejects_non_ascii_millis_without_panicking() {
-        assert_eq!(epoch_ms("2026-08-01T10:00:00.\u{1D7D8}Z"), None);
-        assert_eq!(epoch_ms("2026-08-01T10:00:00.\u{1F600}Z"), None);
-    }
-
-    /// Absurd field values must not overflow the civil-days math (panic=abort).
-    #[test]
-    fn epoch_ms_rejects_out_of_range_fields_without_overflowing() {
-        assert_eq!(epoch_ms("300000000000-01-01T00:00:00.000Z"), None);
-        assert_eq!(epoch_ms("2026-01-99999999999T00:00:00.000Z"), None);
     }
 
     #[test]

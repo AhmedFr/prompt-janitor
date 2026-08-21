@@ -10,6 +10,7 @@ mod apply;
 mod commands;
 pub mod engine;
 pub mod harness;
+pub mod harness_store;
 mod ipc;
 pub mod license;
 mod notify;
