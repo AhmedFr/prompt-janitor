@@ -10,7 +10,7 @@ import { Icon } from "@/components/Icon";
 import { useVerdictHero, verdictSentence } from "@/components/VerdictHero";
 import { isTauri, type FileRow, type Overview as OverviewData } from "@/lib/ipc";
 import { relativeTime } from "@/lib/format";
-import { pickAndScan, rescan } from "@/lib/scan-actions";
+import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useOverview } from "./useOverview";
 import "./Overview.css";
@@ -60,8 +60,8 @@ export function Overview({ navigate }: OverviewProps) {
                 Last scan · {relativeTime(data.last_scan)}
               </span>
             )}
-            <Button size="sm" onClick={() => void runScan(pickAndScan)} disabled={scanning}>
-              <Icon name="folder" /> Change folder…
+            <Button size="sm" onClick={() => void runScan(addFolderAndScan)} disabled={scanning}>
+              <Icon name="folder" /> Add a folder…
             </Button>
             <Button size="sm" onClick={() => void runScan(() => rescan())} disabled={scanning}>
               <Icon name="refresh" /> {scanning ? "Scanning…" : "Scan now"}
@@ -83,7 +83,7 @@ export function Overview({ navigate }: OverviewProps) {
           ) : data?.has_data ? (
             <RealOverview data={data} files={files} navigate={navigate} />
           ) : (
-            <EmptyState scanning={scanning} progress={progress} onPick={() => void runScan(pickAndScan)} />
+            <EmptyState scanning={scanning} progress={progress} onPick={() => void runScan(addFolderAndScan)} />
           )}
         </div>
       </div>

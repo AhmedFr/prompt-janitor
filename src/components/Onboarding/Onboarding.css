@@ -66,6 +66,12 @@
 
 .ob-sub {
   max-width: 400px;
+  margin: 0 0 10px;
+}
+
+.ob-note {
+  max-width: 420px;
+  font-size: 12px;
   margin: 0 0 16px;
 }
 
@@ -196,4 +202,5 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   max-width: 420px;
+  margin: 0;
 }

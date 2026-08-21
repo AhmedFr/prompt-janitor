@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Onboarding } from "@/components/Onboarding";
 import { Overview } from "@/screens/Overview";
+import { Setup } from "@/screens/Setup";
 import { Prompts } from "@/screens/Prompts";
 import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
@@ -43,6 +44,7 @@ export function App() {
       <Sidebar active={route} onNavigate={navigate} onReplay={() => setShowOnboarding(true)} />
       <main id="main-content" className="app-content" tabIndex={-1}>
         {route === "overview" && <Overview navigate={navigate} />}
+        {route === "setup" && <Setup navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}

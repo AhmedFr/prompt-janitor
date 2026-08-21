@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { commands } from "./bindings";
+import { commands } from "./ipc";
 
 /** The extra folders currently configured, or `[]` if the call fails. */
 async function currentFolders(): Promise<string[]> {
@@ -26,7 +26,7 @@ export async function removeExtraFolder(dir: string): Promise<string[]> {
  * Prompt for a folder to scan on top of what the harnesses already cover,
  * add it, and rescan. No-op if the user cancels.
  */
-export async function pickAndScan(): Promise<boolean> {
+export async function addFolderAndScan(): Promise<boolean> {
   const dir = await open({ directory: true, multiple: false, title: "Choose a folder to scan" });
   if (typeof dir !== "string") return false;
   await addExtraFolder(dir);

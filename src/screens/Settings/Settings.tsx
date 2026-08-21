@@ -3,7 +3,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon, type IconName } from "@/components/Icon";
 import { commands, isTauri } from "@/lib/ipc";
-import { pickAndScan, removeExtraFolder, rescan } from "@/lib/scan-actions";
+import { addFolderAndScan, removeExtraFolder, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
 import { AiTab } from "./AiTab";
@@ -50,7 +50,7 @@ export function Settings({ navigate, initialTab }: SettingsProps) {
   }, [initialTab]);
 
   const addFolder = async () => {
-    const ok = await pickAndScan();
+    const ok = await addFolderAndScan();
     if (ok) {
       const res = await commands.getExtraScanFolders();
       if (res.status === "ok") s.setFolders(res.data);
