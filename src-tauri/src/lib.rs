@@ -9,6 +9,7 @@ mod ai_rules;
 mod apply;
 mod commands;
 pub mod engine;
+pub mod harness;
 mod ipc;
 pub mod license;
 mod notify;
