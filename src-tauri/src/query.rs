@@ -292,7 +292,8 @@ pub struct FileRow {
 /// All scanned files, best grade first.
 pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
     let mut stmt = conn.prepare(
-        "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at, f.project_id
+        "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at,
+                rtrim(f.project_id, '/')
          FROM files f JOIN projects p ON p.id = f.project_id
          ORDER BY CASE f.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
                   p.name, f.kind",
@@ -2102,6 +2103,15 @@ mod tests {
         );
         assert_eq!(projects[0].harness.as_deref(), Some("claude_code"));
         assert_eq!(projects[0].session_count, 2);
+
+        // The Prompts screen groups files by `project_id` and looks each group
+        // up by `ProjectRow.id`; the two must agree on a pre-fix database too.
+        let files = list_files(&conn).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(
+            files[0].project_id, projects[0].id,
+            "FileRow.project_id must equal ProjectRow.id"
+        );
     }
 
     /// A project with no harness row at all is still a project — it just has
