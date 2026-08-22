@@ -65,10 +65,10 @@
     {
       "name": "Phase 8",
       "title": "Tables & project pages",
-      "done": 1,
+      "done": 2,
       "total": 6,
       "state": "active",
-      "note": "Six stacked PRs. Done: shared foundation — DataTable (search, faceted pill counts, tri-state sort, virtualisation), Tabs, RankedList and the shared cells (#126 PR). Next: backend read models, Setup tabs, project pages, Rules tabs, ranked analytics."
+      "note": "Foundation merged (#133). Read models landed (#127 PR). Next: Setup tabs (#128), project pages (#129), rules (#130), analytics (#131)."
     }
   ],
   "actions": {
@@ -132,6 +132,11 @@
       }
     ],
     "decisions": [
+      {
+        "title": "Store the AI API key in the macOS keychain instead of the settings table",
+        "detail": "The provider API key is written to the `settings` table in plaintext today, so anyone with read access to the app's SQLite file has it. Moving it to the macOS keychain (Tauri's keyring plugin or the Security framework) is the fix; decide whether it blocks the first release or lands right after.",
+        "kind": "vision"
+      },
       {
         "title": "Decide phase 2 scope: evidence-backed findings + diff apply",
         "detail": "With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. 'unused skill', 'MCP server never called') and/or let fixes be diff-applied directly from the Setup screen.",
@@ -297,11 +302,11 @@
     },
     {
       "name": "Vitest",
-      "result": "465/465 passing (51 files)"
+      "result": "464/464 passing (52 files)"
     },
     {
       "name": "cargo test",
-      "result": "267/267 passing"
+      "result": "286/286 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -330,6 +335,9 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner's own findings), slash-tolerant project ids across the project-scoped reads",
+    "2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions",
+    "2026-08-22 — Read models for tables and ranked usage: windowed usage overview, project usage, project list extras, rule hit counts (#127 PR)",
     "2026-08-22 — Table foundation: DataTable, Tabs, RankedList (#126 PR)",
     "2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses",
     "2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs",

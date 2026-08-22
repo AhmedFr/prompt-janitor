@@ -4,6 +4,7 @@ import type { FileRow, ProjectRow } from "@/lib/ipc";
 
 const proj = (id: string, name: string, grade: ProjectRow["grade"], issues = 0): ProjectRow => ({
   id, name, grade, score: 50, file_count: 0, issue_count: issues, logo: null, modified: "100",
+  harness: null, session_count: 0, last_session_at: null, never_used_count: 0, error_count: 0, exists: true,
 });
 const file = (id: string, projectId: string, project: string, kind: string, grade: FileRow["grade"], issues = 0, modified = "100"): FileRow => ({
   id, name: kind, path: `/x/${project}/${kind}`, project, project_id: projectId, kind, grade, score: 50, issue_count: issues, modified,

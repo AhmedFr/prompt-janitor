@@ -1,24 +1,5 @@
 import type { InvocationKind, ProjectSessions, UsageOverview } from "@/lib/ipc";
 
-/** One day of the top-targets chart: the day plus one numeric column per series. */
-export type StackedRow = Record<string, number | string>;
-
-/**
- * One line of the top-targets chart. The backend groups usage by
- * `(kind, target)`, so `key` — not the bare target — is what identifies a
- * column: a skill and an agent can share a name.
- */
-export interface SeriesColumn {
-  /** `${kind}:${target}` — the chart column, React key and `dataKey`. */
-  key: string;
-  /** The bare target, with the kind appended only when the name collides. */
-  label: string;
-  kind: InvocationKind;
-  target: string;
-  total: number;
-  errors: number;
-}
-
 /** A bar in the "Invocations by kind" chart. */
 export interface KindBar {
   kind: InvocationKind;

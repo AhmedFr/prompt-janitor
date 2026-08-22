@@ -27,11 +27,7 @@ export const MONTHS = [
 /** "Sessions per project" shows at most this many bars. */
 export const MAX_PROJECT_BARS = 10;
 
-/**
- * Categorical series slots, in the fixed CVD-safe order (see `tokens.css`).
- * Assigned in sequence and never cycled — the backend caps `top` at eight,
- * and `SERIES_LIMIT` keeps the chart honest if that ever changes.
- */
+/** Categorical series slots, in the fixed CVD-safe order (see `tokens.css`). */
 export const SERIES_VARS = [
   "var(--series-1)",
   "var(--series-2)",
@@ -43,15 +39,11 @@ export const SERIES_VARS = [
   "var(--series-8)",
 ] as const;
 
-/** How many series the tab considers at all — the backend's own cap on `top`. */
-export const SERIES_LIMIT = SERIES_VARS.length;
+/** How many days of usage the tab asks the backend for. */
+export const USAGE_WINDOW_DAYS = 90;
 
-/**
- * How many of those the line chart actually draws. Past five lines the reader
- * is matching hues against a legend rather than reading a trend, so the rest
- * are left to the table underneath, which lists every series.
- */
-export const CHART_SERIES_LIMIT = 5;
+/** How many ranked targets the tab lists. */
+export const RANKED_LIMIT = 8;
 
 /** Slot 1 — the single hue nominal bar charts use, since bar length carries the value. */
 export const BAR_COLOR = SERIES_VARS[0];

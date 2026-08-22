@@ -1,6 +1,5 @@
 import type { TooltipContentProps } from "recharts";
 import type { ErrorRateBar, KindBar, SessionBar, TipLine } from "./UsageTab.types";
-import { shortDay } from "./usageTab.util";
 
 type TipProps = TooltipContentProps;
 
@@ -25,18 +24,6 @@ export function Tip({ title, lines }: { title: string; lines: TipLine[] }) {
  */
 function hoveredRow<T>(payload: TipProps["payload"]): T | undefined {
   return payload?.[0]?.payload as T | undefined;
-}
-
-/** Crosshair tooltip for the top-targets line chart: every series on that day. */
-export function SeriesTooltip({ active, payload, label }: TipProps) {
-  if (!active || !payload?.length) return null;
-  const lines: TipLine[] = [...payload]
-    .sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0))
-    .map((entry) => ({
-      color: entry.color,
-      text: `${entry.name}: ${plural(Number(entry.value ?? 0), "invocation")}`,
-    }));
-  return <Tip title={shortDay(String(label))} lines={lines} />;
 }
 
 /** Invocations by kind, with the harness's context-token average per turn. */
