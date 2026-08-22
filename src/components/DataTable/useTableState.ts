@@ -12,11 +12,29 @@ function canUseStorage(): boolean {
   return typeof window !== "undefined" && !!window.sessionStorage;
 }
 
-/** Loose shape check so a hand-edited or stale-schema value doesn't get trusted verbatim. */
+/** `sort` is either absent (unsorted) or a well-formed column reference. */
+function isSort(value: unknown): boolean {
+  if (value === null) return true;
+  if (typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.id === "string" && typeof candidate.desc === "boolean";
+}
+
+/**
+ * Loose shape check so a hand-edited or stale-schema value doesn't get trusted
+ * verbatim. `sort` is validated too: a malformed entry would be handed
+ * straight to TanStack's sorting state, where a missing `id` sorts by nothing
+ * and a string `desc` silently reverses the table.
+ */
 function isTableState(value: unknown): value is TableState {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate.search === "string" && typeof candidate.pills === "object" && candidate.pills !== null;
+  return (
+    typeof candidate.search === "string" &&
+    typeof candidate.pills === "object" &&
+    candidate.pills !== null &&
+    isSort(candidate.sort)
+  );
 }
 
 function readStored(key: string, initial: TableState): TableState {

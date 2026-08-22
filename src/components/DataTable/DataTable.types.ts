@@ -1,4 +1,4 @@
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, RowData } from "@tanstack/react-table";
 import type { ReactNode } from "react";
 
 /** One selectable chip within a {@link PillGroup}. */
@@ -58,4 +58,25 @@ export interface DataTableProps<Row> {
   /** Suffix of the `pj.table.<key>` sessionStorage key this table persists under. */
   stateKey: string;
   ariaLabel: string;
+}
+
+/**
+ * Column defs carry their own alignment: a numeric column has to be
+ * right-aligned wherever it is used, and that is a property of the column,
+ * not of the screen that happens to render it.
+ */
+declare module "@tanstack/react-table" {
+  // TanStack's ColumnMeta is generic over the row and cell types even though
+  // this augmentation uses neither; the parameters must be redeclared to match.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: "left" | "right";
+    /**
+     * Set on a column whose cells render their own buttons (e.g. `ActionsCell`).
+     * A clickable row would otherwise take `role="button"` and swallow them:
+     * a widget role must not contain focusable descendants, and assistive
+     * tech that honours that would leave the row actions unreachable.
+     */
+    interactive?: boolean;
+  }
 }

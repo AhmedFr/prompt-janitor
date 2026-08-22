@@ -92,4 +92,34 @@ describe("useTableState", () => {
     const { result } = renderHook(() => useTableState("setup", initial));
     expect(result.current[0]).toEqual(initial);
   });
+
+  it("rejects a stored sort that isn't a well-formed column reference", () => {
+    window.sessionStorage.setItem(
+      "pj.table.setup",
+      JSON.stringify({ search: "", pills: {}, sort: { id: "name" } }),
+    );
+
+    const { result } = renderHook(() => useTableState("setup", initial));
+    expect(result.current[0]).toEqual(initial);
+  });
+
+  it("rejects a stored sort whose direction isn't a boolean", () => {
+    window.sessionStorage.setItem(
+      "pj.table.setup",
+      JSON.stringify({ search: "", pills: {}, sort: { id: "name", desc: "yes" } }),
+    );
+
+    const { result } = renderHook(() => useTableState("setup", initial));
+    expect(result.current[0]).toEqual(initial);
+  });
+
+  it("accepts a stored sort that is a well-formed column reference", () => {
+    window.sessionStorage.setItem(
+      "pj.table.setup",
+      JSON.stringify({ search: "", pills: {}, sort: { id: "name", desc: true } }),
+    );
+
+    const { result } = renderHook(() => useTableState("setup", initial));
+    expect(result.current[0].sort).toEqual({ id: "name", desc: true });
+  });
 });

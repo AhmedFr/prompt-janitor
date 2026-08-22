@@ -1,0 +1,66 @@
+/* Shared table-cell primitives. One stylesheet for all seven cells: they are
+   variations on the same dense row rhythm, not independent components. */
+
+.dt-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.dt-scope {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--group);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+/* The global layer is the one every project inherits — worth reading as a
+   statement about scope rather than as one more neutral chip. */
+.dt-scope[data-layer="global"] {
+  background: var(--blue-tint);
+  color: var(--blue-press);
+  border-color: transparent;
+}
+
+.dt-path {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.dt-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.dt-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-ctrl);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.dt-actions__btn:hover {
+  background: var(--group);
+  color: var(--text);
+}
+
+.dt-actions__btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
