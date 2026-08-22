@@ -24,8 +24,15 @@ export interface SetupTables {
   costBar: number | null;
 }
 
-/** Empty rather than absent: a tab with no rows still renders, with a count of zero. */
-const NO_ROWS: ArtifactView[] = [];
+/**
+ * Empty rather than absent: a tab with no rows still renders, with a count of
+ * zero. Frozen because it is *shared* — every empty tab and every
+ * before-the-data-arrives render hands back this one array, and a caller that
+ * pushed into it would populate all of them. Typed mutable so it can stand in
+ * for a real row set (`DataTable` takes `Row[]`); the freeze is what makes
+ * that safe rather than the type.
+ */
+const NO_ROWS = Object.freeze([] as ArtifactView[]) as ArtifactView[];
 
 /**
  * Turns one `SetupView` into the tab strip and the per-kind row sets its

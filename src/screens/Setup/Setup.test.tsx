@@ -318,26 +318,66 @@ describe("Setup", () => {
     expect(navigate).toHaveBeenCalledWith("detail", "f-web");
   });
 
-  it("keeps each tab's own search, pills and sort", async () => {
+  it("keeps each tab's filters to itself, even between tabs with the same pill groups", async () => {
     await renderSetup();
     openTab(/^Skills/);
     fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
-    expect(rowNames()).toEqual(["sunset", "brainstorming"]);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "brain" } });
+    await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
 
-    openTab(/^Rules/);
-    expect(rowNames()).toEqual(["global-style", "web-rules"]);
+    // Agents carries the very same pill group ids ("scope", "status",
+    // "bundled") and the same search config, so a table keyed on anything
+    // coarser than its own `stateKey` would arrive here already filtered.
+    openTab(/^Agents/);
+
+    expect(rowNames()).toEqual(["code-reviewer"]);
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    // Nothing was typed or pressed on this tab, so it has nothing to remember.
+    expect(window.sessionStorage.getItem("pj.table.setup.agent")).toBeNull();
 
     openTab(/^Skills/);
-    expect(rowNames()).toEqual(["sunset", "brainstorming"]);
+
+    expect(rowNames()).toEqual(["brainstorming"]);
+    expect(screen.getByRole("searchbox")).toHaveValue("brain");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
-  it("refreshes the inventory when a scan finishes", async () => {
+  it("rebuilds the tabs, rows and pill counts from the inventory a scan produced", async () => {
     await renderSetup();
-    await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(1));
+    openTab(/^Skills/);
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used2");
+
+    // The rescan finds one more, never-used skill. Every derived value here
+    // is cached on the identity of what it was built from — the row arrays,
+    // the column context, the pill definitions — so a screen that updated
+    // the inventory in place instead of replacing it would keep showing the
+    // counts, tabs and rows below from before the scan.
+    getSetup.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...populated,
+        global: [
+          ...populated.global,
+          artifact({ id: 99, kind: "skill", name: "zzz-new", path: "/home/u/.claude/skills/zzz-new/SKILL.md" }),
+        ],
+      },
+    });
 
     await emit("scan-done");
 
     await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /^Skills/ })).toHaveTextContent("Skills5"),
+    );
+    expect(rowNames()).toContain("zzz-new");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used3");
   });
 
   it("offers a folder picker when no harness was detected", async () => {

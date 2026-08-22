@@ -265,9 +265,14 @@ export function columnsFor(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<Artif
 /**
  * Rules read best sorted by grade ascending — `desc: false` puts A before
  * F, best grade first, with ungraded rows trailing behind the "Z" sentinel
- * `gradeColumn` sorts them under. Every other kind sorts by how much it's
- * used, most-used first.
+ * `gradeColumn` sorts them under. Hooks have no Uses column to sort by (see
+ * `buildColumns`), and naming one TanStack would silently drop leaves the
+ * table claiming a sort it does not have — so they sort by name, ascending,
+ * which is a column they actually carry. Every other kind sorts by how much
+ * it is used, most-used first.
  */
 export function defaultSortFor(kind: ArtifactKind): { id: string; desc: boolean } {
-  return kind === "rule" ? { id: "grade", desc: false } : { id: "uses", desc: true };
+  if (kind === "rule") return { id: "grade", desc: false };
+  if (kind === "hook") return { id: "name", desc: false };
+  return { id: "uses", desc: true };
 }

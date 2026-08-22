@@ -318,11 +318,34 @@ describe("defaultSortFor", () => {
     expect(defaultSortFor("rule")).toEqual({ id: "grade", desc: false });
   });
 
-  it("sorts every other kind by uses descending", () => {
-    const kinds: ArtifactKind[] = ["skill", "agent", "command", "hook", "mcp_server", "plugin", "settings"];
+  it("sorts every kind that has a Uses column by uses descending", () => {
+    const kinds: ArtifactKind[] = ["skill", "agent", "command", "mcp_server", "plugin", "settings"];
     for (const kind of kinds) {
       expect(defaultSortFor(kind)).toEqual({ id: "uses", desc: true });
     }
+  });
+
+  it("sorts hooks by name, the only sortable column they carry", () => {
+    // A hook table has name and scope and nothing else, so "uses desc" would
+    // be a sort TanStack drops on the floor — the header would show no
+    // `aria-sort` and the rows would land in inventory order.
+    expect(defaultSortFor("hook")).toEqual({ id: "name", desc: false });
+
+    mount(
+      "hook",
+      [
+        artifact({ id: 1, kind: "hook", name: "PreToolUse: lint" }),
+        artifact({ id: 2, kind: "hook", name: "Notification: say" }),
+      ],
+      ctx(),
+      defaultSortFor("hook"),
+    );
+
+    expect(rowNames()).toEqual(["Notification: say", "PreToolUse: lint"]);
+    expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
   });
 });
 
