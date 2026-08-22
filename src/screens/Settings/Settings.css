@@ -87,3 +87,14 @@
   border-radius: 50%;
   background: var(--blue);
 }
+
+/* The same bar Setup draws for a scan, for the same events. */
+.set-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.set-scan__status {
+  font-size: 12px;
+}
