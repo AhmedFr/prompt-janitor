@@ -398,7 +398,7 @@ pub fn effective_rules(
         "SELECT a.layer, a.path, a.name, f.grade, f.id
            FROM artifacts a LEFT JOIN files f ON f.id = a.file_id
           WHERE a.kind = 'rule' AND a.harness = ?1
-            AND (a.layer = 'global' OR (a.layer = 'project' AND a.project_path = ?2))
+            AND (a.layer = 'global' OR (a.layer = 'project' AND a.project_path = rtrim(?2, '/')))
           ORDER BY CASE a.layer WHEN 'global' THEN 0 ELSE 1 END,
                    CASE a.name WHEN 'CLAUDE.md' THEN 0 WHEN 'AGENTS.md' THEN 1 ELSE 2 END,
                    a.name",
@@ -437,9 +437,14 @@ pub fn effective_rules(
 /// past the head of the list.
 ///
 /// `artifact_id` is only reported when the whole group resolved to *one*
-/// artifact. Two projects can each configure a skill of the same name, and the
-/// overview groups across projects — picking either of them would link the row
-/// to a file the number does not describe.
+/// distinct non-null artifact. Two projects can each configure a skill of the
+/// same name, and the overview groups across projects — picking either of them
+/// would link the row to a file the number does not describe.
+///
+/// A scoped `project_path` is compared `rtrim`-ed: a project id read out of a
+/// database written before `scan::resolve_project` stripped the git worktree
+/// root's trailing separator still carries one, and only the bound parameter
+/// is trimmed so `idx_invocations_project` still applies.
 fn ranked_targets(
     conn: &Connection,
     since: &str,
@@ -455,7 +460,9 @@ fn ranked_targets(
     let limit = limit.unwrap_or(RANKED_LIMIT);
     let sql = match scope {
         Some(_) => {
-            format!("{COLUMNS} AND harness = ?2 AND project_path = ?3 {GROUPING} LIMIT {limit}")
+            format!(
+                "{COLUMNS} AND harness = ?2 AND project_path = rtrim(?3, '/') {GROUPING} LIMIT {limit}"
+            )
         }
         None => format!("{COLUMNS} {GROUPING} LIMIT {limit}"),
     };
@@ -540,7 +547,7 @@ pub fn project_usage(
     // transcript is not a day's worth of work on its own.
     let mut days_stmt = conn.prepare(
         "SELECT substr(started_at, 1, 10) AS day, count(*) FROM sessions
-          WHERE harness = ?1 AND project_path = ?2 AND parent_session_id IS NULL
+          WHERE harness = ?1 AND project_path = rtrim(?2, '/') AND parent_session_id IS NULL
             AND started_at >= ?3
           GROUP BY day",
     )?;
@@ -948,6 +955,36 @@ mod tests {
         let u = project_usage(&conn, "claude_code", &app, 1_789_430_400, 1).unwrap();
         assert!(u.ranked.is_empty());
         assert!(busy_days(&u.sessions_per_day).is_empty());
+    }
+
+    /// A project id read out of a database written before the trailing-slash
+    /// fix still carries one. Every project-scoped read must land on the same
+    /// rows the slash-free id does, rather than quietly returning an empty
+    /// project page.
+    #[test]
+    fn project_scoped_reads_accept_a_trailing_slash() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        let slashed = format!("{app}/");
+
+        let u = project_usage(&conn, "claude_code", &slashed, 1_785_628_800, 90).unwrap();
+        assert!(
+            !u.ranked.is_empty(),
+            "the ranking must not be filtered away"
+        );
+        assert_eq!(
+            busy_days(&u.sessions_per_day),
+            vec![DayCount {
+                day: "2026-08-01".into(),
+                count: 1,
+            }]
+        );
+        assert!(
+            !effective_rules(&conn, "claude_code", &slashed)
+                .unwrap()
+                .is_empty(),
+            "the project's rule stack must still resolve"
+        );
     }
 
     /// Two projects can each configure a skill of the same name. The overview

@@ -365,12 +365,14 @@ const INVOCABLE_KINDS: &str = "('skill', 'agent', 'command', 'mcp_server')";
 /// columns of a `max()` group from the row that matched.
 ///
 /// Every join onto a harness-recorded directory path goes through
-/// `rtrim(p.id, '/')`: `scan::resolve_project` mints a separator-free id, but
-/// a database written before that fix still holds `/code/app/` rows, and one
-/// stray separator would silently blank the harness columns rather than error.
+/// `rtrim(p.id, '/')`, and so does the `id` this hands back: `resolve_project`
+/// mints a separator-free id, but a database written before that fix still
+/// holds `/code/app/` rows, and one stray separator would silently blank the
+/// harness columns — and follow the reader into the project page, whose own
+/// reads are keyed by this id.
 pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
     let mut stmt = conn.prepare(&format!(
-        "SELECT p.id, p.name, p.grade, p.score, p.logo,
+        "SELECT rtrim(p.id, '/'), p.name, p.grade, p.score, p.logo,
                 COUNT(f.id), COALESCE(SUM(f.issue_count), 0), MAX(f.modified_at),
                 hp.harness, COALESCE(hp.session_count, 0), hp.last_session_at,
                 COALESCE(hp.exists_on_disk, 1),
@@ -971,6 +973,28 @@ pub fn enabled_nl_rules(
     Ok(out)
 }
 
+/// The rule ids that mark an issue as NL-sourced.
+///
+/// This is the *explicit* marker for "the AI found this". A non-NULL
+/// `rule_id` is not one: every deterministic and custom-pattern finding
+/// carries its rule id too, so anything that keys off that instead would
+/// treat the scanner's own findings as the AI's and delete them.
+///
+/// Same set `snapshot_prior_nl_state` carries forward and
+/// `evaluate_nl_rules` checks against, so all three agree on what an NL
+/// issue is.
+pub fn nl_rule_ids(conn: &Connection) -> rusqlite::Result<std::collections::HashSet<String>> {
+    Ok(enabled_nl_rules(conn, true)?
+        .into_iter()
+        .map(|r| r.id)
+        .collect())
+}
+
+/// `?, ?, ?` — one placeholder per element, for an `IN (...)` clause.
+pub(crate) fn placeholders(n: usize) -> String {
+    vec!["?"; n].join(", ")
+}
+
 /// A cheap fingerprint of *which* issues are currently attached to a file —
 /// not just how many/severe. Two checks can land on the same net score while
 /// disagreeing about which rule is violated (e.g. a verdict flip that swaps
@@ -998,8 +1022,10 @@ fn issue_signature(tx: &rusqlite::Transaction, file_id: &str) -> rusqlite::Resul
     Ok(parts.join("|"))
 }
 
-/// Persist NL verdicts for a file: replace prior NL-sourced issues (tagged by
-/// non-NULL rule_id), insert current violations, and rescore the file with the
+/// Persist NL verdicts for a file: replace prior NL-sourced issues (the ones
+/// whose rule is an NL rule — see [`nl_rule_ids`]; a deterministic finding
+/// also has a `rule_id` and must survive an AI re-check), insert current
+/// violations, and rescore the file with the
 /// unchanged formula. Also appends to `grade_history` (#86) — both the file's
 /// own scope and the `overall` scope the Overview trend/sparkline reads — so
 /// an AI-standards rescore is reflected the same way a scan's baseline score
@@ -1018,11 +1044,23 @@ pub fn apply_nl_verdicts(
     file_id: &str,
     verdicts: &[crate::ai_rules::NlVerdict],
 ) -> rusqlite::Result<(u32, String)> {
+    // Everything this call is allowed to replace: the enabled NL rules, plus
+    // any rule these verdicts speak for (one disabled mid-check would
+    // otherwise leave its old issue behind next to the new one).
+    let mut nl_ids: Vec<String> = nl_rule_ids(conn)?.into_iter().collect();
+    nl_ids.extend(verdicts.iter().map(|v| v.rule_id.clone()));
+    nl_ids.sort();
+    nl_ids.dedup();
+
     let tx = conn.unchecked_transaction()?;
-    tx.execute(
-        "DELETE FROM issues WHERE file_id = ?1 AND rule_id IS NOT NULL",
-        [file_id],
-    )?;
+    if !nl_ids.is_empty() {
+        let sql = format!(
+            "DELETE FROM issues WHERE file_id = ? AND rule_id IN ({})",
+            placeholders(nl_ids.len())
+        );
+        let args = std::iter::once(file_id.to_string()).chain(nl_ids.iter().cloned());
+        tx.execute(&sql, rusqlite::params_from_iter(args))?;
+    }
     // NL verdicts only carry the rule id — look up its quality dimension from
     // the built-in catalog; custom NL rules (not in the catalog) default to
     // Consistency, matching custom pattern-rule issues.
@@ -2026,6 +2064,44 @@ mod tests {
         // any of them.
         assert_eq!(app.never_used_count, 4);
         assert_eq!(app.error_count, 0);
+    }
+
+    /// A database written before `scan::resolve_project` stripped the git
+    /// worktree root's trailing separator still holds slashed ids. The list
+    /// hands out the trimmed one, so the project page it opens can join.
+    #[test]
+    fn list_projects_hands_out_slash_free_ids() {
+        let conn = crate::store::test_conn();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a/','a','/a/','D',52)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count)
+             VALUES('/a/CLAUDE.md','/a/','/a/CLAUDE.md','CLAUDE.md','D',52,5)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO harness_projects(harness, path, exists_on_disk, session_count)
+             VALUES('claude_code', '/a', 1, 2)",
+            [],
+        )
+        .unwrap();
+
+        let projects = list_projects(&conn).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(
+            projects[0].id, "/a",
+            "the id must be usable as a project path"
+        );
+        assert_eq!(
+            projects[0].file_count, 1,
+            "the file rollup still joins on the stored id"
+        );
+        assert_eq!(projects[0].harness.as_deref(), Some("claude_code"));
+        assert_eq!(projects[0].session_count, 2);
     }
 
     /// A project with no harness row at all is still a project — it just has

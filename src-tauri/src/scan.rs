@@ -53,12 +53,18 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
         .collect();
 
     let mut issues: HashMap<String, Vec<Issue>> = HashMap::new();
-    {
-        let mut stmt = conn.prepare(
+    // Selected *by* the NL rule ids, not by "has a rule id at all": every
+    // deterministic and custom-pattern issue carries its rule id too, and the
+    // scan re-derives those from the file. Carrying them forward here would
+    // double them up.
+    if !active_nl_ids.is_empty() {
+        let ids: Vec<String> = active_nl_ids.iter().cloned().collect();
+        let mut stmt = conn.prepare(&format!(
             "SELECT file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension
-             FROM issues WHERE rule_id IS NOT NULL",
-        )?;
-        let rows = stmt.query_map([], |r| {
+             FROM issues WHERE rule_id IN ({})",
+            crate::query::placeholders(ids.len())
+        ))?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(ids.iter()), |r| {
             let file_id: String = r.get(0)?;
             let rule_id: String = r.get(1)?;
             let line: Option<i64> = r.get(2)?;
@@ -76,11 +82,6 @@ fn snapshot_prior_nl_state(conn: &Connection) -> rusqlite::Result<PriorNlState> 
         for row in rows {
             let (file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension) =
                 row?;
-            if !active_nl_ids.contains(&rule_id) {
-                // Rule has since been disabled or deleted — drop the stale
-                // carry-forward instead of folding it into the score again.
-                continue;
-            }
             let fix = match (fix_from, fix_to) {
                 (Some(from), Some(to)) => Some(Fix { from, to }),
                 _ => None,
@@ -622,6 +623,59 @@ For example:
             )
             .unwrap();
         assert_eq!(rule_id.as_deref(), Some("anthropic-clarity"));
+    }
+
+    /// `rule_id IS NOT NULL` used to double as "this issue came from the AI".
+    /// It cannot any more — every deterministic finding carries its rule id
+    /// too — so an AI re-check must delete the NL rules' own findings and
+    /// nothing else.
+    #[test]
+    fn applying_nl_verdicts_keeps_the_deterministic_findings() {
+        let conn = crate::store::test_conn();
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("CLAUDE.md");
+        fs::write(&file, FOCAL).unwrap();
+        let file_id = file.display().to_string();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+        let count = |sql: &str| -> i64 { conn.query_row(sql, [&file_id], |r| r.get(0)).unwrap() };
+        let baseline_issues = count("SELECT count(*) FROM issues WHERE file_id = ?1");
+        let baseline_score: i64 = conn
+            .query_row("SELECT score FROM files WHERE id = ?1", [&file_id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert!(
+            baseline_issues > 0,
+            "the fixture must trip deterministic rules"
+        );
+
+        let (score, _) =
+            crate::query::apply_nl_verdicts(&conn, &file_id, &[clarity_verdict(true)]).unwrap();
+
+        assert_eq!(
+            count(
+                "SELECT count(*) FROM issues WHERE file_id = ?1 AND rule_id <> 'anthropic-clarity'"
+            ),
+            baseline_issues,
+            "an AI re-check must not delete the scanner's own findings"
+        );
+        assert_eq!(
+            count(
+                "SELECT count(*) FROM issues WHERE file_id = ?1 AND rule_id = 'anthropic-clarity'"
+            ),
+            1,
+            "the NL verdict is recorded"
+        );
+        assert!(
+            (score as i64) < baseline_score,
+            "the score must fold the NL issue in on top of the deterministic ones, \
+             not be rescored from an emptied table"
+        );
+        assert_eq!(
+            count("SELECT issue_count FROM files WHERE id = ?1"),
+            baseline_issues + 1
+        );
     }
 
     #[test]

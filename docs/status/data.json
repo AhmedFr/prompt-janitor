@@ -302,11 +302,11 @@
     },
     {
       "name": "Vitest",
-      "result": "462/462 passing (52 files)"
+      "result": "464/464 passing (52 files)"
     },
     {
       "name": "cargo test",
-      "result": "277/277 passing"
+      "result": "286/286 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -335,6 +335,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner's own findings), slash-tolerant project ids across the project-scoped reads",
     "2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions",
     "2026-08-22 — Read models for tables and ranked usage: windowed usage overview, project usage, project list extras, rule hit counts (#127 PR)",
     "2026-08-22 — Table foundation: DataTable, Tabs, RankedList (#126 PR)",
