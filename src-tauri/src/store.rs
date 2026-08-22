@@ -146,17 +146,118 @@ const MIGRATIONS: &[&str] = &[
         applied_at TEXT NOT NULL
     );
     ",
+    // v8 — harness inventory + usage analytics (2026-08 spec)
+    "
+    CREATE TABLE harnesses (
+        id           TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        detected     INTEGER NOT NULL DEFAULT 0,
+        last_scan_at TEXT
+    );
+    CREATE TABLE harness_projects (
+        harness         TEXT NOT NULL,
+        path            TEXT NOT NULL,
+        exists_on_disk  INTEGER NOT NULL DEFAULT 1,
+        log_dir         TEXT,
+        last_session_at TEXT,
+        session_count   INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (harness, path)
+    );
+    CREATE TABLE artifacts (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        harness      TEXT NOT NULL,
+        layer        TEXT NOT NULL,
+        project_path TEXT,
+        kind         TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        path         TEXT NOT NULL,
+        plugin_name  TEXT,
+        description  TEXT,
+        bytes        INTEGER NOT NULL DEFAULT 0,
+        hash         TEXT NOT NULL,
+        seen_at      TEXT NOT NULL,
+        file_id      TEXT
+    );
+    -- NULL project_path (global/plugin layers) must still collide, so the
+    -- identity is indexed over coalesce() rather than a plain UNIQUE clause.
+    CREATE UNIQUE INDEX idx_artifacts_identity
+        ON artifacts(harness, layer, coalesce(project_path,''), kind, name, path);
+    CREATE TABLE sessions (
+        id            TEXT PRIMARY KEY,
+        harness       TEXT NOT NULL,
+        project_path  TEXT NOT NULL,
+        log_path      TEXT NOT NULL,
+        started_at    TEXT,
+        ended_at      TEXT,
+        turns         INTEGER NOT NULL DEFAULT 0,
+        input_tokens  INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        model         TEXT,
+        byte_offset   INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE invocations (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        harness      TEXT NOT NULL,
+        session_id   TEXT NOT NULL,
+        tool_use_id  TEXT NOT NULL,
+        project_path TEXT NOT NULL,
+        ts           TEXT NOT NULL,
+        tool_name    TEXT NOT NULL,
+        kind         TEXT NOT NULL,
+        target       TEXT NOT NULL,
+        artifact_id  INTEGER REFERENCES artifacts(id) ON DELETE SET NULL,
+        duration_ms  INTEGER,
+        is_error     INTEGER NOT NULL DEFAULT 0,
+        turn_tokens  INTEGER
+    );
+    CREATE INDEX idx_invocations_session ON invocations(session_id);
+    CREATE INDEX idx_invocations_target ON invocations(harness, kind, target, ts);
+    CREATE INDEX idx_invocations_project ON invocations(harness, project_path, ts);
+    CREATE INDEX idx_invocations_artifact_ts ON invocations(artifact_id, ts);
+    -- Re-indexing a log replays lines: the harness tool_use id makes each
+    -- invocation idempotent.
+    CREATE UNIQUE INDEX idx_invocations_tool_use
+        ON invocations(harness, session_id, tool_use_id);
+    CREATE TABLE usage_stats (
+        harness         TEXT NOT NULL,
+        kind            TEXT NOT NULL,
+        target          TEXT NOT NULL,
+        artifact_id     INTEGER,
+        total           INTEGER NOT NULL,
+        sessions        INTEGER NOT NULL,
+        last_used       TEXT,
+        error_rate      REAL NOT NULL,
+        avg_turn_tokens REAL,
+        count_30d       INTEGER NOT NULL,
+        count_prev_30d  INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX idx_usage_stats_identity
+        ON usage_stats(harness, kind, target, coalesce(artifact_id,-1));
+    CREATE TABLE scan_diagnostics (
+        scan_id       INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+        harness       TEXT NOT NULL,
+        skipped_lines INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (scan_id, harness)
+    );
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
 pub fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    // `foreign_keys` is per-connection, so every caller that reaches migrate()
+    // gets enforcement — not just the ones going through open_and_migrate.
+    // Must run outside a transaction to take effect.
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     let applied: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     for (i, sql) in MIGRATIONS.iter().enumerate() {
         if (i as i64) < applied {
             continue;
         }
-        conn.execute_batch(sql)?;
-        conn.pragma_update(None, "user_version", (i as i64) + 1)?;
+        // A batch and its version bump land together, or not at all.
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch(sql)?;
+        tx.pragma_update(None, "user_version", (i as i64) + 1)?;
+        tx.commit()?;
     }
     Ok(())
 }
@@ -167,6 +268,14 @@ pub fn open_and_migrate(path: &std::path::Path) -> rusqlite::Result<Connection> 
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
     migrate(&conn)?;
     Ok(conn)
+}
+
+/// In-memory, fully migrated connection for tests.
+#[cfg(test)]
+pub fn test_conn() -> Connection {
+    let conn = Connection::open_in_memory().expect("open in-memory db");
+    migrate(&conn).expect("migrate in-memory db");
+    conn
 }
 
 #[cfg(test)]
@@ -281,5 +390,71 @@ mod tests {
         // A column that only exists after migration 5.
         conn.execute("UPDATE projects SET logo = 'x' WHERE 1=0", [])
             .expect("logo column should exist");
+    }
+
+    #[test]
+    fn harness_tables_exist_after_migration() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        for table in [
+            "harnesses",
+            "harness_projects",
+            "artifacts",
+            "sessions",
+            "invocations",
+            "usage_stats",
+            "scan_diagnostics",
+        ] {
+            let n: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?1",
+                    [table],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "missing table {table}");
+        }
+        for index in [
+            "idx_artifacts_identity",
+            "idx_invocations_tool_use",
+            "idx_invocations_artifact_ts",
+            "idx_usage_stats_identity",
+        ] {
+            let n: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type='index' AND name=?1",
+                    [index],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "missing index {index}");
+        }
+    }
+
+    #[test]
+    fn test_conn_enforces_foreign_keys() {
+        let conn = test_conn();
+        let on: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            on, 1,
+            "foreign key enforcement must be on for this connection"
+        );
+    }
+
+    #[test]
+    fn global_artifacts_with_null_project_path_share_one_identity() {
+        let conn = test_conn();
+        let insert = "INSERT INTO artifacts(harness, layer, project_path, kind, name, path, bytes, hash, seen_at)
+             VALUES('claude_code', 'global', NULL, 'skill', 'adapt', '/g/skills/adapt/SKILL.md', 12, 'h', '2026-08-21T00:00:00Z')";
+        conn.execute(insert, []).unwrap();
+        let err = conn
+            .execute(insert, [])
+            .expect_err("second identical global artifact must violate uniqueness");
+        assert!(
+            err.to_string().contains("UNIQUE"),
+            "unexpected error: {err}"
+        );
     }
 }

@@ -100,7 +100,7 @@ pub trait Harness: Send + Sync {
     fn detect(&self) -> bool;                              // installed for this user?
     fn projects(&self) -> Vec<ProjectRef>;                 // harness-defined scan scope
     fn inventory(&self, scope: Scope) -> Vec<Artifact>;    // Scope::Global | Scope::Project(slug)
-    fn index_usage(&self, cursor: &mut UsageCursor) -> Vec<Invocation>; // incremental; empty for harnesses without logs
+    fn index_usage(&self, cursor: &mut UsageCursor) -> UsageBatch;       // incremental; empty for harnesses without logs
 }
 ```
 
@@ -145,18 +145,19 @@ headers).
 ```
 harnesses        id PK ('claude_code'), detected, last_scan_at
 
-claude_projects  slug PK, harness, path, exists, last_session_at, session_count
-                 -- table name kept generic in code as `projects`
+harness_projects (harness, path) PK, exists, log_dir, last_session_at,
+                 session_count
 
-artifacts        id PK, harness, layer ('global'|'project'|'plugin'), project_slug?,
+artifacts        id PK, harness, layer ('global'|'project'|'plugin'), project_path?,
                  kind, name, path, plugin_name?, description, bytes, hash, seen_at,
                  file_id?  -- link to existing graded `files` row for Rule kinds
 
-sessions         id PK, harness, project_slug, started_at, ended_at, turns,
+sessions         id PK, harness, project_path, log_path, started_at, ended_at, turns,
                  input_tokens, output_tokens, model, byte_offset
 
-invocations      id PK, harness, session_id, project_slug, ts, tool_name, kind,
-                 target, artifact_id?, duration_ms, is_error, turn_tokens
+invocations      id PK, harness, session_id, tool_use_id, project_path, ts,
+                 tool_name, kind, target, artifact_id?, duration_ms, is_error,
+                 turn_tokens
 
 usage_stats      materialised after each index run:
                  artifact_id, total, sessions, last_used, error_rate,
@@ -170,7 +171,7 @@ analytics. Artifacts with no invocations are flagged *never used*.
 
 Size estimate: ~2,300 invocations per large session × hundreds of sessions ≈
 low hundreds of thousands of rows. Indexes on `(artifact_id, ts)`,
-`(session_id)`, `(project_slug, ts)`.
+`(session_id)`, `(harness, project_path, ts)`.
 
 ### 4.4 IPC
 
@@ -212,7 +213,7 @@ Component convention (user CLAUDE.md): one folder per component with
 - Missing `~/.claude` → harness `detect()` false; app shows "no supported agent
   harness found" with the manual folder fallback.
 - Unreadable/corrupt log lines are skipped and counted in scan diagnostics
-  (`scans.skipped_lines`), surfaced in the Scans screen.
+  (the `scan_diagnostics` table), surfaced in the Scans screen.
 - Log format drift (undocumented): classification falls back to `builtin`;
   unknown record types are ignored. A fixture test pins the currently observed
   shape so drift fails CI loudly.
