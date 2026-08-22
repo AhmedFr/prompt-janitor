@@ -118,7 +118,7 @@ const COLUMNS: ColumnDef<Artifact, any>[] = [
     id: "actions",
     header: "Actions",
     enableSorting: false,
-    meta: { align: "right", interactive: true },
+    meta: { align: "right" },
     cell: () => (
       <ActionsCell
         actions={[
@@ -200,6 +200,22 @@ export const Empty: Story = {
     rows: [],
     toolbarRight: <button type="button">Run a scan</button>,
   },
+};
+
+/** Filters that match nothing: the way out is a button, not a dead end. */
+export const NoMatches: Story = {
+  args: { ...base, stateKey: "sb-nomatch", pills: PILLS },
+  decorators: [
+    (Story) => {
+      // The table restores its own filters, so the story seeds the ones that
+      // put it in this state rather than driving the search box.
+      window.sessionStorage.setItem(
+        "pj.table.sb-nomatch",
+        JSON.stringify({ search: "no-such-artifact", pills: {}, sort: null }),
+      );
+      return <Story />;
+    },
+  ],
 };
 
 /** 1 000 rows through `@tanstack/react-virtual` — only the visible window is in the DOM. */

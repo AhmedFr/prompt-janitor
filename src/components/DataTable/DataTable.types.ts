@@ -50,12 +50,29 @@ export interface DataTableProps<Row> {
   search?: DataTableSearch<Row>;
   pills?: PillGroup<Row>[];
   defaultSort?: { id: string; desc?: boolean };
+  /**
+   * Makes rows openable. A clickable row gets `tabIndex=0`, an `aria-label`
+   * and Enter/Space — but never `role="button"`: a widget role must not
+   * contain focusable descendants, and rows carry their own action buttons.
+   * Clicks and keystrokes that land on a control inside the row are that
+   * control's, never the row's.
+   */
   onRowClick?: (r: Row) => void;
+  /**
+   * Accessible name for a clickable row. Defaults to the first column's
+   * rendered value, falling back to {@link DataTableProps.rowId}.
+   */
+  rowLabel?: (r: Row) => string;
   empty: { title: string; hint?: string };
   density?: "compact" | "regular";
   virtualize?: boolean;
   toolbarRight?: ReactNode;
-  /** Suffix of the `pj.table.<key>` sessionStorage key this table persists under. */
+  /**
+   * Suffix of the `pj.table.<key>` sessionStorage key this table persists
+   * under. Changing it mid-mount (one component rendering a different table
+   * per tab) swaps the remembered view over to that key's stored state
+   * instead of carrying the old one across.
+   */
   stateKey: string;
   ariaLabel: string;
 }
@@ -71,12 +88,5 @@ declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData extends RowData, TValue> {
     align?: "left" | "right";
-    /**
-     * Set on a column whose cells render their own buttons (e.g. `ActionsCell`).
-     * A clickable row would otherwise take `role="button"` and swallow them:
-     * a widget role must not contain focusable descendants, and assistive
-     * tech that honours that would leave the row actions unreachable.
-     */
-    interactive?: boolean;
   }
 }

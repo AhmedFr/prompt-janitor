@@ -1,4 +1,11 @@
-import { useRef, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type SyntheticEvent,
+} from "react";
 import { flexRender, type Header, type Row as TanstackRow } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Icon } from "@/components/Icon";
@@ -14,6 +21,23 @@ import {
 import "./DataTable.css";
 
 const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");
+
+/** Anything inside a row that owns its own clicks and keystrokes. */
+const INTERACTIVE =
+  "button, a, input, select, textarea, label, [role='button'], [role='switch'], [tabindex]:not([tabindex='-1'])";
+
+/**
+ * Whether an event belongs to the row itself rather than to a control inside
+ * it. A row action must never also open the row — and because the row is
+ * focusable it matches `INTERACTIVE` too, so it has to be excluded by
+ * identity rather than by selector.
+ */
+function fromRowItself(event: SyntheticEvent<HTMLTableRowElement>): boolean {
+  const target = event.target;
+  if (!(target instanceof Element)) return true;
+  const control = target.closest(INTERACTIVE);
+  return control === null || control === event.currentTarget;
+}
 
 /** Ascending / descending / unsorted, as a glyph the header button owns. */
 const SORT_GLYPH = { ascending: "▲", descending: "▼", none: "↕" } as const;
@@ -39,6 +63,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     toolbarRight,
     ariaLabel,
     rowId,
+    rowLabel,
   } = props;
 
   const {
@@ -66,19 +91,18 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     overscan: VIRTUAL_OVERSCAN,
   });
 
+  // Row heights are pinned per density in CSS; when that changes, every cached
+  // measurement describes the old rhythm and the scroll offsets drift.
+  useEffect(() => {
+    virtualizer.measure();
+  }, [density, virtualizer]);
+
   const items = virtualizer.getVirtualItems();
   const padTop = isVirtual && items.length > 0 ? items[0].start : 0;
   const padBottom =
     isVirtual && items.length > 0 ? virtualizer.getTotalSize() - items[items.length - 1].end : 0;
   const visibleRows = isVirtual ? items.map((item) => modelRows[item.index]) : modelRows;
-  const leafColumns = table.getAllLeafColumns();
-  const columnCount = leafColumns.length;
-
-  // A row is a button only when nothing inside it is: nesting an actions
-  // column inside `role="button"` is an `aria` violation, and the row actions
-  // are the thing that stops being reachable. Such rows stay focusable and
-  // keyboard-operable, they just keep their native `row` role.
-  const rowIsButton = !!onRowClick && !leafColumns.some((c) => c.columnDef.meta?.interactive);
+  const columnCount = table.getAllLeafColumns().length;
 
   // With nothing scanned yet there is nothing to search or slice, so the
   // filter controls would only be furniture. `toolbarRight` stays — the way
@@ -89,19 +113,31 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     state.sort?.id === header.column.id ? (state.sort.desc ? "descending" : "ascending") : "none";
 
   const labelOf = (row: TanstackRow<Row>) => {
-    const first = row.getVisibleCells()[0];
-    const value = first?.getValue();
+    if (rowLabel) return rowLabel(row.original);
+    const value = row.getVisibleCells()[0]?.getValue();
     return value == null || value === "" ? rowId(row.original) : String(value);
+  };
+
+  const onRowMouseClick = (row: TanstackRow<Row>) => (event: MouseEvent<HTMLTableRowElement>) => {
+    if (!fromRowItself(event)) return;
+    onRowClick?.(row.original);
   };
 
   const onRowKeyDown = (row: TanstackRow<Row>) => (event: KeyboardEvent<HTMLTableRowElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
+    if (!fromRowItself(event)) return;
     event.preventDefault();
     onRowClick?.(row.original);
   };
 
   return (
-    <div className={cx("dt", density === "compact" && "dt--compact")}>
+    <div
+      className={cx("dt", density === "compact" && "dt--compact")}
+      // `DataTable.css` declares the same heights per density, but the
+      // virtualiser estimates scroll offsets from ROW_HEIGHT — so the number
+      // rows actually render at comes from there, and the two cannot drift.
+      style={{ "--dt-row-h": `${ROW_HEIGHT[density]}px` } as CSSProperties}
+    >
       {(showFilters || toolbarRight) && (
         <div className="dt__toolbar">
           {showFilters && search && (
@@ -146,10 +182,16 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       )}
 
       <div className="dt__scroll" ref={scrollRef}>
-        <table className="dt__table" aria-label={ariaLabel}>
+        <table
+          className="dt__table"
+          aria-label={ariaLabel}
+          // Only meaningful while rows are missing from the DOM; a full table
+          // already tells assistive tech how many rows there are.
+          aria-rowcount={isVirtual ? modelRows.length + 1 : undefined}
+        >
           <thead className="dt__head">
             {table.getHeaderGroups().map((group) => (
-              <tr key={group.id}>
+              <tr key={group.id} aria-rowindex={isVirtual ? 1 : undefined}>
                 {group.headers.map((header) => {
                   const sortable = header.column.getCanSort();
                   const sort = sortOf(header);
@@ -190,17 +232,21 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
               </tr>
             )}
 
-            {visibleRows.map((row) => (
+            {visibleRows.map((row, index) => (
               <tr
                 key={row.id}
                 data-row-id={row.id}
+                data-index={isVirtual ? items[index].index : undefined}
+                // Measured rather than trusted: a wrapped cell is taller than
+                // the estimate, and unmeasured rows drift the scrollbar.
+                ref={isVirtual ? virtualizer.measureElement : undefined}
+                aria-rowindex={isVirtual ? items[index].index + 2 : undefined}
                 className={cx("dt__row", onRowClick && "dt__row--clickable")}
                 {...(onRowClick
                   ? {
-                      ...(rowIsButton ? { role: "button" as const } : {}),
                       tabIndex: 0,
                       "aria-label": labelOf(row),
-                      onClick: () => onRowClick(row.original),
+                      onClick: onRowMouseClick(row),
                       onKeyDown: onRowKeyDown(row),
                     }
                   : {})}
@@ -226,7 +272,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
             )}
 
             {modelRows.length === 0 && (
-              <tr className="dt__row">
+              <tr className="dt__empty-row">
                 <td colSpan={columnCount}>
                   {total === 0 ? (
                     <div className="dt__empty">

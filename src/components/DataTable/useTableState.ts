@@ -79,6 +79,16 @@ export function useTableState(
   initial: TableState,
 ): [TableState, (patch: Partial<TableState>) => void, () => void] {
   const [state, setState] = useState<TableState>(() => readStored(key, initial));
+  const [loadedKey, setLoadedKey] = useState(key);
+
+  // One component can render a different table per tab, changing `key` without
+  // unmounting. Adjusting during render rather than in an effect keeps the
+  // previous tab's filters from being painted under the new tab's key — and
+  // nothing is written back, so the old state never leaks onto the new key.
+  if (loadedKey !== key) {
+    setLoadedKey(key);
+    setState(readStored(key, initial));
+  }
 
   const patch = useCallback(
     (next: Partial<TableState>) => {

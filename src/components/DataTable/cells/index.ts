@@ -1,4 +1,3 @@
-
 export { GradeCell } from "./GradeCell";
 export { UsageCell } from "./UsageCell";
 export { PercentCell } from "./PercentCell";

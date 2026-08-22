@@ -48,7 +48,7 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     () => ({ search: "", pills: {}, sort: sortId ? { id: sortId, desc: !!sortDesc } : null }),
     [sortId, sortDesc],
   );
-  const [state, patch, reset] = useTableState(stateKey, initial);
+  const [state, patch] = useTableState(stateKey, initial);
   const [query, setQuery] = useState(state.search);
 
   // Typing updates the box immediately and the table 150 ms later, so a fast
@@ -59,9 +59,11 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     return () => clearTimeout(timer);
   }, [query, state.search, patch]);
 
+  // Deliberately not keyed on the whole `state`: sorting is TanStack's job,
+  // and re-filtering every row because a header was clicked is wasted work.
   const filtered = useMemo(
-    () => applyFilters(rows, state, search, pills),
-    [rows, state, search, pills],
+    () => applyFilters(rows, { search: state.search, pills: state.pills, sort: null }, search, pills),
+    [rows, state.search, state.pills, search, pills],
   );
 
   const sorting = useMemo<SortingState>(
@@ -113,14 +115,21 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     [patch, state.pills],
   );
 
+  // Clears the *filters*, not the view: the sort is the order the user chose to
+  // read in, and throwing it away on "no rows match" loses their place too.
   const clearFilters = useCallback(() => {
     setQuery("");
-    reset();
-  }, [reset]);
+    patch({ search: "", pills: {} });
+  }, [patch]);
 
   const counts = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
-    for (const group of pills ?? []) out[group.id] = pillCounts(rows, group);
+    for (const group of pills ?? []) {
+      // A group that ships its own counts (from a Rust rollup, say) must not
+      // pay for a full predicate pass over every row.
+      if (group.options.every((option) => option.count != null)) continue;
+      out[group.id] = pillCounts(rows, group);
+    }
     return out;
   }, [rows, pills]);
 

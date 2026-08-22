@@ -5,6 +5,10 @@
   --dt-row-pad-y: 10px;
   --dt-row-pad-x: 12px;
   --dt-font: 13px;
+  /* Must match ROW_HEIGHT in DataTable.constants.ts: the virtualiser estimates
+     scroll offsets from those numbers, and a row that renders at a different
+     height makes the scrollbar lie. Asserted in DataTable.test.tsx. */
+  --dt-row-h: 44px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -15,6 +19,7 @@
   --dt-row-pad-y: 5px;
   --dt-row-pad-x: 9px;
   --dt-font: 12px;
+  --dt-row-h: 34px;
 }
 
 /* ---------- toolbar ---------- */
@@ -186,6 +191,11 @@
   border-bottom: 0;
 }
 
+/* A floor, not a cap: table layout still grows a row whose content needs it. */
+.dt__row {
+  height: var(--dt-row-h);
+}
+
 .dt__row--clickable {
   cursor: pointer;
 }
@@ -205,6 +215,11 @@
 }
 
 /* ---------- empty + footer ---------- */
+
+/* The empty state sets its own height; the pinned row height would squash it. */
+.dt__empty-row td {
+  border: 0;
+}
 
 .dt__empty {
   display: flex;

@@ -113,6 +113,35 @@ describe("useTableState", () => {
     expect(result.current[0]).toEqual(initial);
   });
 
+  it("re-reads storage when the table key changes", () => {
+    window.sessionStorage.setItem(
+      "pj.table.prompts",
+      JSON.stringify({ search: "other", pills: { kind: ["prompt"] }, sort: null }),
+    );
+
+    const { result, rerender } = renderHook(({ key }) => useTableState(key, initial), {
+      initialProps: { key: "setup" },
+    });
+
+    act(() => result.current[1]({ search: "web" }));
+    rerender({ key: "prompts" });
+
+    expect(result.current[0]).toEqual({ search: "other", pills: { kind: ["prompt"] }, sort: null });
+  });
+
+  it("does not copy the previous table's state onto the new key", () => {
+    const { result, rerender } = renderHook(({ key }) => useTableState(key, initial), {
+      initialProps: { key: "setup" },
+    });
+
+    act(() => result.current[1]({ search: "web" }));
+    rerender({ key: "prompts" });
+
+    expect(window.sessionStorage.getItem("pj.table.prompts")).toBeNull();
+    expect(result.current[0]).toEqual(initial);
+    expect(window.sessionStorage.getItem("pj.table.setup")).toContain('"web"');
+  });
+
   it("accepts a stored sort that is a well-formed column reference", () => {
     window.sessionStorage.setItem(
       "pj.table.setup",
