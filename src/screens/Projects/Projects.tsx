@@ -1,10 +1,16 @@
 import { useMemo } from "react";
+import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ProjectRow } from "@/lib/ipc";
 import { buildPills, DEFAULT_SORT, PROJECT_COLUMNS } from "./projects.columns";
 import {
   EMPTY_HINT,
   EMPTY_TITLE,
+  FAILED_BODY,
+  FAILED_RETRY,
+  FAILED_TITLE,
   SEARCH_PLACEHOLDER,
   TABLE_STATE_KEY,
 } from "./Projects.constants";
@@ -44,6 +50,10 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const rows = data ?? NO_ROWS;
+  // The load finished and still produced nothing to hold: the query failed.
+  // An empty table would call that "no projects", which is a different — and
+  // false — thing to tell someone whose projects are all still there.
+  const failed = !loading && data == null;
 
   // Rebuilt only when a scan swaps the row set — the harness chips are
   // derived from the rows themselves.
@@ -57,22 +67,41 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
 
       <div className="scroll-area">
         <div className="page projects-page">
-          <DataTable
-            ariaLabel="Projects"
-            stateKey={TABLE_STATE_KEY}
-            columns={PROJECT_COLUMNS}
-            rows={rows}
-            rowId={rowId}
-            search={SEARCH}
-            pills={pills}
-            defaultSort={DEFAULT_SORT}
-            onRowClick={(row) => navigate("project", row.id)}
-            loading={loading}
-            density="compact"
-            empty={{ title: EMPTY_TITLE, hint: EMPTY_HINT }}
-          />
+          {failed ? (
+            <UnreadableProjects onRetry={() => void state.refetch()} />
+          ) : (
+            <DataTable
+              ariaLabel="Projects"
+              stateKey={TABLE_STATE_KEY}
+              columns={PROJECT_COLUMNS}
+              rows={rows}
+              rowId={rowId}
+              search={SEARCH}
+              pills={pills}
+              defaultSort={DEFAULT_SORT}
+              onRowClick={(row) => navigate("project", row.id)}
+              loading={loading}
+              density="compact"
+              empty={{ title: EMPTY_TITLE, hint: EMPTY_HINT }}
+            />
+          )}
         </div>
       </div>
     </section>
+  );
+}
+
+/** The query failed — say so rather than showing an empty table, and offer the one retry there is. */
+function UnreadableProjects({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card padded>
+      <div className="projects-panel">
+        <h2 className="projects-panel__title">{FAILED_TITLE}</h2>
+        <p className="muted projects-panel__body">{FAILED_BODY}</p>
+        <Button onClick={onRetry}>
+          <Icon name="refresh" /> {FAILED_RETRY}
+        </Button>
+      </div>
+    </Card>
   );
 }

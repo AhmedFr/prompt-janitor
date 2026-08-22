@@ -44,7 +44,10 @@ export function App() {
     if (next === "detail" && target !== undefined) setDetailId(target);
     if (next === "settings") setSettingsTab(target);
     if (next === "prompts") setPromptsTarget(target);
-    if (next === "project" && target !== undefined) setProjectPath(target);
+    // Unlike `detail`, an untargeted `project` clears rather than keeps: the
+    // screen is addressed by path, and carrying the last one forward would
+    // silently open the wrong project.
+    if (next === "project") setProjectPath(target);
   }, []);
 
   const finishOnboarding = () => {

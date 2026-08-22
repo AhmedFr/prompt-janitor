@@ -1,12 +1,12 @@
 import type { ColumnDef, SortingFn } from "@tanstack/react-table";
-import type { GradeLetter } from "@/components/Grade";
+import { GRADE_LETTERS, type GradeLetter } from "@/components/Grade";
 import { GradeCell, type PillGroup } from "@/components/DataTable";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
 import type { ProjectRow } from "@/lib/ipc";
 // Deep import rather than the Setup barrel: this is one pure formatter, and
 // the barrel would pull the whole Setup screen in behind it.
 import { relativeSession } from "@/screens/Setup/setup.util";
-import { GLYPH_SIZE, GRADE_LETTERS, MISSING_FOLDER_CHIP } from "./Projects.constants";
+import { GLYPH_SIZE, MISSING_FOLDER_CHIP } from "./Projects.constants";
 
 /**
  * The grade a project sorts under. `ProjectRow.grade` is non-null today (the
@@ -72,7 +72,7 @@ export const PROJECT_COLUMNS: ColumnDef<ProjectRow, unknown>[] = [
     accessorFn: gradeKey,
     sortingFn: byGradeThenIssues,
     // Reads the raw grade, not the "Z"-substituted sort key above.
-    cell: (c) => <GradeCell grade={c.row.original.grade as GradeLetter | null} />,
+    cell: (c) => <GradeCell grade={c.row.original.grade} />,
   },
   countColumn("files", "Rule files", (r) => r.file_count),
   countColumn("issues", "Open issues", (r) => r.issue_count),

@@ -1,8 +1,3 @@
-import type { GradeLetter } from "@/components/Grade";
-
-/** Every grade a project can carry, in report-card order — one filter chip each. */
-export const GRADE_LETTERS: readonly GradeLetter[] = ["A", "B", "C", "D", "F"] as const;
-
 /** Square size of the row's project logo/folder glyph, in px. */
 export const GLYPH_SIZE = 18;
 
@@ -18,3 +13,13 @@ export const SEARCH_PLACEHOLDER = "Search project name or path";
 /** Nothing scanned yet — the honest headline, and the one lever from here. */
 export const EMPTY_TITLE = "No projects scanned yet";
 export const EMPTY_HINT = "Add a folder from Setup and Prompt Janitor will grade what it finds inside.";
+
+/**
+ * The load finished with nothing to show — not because nothing is scanned,
+ * but because the read failed. Almost always a scan still holding the
+ * database, which is why the only lever offered is "try it again".
+ */
+export const FAILED_TITLE = "Projects could not be read";
+export const FAILED_BODY =
+  "The project list query failed. This is usually a scan still holding the database — try again.";
+export const FAILED_RETRY = "Try again";

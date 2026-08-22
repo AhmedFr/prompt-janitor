@@ -142,6 +142,32 @@ describe("Projects", () => {
     await waitFor(() => expect(screen.getByText(/No projects scanned yet/)).toBeInTheDocument());
   });
 
+  it("says the query failed rather than claiming nothing is scanned", async () => {
+    listProjects.mockRejectedValue(new Error("database is locked"));
+    render(<Projects navigate={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/The project list query failed/)).toBeInTheDocument(),
+    );
+    // The one thing this state must never do is read as "you have no projects".
+    expect(screen.queryByText(/No projects scanned yet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("retries the query from the failure panel", async () => {
+    listProjects.mockRejectedValue(new Error("database is locked"));
+    render(<Projects navigate={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByText(/The project list query failed/)).toBeInTheDocument(),
+    );
+
+    listProjects.mockResolvedValue({ status: "ok", data: populated });
+    fireEvent.click(screen.getByRole("button", { name: /Try again/ }));
+
+    await waitFor(() => expect(rowNames()).toHaveLength(3));
+    expect(listProjects).toHaveBeenCalledTimes(2);
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
