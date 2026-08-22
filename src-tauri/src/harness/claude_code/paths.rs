@@ -3,11 +3,17 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClaudeHome {
     pub root: PathBuf,
+    /// Test seam: `~/.claude.json` sits *beside* the home, which a fixture
+    /// tree copied into a tempdir cannot reproduce. `None` in production.
+    pub user_config_override: Option<PathBuf>,
 }
 
 impl ClaudeHome {
     pub fn at(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            user_config_override: None,
+        }
     }
     /// `$CLAUDE_CONFIG_DIR` (Claude Code's own override), else `$CLAUDE_HOME`
     /// (tests / power users), else `~/.claude` when present.
@@ -27,6 +33,18 @@ impl ClaudeHome {
         }
         // Symlinked/relative homes must compare equal to paths we read off disk.
         Some(Self::at(root.canonicalize().ok()?))
+    }
+    /// `~/.claude.json` — Claude Code's user config, a sibling of `~/.claude`.
+    /// Holds the globally-installed `mcpServers` and, under `projects`, the
+    /// per-project ones (keyed by absolute path).
+    pub fn user_config(&self) -> PathBuf {
+        if let Some(p) = &self.user_config_override {
+            return p.clone();
+        }
+        match self.root.parent() {
+            Some(parent) => parent.join(".claude.json"),
+            None => self.root.join("../.claude.json"),
+        }
     }
     pub fn global_rule(&self) -> PathBuf {
         self.root.join("CLAUDE.md")
@@ -70,6 +88,11 @@ mod tests {
         assert_eq!(home.global_rule(), dir.path().join("CLAUDE.md"));
         assert_eq!(home.settings(), vec![dir.path().join("settings.json")]);
         assert_eq!(home.projects_dir(), dir.path().join("projects"));
+        // `~/.claude.json` is a sibling of `~/.claude`, not a child.
+        assert_eq!(
+            home.user_config(),
+            dir.path().parent().unwrap().join(".claude.json")
+        );
         assert_eq!(
             home.plugins_manifest(),
             dir.path().join("plugins/installed_plugins.json")
@@ -123,6 +146,14 @@ mod tests {
             got.map(|h| h.root),
             Some(dir.path().join(".claude").canonicalize().unwrap())
         );
+    }
+
+    #[test]
+    fn user_config_override_wins_over_the_sibling_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut home = ClaudeHome::at(dir.path());
+        home.user_config_override = Some(dir.path().join("user.claude.json"));
+        assert_eq!(home.user_config(), dir.path().join("user.claude.json"));
     }
 
     #[test]

@@ -44,16 +44,20 @@ pub fn fixture_home() -> (tempfile::TempDir, ClaudeHome) {
         projects.join(slug::encode(&root.join("work/gone"))),
     )
     .unwrap();
-    let log = projects
-        .join(slug::encode(&app_path))
-        .join("0001-session.jsonl");
-    rewrite(&log, "<FIXTURE>", &root_str);
-    rewrite(
-        &root.join("plugins/installed_plugins.json"),
-        "<FIXTURE>",
-        &root_str,
-    );
-    (tmp, ClaudeHome::at(root))
+    let app_slug = projects.join(slug::encode(&app_path));
+    for f in [
+        app_slug.join("0001-session.jsonl"),
+        app_slug.join("0001-session/subagents/agent-abc.jsonl"),
+        root.join("plugins/installed_plugins.json"),
+        root.join("user.claude.json"),
+    ] {
+        rewrite(&f, "<FIXTURE>", &root_str);
+    }
+    // `~/.claude.json` lives beside the home, not inside it; the fixture keeps
+    // it in the tree and points the override at it.
+    let mut home = ClaudeHome::at(root.clone());
+    home.user_config_override = Some(root.join("user.claude.json"));
+    (tmp, home)
 }
 
 #[test]
