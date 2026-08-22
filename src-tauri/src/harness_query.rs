@@ -155,6 +155,24 @@ pub struct UsageOverview {
     pub mcp_error_rates: Vec<TargetRate>,
 }
 
+/// Top-level sessions started on one calendar day (`YYYY-MM-DD`, UTC).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
+pub struct DayCount {
+    pub day: String,
+    pub count: u32,
+}
+
+/// What one project's usage tab renders, over the same window as the
+/// Analytics overview.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
+pub struct ProjectUsage {
+    /// Every `(kind, target)` invoked inside the project, busiest first.
+    /// Sub-agent invocations count — they ran in this project's sessions.
+    pub ranked: Vec<RankedTarget>,
+    /// Top-level sessions per day, oldest day first — the activity sparkline.
+    pub sessions_per_day: Vec<DayCount>,
+}
+
 /// `skill, agent, mcp, builtin` — the order the UI legend lists kinds in.
 const KIND_ORDER: [InvocationKind; 4] = [
     InvocationKind::Skill,
@@ -395,31 +413,29 @@ pub fn effective_rules(
     Ok(out)
 }
 
-/// Usage aggregates for the Analytics screen, over the `window_days` ending at
-/// `now_epoch_secs`.
+/// Every `(kind, target)` invoked since `since`, busiest first — the ranked
+/// list both the Analytics overview and a single project page render.
 ///
-/// The window bounds all four aggregates: invocations by `invocations.ts`,
-/// projects by `sessions.started_at`. Nothing here is all-time, so the ranked
-/// list, the kind totals and the error rates can be read against each other.
-pub fn usage_overview(
+/// `scope` narrows it to one harness's work inside one project directory; the
+/// overview passes `None` and ranks everything. Sessions are counted distinct
+/// — a target invoked ten times in one session is one session's worth of
+/// habit — and sub-agent sessions count, because the work really happened.
+fn ranked_targets(
     conn: &Connection,
-    now_epoch_secs: i64,
-    window_days: u32,
-) -> rusqlite::Result<UsageOverview> {
-    // `invocations.ts` and `sessions.started_at` are fixed-width UTC RFC3339
-    // strings, so the window bound compares lexicographically.
-    let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
+    since: &str,
+    scope: Option<(&str, &str)>,
+) -> rusqlite::Result<Vec<RankedTarget>> {
+    const COLUMNS: &str = "SELECT kind, target, max(artifact_id), count(*),
+                count(DISTINCT session_id), avg(is_error), avg(turn_tokens)
+           FROM invocations WHERE ts >= ?1";
+    const GROUPING: &str = "GROUP BY kind, target ORDER BY count(*) DESC, target";
 
-    // One row per (kind, target). Sessions are counted distinct — a target
-    // invoked ten times in one session is one session's worth of habit.
-    let mut ranked_stmt = conn.prepare(
-        "SELECT kind, target, max(artifact_id), count(*), count(DISTINCT session_id),
-                avg(is_error), avg(turn_tokens)
-           FROM invocations WHERE ts >= ?1
-          GROUP BY kind, target ORDER BY count(*) DESC, target",
-    )?;
-    let mut ranked = Vec::new();
-    for row in ranked_stmt.query_map(params![since], |r| {
+    let sql = match scope {
+        Some(_) => format!("{COLUMNS} AND harness = ?2 AND project_path = ?3 {GROUPING}"),
+        None => format!("{COLUMNS} {GROUPING}"),
+    };
+    let mut stmt = conn.prepare(&sql)?;
+    let read = |r: &Row<'_>| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, String>(1)?,
@@ -429,7 +445,16 @@ pub fn usage_overview(
             r.get::<_, Option<f64>>(5)?,
             r.get::<_, Option<f64>>(6)?,
         ))
-    })? {
+    };
+    let rows = match scope {
+        Some((harness, project_path)) => {
+            stmt.query_map(params![since, harness, project_path], read)?
+        }
+        None => stmt.query_map(params![since], read)?,
+    };
+
+    let mut ranked = Vec::new();
+    for row in rows {
         let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens) = row?;
         // A kind outside the model is dropped rather than guessed at.
         let Some(kind) = InvocationKind::parse(&kind) else {
@@ -445,6 +470,64 @@ pub fn usage_overview(
             avg_turn_tokens,
         });
     }
+    Ok(ranked)
+}
+
+/// One project's usage over the `window_days` ending at `now_epoch_secs`: what
+/// `harness` invoked inside `project_path`, and how often it was worked in.
+///
+/// Scoped to one harness, like [`effective_rules`] — a directory can be a
+/// project of several, and each only accounts for its own sessions.
+pub fn project_usage(
+    conn: &Connection,
+    harness: &str,
+    project_path: &str,
+    now_epoch_secs: i64,
+    window_days: u32,
+) -> rusqlite::Result<ProjectUsage> {
+    let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
+    let ranked = ranked_targets(conn, &since, Some((harness, project_path)))?;
+
+    // `started_at` is a fixed-width UTC RFC3339 stamp, so its first ten
+    // characters are the UTC calendar day. Top-level only: a sub-agent
+    // transcript is not a day's worth of work on its own.
+    let mut days_stmt = conn.prepare(
+        "SELECT substr(started_at, 1, 10) AS day, count(*) FROM sessions
+          WHERE harness = ?1 AND project_path = ?2 AND parent_session_id IS NULL
+            AND started_at >= ?3
+          GROUP BY day ORDER BY day",
+    )?;
+    let sessions_per_day = days_stmt
+        .query_map(params![harness, project_path, since], |r| {
+            Ok(DayCount {
+                day: r.get(0)?,
+                count: as_u32(r.get(1)?),
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(ProjectUsage {
+        ranked,
+        sessions_per_day,
+    })
+}
+
+/// Usage aggregates for the Analytics screen, over the `window_days` ending at
+/// `now_epoch_secs`.
+///
+/// The window bounds all four aggregates: invocations by `invocations.ts`,
+/// projects by `sessions.started_at`. Nothing here is all-time, so the ranked
+/// list, the kind totals and the error rates can be read against each other.
+pub fn usage_overview(
+    conn: &Connection,
+    now_epoch_secs: i64,
+    window_days: u32,
+) -> rusqlite::Result<UsageOverview> {
+    // `invocations.ts` and `sessions.started_at` are fixed-width UTC RFC3339
+    // strings, so the window bound compares lexicographically.
+    let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
+
+    let ranked = ranked_targets(conn, &since, None)?;
 
     // Read the windowed totals into a map and project them onto the fixed kind
     // order: a kind with nothing in the window is a zero, not a missing bar.
@@ -708,6 +791,58 @@ mod tests {
         let bash = u.ranked.iter().find(|r| r.target == "Bash").unwrap();
         assert_eq!(bash.kind, InvocationKind::Builtin);
         assert_eq!(bash.artifact_id, None, "a builtin resolves to no artifact");
+    }
+
+    #[test]
+    fn project_usage_ranks_only_that_projects_targets() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        let u = project_usage(&conn, "claude_code", &app, 1_785_628_800, 90).unwrap();
+        assert_eq!(
+            u.ranked
+                .iter()
+                .map(|r| r.target.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Bash",
+                "Read",
+                "adapt",
+                "playwright",
+                "reviewer",
+                "superpowers:brainstorming",
+            ],
+            "sub-agent invocations belong to the project their session ran in"
+        );
+        assert_eq!(
+            u.sessions_per_day,
+            vec![DayCount {
+                day: "2026-08-01".into(),
+                count: 1,
+            }],
+            "top-level sessions only, one bucket per calendar day"
+        );
+    }
+
+    /// The project filter is a filter: a path the harness never ran in has no
+    /// usage of its own, even though the database is full of invocations.
+    #[test]
+    fn project_usage_of_an_unused_project_is_empty() {
+        let (conn, home) = seeded();
+        let gone = home.root.join("work/gone").to_string_lossy().into_owned();
+        let u = project_usage(&conn, "claude_code", &gone, 1_785_628_800, 90).unwrap();
+        assert!(u.ranked.is_empty());
+        assert!(u.sessions_per_day.is_empty());
+    }
+
+    /// Same window rule as the overview: a clock past the fixture empties both
+    /// halves rather than falling back to all-time.
+    #[test]
+    fn project_usage_is_windowed() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        let u = project_usage(&conn, "claude_code", &app, 1_789_430_400, 1).unwrap();
+        assert!(u.ranked.is_empty());
+        assert!(u.sessions_per_day.is_empty());
     }
 
     /// The window bounds every aggregate, not just the ranking: a clock past

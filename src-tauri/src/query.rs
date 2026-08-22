@@ -336,18 +336,58 @@ pub struct ProjectRow {
     pub logo: Option<String>,
     /// Most recent file mtime in the project (epoch seconds string).
     pub modified: Option<String>,
+    /// The harness that has worked here most, when any has.
+    pub harness: Option<String>,
+    /// Top-level sessions that harness has run here (all time).
+    pub session_count: u32,
+    pub last_session_at: Option<String>,
+    /// Invocable artifacts configured in the project (skill/agent/command/
+    /// mcp_server) that nothing has ever invoked.
+    pub never_used_count: u32,
+    /// Those of them whose rollup says at least a quarter of their calls
+    /// errored.
+    pub error_count: u32,
+    /// False only when a harness has seen the directory and it is gone from
+    /// disk — a project no harness knows about is assumed to be there.
+    pub exists: bool,
 }
 
-/// Every project with its rolled-up file/issue counts, worst-grade first.
+/// The project-layer artifacts a user can actually invoke. A rule or a
+/// settings file is configuration, not a habit, so neither can be "unused".
+const INVOCABLE_KINDS: &str = "('skill', 'agent', 'command', 'mcp_server')";
+
+/// Every project with its rolled-up file/issue counts, worst-grade first,
+/// plus what the harness scan knows about the same directory.
+///
+/// The harness facts are joined in through one row per path: a directory can
+/// be a project of several harnesses, and joining them all in would multiply
+/// the file rollup. The busiest harness's row wins — SQLite fills the bare
+/// columns of a `max()` group from the row that matched.
 pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
-    let mut stmt = conn.prepare(
+    let mut stmt = conn.prepare(&format!(
         "SELECT p.id, p.name, p.grade, p.score, p.logo,
-                COUNT(f.id), COALESCE(SUM(f.issue_count), 0), MAX(f.modified_at)
-         FROM projects p LEFT JOIN files f ON f.project_id = p.id
+                COUNT(f.id), COALESCE(SUM(f.issue_count), 0), MAX(f.modified_at),
+                hp.harness, COALESCE(hp.session_count, 0), hp.last_session_at,
+                COALESCE(hp.exists_on_disk, 1),
+                (SELECT COUNT(*) FROM artifacts a
+                  WHERE a.project_path = p.id AND a.layer = 'project'
+                    AND a.kind IN {INVOCABLE_KINDS}
+                    AND NOT EXISTS (SELECT 1 FROM usage_stats u
+                                     WHERE u.artifact_id = a.id)),
+                (SELECT COUNT(*) FROM artifacts a
+                  WHERE a.project_path = p.id AND a.layer = 'project'
+                    AND a.kind IN {INVOCABLE_KINDS}
+                    AND EXISTS (SELECT 1 FROM usage_stats u
+                                 WHERE u.artifact_id = a.id AND u.error_rate >= 0.25))
+         FROM projects p
+         LEFT JOIN files f ON f.project_id = p.id
+         LEFT JOIN (SELECT path, harness, exists_on_disk, last_session_at,
+                           max(session_count) AS session_count
+                      FROM harness_projects GROUP BY path) hp ON hp.path = p.id
          GROUP BY p.id
          ORDER BY CASE p.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
-                  MAX(f.modified_at) DESC",
-    )?;
+                  MAX(f.modified_at) DESC"
+    ))?;
     let rows = stmt
         .query_map([], |r| {
             Ok(ProjectRow {
@@ -359,6 +399,12 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
                 file_count: r.get::<_, i64>(5)? as u32,
                 issue_count: r.get::<_, i64>(6)? as u32,
                 modified: r.get::<_, Option<String>>(7)?,
+                harness: r.get(8)?,
+                session_count: r.get::<_, i64>(9)?.max(0) as u32,
+                last_session_at: r.get(10)?,
+                exists: r.get::<_, i64>(11)? != 0,
+                never_used_count: r.get::<_, i64>(12)?.max(0) as u32,
+                error_count: r.get::<_, i64>(13)?.max(0) as u32,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -668,6 +714,9 @@ pub struct RuleInfo {
     pub nl: bool,
     /// The forbidden substring (pattern rules) or the instruction (NL rules).
     pub pattern: Option<String>,
+    /// Open issues this rule is currently responsible for — dismissed ones
+    /// stop counting, so silencing a finding silences the number too.
+    pub hit_count: u32,
 }
 
 /// Seed the rules table from the built-in catalog. Idempotent — preserves the
@@ -717,6 +766,18 @@ pub fn seed_builtin_nl_rules(conn: &Connection) -> rusqlite::Result<()> {
 
 /// The built-in rules with their enabled state (defaults to on if unseeded).
 pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
+    let mut hits = std::collections::HashMap::new();
+    {
+        let mut stmt = conn.prepare(
+            "SELECT rule_id, COUNT(*) FROM issues
+              WHERE rule_id IS NOT NULL AND dismissed_at IS NULL GROUP BY rule_id",
+        )?;
+        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+        for row in rows {
+            let (id, n) = row?;
+            hits.insert(id, n.max(0) as u32);
+        }
+    }
     let mut enabled = std::collections::HashMap::new();
     {
         let mut stmt = conn.prepare("SELECT id, enabled FROM rules")?;
@@ -740,6 +801,7 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             custom: false,
             nl: false,
             pattern: None,
+            hit_count: hits.get(rule.id()).copied().unwrap_or(0),
         })
         .collect();
 
@@ -754,6 +816,7 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
             custom: false,
             nl: true,
             pattern: Some(rule.instruction.to_string()),
+            hit_count: hits.get(rule.id).copied().unwrap_or(0),
         });
     }
 
@@ -765,8 +828,10 @@ pub fn list_rules(conn: &Connection) -> rusqlite::Result<Vec<RuleInfo>> {
         let expr: String = r.get(2)?;
         let kind: String = r.get(5)?;
         let nl = kind == "nl";
+        let id: String = r.get(0)?;
         Ok(RuleInfo {
-            id: r.get(0)?,
+            hit_count: hits.get(&id).copied().unwrap_or(0),
+            id,
             title: r.get(1)?,
             description: if nl {
                 format!("AI rule — {expr}")
@@ -1922,6 +1987,161 @@ mod tests {
         assert_eq!(projects[0].file_count, 2);
         assert_eq!(projects[0].issue_count, 11);
         assert_eq!(projects[0].modified.as_deref(), Some("200"));
+    }
+
+    /// The harness columns come from a real scan: the harness pass writes
+    /// `harness_projects` and the artifact inventory, the file pass writes
+    /// `projects`/`files`, and `list_projects` has to join the two.
+    #[test]
+    fn list_projects_carries_the_harness_columns() {
+        use crate::harness::claude_code::test_support::fixture_home;
+        use crate::harness::claude_code::ClaudeCode;
+        use crate::harness::Harness;
+
+        let (_guard, home) = fixture_home();
+        let conn = crate::store::test_conn();
+        let harnesses: Vec<Box<dyn Harness>> = vec![Box::new(ClaudeCode::with_home(home.clone()))];
+        let outcome = crate::harness_scan::run_harness_scan(&conn, &harnesses, 1_785_628_800)
+            .expect("harness scan");
+        crate::scan::run_scan_all(&conn, &outcome.roots, &outcome.extra_files, |_, _| {})
+            .expect("file scan");
+
+        let projects = list_projects(&conn).unwrap();
+        let app_path = home.root.join("work/app").to_string_lossy().into_owned();
+        let app = projects
+            .iter()
+            .find(|p| p.id == app_path)
+            .expect("the scanned project is listed");
+        assert_eq!(app.harness.as_deref(), Some("claude_code"));
+        assert_eq!(app.session_count, 1, "top-level sessions only");
+        assert!(app.last_session_at.is_some());
+        assert!(app.exists);
+        // The `deploy` skill plus the three MCP servers the project declares
+        // (`supabase`, `github`, `linear`) — nothing in the session touched
+        // any of them.
+        assert_eq!(app.never_used_count, 4);
+        assert_eq!(app.error_count, 0);
+    }
+
+    /// A project with no harness row at all is still a project — it just has
+    /// no harness facts, and it exists (the grader read its files).
+    #[test]
+    fn list_projects_defaults_a_project_with_no_harness_row() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a','a','/a','D',52)",
+            [],
+        )
+        .unwrap();
+        let projects = list_projects(&conn).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert!(projects[0].exists);
+        assert_eq!(projects[0].harness, None);
+        assert_eq!(projects[0].session_count, 0);
+        assert_eq!(projects[0].last_session_at, None);
+    }
+
+    /// A directory the harness has seen but that is gone from disk reads as
+    /// missing, so the UI can mark it instead of pretending it is live.
+    #[test]
+    fn list_projects_reports_a_missing_directory() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path, grade, score) VALUES('/gone','gone','/gone','D',52)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO harness_projects(harness, path, exists_on_disk, session_count, last_session_at)
+             VALUES('claude_code', '/gone', 0, 3, '2026-08-01T00:00:00Z')",
+            [],
+        )
+        .unwrap();
+        let p = &list_projects(&conn).unwrap()[0];
+        assert!(!p.exists);
+        assert_eq!(p.harness.as_deref(), Some("claude_code"));
+        assert_eq!(p.session_count, 3);
+        assert_eq!(p.last_session_at.as_deref(), Some("2026-08-01T00:00:00Z"));
+    }
+
+    /// An artifact whose rollup says a quarter of its calls error is a problem
+    /// artifact; one with no rollup at all was never used.
+    #[test]
+    fn list_projects_counts_never_used_and_erroring_artifacts() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path, grade, score) VALUES('/a','a','/a','D',52)",
+            [],
+        )
+        .unwrap();
+        let insert = |kind: &str, name: &str| {
+            conn.execute(
+                "INSERT INTO artifacts(harness, layer, project_path, kind, name, path, hash, seen_at)
+                 VALUES('claude_code', 'project', '/a', ?1, ?2, ?3, 'h', '2026-08-01T00:00:00Z')",
+                params![kind, name, format!("/a/{name}")],
+            )
+            .unwrap();
+            conn.last_insert_rowid()
+        };
+        let noisy = insert("skill", "noisy");
+        let quiet = insert("agent", "quiet");
+        insert("command", "never-run");
+        insert("mcp_server", "never-called");
+        // A rule is not an invocable artifact — it never counts as unused.
+        insert("rule", "CLAUDE.md");
+
+        let roll = |artifact_id: i64, target: &str, error_rate: f64| {
+            conn.execute(
+                "INSERT INTO usage_stats(harness, kind, target, artifact_id, total, sessions,
+                                         error_rate, count_30d, count_prev_30d)
+                 VALUES('claude_code', 'skill', ?1, ?2, 4, 1, ?3, 4, 0)",
+                params![target, artifact_id, error_rate],
+            )
+            .unwrap();
+        };
+        roll(noisy, "noisy", 0.25);
+        roll(quiet, "quiet", 0.0);
+
+        let p = &list_projects(&conn).unwrap()[0];
+        assert_eq!(p.never_used_count, 2, "the command and the mcp server");
+        assert_eq!(p.error_count, 1, "error_rate >= 0.25 is the threshold");
+    }
+
+    /// The rules screen shows how often a rule actually fires — open issues
+    /// only, so dismissing one takes it off the count.
+    #[test]
+    fn list_rules_counts_open_issues_per_rule() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects(id, name, root_path) VALUES('p', 'p', '/tmp')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind) VALUES('f','p','/tmp/f','CLAUDE.md')",
+            [],
+        )
+        .unwrap();
+        for dismissed in [None, Some("2026-08-01T00:00:00Z")] {
+            conn.execute(
+                "INSERT INTO issues(file_id, rule_id, severity, source, title, dismissed_at)
+                 VALUES('f', 'anthropic-clarity', 'mid', 'anthropic', 'Unclear', ?1)",
+                params![dismissed],
+            )
+            .unwrap();
+        }
+        seed_builtin_nl_rules(&conn).unwrap();
+        let rules = list_rules(&conn).unwrap();
+        let clarity = rules.iter().find(|r| r.id == "anthropic-clarity").unwrap();
+        assert_eq!(clarity.hit_count, 1, "the dismissed issue does not count");
+        assert!(rules
+            .iter()
+            .filter(|r| r.id != "anthropic-clarity")
+            .all(|r| r.hit_count == 0));
     }
 
     #[test]

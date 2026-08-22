@@ -862,6 +862,22 @@ pub fn get_usage_overview(
     crate::harness_query::usage_overview(&conn, now, window_days).map_err(|e| e.to_string())
 }
 
+/// One project's usage over the last `window_days`, anchored to the current
+/// clock: what `harness` invoked there, and how often it was worked in.
+#[tauri::command]
+#[specta::specta]
+pub fn get_project_usage(
+    db: tauri::State<'_, AppDb>,
+    harness: String,
+    project_path: String,
+    window_days: u32,
+) -> Result<crate::harness_query::ProjectUsage, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::harness_query::project_usage(&conn, &harness, &project_path, now, window_days)
+        .map_err(|e| e.to_string())
+}
+
 /// Every harness we know of, detected or not.
 #[tauri::command]
 #[specta::specta]

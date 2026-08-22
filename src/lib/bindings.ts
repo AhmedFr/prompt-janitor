@@ -135,6 +135,11 @@ export const commands = {
 	 *  anchored to the current clock.
 	 */
 	getUsageOverview: (windowDays: number) => typedError<UsageOverview, string>(__TAURI_INVOKE("get_usage_overview", { windowDays })),
+	/**
+	 *  One project's usage over the last `window_days`, anchored to the current
+	 *  clock: what `harness` invoked there, and how often it was worked in.
+	 */
+	getProjectUsage: (harness: string, projectPath: string, windowDays: number) => typedError<ProjectUsage, string>(__TAURI_INVOKE("get_project_usage", { harness, projectPath, windowDays })),
 	/**  Every harness we know of, detected or not. */
 	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
 };
@@ -229,6 +234,12 @@ export type ArtifactView = {
 export type CommonIssue = {
 	title: string,
 	files_affected: number,
+};
+
+/**  Top-level sessions started on one calendar day (`YYYY-MM-DD`, UTC). */
+export type DayCount = {
+	day: string,
+	count: number,
 };
 
 /**  An item in the digest's "needs your eyes" list. */
@@ -421,6 +432,26 @@ export type ProjectRow = {
 	logo: string | null,
 	/**  Most recent file mtime in the project (epoch seconds string). */
 	modified: string | null,
+	/**  The harness that has worked here most, when any has. */
+	harness: string | null,
+	/**  Top-level sessions that harness has run here (all time). */
+	session_count: number,
+	last_session_at: string | null,
+	/**
+	 *  Invocable artifacts configured in the project (skill/agent/command/
+	 *  mcp_server) that nothing has ever invoked.
+	 */
+	never_used_count: number,
+	/**
+	 *  Those of them whose rollup says at least a quarter of their calls
+	 *  errored.
+	 */
+	error_count: number,
+	/**
+	 *  False only when a harness has seen the directory and it is gone from
+	 *  disk — a project no harness knows about is assumed to be there.
+	 */
+	exists: boolean,
 };
 
 export type ProjectSessions = {
@@ -439,6 +470,20 @@ export type ProjectSetup = {
 	session_count: number,
 	last_session_at: string | null,
 	artifacts: ArtifactView[],
+};
+
+/**
+ *  What one project's usage tab renders, over the same window as the
+ *  Analytics overview.
+ */
+export type ProjectUsage = {
+	/**
+	 *  Every `(kind, target)` invoked inside the project, busiest first.
+	 *  Sub-agent invocations count — they ran in this project's sessions.
+	 */
+	ranked: RankedTarget[],
+	/**  Top-level sessions per day, oldest day first — the activity sparkline. */
+	sessions_per_day: DayCount[],
 };
 
 /**
@@ -476,6 +521,11 @@ export type RuleInfo = {
 	nl: boolean,
 	/**  The forbidden substring (pattern rules) or the instruction (NL rules). */
 	pattern: string | null,
+	/**
+	 *  Open issues this rule is currently responsible for — dismissed ones
+	 *  stop counting, so silencing a finding silences the number too.
+	 */
+	hit_count: number,
 };
 
 /**  Summary of a completed scan, returned to the frontend. */

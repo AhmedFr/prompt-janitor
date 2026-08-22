@@ -37,6 +37,8 @@ export type {
   UsageStat,
   EffectiveRule,
   UsageOverview,
+  ProjectUsage,
+  DayCount,
   RankedTarget,
   KindTotal,
   ProjectSessions,
