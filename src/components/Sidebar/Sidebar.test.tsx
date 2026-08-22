@@ -41,7 +41,23 @@ describe("Sidebar", () => {
     expect(getByRole("button", { name: /Prompts.*42/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /Rules.*27/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
-    expect(getByText("Projects")).toBeInTheDocument();
+    // Qualified by class: "Projects" is now both a nav destination and the
+    // heading of the recents list underneath it.
+    expect(getByText("Projects", { selector: ".sidebar__section-label" })).toBeInTheDocument();
+  });
+
+  it("lists Projects as a destination of its own, right after Setup", () => {
+    const { getAllByRole } = render(<Sidebar active="overview" onNavigate={() => {}} />);
+    const labels = getAllByRole("button").map((b) => b.textContent);
+    expect(labels).toContain("Projects");
+    expect(labels.indexOf("Projects")).toBe(labels.indexOf("Setup") + 1);
+  });
+
+  it("routes the Projects nav item to the projects table", () => {
+    const onNavigate = vi.fn();
+    const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
+    getByRole("button", { name: "Projects" }).click();
+    expect(onNavigate).toHaveBeenCalledWith("projects");
   });
 
   it("routes a project click to Prompts with the project id", () => {

@@ -1,0 +1,34 @@
+/* Nine columns need the width; the default page caps at 920px. */
+.projects-page {
+  max-width: 1180px;
+}
+
+.projects-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.projects-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/*
+ * A folder the harness remembers and the disk has lost: the one row state on
+ * this table that is a problem rather than a measurement, so it is the only
+ * one that takes the error tone — the same opaque, contrast-measured pair
+ * `UsageBadge` uses (see `tokens.css`).
+ */
+.projects-chip--missing {
+  border-color: transparent;
+  color: var(--tone-error-fg);
+  background: var(--tone-error-tint);
+}
