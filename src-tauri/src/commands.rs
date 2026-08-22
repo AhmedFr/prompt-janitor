@@ -321,11 +321,25 @@ pub fn set_ai_config(
     model: String,
 ) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::set_setting(&conn, "ai_provider", &provider).map_err(|e| e.to_string())?;
-    if !api_key.is_empty() {
-        query::set_setting(&conn, "ai_key", &api_key).map_err(|e| e.to_string())?;
+    set_ai_config_with_conn(&conn, &provider, &api_key, &model)
+}
+
+/// The body of [`set_ai_config`], taking a `&Connection` directly rather than
+/// a Tauri `State` so it can be exercised in tests.
+fn set_ai_config_with_conn(
+    conn: &rusqlite::Connection,
+    provider: &str,
+    api_key: &str,
+    model: &str,
+) -> Result<(), String> {
+    if provider != "none" && !crate::ai::provider::provider_ids().contains(&provider) {
+        return Err(format!("Unknown AI provider: {provider}"));
     }
-    query::set_setting(&conn, "ai_model", &model).map_err(|e| e.to_string())?;
+    query::set_setting(conn, "ai_provider", provider).map_err(|e| e.to_string())?;
+    if !api_key.is_empty() {
+        query::set_setting(conn, "ai_key", api_key).map_err(|e| e.to_string())?;
+    }
+    query::set_setting(conn, "ai_model", model).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -366,10 +380,12 @@ fn entitlement_of(conn: &rusqlite::Connection) -> crate::license::Entitlement {
             email: Some(info.email),
             plan: Some(info.plan),
         },
+        // Monetisation is paused: every feature is open. A stored key still
+        // surfaces its email/plan so nothing is lost when gates return.
         None => crate::license::Entitlement {
-            paid: false,
+            paid: true,
             email: None,
-            plan: None,
+            plan: Some("open".to_string()),
         },
     }
 }
@@ -667,7 +683,10 @@ mod tests {
     }
 
     #[test]
-    fn apply_fix_is_paid_gated_for_a_free_user() {
+    fn apply_fix_is_not_paid_gated_for_a_free_user() {
+        // Monetisation is paused: a free/unentitled user is never turned away
+        // by the paid gate. This DB row points at a file that doesn't exist
+        // on disk, so the call still fails — just not with PAID_GATE.
         let conn = free_conn();
         conn.execute(
             "INSERT INTO projects(id, name, root_path) VALUES('p', 'P', '/p')",
@@ -686,6 +705,34 @@ mod tests {
         }];
         let result = apply_fix_with_conn(&conn, "f", &edits, false, "manual");
 
-        assert_eq!(result.unwrap_err(), PAID_GATE);
+        assert!(result.unwrap_err().contains("Couldn't read the file"));
+    }
+
+    #[test]
+    fn set_ai_config_rejects_an_unknown_provider() {
+        let conn = free_conn();
+        let result = set_ai_config_with_conn(&conn, "not-a-real-provider", "", "");
+        assert_eq!(
+            result.unwrap_err(),
+            "Unknown AI provider: not-a-real-provider"
+        );
+    }
+
+    #[test]
+    fn set_ai_config_allows_none_and_registered_providers() {
+        let conn = free_conn();
+        assert!(set_ai_config_with_conn(&conn, "none", "", "").is_ok());
+        for id in crate::ai::provider::provider_ids() {
+            assert!(set_ai_config_with_conn(&conn, id, "", "").is_ok());
+        }
+    }
+
+    #[test]
+    fn entitlement_is_open_without_a_license() {
+        let conn = free_conn();
+        let ent = entitlement_of(&conn);
+        assert!(ent.paid);
+        assert_eq!(ent.plan.as_deref(), Some("open"));
+        assert!(ent.email.is_none());
     }
 }

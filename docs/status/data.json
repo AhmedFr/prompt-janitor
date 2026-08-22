@@ -40,11 +40,11 @@
     },
     {
       "name": "Phase 4",
-      "title": "AI fix engine (paid)",
+      "title": "AI fix engine (paid) (gates open while monetisation is paused, 2026-08)",
       "done": 5,
       "total": 5,
       "state": "done",
-      "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate"
+      "note": "Provider abstraction, AI rewrite, apply / undo / git branch, NL rules, license gate (gates open while monetisation is paused, 2026-08)"
     },
     {
       "name": "Phase 5",
@@ -98,8 +98,8 @@
         "kind": "external"
       },
       {
-        "title": "Set the Pro price & pick a payment provider",
-        "detail": "Landing shows 'One-time license' with no number. Pick a price, set up Gumroad / Lemon Squeezy / Polar, and decide license delivery: manually mint per sale with license-tool (fine at first), or automate via webhook later. Then update the landing pricing section.",
+        "title": "Deferred: set the Pro price & pick a payment provider",
+        "detail": "Monetisation is paused (2026-08) — all gates are open, no purchase flow needed for now. When it resumes: pick a price, set up Gumroad / Lemon Squeezy / Polar, decide license delivery (manual mint via license-tool, or webhook automation), then update the landing pricing section.",
         "kind": "vision"
       },
       {
@@ -173,7 +173,7 @@
       "status": "shipped"
     },
     {
-      "name": "AI provider config — BYO key (Anthropic / OpenAI)",
+      "name": "AI provider config — BYO key (Anthropic / OpenAI / OpenRouter)",
       "tier": "pro",
       "status": "shipped"
     },
@@ -195,7 +195,8 @@
     {
       "name": "Offline Ed25519 license gate",
       "tier": "pro",
-      "status": "shipped"
+      "status": "shipped",
+      "note": "Gates open while monetisation is paused (2026-08) — every feature is unlocked regardless of license"
     },
     {
       "name": "License vendor CLI (keygen / mint / verify)",
@@ -237,11 +238,11 @@
     },
     {
       "name": "Vitest",
-      "result": "5/5 passing"
+      "result": "110/110 passing (22 files)"
     },
     {
       "name": "cargo test",
-      "result": "166/166 passing"
+      "result": "173/173 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -270,6 +271,7 @@
     }
   ],
   "recent": [
+    "2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)",
     "2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused",
     "2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)",
     "2026-06-11 — Found & fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)",

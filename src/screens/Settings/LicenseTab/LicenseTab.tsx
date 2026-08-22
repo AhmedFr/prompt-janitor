@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import { openExternal } from "@/lib/open-external";
-import { POLAR_CHECKOUT_URL, GET_LICENSE_LABEL } from "@/lib/monetization";
 import type { LicenseTabProps } from "./LicenseTab.types";
 
 const fieldStyle = { display: "block", marginTop: 12 } as const;
@@ -15,7 +13,11 @@ export function LicenseTab({ entitlement, onActivate, onRemove }: LicenseTabProp
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  const paid = entitlement?.paid ?? false;
+  // `paid` alone is not enough: while monetisation gates are open the core
+  // reports `paid: true` for everyone so nothing is turned away, and signals
+  // that with `plan: "open"`. Only a real license (a non-"open" plan) counts
+  // as licensed for the purposes of this tab.
+  const licensed = entitlement?.paid === true && entitlement.plan !== "open";
 
   const activate = async () => {
     if (!key.trim()) return;
@@ -44,16 +46,16 @@ export function LicenseTab({ entitlement, onActivate, onRemove }: LicenseTabProp
             className="chip on"
             style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
           >
-            <Icon name={paid ? "check" : "sparkles"} size={13} /> {paid ? "Pro" : "Free"}
+            <Icon name={licensed ? "check" : "sparkles"} size={13} /> {licensed ? "Pro" : "Open"}
           </span>
           <span className="faint" style={{ fontSize: 13 }}>
-            {paid
+            {licensed
               ? `Paid features unlocked${entitlement?.email ? ` · ${entitlement.email}` : ""}`
-              : "Auto-fix, AI rewrites & natural-language rules are locked."}
+              : "No license required — every feature is unlocked while gates are open."}
           </span>
         </div>
 
-        {paid ? (
+        {licensed ? (
           <div className="row" style={{ gap: 8, marginTop: 16 }}>
             <Button size="sm" onClick={() => void remove()} disabled={busy}>
               <Icon name="x" /> Remove license
@@ -66,15 +68,9 @@ export function LicenseTab({ entitlement, onActivate, onRemove }: LicenseTabProp
           </div>
         ) : (
           <>
-            <div style={{ marginTop: 16 }}>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
-              >
-                <Icon name="sparkles" /> {GET_LICENSE_LABEL}
-              </Button>
-            </div>
+            <p className="faint" style={{ fontSize: 13, marginTop: 16 }}>
+              All features are currently open — no license needed.
+            </p>
             <label style={fieldStyle}>
               <span style={labelStyle}>License key</span>
               <input

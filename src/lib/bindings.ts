@@ -128,7 +128,7 @@ export const commands = {
 /* Types */
 /**  Public view of the AI config (no secret key). */
 export type AiConfig = {
-	/**  "anthropic", "openai", or "none". */
+	/**  A provider id from `provider::provider_ids()`, or "none". */
 	provider: string,
 	model: string,
 	/**  Whether an API key is stored. */

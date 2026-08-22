@@ -3,17 +3,9 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import type { AiTabProps } from "./AiTab.types";
+import { PROVIDERS, DEFAULT_MODELS } from "./AiTab.constants";
 
-const PROVIDERS: [string, string][] = [
-  ["none", "Off"],
-  ["anthropic", "Anthropic"],
-  ["openai", "OpenAI"],
-];
-
-const DEFAULT_MODEL: Record<string, string> = {
-  anthropic: "claude-sonnet-4-6",
-  openai: "gpt-4o-mini",
-};
+const PROVIDER_OPTIONS: [string, string][] = [["none", "Off"], ...PROVIDERS];
 
 const fieldStyle = { display: "block", marginTop: 12 } as const;
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 500, marginBottom: 6 } as const;
@@ -59,6 +51,17 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
 
   const off = provider === "none";
 
+  // Model ids are provider-specific (e.g. "claude-sonnet-4-6" vs.
+  // "anthropic/claude-sonnet-4.6" on OpenRouter). If the field still holds
+  // the outgoing provider's default, carry the switch forward to the new
+  // provider's default too; a model the user typed themselves is left alone.
+  const switchProvider = (key: string) => {
+    if (model === DEFAULT_MODELS[provider]) {
+      setModel(DEFAULT_MODELS[key] ?? "");
+    }
+    setProvider(key);
+  };
+
   return (
     <>
       <h2 className="set-sec">AI provider</h2>
@@ -69,11 +72,11 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
         </p>
 
         <div className="seg" style={{ marginBottom: 4 }}>
-          {PROVIDERS.map(([key, label]) => (
+          {PROVIDER_OPTIONS.map(([key, label]) => (
             <button
               key={key}
               className={provider === key ? "on" : ""}
-              onClick={() => setProvider(key)}
+              onClick={() => switchProvider(key)}
             >
               {label}
             </button>
@@ -90,14 +93,24 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
                 value={apiKey}
                 placeholder={hasKey ? "•••••••• stored — leave blank to keep" : "Paste your API key"}
                 onChange={(e) => setApiKey(e.target.value)}
+                aria-describedby={provider === "openrouter" ? "ai-openrouter-hint" : undefined}
               />
             </label>
+            {provider === "openrouter" && (
+              <span
+                id="ai-openrouter-hint"
+                className="faint"
+                style={{ fontSize: 12, marginTop: 4, display: "block" }}
+              >
+                Keys at openrouter.ai/keys — model ids look like vendor/model.
+              </span>
+            )}
             <label style={fieldStyle}>
               <span style={labelStyle}>Model</span>
               <input
                 className="input"
                 value={model}
-                placeholder={DEFAULT_MODEL[provider] ?? ""}
+                placeholder={DEFAULT_MODELS[provider] ?? ""}
                 onChange={(e) => setModel(e.target.value)}
               />
             </label>
