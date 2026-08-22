@@ -39,19 +39,21 @@ const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   ...o,
 });
 
+/** A plugin's own rules: they ship with the plugin, so they load everywhere. */
+const pluginRung = rule({
+  layer: "plugin",
+  path: "/Users/ada/.claude/plugins/posthog/CLAUDE.md",
+  name: "posthog plugin",
+  grade: null,
+  file_id: null,
+});
+
 const projectStack: MergePositionData = {
   layer: "project",
   project: { name: "prompt-janitor", path: "/Users/ada/code/prompt-janitor" },
   filePath: "/Users/ada/code/prompt-janitor/CLAUDE.md",
   effective: [
     rule(),
-    rule({
-      layer: "plugin",
-      path: "/Users/ada/.claude/plugins/posthog/CLAUDE.md",
-      name: "posthog plugin",
-      grade: null,
-      file_id: null,
-    }),
     rule({
       layer: "project",
       path: "/Users/ada/code/prompt-janitor/CLAUDE.md",
@@ -60,6 +62,7 @@ const projectStack: MergePositionData = {
       file_id: "f-repo",
     }),
   ],
+  inStack: true,
   referenced: [
     artifact(),
     artifact({
@@ -116,7 +119,46 @@ export const GlobalFile: Story = {
       layer: "global",
       project: null,
       filePath: "/Users/ada/.claude/CLAUDE.md",
+      effective: [rule(), pluginRung],
     },
+    now,
+  },
+};
+
+/**
+ * A rule file below a project root: it never joins the merged stack, so the
+ * panel names the folder it does govern and labels the stack as the project's.
+ */
+export const BelowTheRoot: Story = {
+  args: {
+    state: {
+      ...projectStack,
+      filePath: "/Users/ada/code/prompt-janitor/src-tauri/CLAUDE.md",
+      inStack: false,
+    },
+    now,
+  },
+};
+
+/** A file no harness has ever indexed — there is no stack to place it in. */
+export const UnknownFolder: Story = {
+  args: {
+    state: {
+      ...projectStack,
+      project: null,
+      filePath: "/Users/ada/notes/CLAUDE.md",
+      effective: [],
+      inStack: false,
+      referenced: [],
+    },
+    now,
+  },
+};
+
+/** The project was found but its stack could not be read. */
+export const StackUnreadable: Story = {
+  args: {
+    state: { ...projectStack, effective: "error", inStack: false },
     now,
   },
 };
@@ -124,7 +166,7 @@ export const GlobalFile: Story = {
 /** Nothing named, nothing stacked — both empty states say what is absent. */
 export const NothingToShow: Story = {
   args: {
-    state: { ...projectStack, effective: [], referenced: [] },
+    state: { ...projectStack, effective: [], inStack: false, referenced: [] },
     now,
   },
 };

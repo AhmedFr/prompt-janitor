@@ -79,7 +79,9 @@ function useMergePosition(detail: FileDetail | null): MergePositionState {
   // A failed lookup is not an empty setup: reporting `null` here would leave the
   // panel spinning forever, and `[]` would claim nothing applies to the file.
   const [failed, setFailed] = useState(false);
-  const [effective, setEffective] = useState<EffectiveRule[] | null>(null);
+  // `"error"` is a third answer, distinct from "not loaded yet" and "empty":
+  // the panel must say it could not look rather than that nothing applies.
+  const [effective, setEffective] = useState<EffectiveRule[] | "error" | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -122,9 +124,9 @@ function useMergePosition(detail: FileDetail | null): MergePositionState {
         if (!active) return;
         // The stack is one section of the panel; losing it is not worth
         // discarding the file's layer and its referenced artifacts too.
-        setEffective(res.status === "ok" ? res.data : []);
+        setEffective(res.status === "ok" ? res.data : "error");
       } catch {
-        if (active) setEffective([]);
+        if (active) setEffective("error");
       }
     }
     void loadRules();
@@ -140,11 +142,16 @@ function useMergePosition(detail: FileDetail | null): MergePositionState {
     // A global rule file has no project stack to ask for, so it never waits on
     // one; a project file holds the panel back until its stack has arrived.
     if (layer === "project" && project && effective === null) return null;
+    const stack =
+      layer === "global" ? globalRuleStack(detail.path, setup.global) : (effective ?? []);
     return {
       layer,
       project: project ? { name: project.name, path: project.path } : null,
       filePath: detail.path,
-      effective: layer === "global" ? globalRuleStack(detail.path, setup.global) : (effective ?? []),
+      effective: stack,
+      // A file the merged stack never names is read only inside its own folder,
+      // whatever layer it nominally belongs to.
+      inStack: stack !== "error" && stack.some((rule) => rule.path === detail.path),
       referenced: referencedArtifacts(
         detail.content,
         referenceCandidates(setup.global, project, detail.path),

@@ -137,7 +137,8 @@ export function relativeSession(iso: string | null, now: Date = new Date()): str
   return `${Math.floor(days / MONTH_DAYS)}mo ago`;
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** "1 project" / "3 projects" — the count and its noun, agreed in number. */
+export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** The one-line summary chip for a detected harness. */
 export function harnessSummary(harness: HarnessInfo): string {

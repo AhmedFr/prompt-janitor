@@ -81,14 +81,14 @@
         "kind": "testing"
       },
       {
-        "title": "Decide phase 2 scope: evidence-backed findings + diff apply",
-        "detail": "With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. 'unused skill', 'MCP server never called') and/or let fixes be diff-applied directly from the Setup screen.",
-        "kind": "vision"
-      },
-      {
         "title": "Decide: public repo or external hosting for downloads",
         "detail": "The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.",
         "kind": "vision"
+      },
+      {
+        "title": "Mint the production license keypair",
+        "detail": "After merging PR #69: cd src-tauri && cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The current embedded key's private seed was discarded after minting your own dev pro key, so no customer keys can be minted today — and re-keygening invalidates that dev key (mint yourself a fresh one). Only you should ever hold this key.",
+        "kind": "external"
       },
       {
         "title": "Manual QA on your Mac (I run headless — cannot do this)",
@@ -124,6 +124,11 @@
       }
     ],
     "decisions": [
+      {
+        "title": "Decide phase 2 scope: evidence-backed findings + diff apply",
+        "detail": "With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. 'unused skill', 'MCP server never called') and/or let fixes be diff-applied directly from the Setup screen.",
+        "kind": "vision"
+      },
       {
         "title": "Version number for launch",
         "detail": "Ship as v0.1.0 (honest early-access) or v1.0.0 (marketing-friendly)? The bump script handles either.",
@@ -311,6 +316,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses",
     "2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs",
     "2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)",
     "2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve",

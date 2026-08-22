@@ -41,7 +41,9 @@ const isTab = (value: string | undefined): value is Tab =>
 
 export function Settings({ navigate, initialTab }: SettingsProps) {
   const s = useSettings();
-  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "schedule");
+  // Default to the first tab in the strip: a screen that opens on its second
+  // tab reads as a lost selection rather than a starting point.
+  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "harnesses");
 
   // Follow later in-app deep links (e.g. Overview → Settings → AI) even if
   // the screen happens to stay mounted.

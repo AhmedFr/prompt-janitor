@@ -3,7 +3,7 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import type { HarnessInfo } from "@/lib/ipc";
 import { scanPercent, scanStatusLine } from "@/lib/useScanProgress";
-import { harnessSummary } from "@/screens/Setup/setup.util";
+import { plural } from "@/screens/Setup/setup.util";
 import { useHarnessTab } from "./useHarnessTab";
 import type { HarnessTabBodyProps } from "./HarnessTab.types";
 
@@ -27,10 +27,14 @@ function lastScanned(iso: string | null, now: Date = new Date()): string | null 
   return `${Math.floor(ms / DAY_MS)}d ago`;
 }
 
-/** The one-line row label: reuses `harnessSummary`'s counts, not a second formatter. */
+/** The one-line row label: the harness, whether it was found, and its counts. */
 function harnessLabel(h: HarnessInfo): string {
   if (!h.detected) return `${h.display_name} — not detected`;
-  return harnessSummary(h).replace(`${h.display_name} · `, `${h.display_name} — detected · `);
+  return [
+    `${h.display_name} — detected`,
+    plural(h.project_count, "project"),
+    plural(h.session_count, "session"),
+  ].join(" · ");
 }
 
 /** Settings → Harnesses: what's registered, and the extra folders scanned alongside them. */
@@ -125,7 +129,12 @@ export function HarnessTabBody({
                 <Icon name="folder" size={18} />
               </span>
               <span className="path grow">{f}</span>
-              <Button size="sm" disabled={scanning} onClick={() => void removeFolder(f)}>
+              <Button
+                size="sm"
+                disabled={scanning}
+                aria-label={`Remove ${f}`}
+                onClick={() => void removeFolder(f)}
+              >
                 Remove
               </Button>
             </div>

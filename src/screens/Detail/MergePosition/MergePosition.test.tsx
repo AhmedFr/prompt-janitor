@@ -46,6 +46,7 @@ const data = (o: Partial<MergePositionData> = {}): MergePositionData => ({
   project: { name: "repo", path: "/repo" },
   filePath: "/repo/CLAUDE.md",
   effective: [rule(), rule({ layer: "project", path: "/repo/CLAUDE.md", name: "repo CLAUDE.md", file_id: "f1" })],
+  inStack: true,
   referenced: [artifact()],
   ...o,
 });
@@ -61,7 +62,12 @@ describe("MergePosition", () => {
   it("says a global file loads everywhere", () => {
     render(
       <MergePosition
-        state={data({ layer: "global", project: null, filePath: "/home/u/.claude/CLAUDE.md" })}
+        state={data({
+          layer: "global",
+          project: null,
+          filePath: "/home/u/.claude/CLAUDE.md",
+          effective: [rule()],
+        })}
         now={NOW}
       />,
     );
@@ -96,13 +102,50 @@ describe("MergePosition", () => {
   it("names what is missing when the file references nothing", () => {
     render(<MergePosition state={data({ referenced: [] })} now={NOW} />);
     expect(
-      screen.getByText("No skills, agents or MCP servers referenced by name"),
+      screen.getByText("No skills, agents, commands, MCP servers or plugins referenced by name"),
     ).toBeInTheDocument();
   });
 
   it("says so when no rule file applies", () => {
-    render(<MergePosition state={data({ effective: [] })} now={NOW} />);
+    render(<MergePosition state={data({ effective: [], inStack: false })} now={NOW} />);
     expect(screen.getByText("No rule files apply here.")).toBeInTheDocument();
+  });
+
+  it("says the folder is unknown to every harness rather than inventing a stack", () => {
+    render(
+      <MergePosition
+        state={data({ project: null, filePath: "/notes/CLAUDE.md", effective: [], inStack: false })}
+        now={NOW}
+      />,
+    );
+    expect(
+      screen.getByText("This folder hasn't been seen by an agent harness"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Load order")).not.toBeInTheDocument();
+    expect(screen.queryByText("Project's root stack")).not.toBeInTheDocument();
+  });
+
+  it("says a file outside the merged stack is only read in its own folder", () => {
+    render(
+      <MergePosition state={data({ filePath: "/repo/docs/notes.md", inStack: false })} now={NOW} />,
+    );
+    expect(
+      screen.getByText(
+        "Not part of repo's merged rule stack — read only when working in /repo/docs",
+      ),
+    ).toBeInTheDocument();
+    // The root stack is still worth showing — it is what *does* load there —
+    // but it must not be labelled as this file's load order.
+    expect(screen.getByText("Project's root stack")).toBeInTheDocument();
+    expect(screen.queryByText("Load order")).not.toBeInTheDocument();
+    expect(screen.getByText("global CLAUDE.md")).toBeInTheDocument();
+    expect(screen.queryByText("this file")).not.toBeInTheDocument();
+  });
+
+  it("admits the rule stack could not be read instead of claiming none applies", () => {
+    render(<MergePosition state={data({ effective: "error", inStack: false })} now={NOW} />);
+    expect(screen.getByText("Couldn't read the rule stack")).toBeInTheDocument();
+    expect(screen.queryByText("No rule files apply here.")).not.toBeInTheDocument();
   });
 
   it("degrades to one muted line when the setup could not be read", () => {

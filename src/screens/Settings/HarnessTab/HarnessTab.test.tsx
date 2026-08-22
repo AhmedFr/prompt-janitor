@@ -92,10 +92,22 @@ describe("HarnessTab extra folders", () => {
     expect(await screen.findByText("/code/scratch")).toBeInTheDocument();
 
     getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove /code/scratch" }));
 
     await waitFor(() => expect(setExtraScanFolders).toHaveBeenCalledWith([]));
     await waitFor(() => expect(scanNow).toHaveBeenCalled());
+  });
+
+  it("names each Remove button after its own folder", async () => {
+    getExtraScanFolders.mockResolvedValue({ status: "ok", data: ["/code/scratch", "/code/spikes"] });
+    render(<HarnessTab />);
+    await screen.findByText("/code/spikes");
+
+    // Two identically-labelled "Remove" buttons are indistinguishable to a
+    // screen reader; each must say which folder it drops.
+    fireEvent.click(screen.getByRole("button", { name: "Remove /code/spikes" }));
+
+    await waitFor(() => expect(setExtraScanFolders).toHaveBeenCalledWith(["/code/scratch"]));
   });
 
   it("shows an empty-state message when there are no extra folders", async () => {

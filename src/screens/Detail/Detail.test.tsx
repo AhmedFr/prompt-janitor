@@ -209,8 +209,19 @@ describe("Detail merge position", () => {
     render(<Detail fileId="f1" navigate={() => {}} />);
 
     expect(
-      await screen.findByText("No skills, agents or MCP servers referenced by name"),
+      await screen.findByText("No skills, agents, commands, MCP servers or plugins referenced by name"),
     ).toBeInTheDocument();
+  });
+
+  it("admits the rule stack is unreadable rather than claiming nothing applies", async () => {
+    setup(true);
+    getEffectiveRules.mockResolvedValue({ status: "error", error: "no db" });
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("Couldn't read the rule stack")).toBeInTheDocument();
+    expect(screen.queryByText("No rule files apply here.")).not.toBeInTheDocument();
+    // The rest of the panel — the file's layer and what it names — still stands.
+    expect(screen.getByText("Project rules — loaded after global")).toBeInTheDocument();
   });
 
   it("shows one muted line and keeps the rest of Detail when setup is unreadable", async () => {

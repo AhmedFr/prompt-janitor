@@ -20,8 +20,17 @@ export interface MergePositionData {
   project: MergeProject | null;
   /** The viewed file's own path, so its row in the stack can say "this file". */
   filePath: string;
-  /** Every rule file that applies here, in load order. */
-  effective: EffectiveRule[];
+  /**
+   * Every rule file that applies here, in load order — or `"error"` when the
+   * stack could not be read. `[]` is the different claim "nothing applies".
+   */
+  effective: EffectiveRule[] | "error";
+  /**
+   * Whether the viewed file is itself one of the rungs above. A rule file below
+   * a project root never joins the merged stack: it is read only while the
+   * agent works in its own subtree.
+   */
+  inStack: boolean;
   /** Artifacts this file names in its text, with their usage evidence. */
   referenced: ArtifactView[];
 }
