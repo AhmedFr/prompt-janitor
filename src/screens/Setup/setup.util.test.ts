@@ -1,16 +1,18 @@
 import { describe, it, expect } from "vitest";
-import type { ArtifactKind, ArtifactView, ProjectSetup, UsageStat } from "@/lib/ipc";
+import type { ArtifactView, ProjectSetup, UsageStat } from "@/lib/ipc";
 import {
+  allArtifacts,
   applyFilter,
   costThreshold,
   filterCounts,
-  groupByKind,
   harnessSummary,
-  kindHeading,
+  lastScanAt,
   matchProject,
-  projectMatchCount,
+  pluginBundleCounts,
   projectNameFor,
+  projectNameMap,
   relativeSession,
+  rowsByKind,
   sessionLabel,
   sortProjects,
   topRuleGrade,
@@ -53,27 +55,6 @@ const project = (o: Partial<ProjectSetup> = {}): ProjectSetup => ({
   last_session_at: null,
   artifacts: [],
   ...o,
-});
-
-describe("groupByKind", () => {
-  it("groups in canonical kind order and omits empty kinds", () => {
-    const items = [
-      artifact({ id: 1, kind: "settings", name: "settings.json" }),
-      artifact({ id: 2, kind: "skill", name: "debugging" }),
-      artifact({ id: 3, kind: "rule", name: "no-console" }),
-      artifact({ id: 4, kind: "skill", name: "planning" }),
-    ];
-
-    const groups = groupByKind(items);
-
-    expect(groups.map((g) => g.kind)).toEqual<ArtifactKind[]>(["rule", "skill", "settings"]);
-    expect(groups[1].items.map((a) => a.name)).toEqual(["debugging", "planning"]);
-    expect(groups.some((g) => g.items.length === 0)).toBe(false);
-  });
-
-  it("returns nothing for an empty list", () => {
-    expect(groupByKind([])).toEqual([]);
-  });
 });
 
 describe("applyFilter", () => {
@@ -150,31 +131,6 @@ describe("costThreshold", () => {
   });
 });
 
-describe("projectMatchCount", () => {
-  const p = project({
-    artifacts: [
-      artifact({ id: 1, name: "never", usage: null }),
-      artifact({ id: 2, name: "errors", usage: usage({ error_rate: 0.4, avg_turn_tokens: 400 }) }),
-      artifact({ id: 3, name: "pricey", usage: usage({ avg_turn_tokens: 4000 }) }),
-    ],
-  });
-
-  it("counts everything for `all`", () => {
-    expect(projectMatchCount(p, "all", 1000)).toBe(3);
-  });
-
-  it("counts only the artifacts the filter keeps", () => {
-    expect(projectMatchCount(p, "never", 1000)).toBe(1);
-    expect(projectMatchCount(p, "errors", 1000)).toBe(1);
-    expect(projectMatchCount(p, "cost", 1000)).toBe(1);
-  });
-
-  it("is zero for a project with nothing in the slice, so the row can be pruned", () => {
-    expect(projectMatchCount(project(), "never", 1000)).toBe(0);
-    expect(projectMatchCount(p, "cost", null)).toBe(0);
-  });
-});
-
 describe("filterCounts", () => {
   it("counts every chip's slice over the artifacts it is handed", () => {
     const all = [
@@ -216,14 +172,6 @@ describe("topRuleGrade", () => {
   it("is null when the project has no graded rule", () => {
     expect(topRuleGrade(project({ artifacts: [artifact({ kind: "skill", grade: "A" })] }))).toBeNull();
     expect(topRuleGrade(project())).toBeNull();
-  });
-});
-
-describe("kindHeading", () => {
-  it("pluralises the kind label, leaving already-plural labels alone", () => {
-    expect(kindHeading("rule")).toBe("Rules");
-    expect(kindHeading("mcp_server")).toBe("MCP Servers");
-    expect(kindHeading("settings")).toBe("Settings");
   });
 });
 
@@ -340,5 +288,95 @@ describe("projectNameFor", () => {
 
   it("is null outside every known project", () => {
     expect(projectNameFor("/Users/ada/.claude/rules/web.md", projectNames)).toBeNull();
+  });
+});
+
+describe("allArtifacts", () => {
+  it("flattens the global layer and every project into one list", () => {
+    const view = {
+      harnesses: [],
+      global: [artifact({ id: 1 }), artifact({ id: 2 })],
+      projects: [
+        project({ artifacts: [artifact({ id: 3, layer: "project" })] }),
+        project({ artifacts: [] }),
+      ],
+    };
+    expect(allArtifacts(view).map((a) => a.id)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("rowsByKind", () => {
+  it("buckets by kind, keeping input order inside a bucket", () => {
+    const rows = rowsByKind([
+      artifact({ id: 1, kind: "skill", name: "a" }),
+      artifact({ id: 2, kind: "rule", name: "b" }),
+      artifact({ id: 3, kind: "skill", name: "c" }),
+    ]);
+    expect(rows.get("skill")?.map((a) => a.name)).toEqual(["a", "c"]);
+    expect(rows.get("rule")?.map((a) => a.name)).toEqual(["b"]);
+  });
+
+  it("gives every kind an entry, so an empty tab still counts zero", () => {
+    const rows = rowsByKind([]);
+    expect(rows.get("agent")).toEqual([]);
+    expect(rows.get("plugin")).toEqual([]);
+  });
+});
+
+describe("projectNameMap", () => {
+  it("maps each project's root path to its display name", () => {
+    const map = projectNameMap([
+      project({ path: "/code/web", name: "web" }),
+      project({ path: "/code/api", name: "api" }),
+    ]);
+    expect([...map]).toEqual([
+      ["/code/web", "web"],
+      ["/code/api", "api"],
+    ]);
+  });
+});
+
+describe("pluginBundleCounts", () => {
+  it("counts what each plugin bundled, never the plugin's own manifest row", () => {
+    const counts = pluginBundleCounts([
+      artifact({ id: 1, kind: "plugin", layer: "plugin", name: "sp", plugin_name: "sp" }),
+      artifact({ id: 2, kind: "skill", layer: "plugin", name: "brainstorm", plugin_name: "sp" }),
+      artifact({ id: 3, kind: "agent", layer: "plugin", name: "reviewer", plugin_name: "sp" }),
+      artifact({ id: 4, kind: "skill", layer: "global", name: "adapt" }),
+    ]);
+    expect(counts.get("sp")).toBe(2);
+  });
+
+  it("ignores an artifact that names a plugin without being installed by one", () => {
+    const counts = pluginBundleCounts([
+      artifact({ id: 1, kind: "skill", layer: "project", name: "copy", plugin_name: "sp" }),
+    ]);
+    expect(counts.get("sp")).toBeUndefined();
+  });
+});
+
+describe("lastScanAt", () => {
+  const harness = (id: string, last_scan_at: string | null) => ({
+    id,
+    display_name: id,
+    detected: true,
+    last_scan_at,
+    project_count: 0,
+    session_count: 0,
+  });
+
+  it("takes the most recent scan across harnesses", () => {
+    expect(
+      lastScanAt([
+        harness("a", "2026-08-19T08:00:00.000Z"),
+        harness("b", "2026-08-20T09:00:00.000Z"),
+        harness("c", null),
+      ]),
+    ).toBe("2026-08-20T09:00:00.000Z");
+  });
+
+  it("is null when nothing has been scanned", () => {
+    expect(lastScanAt([harness("a", null)])).toBeNull();
+    expect(lastScanAt([])).toBeNull();
   });
 });
