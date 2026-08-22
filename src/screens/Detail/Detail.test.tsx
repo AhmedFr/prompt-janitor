@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import type { FileDetail } from "@/lib/ipc";
+import type { ArtifactView, FileDetail, SetupView } from "@/lib/ipc";
 import { Detail } from "./Detail";
 
 const openExternal = vi.hoisted(() => vi.fn());
@@ -12,6 +12,8 @@ const getEntitlement = vi.hoisted(() => vi.fn());
 const hasBackup = vi.hoisted(() => vi.fn());
 const applyFix = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
+const getSetup = vi.hoisted(() => vi.fn());
+const getEffectiveRules = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
@@ -25,6 +27,8 @@ vi.mock("@/lib/ipc", async () => {
       hasBackup,
       applyFix,
       scanNow,
+      getSetup,
+      getEffectiveRules,
     },
   };
 });
@@ -58,12 +62,52 @@ const detail: FileDetail = {
   ],
 };
 
+const skill: ArtifactView = {
+  id: 1,
+  harness: "claude_code",
+  layer: "global",
+  kind: "skill",
+  name: "adapt",
+  path: "/home/u/.claude/skills/adapt/SKILL.md",
+  plugin_name: null,
+  description: null,
+  bytes: 120,
+  grade: "A",
+  score: 91,
+  file_id: null,
+  usage: null,
+};
+
+const setupView: SetupView = {
+  harnesses: [],
+  global: [skill],
+  projects: [
+    {
+      harness: "claude_code",
+      path: "/demo",
+      name: "demo",
+      exists: true,
+      session_count: 4,
+      last_session_at: null,
+      artifacts: [],
+    },
+  ],
+};
+
 function setup(entitled: boolean) {
   getFileDetail.mockResolvedValue({ status: "ok", data: detail });
   getAiConfig.mockResolvedValue({ status: "ok", data: { provider: "none", model: "", has_key: false } });
   getEntitlement.mockResolvedValue({ status: "ok", data: { paid: entitled, email: null, plan: null } });
   hasBackup.mockResolvedValue({ status: "ok", data: false });
   scanNow.mockResolvedValue({ status: "ok", data: {} });
+  getSetup.mockResolvedValue({ status: "ok", data: setupView });
+  getEffectiveRules.mockResolvedValue({
+    status: "ok",
+    data: [
+      { layer: "global", path: "/home/u/.claude/CLAUDE.md", name: "global CLAUDE.md", grade: "B", file_id: "f0" },
+      { layer: "project", path: "/demo/CLAUDE.md", name: "demo CLAUDE.md", grade: "C", file_id: "f1" },
+    ],
+  });
 }
 
 beforeEach(() => {
@@ -134,5 +178,48 @@ describe("Detail per-issue Apply fix", () => {
     await waitFor(() =>
       expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "manual"),
     );
+  });
+});
+
+describe("Detail merge position", () => {
+  it("places the file in its project's stack, keyed off the project's own harness", async () => {
+    setup(true);
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("Project rules — loaded after global")).toBeInTheDocument();
+    expect(getEffectiveRules).toHaveBeenCalledWith("claude_code", "/demo");
+    expect(screen.getByText("global CLAUDE.md")).toBeInTheDocument();
+    expect(screen.getByText("this file")).toBeInTheDocument();
+  });
+
+  it("lists an artifact the prompt names, and not one it merely resembles", async () => {
+    setup(true);
+    getFileDetail.mockResolvedValue({
+      status: "ok",
+      data: { ...detail, content: "Use the adapt skill for adaptive layouts." },
+    });
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("adapt")).toBeInTheDocument();
+    expect(screen.getByText("never used")).toBeInTheDocument();
+  });
+
+  it("says nothing is referenced rather than leaving the section blank", async () => {
+    setup(true);
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(
+      await screen.findByText("No skills, agents or MCP servers referenced by name"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows one muted line and keeps the rest of Detail when setup is unreadable", async () => {
+    setup(true);
+    getSetup.mockResolvedValue({ status: "error", error: "no db" });
+    render(<Detail fileId="f1" navigate={() => {}} />);
+
+    expect(await screen.findByText("Setup not available")).toBeInTheDocument();
+    expect(screen.getByText("File scorecard")).toBeInTheDocument();
+    expect(screen.getAllByText("Deprecated model reference").length).toBeGreaterThan(0);
   });
 });
