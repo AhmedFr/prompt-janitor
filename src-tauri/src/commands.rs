@@ -1,8 +1,10 @@
 //! Tauri commands exposed to the frontend. Each is `#[specta::specta]` so
 //! tauri-specta can generate typed TypeScript bindings.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::query::{self, Overview};
-use crate::scan::{run_scan, ScanSummary};
+use crate::scan::ScanSummary;
 use crate::store::AppDb;
 
 /// A small status payload proving the typed store ↔ frontend round-trip.
@@ -47,6 +49,28 @@ pub fn ping() -> String {
     "pong".to_string()
 }
 
+/// Set while a scan is running. A scan walks every project and rewrites the
+/// database; two overlapping ones interleave their writes and emit two
+/// `scan-done` events for what the user asked once.
+static SCAN_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+/// Holds the single-flight claim for as long as a scan runs and releases it
+/// however that scan ends — including on an early `?`.
+struct ScanGuard;
+
+impl ScanGuard {
+    /// `None` when a scan is already in flight.
+    fn acquire() -> Option<Self> {
+        (!SCAN_IN_PROGRESS.swap(true, Ordering::SeqCst)).then_some(Self)
+    }
+}
+
+impl Drop for ScanGuard {
+    fn drop(&mut self) {
+        SCAN_IN_PROGRESS.store(false, Ordering::SeqCst);
+    }
+}
+
 /// Per-file scan progress, emitted on the `scan-progress` event.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct ScanProgress {
@@ -54,46 +78,89 @@ pub struct ScanProgress {
     pub total: u32,
 }
 
-/// Run a scan of `root`, persist results, and emit `scan-progress`/`scan-done`.
-/// Shared by the `scan_now` command and the background scheduler.
-pub fn scan_and_emit(
-    app: &tauri::AppHandle,
-    root: &std::path::Path,
-) -> Result<ScanSummary, String> {
+/// Run a full scan and emit `scan-phase` / `scan-progress` / `scan-done`.
+///
+/// Two phases: every detected harness is inventoried and its usage indexed,
+/// then every rule file is graded — across the harness's project roots, its
+/// global layer, and any extra folders the user added by hand. Shared by the
+/// `scan_now` command, the tray, and the background scheduler.
+///
+/// The harness phase runs in three steps so its slowest part holds no lock:
+/// `prepare` reads the usage cursors, the guard is dropped while every session
+/// log is parsed, and `commit` takes it again to write the pass back. The file
+/// phase continues under that same guard.
+pub fn scan_and_emit(app: &tauri::AppHandle) -> Result<ScanSummary, String> {
     use tauri::{Emitter, Manager};
 
+    // Before the first event: a refused scan must look like nothing happened,
+    // not like a scan that started and never finished.
+    let _guard = ScanGuard::acquire().ok_or("A scan is already running.")?;
+
     let db = app.state::<AppDb>();
+    let now_secs = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    let harnesses = crate::harness::all();
+
+    let _ = app.emit("scan-phase", "harness");
+    let prepared = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::harness_scan::prepare(&conn, &harnesses).map_err(|e| e.to_string())?
+    };
+    // Unlocked: parsing hundreds of megabytes of session logs must not block
+    // every read the UI makes while it runs.
+    let indexed = crate::harness_scan::index(&harnesses, prepared);
+
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let summary = run_scan(&conn, root, |done, total| {
+    let outcome =
+        crate::harness_scan::commit(&conn, &indexed, now_secs).map_err(|e| e.to_string())?;
+
+    let _ = app.emit("scan-phase", "files");
+
+    let mut roots = outcome.roots.clone();
+    roots.extend(
+        query::extra_scan_folders(&conn)
+            .into_iter()
+            .map(std::path::PathBuf::from),
+    );
+    // A hand-picked folder gets the same sieve as a harness project root: a
+    // picked `$HOME` (or any parent of a harness home) would sweep the whole
+    // disk, and one nested in a root already listed would be walked twice.
+    let home_roots: Vec<std::path::PathBuf> = indexed
+        .iter()
+        .filter(|(p, _)| p.detected)
+        .filter_map(|(p, _)| p.home_root.clone())
+        .collect();
+    let roots = crate::harness_scan::scan_roots(roots, &home_roots);
+
+    let summary = crate::scan::run_scan_all(&conn, &roots, &outcome.extra_files, |done, total| {
         let _ = app.emit("scan-progress", ScanProgress { done, total });
     })
     .map_err(|e| e.to_string())?;
+
+    // Each harness owns its own diagnostics: a single total cannot say which
+    // log parser is struggling. Only harnesses that actually ran are listed —
+    // an undetected one skipped no lines because it read nothing.
+    if let Ok(Some(scan_id)) = crate::harness_store::last_scan_id(&conn) {
+        for (harness, skipped) in &outcome.skipped_lines_by_harness {
+            let _ = crate::harness_store::record_diagnostics(&conn, scan_id, harness, *skipped);
+        }
+    }
+
     let _ = app.emit("scan-done", &summary);
     crate::notify::after_scan(app, &conn);
     Ok(summary)
 }
 
-/// Scan `path`, grade + persist every prompt file, and return a summary.
-/// Emits `scan-progress` per file and `scan-done` at the end.
+/// Scan everything, grade + persist every prompt file, and return a summary.
+/// Emits `scan-phase`, `scan-progress` per file, and `scan-done` at the end.
 #[tauri::command]
 #[specta::specta]
-pub fn scan_now(app: tauri::AppHandle, path: String) -> Result<ScanSummary, String> {
-    scan_and_emit(&app, &std::path::PathBuf::from(&path))
+pub fn scan_now(app: tauri::AppHandle) -> Result<ScanSummary, String> {
+    scan_and_emit(&app)
 }
 
-/// Scan the currently configured folder, if any. Used by the tray.
-pub fn scan_configured_folder(app: &tauri::AppHandle) {
-    use tauri::Manager;
-    let folder = {
-        let db = app.state::<AppDb>();
-        let Ok(conn) = db.conn.lock() else {
-            return;
-        };
-        query::get_setting(&conn, "scan_folder").ok().flatten()
-    };
-    if let Some(folder) = folder {
-        let _ = scan_and_emit(app, &std::path::PathBuf::from(folder));
-    }
+/// Fire-and-forget full scan. Used by the tray and the scheduler.
+pub fn scan_everything(app: &tauri::AppHandle) {
+    let _ = scan_and_emit(app);
 }
 
 /// Aggregated data for the Overview screen.
@@ -104,20 +171,24 @@ pub fn get_overview(db: tauri::State<'_, AppDb>) -> Result<Overview, String> {
     query::get_overview(&conn).map_err(|e| e.to_string())
 }
 
-/// Persist the folder to scan.
+/// Persist the extra folders to scan on top of the harness's own projects.
 #[tauri::command]
 #[specta::specta]
-pub fn set_scan_folder(db: tauri::State<'_, AppDb>, path: String) -> Result<(), String> {
+pub fn set_extra_scan_folders(
+    db: tauri::State<'_, AppDb>,
+    folders: Vec<String>,
+) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::set_setting(&conn, "scan_folder", &path).map_err(|e| e.to_string())
+    let json = serde_json::to_string(&folders).map_err(|e| e.to_string())?;
+    query::set_setting(&conn, "extra_scan_folders", &json).map_err(|e| e.to_string())
 }
 
-/// The currently configured scan folder, if any.
+/// The extra folders currently configured (empty when none).
 #[tauri::command]
 #[specta::specta]
-pub fn get_scan_folder(db: tauri::State<'_, AppDb>) -> Result<Option<String>, String> {
+pub fn get_extra_scan_folders(db: tauri::State<'_, AppDb>) -> Result<Vec<String>, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::get_setting(&conn, "scan_folder").map_err(|e| e.to_string())
+    Ok(query::extra_scan_folders(&conn))
 }
 
 /// Persist the scan schedule ("1h", "6h", "1d", "save", or "manual").
@@ -682,6 +753,22 @@ mod tests {
         conn
     }
 
+    /// A scan writes the whole database and ends with one `scan-done`; a
+    /// second one starting while the first runs would interleave both.
+    #[test]
+    fn a_second_scan_is_refused_while_one_is_running() {
+        let first = ScanGuard::acquire().expect("the first scan takes the claim");
+        assert!(
+            ScanGuard::acquire().is_none(),
+            "a scan starting mid-scan must be turned away"
+        );
+        drop(first);
+        assert!(
+            ScanGuard::acquire().is_some(),
+            "the claim is released however the scan ends"
+        );
+    }
+
     #[test]
     fn apply_fix_is_not_paid_gated_for_a_free_user() {
         // Monetisation is paused: a free/unentitled user is never turned away
@@ -735,4 +822,50 @@ mod tests {
         assert_eq!(ent.plan.as_deref(), Some("open"));
         assert!(ent.email.is_none());
     }
+}
+
+// ---------------------------------------------------------------------------
+// Harness setup + usage (read models in `harness_query`)
+// ---------------------------------------------------------------------------
+
+/// Everything the Setup screen renders: harnesses, the global layer, and each
+/// project with its own artifacts.
+#[tauri::command]
+#[specta::specta]
+pub fn get_setup(db: tauri::State<'_, AppDb>) -> Result<crate::harness_query::SetupView, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::setup_view(&conn).map_err(|e| e.to_string())
+}
+
+/// The rule files `harness` loads inside `project_path`, in load order.
+#[tauri::command]
+#[specta::specta]
+pub fn get_effective_rules(
+    db: tauri::State<'_, AppDb>,
+    harness: String,
+    project_path: String,
+) -> Result<Vec<crate::harness_query::EffectiveRule>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::effective_rules(&conn, &harness, &project_path).map_err(|e| e.to_string())
+}
+
+/// Usage aggregates for the Analytics screen, anchored to the current clock.
+#[tauri::command]
+#[specta::specta]
+pub fn get_usage_overview(
+    db: tauri::State<'_, AppDb>,
+) -> Result<crate::harness_query::UsageOverview, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::harness_query::usage_overview(&conn, now).map_err(|e| e.to_string())
+}
+
+/// Every harness we know of, detected or not.
+#[tauri::command]
+#[specta::specta]
+pub fn list_harnesses(
+    db: tauri::State<'_, AppDb>,
+) -> Result<Vec<crate::harness_query::HarnessInfo>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::harness_query::list_harnesses(&conn).map_err(|e| e.to_string())
 }

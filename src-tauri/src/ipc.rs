@@ -11,8 +11,8 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::ping,
         crate::commands::scan_now,
         crate::commands::get_overview,
-        crate::commands::set_scan_folder,
-        crate::commands::get_scan_folder,
+        crate::commands::set_extra_scan_folders,
+        crate::commands::get_extra_scan_folders,
         crate::commands::set_schedule,
         crate::commands::get_schedule,
         crate::commands::set_alert,
@@ -43,6 +43,10 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
         crate::commands::get_scans_digest,
         crate::commands::list_templates,
         crate::commands::apply_template,
+        crate::commands::get_setup,
+        crate::commands::get_effective_rules,
+        crate::commands::get_usage_overview,
+        crate::commands::list_harnesses,
     ])
 }
 

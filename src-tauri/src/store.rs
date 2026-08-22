@@ -251,6 +251,14 @@ const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (scan_id, harness)
     );
     ",
+    // v9 — the single scan folder became a list of extra folders. A pre-v9
+    // install keeps scanning what it always did: the old folder is carried
+    // over as the first entry of `extra_scan_folders`.
+    "
+    INSERT OR IGNORE INTO settings(key, value)
+        SELECT 'extra_scan_folders', json_array(value) FROM settings WHERE key='scan_folder';
+    DELETE FROM settings WHERE key='scan_folder';
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -292,6 +300,59 @@ pub fn test_conn() -> Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Number of migrations that existed before v9. Hard-coded on purpose:
+    /// the legacy-settings test has to stop exactly at the schema v9 upgrades
+    /// from, not at "one before whatever is newest".
+    const V8: usize = 8;
+
+    #[test]
+    fn v9_carries_the_legacy_scan_folder_into_extra_scan_folders() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        for sql in &MIGRATIONS[..V8] {
+            conn.execute_batch(sql).unwrap();
+        }
+        conn.pragma_update(None, "user_version", V8 as i64).unwrap();
+        conn.execute(
+            "INSERT INTO settings(key, value) VALUES('scan_folder', '/x')",
+            [],
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+
+        let folders: String = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key='extra_scan_folders'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(folders, r#"["/x"]"#);
+        let legacy: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM settings WHERE key='scan_folder'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(legacy, 0, "the legacy key must not linger");
+    }
+
+    #[test]
+    fn v9_is_a_no_op_without_a_legacy_scan_folder() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        let n: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM settings WHERE key='extra_scan_folders'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(n, 0);
+    }
 
     #[test]
     fn migrations_create_schema_and_are_idempotent() {

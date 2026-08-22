@@ -1,8 +1,9 @@
 //! Background scheduler: periodic scans (1h/6h/1d) + on-save watch-mode.
 //!
-//! A single tick loop reads the current schedule + folder each tick and scans
-//! when due. One `notify` watcher (re-pointed when the folder changes) flips a
-//! `dirty` flag for on-save mode. `manual` never auto-scans.
+//! A single tick loop reads the current schedule each tick and runs a full
+//! scan (every detected harness + the user's extra folders) when due. One
+//! `notify` watcher, re-pointed when the extra folders change, flips a `dirty`
+//! flag for on-save mode. `manual` never auto-scans.
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,6 +38,19 @@ pub fn parse_schedule(value: &str) -> Schedule {
     }
 }
 
+/// The schedule actually in force this tick.
+///
+/// On-save mode is driven by a filesystem watcher, and only the user's extra
+/// folders are watched. With none configured no event can ever arrive, so
+/// "on save" would silently mean "never" — fall back to the 6h default so a
+/// harness-only setup still gets refreshed.
+fn effective_schedule(schedule: &str, watch_roots_empty: bool) -> Schedule {
+    match parse_schedule(schedule) {
+        Schedule::OnSave if watch_roots_empty => parse_schedule("6h"),
+        other => other,
+    }
+}
+
 fn now_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -57,14 +71,14 @@ pub fn start(app: AppHandle) {
             })
             .ok()
         };
-        let mut watched: Option<String> = None;
+        let mut watched: Vec<String> = Vec::new();
         let mut change_at = 0u64;
 
         loop {
             tokio::time::sleep(TICK).await;
 
             let db = app.state::<AppDb>();
-            let (schedule_str, folder, last_scan, notify_digest, last_digest) = {
+            let (schedule_str, watch_roots, last_scan, notify_digest, last_digest) = {
                 let Ok(conn) = db.conn.lock() else {
                     continue;
                 };
@@ -72,7 +86,7 @@ pub fn start(app: AppHandle) {
                     .ok()
                     .flatten()
                     .unwrap_or_else(|| "6h".to_string());
-                let folder = get_setting(&conn, "scan_folder").ok().flatten();
+                let watch_roots = crate::query::extra_scan_folders(&conn);
                 let last = conn
                     .query_row("SELECT MAX(finished_at) FROM scans", [], |r| {
                         r.get::<_, Option<String>>(0)
@@ -91,22 +105,22 @@ pub fn start(app: AppHandle) {
                     .flatten()
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
-                (schedule, folder, last, notify_digest, last_digest)
+                (schedule, watch_roots, last, notify_digest, last_digest)
             };
 
-            let Some(folder) = folder else {
-                continue; // nothing configured to scan
-            };
-
-            // Re-point the watcher when the folder changes.
-            if watched.as_deref() != Some(folder.as_str()) {
+            // Re-point the watcher when the extra folders change. Only those
+            // are watched: harness project roots come and go on their own and
+            // are covered by the interval schedules.
+            if watched != watch_roots {
                 if let Some(w) = watcher.as_mut() {
-                    if let Some(old) = &watched {
+                    for old in &watched {
                         let _ = w.unwatch(Path::new(old));
                     }
-                    let _ = w.watch(Path::new(&folder), RecursiveMode::Recursive);
+                    for root in &watch_roots {
+                        let _ = w.watch(Path::new(root), RecursiveMode::Recursive);
+                    }
                 }
-                watched = Some(folder.clone());
+                watched = watch_roots;
                 dirty.store(false, Ordering::Relaxed);
                 change_at = 0;
             }
@@ -115,7 +129,7 @@ pub fn start(app: AppHandle) {
                 change_at = now_secs();
             }
 
-            let due = match parse_schedule(&schedule_str) {
+            let due = match effective_schedule(&schedule_str, watched.is_empty()) {
                 Schedule::Manual => false,
                 Schedule::Interval(d) => now_secs().saturating_sub(last_scan) >= d.as_secs(),
                 Schedule::OnSave => {
@@ -127,7 +141,7 @@ pub fn start(app: AppHandle) {
             if due {
                 dirty.store(false, Ordering::Relaxed);
                 change_at = 0;
-                let _ = crate::commands::scan_and_emit(&app, &std::path::PathBuf::from(&folder));
+                crate::commands::scan_everything(&app);
             }
 
             // Weekly digest notification.
@@ -177,5 +191,17 @@ mod tests {
         assert_eq!(parse_schedule("save"), Schedule::OnSave);
         assert_eq!(parse_schedule("manual"), Schedule::Manual);
         assert_eq!(parse_schedule("nonsense"), Schedule::Manual);
+    }
+
+    #[test]
+    fn on_save_without_watch_roots_falls_back_to_periodic() {
+        // Nothing is watched (no extra folders), so no file event will ever
+        // arrive — on-save would mean "never scan again".
+        assert_eq!(effective_schedule("save", true), parse_schedule("6h"));
+        // With something watched, on-save is honoured.
+        assert_eq!(effective_schedule("save", false), Schedule::OnSave);
+        // Every other schedule is unaffected by the watch set.
+        assert_eq!(effective_schedule("1h", true), parse_schedule("1h"));
+        assert_eq!(effective_schedule("manual", true), Schedule::Manual);
     }
 }

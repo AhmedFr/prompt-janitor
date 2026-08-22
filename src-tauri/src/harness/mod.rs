@@ -3,6 +3,9 @@
 
 pub mod claude_code;
 pub mod model;
+pub mod time;
+
+use std::path::PathBuf;
 
 use model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
 
@@ -16,6 +19,14 @@ pub trait Harness: Send + Sync {
     fn id(&self) -> &'static str;
     fn display_name(&self) -> &'static str;
     fn detect(&self) -> bool;
+    /// Where the harness keeps its own configuration (`~/.claude` for Claude
+    /// Code), once detected. The scan uses it to recognise roots that are too
+    /// broad to walk: a project that *contains* the harness home is the user's
+    /// home directory wearing a slug. `None` when the harness has no such
+    /// directory, or is not installed.
+    fn home_root(&self) -> Option<PathBuf> {
+        None
+    }
     fn projects(&self) -> Vec<ProjectRef>;
     fn inventory(&self, scope: &Scope) -> Vec<Artifact>;
     fn index_usage(&self, cursor: &mut UsageCursor) -> UsageBatch;

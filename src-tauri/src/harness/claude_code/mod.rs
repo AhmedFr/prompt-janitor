@@ -108,6 +108,10 @@ impl Harness for ClaudeCode {
         self.home.is_some()
     }
 
+    fn home_root(&self) -> Option<std::path::PathBuf> {
+        self.home.as_ref().map(|h| h.root.clone())
+    }
+
     fn projects(&self) -> Vec<ProjectRef> {
         let Some(home) = &self.home else {
             return Vec::new();

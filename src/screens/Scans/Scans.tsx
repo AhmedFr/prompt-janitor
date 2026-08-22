@@ -32,9 +32,14 @@ export function Scans({ navigate }: ScansProps) {
               <div className="muted">Loading…</div>
             </Card>
           ) : !digest?.has_data ? (
-            <Card padded>
-              <div className="muted">No scans yet — scan a folder from the Overview tab.</div>
-            </Card>
+            <>
+              <Card padded>
+                <div className="muted">No scans yet — run a scan from the Overview tab.</div>
+              </Card>
+              {/* An empty digest can still be the *result* of a scan whose logs
+                  would not parse; the caveat explains the emptiness. */}
+              <SkippedLines count={digest?.skipped_lines ?? 0} />
+            </>
           ) : (
             <DigestBody digest={digest} navigate={navigate} />
           )}
@@ -107,6 +112,8 @@ function DigestBody({ digest, navigate }: { digest: ScansDigest; navigate: Navig
         </Card>
       )}
 
+      <SkippedLines count={digest.skipped_lines} />
+
       <div className="row between" style={{ marginTop: 16 }}>
         <span className="faint" style={{ fontSize: 12 }}>
           {digest.scan_count} scans recorded
@@ -116,6 +123,16 @@ function DigestBody({ digest, navigate }: { digest: ScansDigest; navigate: Navig
         </Button>
       </div>
     </>
+  );
+}
+
+/** The indexer's own caveat: how much of the logs it could not read. */
+function SkippedLines({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <div className="muted" style={{ marginTop: 16, fontSize: 12 }}>
+      {count} log line{count === 1 ? "" : "s"} skipped while indexing
+    </div>
   );
 }
 

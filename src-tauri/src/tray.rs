@@ -32,7 +32,7 @@ pub fn setup(app: &App) -> tauri::Result<()> {
             "scan" => {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    crate::commands::scan_configured_folder(&app);
+                    crate::commands::scan_everything(&app);
                 });
             }
             "quit" => app.exit(0),

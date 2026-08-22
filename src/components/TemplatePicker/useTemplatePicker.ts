@@ -3,10 +3,9 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { commands, isTauri, type TemplateInfo } from "@/lib/ipc";
 import type { ApplyOutcome } from "./TemplatePicker.types";
 
-/** Rescan the configured folder so a freshly-written file gets graded. */
+/** Rescan everything so a freshly-written file gets graded. */
 async function rescanConfigured(): Promise<void> {
-  const f = await commands.getScanFolder();
-  if (f.status === "ok" && f.data) await commands.scanNow(f.data);
+  await commands.scanNow();
 }
 
 /** Find the scanned file id whose path matches exactly what was just written. */

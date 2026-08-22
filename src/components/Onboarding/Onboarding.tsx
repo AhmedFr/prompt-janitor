@@ -22,14 +22,19 @@ export interface OnboardingProps {
 }
 
 /**
- * First-run flow, tuned for time-to-verdict: pick a folder, scan, and land on
- * the grade. Standards packs and the scan schedule are not asked about — the
- * backend defaults (all packs on, every 6 hours) already apply, and both live
- * in Settings.
+ * First-run flow, tuned for time-to-verdict: scan, and land on the grade.
+ *
+ * A detected harness already knows where the prompts are — its own projects
+ * and global layer — so the first scan needs no folder at all. Picking one is
+ * the escape hatch for prompts kept somewhere the harness never opened, and it
+ * *adds* to whatever is already configured rather than replacing it. Standards
+ * packs and the scan schedule are not asked about — the backend defaults (all
+ * packs on, every 6 hours) already apply, and both live in Settings.
  */
 export function Onboarding({ onDone }: OnboardingProps) {
   const [step, setStep] = useState<Step>("folder");
   const [folder, setFolder] = useState<string | null>(null);
+  const [detected, setDetected] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [summary, setSummary] = useState<ScanSummary | null>(null);
 
@@ -40,16 +45,28 @@ export function Onboarding({ onDone }: OnboardingProps) {
     };
   }, []);
 
+  useEffect(() => {
+    void commands.listHarnesses().then((res) => {
+      if (res.status === "ok") setDetected(res.data.some((h) => h.detected));
+    });
+  }, []);
+
   const pickFolder = async () => {
     const dir = await open({ directory: true, multiple: false, title: "Choose a folder to scan" });
     if (typeof dir === "string") setFolder(dir);
   };
 
   const runFirstScan = async () => {
-    if (!folder) return;
+    if (!folder && !detected) return;
     setStep("scanning");
-    await commands.setScanFolder(folder);
-    const res = await commands.scanNow(folder);
+    if (folder) {
+      // Append: Settings may already hold folders, and onboarding is not the
+      // place to quietly drop them.
+      const existing = await commands.getExtraScanFolders();
+      const prior = existing.status === "ok" ? existing.data : [];
+      if (!prior.includes(folder)) await commands.setExtraScanFolders([...prior, folder]);
+    }
+    const res = await commands.scanNow();
     if (res.status === "ok") {
       setSummary(res.data);
       setStep("reveal");
@@ -106,10 +123,13 @@ export function Onboarding({ onDone }: OnboardingProps) {
           <div className="ob-logo" aria-hidden="true">
             🧹
           </div>
-          <h2 className="ob-title">Where should I look for prompts?</h2>
+          <h2 className="ob-title">
+            {detected ? "Found your agent setup" : "Where should I look for prompts?"}
+          </h2>
           <p className="muted ob-sub">
-            I&apos;ll find AGENTS.md, CLAUDE.md, .cursorrules and other AI prompt files inside this
-            folder.
+            {detected
+              ? "I'll grade the rules, skills and agents your coding agent already loads. Add a folder only if you keep prompts somewhere it never opens."
+              : "I'll find AGENTS.md, CLAUDE.md, .cursorrules and other AI prompt files inside this folder."}
           </p>
           {folder && (
             <div className="ob-folder">
@@ -117,8 +137,11 @@ export function Onboarding({ onDone }: OnboardingProps) {
               <span className="path">{folder}</span>
             </div>
           )}
-          <Button variant={folder ? "default" : "primary"} onClick={() => void pickFolder()}>
-            <Icon name="folder" /> {folder ? "Choose a different folder…" : "Choose a folder…"}
+          <Button
+            variant={folder || detected ? "default" : "primary"}
+            onClick={() => void pickFolder()}
+          >
+            <Icon name="folder" /> {folder ? "Add a different folder…" : "Add a folder…"}
           </Button>
           <p className="faint" style={{ fontSize: 12, marginTop: 16, marginBottom: 0 }}>
             Standards packs and scan schedule start with sensible defaults — change them anytime in
@@ -130,7 +153,12 @@ export function Onboarding({ onDone }: OnboardingProps) {
           <Button size="sm" onClick={onDone}>
             Skip setup
           </Button>
-          <Button variant="primary" size="sm" disabled={!folder} onClick={() => void runFirstScan()}>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!folder && !detected}
+            onClick={() => void runFirstScan()}
+          >
             <Icon name="sparkles" /> Run first scan
           </Button>
         </div>

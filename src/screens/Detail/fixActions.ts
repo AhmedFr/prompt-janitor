@@ -2,10 +2,9 @@ import { commands, type FixEdit } from "@/lib/ipc";
 
 export type ApplyOutcome = { ok: boolean; message: string };
 
-/** Rescan the configured folder so grades reflect the file's new content. */
+/** Rescan everything so grades reflect the file's new content. */
 async function rescanConfigured(): Promise<void> {
-  const f = await commands.getScanFolder();
-  if (f.status === "ok" && f.data) await commands.scanNow(f.data);
+  await commands.scanNow();
 }
 
 /** Apply edits to a file (optionally committing to git), then rescan.

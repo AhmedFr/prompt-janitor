@@ -58,11 +58,8 @@ export function Prompts({ navigate, target }: PromptsProps) {
   }, [target, groups]);
 
   const scanNow = async () => {
-    const folder = await commands.getScanFolder();
-    if (folder.status === "ok" && folder.data) {
-      await commands.scanNow(folder.data);
-      void refetch();
-    }
+    await commands.scanNow();
+    void refetch();
   };
 
   return (

@@ -11,7 +11,6 @@ const getAiConfig = vi.hoisted(() => vi.fn());
 const getEntitlement = vi.hoisted(() => vi.fn());
 const hasBackup = vi.hoisted(() => vi.fn());
 const applyFix = vi.hoisted(() => vi.fn());
-const getScanFolder = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
@@ -25,7 +24,6 @@ vi.mock("@/lib/ipc", async () => {
       getEntitlement,
       hasBackup,
       applyFix,
-      getScanFolder,
       scanNow,
     },
   };
@@ -65,7 +63,6 @@ function setup(entitled: boolean) {
   getAiConfig.mockResolvedValue({ status: "ok", data: { provider: "none", model: "", has_key: false } });
   getEntitlement.mockResolvedValue({ status: "ok", data: { paid: entitled, email: null, plan: null } });
   hasBackup.mockResolvedValue({ status: "ok", data: false });
-  getScanFolder.mockResolvedValue({ status: "ok", data: "/demo" });
   scanNow.mockResolvedValue({ status: "ok", data: {} });
 }
 

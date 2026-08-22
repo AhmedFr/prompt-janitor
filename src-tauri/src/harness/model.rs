@@ -174,7 +174,7 @@ pub struct OrphanResult {
 }
 
 /// Per-log-file byte offsets already indexed. Persisted in `sessions.byte_offset`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UsageCursor {
     pub offsets: HashMap<String, u64>,
     /// Log path → last assistant `message.id` indexed in it. Persisted in
