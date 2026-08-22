@@ -84,6 +84,21 @@
         "title": "Decide phase 2 scope: evidence-backed findings + diff apply",
         "detail": "With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. 'unused skill', 'MCP server never called') and/or let fixes be diff-applied directly from the Setup screen.",
         "kind": "vision"
+      },
+      {
+        "title": "Decide: public repo or external hosting for downloads",
+        "detail": "The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.",
+        "kind": "vision"
+      },
+      {
+        "title": "Manual QA on your Mac (I run headless — cannot do this)",
+        "detail": "Full pass: onboarding → Scan everything (no folder needed) → Setup screen → Overview/Prompts/Detail → Settings each tab → AI fix with your real API key → apply fix → undo → git-branch commit option → tray menu → notifications → activate a license minted with the new keypair.",
+        "kind": "testing"
+      },
+      {
+        "title": "Tag and publish the first release",
+        "detail": "After the above: pnpm bump <version> if desired, git tag v0.1.0 && git push origin v0.1.0, wait for the Release workflow, check the draft release's DMG installs and launches, then publish the draft and verify the landing page download link resolves.",
+        "kind": "external"
       }
     ],
     "marketing": [

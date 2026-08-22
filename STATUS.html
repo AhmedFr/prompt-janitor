@@ -224,6 +224,36 @@
           </div>
           <p>With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. &#39;unused skill&#39;, &#39;MCP server never called&#39;) and/or let fixes be diff-applied directly from the Setup screen.</p>
         </div>
+      </li>
+      <li class="action">
+        <span class="action__num">5</span>
+        <div class="action__body">
+          <div class="action__head">
+            <strong>Decide: public repo or external hosting for downloads</strong>
+            <span class="tag tag--vision">vision call</span>
+          </div>
+          <p>The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.</p>
+        </div>
+      </li>
+      <li class="action">
+        <span class="action__num">6</span>
+        <div class="action__body">
+          <div class="action__head">
+            <strong>Manual QA on your Mac (I run headless — cannot do this)</strong>
+            <span class="tag tag--testing">testing</span>
+          </div>
+          <p>Full pass: onboarding → Scan everything (no folder needed) → Setup screen → Overview/Prompts/Detail → Settings each tab → AI fix with your real API key → apply fix → undo → git-branch commit option → tray menu → notifications → activate a license minted with the new keypair.</p>
+        </div>
+      </li>
+      <li class="action">
+        <span class="action__num">7</span>
+        <div class="action__body">
+          <div class="action__head">
+            <strong>Tag and publish the first release</strong>
+            <span class="tag tag--external">external action</span>
+          </div>
+          <p>After the above: pnpm bump &lt;version&gt; if desired, git tag v0.1.0 &amp;&amp; git push origin v0.1.0, wait for the Release workflow, check the draft release&#39;s DMG installs and launches, then publish the draft and verify the landing page download link resolves.</p>
+        </div>
       </li></ol>
     </div>
       
