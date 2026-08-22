@@ -2,7 +2,9 @@
 
 A macOS desktop app that finds, grades, and helps you fix the AI prompt files scattered across your projects — `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, and friends.
 
-It scans your folders on a schedule, grades each prompt file **A–F** against best-practice standards (Anthropic, OpenAI, Karpathy/community, plus your own rules), surfaces issues with a cited source and a plain-English explanation, notifies you on a calm cadence, and — as a paid upgrade — rewrites the bad parts for you.
+It detects your Claude Code setup automatically — no folder picker to configure. On a schedule, it inventories your global and per-project rules, skills, agents, commands, hooks, MCP servers, and plugins, and indexes your Claude Code session logs so you can see which of them are actually used (a manual "extra folder" in Settings remains available for anything outside that automatic scope). Each rule file is graded **A–F** against best-practice standards (Anthropic, OpenAI, Karpathy/community, plus your own rules), with issues surfaced via a cited source and a plain-English explanation, notifications on a calm cadence, and — as a paid upgrade — automatic rewrites for the bad parts.
+
+The **Setup screen** is the home base for this inventory: a global + per-project tree of everything Prompt Janitor found, each item tagged with whether — and how often — it's actually being used.
 
 ## Status
 

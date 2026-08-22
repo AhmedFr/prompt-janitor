@@ -57,23 +57,28 @@
     {
       "name": "Phase 7",
       "title": "Setup inventory & usage evidence",
-      "done": 4,
+      "done": 6,
       "total": 6,
-      "state": "active",
-      "note": "Spec + plans + process skill landed (#107); harness core landed (#109); Claude Code harness landed (#110); persistence, orchestrator and IPC read models landed (#111); Setup screen, detection onboarding and the Analytics usage tab are up for review (#112). Next: phase 0 (#108), detail/settings/docs (#113)"
+      "state": "done",
+      "note": "Implementation complete across 7 stacked PRs: docs/spec (#114), phase 0 LLM providers (#115), harness core (#116), Claude Code harness (#117), persistence/orchestrator/IPC (#118), Setup UI (#119), and Detail merge position + Settings harness tab + docs (this PR, #113). Awaiting review & merge in order."
     }
   ],
   "actions": {
     "blocking": [
       {
         "title": "Review & merge the Phase 7 PR stack in order",
-        "detail": "#114 docs → #115 phase 0 → #116 harness core → #117 Claude Code harness → #118 persistence/IPC → #112's PR (Setup UI). Merge in that order since each builds on the last; all tests green, each PR body lists what was verified.",
+        "detail": "#114 docs → #115 phase 0 → #116 harness core → #117 Claude Code harness → #118 persistence/IPC → #119 Setup UI → this branch's PR (Detail merge position, Settings harness tab, docs). Merge in that order since each builds on the last; all tests green, each PR body lists what was verified.",
         "kind": "review"
       },
       {
-        "title": "Mint the production license keypair",
-        "detail": "After merging PR #69: cd src-tauri && cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The current embedded key's private seed was discarded after minting your own dev pro key, so no customer keys can be minted today — and re-keygening invalidates that dev key (mint yourself a fresh one). Only you should ever hold this key.",
-        "kind": "external"
+        "title": "Delete the local dev DB before first run from these branches",
+        "detail": "Migrations v8/v9 were edited in place while unreleased (additive harness/usage schema). A dev DB created before those edits will be out of sync — delete it before running an app build from anywhere in this PR stack.",
+        "kind": "testing"
+      },
+      {
+        "title": "Run a real full scan on your Mac and report back",
+        "detail": "Report first-index time and anything odd in the Setup screen — the harness has been validated against fixtures and spot real-data checks, but not a full scan of your actual ~/.claude logs.",
+        "kind": "testing"
       },
       {
         "title": "Decide: public repo or external hosting for downloads",
@@ -81,8 +86,13 @@
         "kind": "vision"
       },
       {
+        "title": "Mint the production license keypair",
+        "detail": "After merging PR #69: cd src-tauri && cargo run --bin license-tool -- keygen. Store the private key in your password manager, paste the printed PUBKEY array into src-tauri/src/license.rs, commit. The current embedded key's private seed was discarded after minting your own dev pro key, so no customer keys can be minted today — and re-keygening invalidates that dev key (mint yourself a fresh one). Only you should ever hold this key.",
+        "kind": "external"
+      },
+      {
         "title": "Manual QA on your Mac (I run headless — cannot do this)",
-        "detail": "Full pass: onboarding → pick a real folder → scan → Overview/Prompts/Detail → Settings each tab → AI fix with your real API key → apply fix → undo → git-branch commit option → tray menu → notifications → activate a license minted with the new keypair.",
+        "detail": "Full pass: onboarding → Scan everything (no folder needed) → Setup screen → Overview/Prompts/Detail → Settings each tab → AI fix with your real API key → apply fix → undo → git-branch commit option → tray menu → notifications → activate a license minted with the new keypair.",
         "kind": "testing"
       },
       {
@@ -114,6 +124,11 @@
       }
     ],
     "decisions": [
+      {
+        "title": "Decide phase 2 scope: evidence-backed findings + diff apply",
+        "detail": "With usage evidence now landing, decide whether phase 2 should turn it into evidence-backed findings (e.g. 'unused skill', 'MCP server never called') and/or let fixes be diff-applied directly from the Setup screen.",
+        "kind": "vision"
+      },
       {
         "title": "Version number for launch",
         "detail": "Ship as v0.1.0 (honest early-access) or v1.0.0 (marketing-friendly)? The bump script handles either.",
@@ -217,6 +232,18 @@
       "note": "PR for #112 awaiting review"
     },
     {
+      "name": "Detail screen — merge position + referenced-artifact usage",
+      "tier": "free",
+      "status": "pr",
+      "note": "PR for #113 awaiting review"
+    },
+    {
+      "name": "Settings → harness tab (Claude Code inventory + extra folders)",
+      "tier": "free",
+      "status": "pr",
+      "note": "PR for #113 awaiting review"
+    },
+    {
       "name": "License vendor CLI (keygen / mint / verify)",
       "tier": "infra",
       "status": "pr",
@@ -256,11 +283,11 @@
     },
     {
       "name": "Vitest",
-      "result": "234/234 passing (36 files)"
+      "result": "282/282 passing (40 files)"
     },
     {
       "name": "cargo test",
-      "result": "265/265 passing"
+      "result": "267/267 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -289,6 +316,8 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses",
+    "2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs",
     "2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)",
     "2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve",
     "2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard",

@@ -2,18 +2,18 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon, type IconName } from "@/components/Icon";
-import { commands, isTauri } from "@/lib/ipc";
-import { addFolderAndScan, removeExtraFolder, rescan } from "@/lib/scan-actions";
+import { isTauri } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
+import { HarnessTab } from "./HarnessTab";
 import { AiTab } from "./AiTab";
 import { LicenseTab } from "./LicenseTab";
 import "./Settings.css";
 
-type Tab = "folders" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general";
+type Tab = "harnesses" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general";
 
 const TABS: [Tab, string, IconName][] = [
-  ["folders", "Folders", "folder"],
+  ["harnesses", "Harnesses", "layers"],
   ["schedule", "Schedule", "clock"],
   ["alerts", "Alerts", "bell"],
   ["rules", "Rules", "rules"],
@@ -41,26 +41,15 @@ const isTab = (value: string | undefined): value is Tab =>
 
 export function Settings({ navigate, initialTab }: SettingsProps) {
   const s = useSettings();
-  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "schedule");
+  // Default to the first tab in the strip: a screen that opens on its second
+  // tab reads as a lost selection rather than a starting point.
+  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "harnesses");
 
   // Follow later in-app deep links (e.g. Overview → Settings → AI) even if
   // the screen happens to stay mounted.
   useEffect(() => {
     if (isTab(initialTab)) setTab(initialTab);
   }, [initialTab]);
-
-  const addFolder = async () => {
-    const ok = await addFolderAndScan();
-    if (ok) {
-      const res = await commands.getExtraScanFolders();
-      if (res.status === "ok") s.setFolders(res.data);
-    }
-  };
-
-  const dropFolder = async (dir: string) => {
-    s.setFolders(await removeExtraFolder(dir));
-    await rescan();
-  };
 
   return (
     <section className="screen">
@@ -94,44 +83,7 @@ export function Settings({ navigate, initialTab }: SettingsProps) {
             </Card>
           ) : (
             <>
-              {tab === "folders" && (
-                <>
-                  <h2 className="set-sec">Extra folders</h2>
-                  <Card>
-                    {s.folders.length === 0 ? (
-                      <div className="set-row">
-                        <span className="muted grow">
-                          No extra folders — every detected agent harness is scanned already.
-                        </span>
-                      </div>
-                    ) : (
-                      s.folders.map((f) => (
-                        <div className="set-row" key={f}>
-                          <span style={{ display: "flex", color: "var(--blue)" }}>
-                            <Icon name="folder" size={18} />
-                          </span>
-                          <span className="path grow">{f}</span>
-                          <Button size="sm" onClick={() => void dropFolder(f)}>
-                            Remove
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </Card>
-                  <div className="row" style={{ gap: 8, marginTop: 10 }}>
-                    <Button size="sm" onClick={() => void addFolder()}>
-                      <Icon name="folder" /> Add folder…
-                    </Button>
-                    <Button size="sm" onClick={() => void rescan()}>
-                      <Icon name="refresh" /> Rescan now
-                    </Button>
-                  </div>
-                  <p className="faint" style={{ fontSize: 12, marginTop: 12, maxWidth: 560 }}>
-                    Prompt Janitor skips <code>node_modules</code>/<code>vendor</code> and respects{" "}
-                    <code>.gitignore</code>.
-                  </p>
-                </>
-              )}
+              {tab === "harnesses" && <HarnessTab />}
 
               {tab === "schedule" && (
                 <>

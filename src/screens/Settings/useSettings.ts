@@ -6,7 +6,6 @@ export function useSettings() {
   const [schedule, setScheduleState] = useState("6h");
   const [digest, setDigestState] = useState(true);
   const [regressions, setRegressionsState] = useState(true);
-  const [folders, setFolders] = useState<string[]>([]);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [ai, setAi] = useState<AiConfig | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
@@ -19,11 +18,10 @@ export function useSettings() {
         setLoading(false);
         return;
       }
-      const [s, d, r, f, st, a, e] = await Promise.all([
+      const [s, d, r, st, a, e] = await Promise.all([
         commands.getSchedule(),
         commands.getAlert("digest"),
         commands.getAlert("regressions"),
-        commands.getExtraScanFolders(),
         commands.getAppStatus(),
         commands.getAiConfig(),
         commands.getEntitlement(),
@@ -32,7 +30,6 @@ export function useSettings() {
       if (s.status === "ok") setScheduleState(s.data);
       if (d.status === "ok") setDigestState(d.data);
       if (r.status === "ok") setRegressionsState(r.data);
-      if (f.status === "ok") setFolders(f.data);
       if (st.status === "ok") setStatus(st.data);
       if (a.status === "ok") setAi(a.data);
       if (e.status === "ok") setEntitlement(e.data);
@@ -86,7 +83,6 @@ export function useSettings() {
     schedule,
     digest,
     regressions,
-    folders,
     status,
     ai,
     entitlement,
@@ -94,7 +90,6 @@ export function useSettings() {
     setSchedule,
     setDigest,
     setRegressions,
-    setFolders,
     saveAi,
     testAi,
     activateLicense,

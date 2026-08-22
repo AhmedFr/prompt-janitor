@@ -1,0 +1,105 @@
+.mp {
+  width: 100%;
+}
+
+.mp__hd {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.mp__title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.mp__project {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp__section {
+  padding: 10px 14px 12px;
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.mp__section:last-child {
+  border-bottom: none;
+}
+
+.mp__sub {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 8px;
+}
+
+.mp__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* Rows wrap: this panel lives in the 340px scorecard column, and truncating a
+   rule name or a usage chip would hide the very evidence it is here to show. */
+.mp__rule,
+.mp__ref {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mp__layer {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+
+.mp__name {
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* The reader's own file, called out so the stack answers "where am I?". */
+.mp__rule--self .mp__name {
+  font-weight: 600;
+}
+
+.mp__self {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--blue-tint);
+  color: var(--blue-press);
+  flex: 0 0 auto;
+}
+
+/* Says out loud what a neutral grade chip could only imply. */
+.mp__ungraded {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--tone-never-tint);
+  color: var(--tone-never-fg);
+}
+
+.mp__empty {
+  font-size: 12px;
+  margin: 0;
+}

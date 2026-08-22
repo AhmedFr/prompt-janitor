@@ -12,6 +12,7 @@ import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
 import { NlRulesPanel } from "./NlRulesPanel";
+import { MergePosition, type MergePositionState } from "./MergePosition";
 import "./Detail.css";
 
 export interface DetailProps {
@@ -20,7 +21,7 @@ export interface DetailProps {
 }
 
 export function Detail({ fileId, navigate }: DetailProps) {
-  const { detail, loading, aiReady, entitled, reload } = useFileDetail(fileId);
+  const { detail, loading, aiReady, entitled, reload, mergePosition } = useFileDetail(fileId);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
                 aiReady={aiReady}
                 entitled={entitled}
                 onReload={reload}
+                mergePosition={mergePosition}
               />
             </>
           )}
@@ -153,6 +155,7 @@ function DetailBody({
   aiReady,
   entitled,
   onReload,
+  mergePosition,
 }: {
   detail: FileDetail;
   selectedIndex: number | null;
@@ -160,6 +163,7 @@ function DetailBody({
   aiReady: boolean;
   entitled: boolean;
   onReload: () => Promise<void>;
+  mergePosition: MergePositionState;
 }) {
   // Source lines + the first issue per line — recomputed only when the file
   // changes, not on every selection/hover render.
@@ -257,6 +261,9 @@ function DetailBody({
               </div>
             )}
           </Card>
+          {/* Before the issue list, because it reframes it: a rule file that
+              loads everywhere carries its defects into every project. */}
+          <MergePosition state={mergePosition} />
           <Card style={{ width: "100%" }}>
             <div className="d-source-hd">
               <span style={{ fontSize: 13, fontWeight: 600 }}>
