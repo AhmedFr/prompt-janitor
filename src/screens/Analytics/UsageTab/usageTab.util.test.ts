@@ -160,10 +160,12 @@ describe("errorRateBars", () => {
     { target: "supabase", total: 4, error_rate: null },
   ];
 
-  it("converts the 0–1 rate to a percentage and treats null as zero", () => {
+  it("converts the 0–1 rate to a percentage and marks an unmeasured row", () => {
+    // A missing rate is not a clean 0% — the harness recorded no outcome at
+    // all — so the row carries the distinction the chart greys it out on.
     expect(errorRateBars(rates)).toEqual([
-      { target: "playwright", total: 8, pct: 25 },
-      { target: "supabase", total: 4, pct: 0 },
+      { target: "playwright", total: 8, pct: 25, measured: true },
+      { target: "supabase", total: 4, pct: 0, measured: false },
     ]);
   });
 

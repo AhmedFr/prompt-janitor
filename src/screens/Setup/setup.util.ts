@@ -72,6 +72,36 @@ export function applyFilter(
 }
 
 /**
+ * How many of a project's artifacts survive the current filter. Zero means the
+ * project has nothing to say about this slice, and the screen drops its row
+ * rather than making the user expand it to find out.
+ */
+export function projectMatchCount(
+  project: ProjectSetup,
+  filter: SetupFilter,
+  costBar: number | null,
+): number {
+  return applyFilter(project.artifacts, filter, costBar).length;
+}
+
+/**
+ * The size of every filter's slice, so the chips can say what they would
+ * narrow to before the user commits a click. Pass the whole inventory —
+ * global plus every project's artifacts — and the shared cost bar.
+ */
+export function filterCounts(
+  artifacts: ArtifactView[],
+  costBar: number | null,
+): Record<SetupFilter, number> {
+  return {
+    all: artifacts.length,
+    never: applyFilter(artifacts, "never", costBar).length,
+    errors: applyFilter(artifacts, "errors", costBar).length,
+    cost: applyFilter(artifacts, "cost", costBar).length,
+  };
+}
+
+/**
  * Orders projects the way the user thinks about them: the ones still on disk
  * first, most recently worked in first within that, and projects that never had
  * a session last.

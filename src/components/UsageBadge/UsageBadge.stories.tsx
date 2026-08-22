@@ -27,6 +27,27 @@ export const Used: Story = {};
 
 export const Never: Story = { args: { usage: null, now } };
 
-export const ErrorProne: Story = { args: { usage: stat({ error_rate: 0.5 }), now } };
+/** The label names the error rate, so the red is confirmation and not the message. */
+export const ErrorProne: Story = {
+  args: { usage: stat({ total: 40, error_rate: 0.42 }), now },
+};
 
-export const Stale: Story = { args: { usage: stat({ last_used: "2026-05-01T00:00:00.000Z" }), now } };
+/** Likewise "stale" is written out next to the date that made it stale. */
+export const Stale: Story = {
+  args: { usage: stat({ total: 9, sessions: 4, last_used: "2026-05-01T00:00:00.000Z" }), now },
+};
+
+/** All four tones together — the palette this screen's evidence is read through. */
+export const AllTones: Story = {
+  render: () => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "start", gap: 8 }}>
+      <UsageBadge usage={stat()} now={now} />
+      <UsageBadge usage={null} now={now} />
+      <UsageBadge usage={stat({ total: 40, error_rate: 0.42 })} now={now} />
+      <UsageBadge
+        usage={stat({ total: 9, sessions: 4, last_used: "2026-05-01T00:00:00.000Z" })}
+        now={now}
+      />
+    </div>
+  ),
+};

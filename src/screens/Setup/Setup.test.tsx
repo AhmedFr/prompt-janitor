@@ -120,6 +120,13 @@ const populated: SetupView = {
           file_id: "f-web",
           usage: usage({ avg_turn_tokens: 300 }),
         }),
+        artifact({
+          id: 5,
+          layer: "project",
+          kind: "skill",
+          name: "web-skill",
+          usage: usage({ error_rate: 0.6, avg_turn_tokens: 300 }),
+        }),
       ],
     },
     {
@@ -183,9 +190,9 @@ describe("Setup", () => {
     await renderSetup();
     await screen.findByText("debugging");
 
-    fireEvent.click(screen.getByRole("button", { name: "Never used" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
 
-    expect(screen.getByRole("button", { name: "Never used" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -214,7 +221,7 @@ describe("Setup", () => {
       expect(getEffectiveRules).toHaveBeenCalledWith("claude_code", "/repo/web"),
     );
     expect(
-      within(web).getByRole("heading", { name: "Effective rules", level: 3 }),
+      within(web).getByRole("heading", { name: "Effective rules", level: 4 }),
     ).toBeInTheDocument();
     expect(await within(web).findByText("home CLAUDE.md")).toBeInTheDocument();
 
@@ -263,7 +270,7 @@ describe("Setup", () => {
     await renderSetup();
     await screen.findByText("linear");
 
-    fireEvent.click(screen.getByRole("button", { name: "High cost" }));
+    fireEvent.click(screen.getByRole("button", { name: /^High cost/ }));
 
     // Turn costs across global + projects are 300, 9000 and 300 — median 300,
     // so the bar is 600. Scoped to the global list alone the median would be
@@ -272,20 +279,26 @@ describe("Setup", () => {
     expect(screen.queryByText("debugging")).not.toBeInTheDocument();
   });
 
-  it("does not cache a failed rule lookup", async () => {
+  it("says the rule stack could not be read instead of that there is none", async () => {
     getEffectiveRules.mockRejectedValueOnce(new Error("db is busy"));
     await renderSetup();
     const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
 
     fireEvent.click(screen.getByText("web"));
-    expect(await within(web).findByText(/no rule files apply/i)).toBeInTheDocument();
 
-    // Collapse and reopen: the failed key must not have been memoised. Wait on
-    // the body unmounting, not on `details.open` — the DOM flag flips
-    // synchronously on click, well before React has seen the toggle event.
+    expect(await within(web).findByText(/couldn.t read the rule stack/i)).toBeInTheDocument();
+    expect(within(web).queryByText(/no rule files apply/i)).toBeNull();
+  });
+
+  it("retries a failed rule lookup in place, without caching the failure", async () => {
+    getEffectiveRules.mockRejectedValueOnce(new Error("db is busy"));
+    await renderSetup();
+    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
+
     fireEvent.click(screen.getByText("web"));
-    await waitFor(() => expect(within(web).queryByText(/no rule files apply/i)).toBeNull());
-    fireEvent.click(screen.getByText("web"));
+    const retry = await within(web).findByRole("button", { name: /try again/i });
+
+    fireEvent.click(retry);
 
     await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(2));
     expect(await within(web).findByText("home CLAUDE.md")).toBeInTheDocument();
@@ -297,6 +310,49 @@ describe("Setup", () => {
 
     expect(await screen.findByText(/setup could not be read/i)).toBeInTheDocument();
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
+  it("counts every filter's slice on its chip", async () => {
+    await renderSetup();
+    await screen.findByText("linear");
+
+    // 5 artifacts in all: one never used, two over the error bar (linear and
+    // web-skill), and one over the 600-token cost bar (linear).
+    expect(screen.getByRole("button", { name: "All 5" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Never used 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Errors 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "High cost 1" })).toBeInTheDocument();
+  });
+
+  it("drops project rows with nothing in the current slice, and counts the rest", async () => {
+    await renderSetup();
+    await screen.findByText("web");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Errors/ }));
+
+    // `gone` holds no artifacts at all, so its row is noise under a filter.
+    expect(screen.queryByText("gone")).not.toBeInTheDocument();
+    expect(screen.getByText("web").closest("summary")).toHaveTextContent("1 match");
+  });
+
+  it("keeps every project row on the unfiltered view", async () => {
+    await renderSetup();
+
+    expect(await screen.findByText("gone")).toBeInTheDocument();
+    expect(screen.getByText("web").closest("summary")).not.toHaveTextContent("match");
+  });
+
+  it("titles a project row as a heading under Projects, without skipping a level", async () => {
+    await renderSetup();
+    await screen.findByText("web");
+
+    expect(screen.getByRole("heading", { name: "web", level: 3 })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("web"));
+
+    const web = screen.getByText("web").closest("details") as HTMLDetailsElement;
+    await waitFor(() =>
+      expect(within(web).getByRole("heading", { name: /^Rules/, level: 4 })).toBeInTheDocument(),
+    );
   });
 
   it("has no accessibility violations", async () => {

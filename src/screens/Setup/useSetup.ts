@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { commands, isTauri, type EffectiveRule, type SetupView } from "@/lib/ipc";
+import { commands, isTauri, type SetupView } from "@/lib/ipc";
+import type { EffectiveRules } from "./ProjectRow";
 import type { SetupState } from "./Setup.types";
 import type { SetupFilter } from "./setup.util";
 
@@ -17,7 +18,7 @@ export function useSetup(initialFilter: SetupFilter = "all"): SetupState {
   const [data, setData] = useState<SetupView | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<SetupFilter>(initialFilter);
-  const rules = useRef(new Map<string, Promise<EffectiveRule[]>>());
+  const rules = useRef(new Map<string, Promise<EffectiveRules>>());
   // Bumped alongside every cache clear so open projects know to ask again.
   const [rulesVersion, setRulesVersion] = useState(0);
 
@@ -59,15 +60,19 @@ export function useSetup(initialFilter: SetupFilter = "all"): SetupState {
     const key = rulesKey(harness, projectPath);
     const cached = rules.current.get(key);
     if (cached) return cached;
-    const pending = (async () => {
+    const pending = (async (): Promise<EffectiveRules> => {
       if (!isTauri) return [];
       const res = await commands.getEffectiveRules(harness, projectPath);
-      return res.status === "ok" ? res.data : [];
-    })().catch(() => {
-      // Never memoise a failure — the next expand should get a real attempt.
-      rules.current.delete(key);
-      return [] as EffectiveRule[];
-    });
+      // A failed query is not an empty stack. Reporting it as `[]` would tell
+      // the user no rule file applies to a project that may be full of them.
+      return res.status === "ok" ? res.data : "error";
+    })()
+      .catch((): EffectiveRules => "error")
+      .then((result) => {
+        // Never memoise a failure — the next attempt should be a real one.
+        if (result === "error") rules.current.delete(key);
+        return result;
+      });
     rules.current.set(key, pending);
     return pending;
   }, []);

@@ -83,12 +83,20 @@ export function kindBars(byKind: KindTotal[]): KindBar[] {
   }));
 }
 
-/** Converts each MCP server's 0–1 error rate into a 0–100 percentage bar. */
+/**
+ * Converts each MCP server's 0–1 error rate into a 0–100 percentage bar.
+ *
+ * A `null` rate means the harness never recorded an outcome for that server,
+ * which is not the same claim as "0% of its calls failed". The row keeps its
+ * place in the chart — dropping it would hide a server entirely — but says it
+ * is unmeasured so the chart can grey it out instead of vouching for it.
+ */
 export function errorRateBars(rates: TargetRate[]): ErrorRateBar[] {
   return rates.map(({ target, total, error_rate }) => ({
     target,
     total,
     pct: (error_rate ?? 0) * 100,
+    measured: error_rate !== null,
   }));
 }
 

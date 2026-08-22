@@ -4,12 +4,24 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { isTauri, type HarnessInfo, type SetupView } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
+import {
+  scanPercent,
+  scanStatusLine,
+  useScanProgress,
+  type ScanProgress,
+} from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
 import { KindSections, type Level } from "./KindSections";
 import { ProjectRow } from "./ProjectRow";
 import { FILTER_CHIPS } from "./Setup.constants";
 import type { SetupProps, SetupState } from "./Setup.types";
-import { costThreshold, harnessSummary, sortProjects } from "./setup.util";
+import {
+  costThreshold,
+  filterCounts,
+  harnessSummary,
+  projectMatchCount,
+  sortProjects,
+} from "./setup.util";
 import { useSetup } from "./useSetup";
 import "./Setup.css";
 
@@ -23,12 +35,14 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const [busy, setBusy] = useState(false);
+  const scan = useScanProgress();
 
+  // A scan refreshes the inventory through the `scan-done` listener in
+  // `useSetup`, so nothing here needs to refetch on its own.
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await action();
-      await state.refetch();
     } finally {
       setBusy(false);
     }
@@ -50,6 +64,12 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
 
       <div className="scroll-area">
         <div className="page" style={{ maxWidth: 1000 }}>
+          {busy && (
+            <ScanBar
+              progress={scan.progress}
+              status={scanStatusLine(scan.phase, scan.progress, harnessName(detected))}
+            />
+          )}
           {loading ? (
             <Card padded>
               <div className="muted">
@@ -57,7 +77,7 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
               </div>
             </Card>
           ) : !data ? (
-            <UnreadableSetup busy={busy} onRetry={() => void run(async () => {})} />
+            <UnreadableSetup busy={busy} onRetry={() => void run(state.refetch)} />
           ) : detected.length === 0 ? (
             <NoHarness busy={busy} onAddFolder={() => void run(addFolderAndScan)} />
           ) : (
@@ -66,6 +86,28 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Whose sessions the scan is indexing right now, for the phase line. */
+function harnessName(detected: HarnessInfo[]): string {
+  return detected[0]?.display_name ?? "agent";
+}
+
+/**
+ * The same bar onboarding shows, for the same events. A rescan that only
+ * greys out a button leaves a long scan indistinguishable from a hang.
+ */
+function ScanBar({ progress, status }: { progress: ScanProgress | null; status: string }) {
+  return (
+    <Card padded>
+      <div className="setup-scan">
+        <div className="bar" style={{ width: "100%" }}>
+          <i style={{ width: `${scanPercent(progress)}%`, transition: "width .15s" }} />
+        </div>
+        <div className="faint tnum setup-scan__status">{status}</div>
+      </div>
+    </Card>
   );
 }
 
@@ -122,11 +164,23 @@ function Inventory({
   const grouped = detected.length > 1;
   const level: Level = grouped ? 4 : 3;
   const projects = useMemo(() => sortProjects(data.projects), [data.projects]);
+  const everything = useMemo(
+    () => [...data.global, ...data.projects.flatMap((p) => p.artifacts)],
+    [data],
+  );
   // One bar for the whole setup: a per-section median would call half of any
   // list expensive, however cheap the list actually is.
-  const costBar = useMemo(
-    () => costThreshold([...data.global, ...data.projects.flatMap((p) => p.artifacts)]),
-    [data],
+  const costBar = useMemo(() => costThreshold(everything), [everything]);
+  // What each chip would narrow to, so the choice is informed before the click.
+  const counts = useMemo(() => filterCounts(everything, costBar), [everything, costBar]);
+  // A project with nothing in the current slice is a row the user has to open
+  // to learn it had nothing to say. Drop it instead.
+  const visible = useMemo(
+    () =>
+      filter === "all"
+        ? projects
+        : projects.filter((p) => projectMatchCount(p, filter, costBar) > 0),
+    [projects, filter, costBar],
   );
 
   const projectRow = (project: SetupView["projects"][number]) => (
@@ -135,7 +189,6 @@ function Inventory({
       project={project}
       filter={filter}
       costBar={costBar}
-      level={level}
       effectiveRulesFor={effectiveRulesFor}
       rulesVersion={rulesVersion}
       navigate={navigate}
@@ -161,7 +214,7 @@ function Inventory({
             aria-pressed={filter === chip.id}
             onClick={() => setFilter(chip.id)}
           >
-            {chip.label}
+            {chip.label} <span className="setup-chip__count tnum">{counts[chip.id]}</span>
           </button>
         ))}
       </div>
@@ -202,11 +255,15 @@ function Inventory({
           ? detected.map((h) => (
               <div key={h.id}>
                 <h3 className="setup-harness__title">{h.display_name}</h3>
-                {projects.filter((p) => p.harness === h.id).map(projectRow)}
+                {visible.filter((p) => p.harness === h.id).map(projectRow)}
               </div>
             ))
-          : projects.map(projectRow)}
-        {projects.length === 0 && <p className="muted">No projects seen yet.</p>}
+          : visible.map(projectRow)}
+        {visible.length === 0 && (
+          <p className="muted">
+            {projects.length === 0 ? "No projects seen yet." : "No project matches this filter."}
+          </p>
+        )}
       </section>
     </>
   );

@@ -60,6 +60,65 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Onboarding", () => {
+  it("says it is looking rather than claiming nothing is installed", async () => {
+    // Hold the probe open: the first paint must not answer a question the
+    // round trip has not come back from yet.
+    let settle: (r: { status: "ok"; data: ReturnType<typeof harness>[] }) => void = () => {};
+    listHarnesses.mockReturnValue(
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    render(<Onboarding onDone={vi.fn()} />);
+
+    expect(
+      screen.getByRole("heading", { name: "Looking for your agent setup…" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "No supported agent harness found" }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      settle({ status: "ok", data: [harness(true)] });
+    });
+
+    expect(screen.getByRole("heading", { name: "Detected: Claude Code" })).toBeInTheDocument();
+  });
+
+  it("treats a probe that throws as an empty machine", async () => {
+    listHarnesses.mockRejectedValue(new Error("no ipc"));
+    render(<Onboarding onDone={vi.fn()} />);
+
+    expect(
+      await screen.findByRole("heading", { name: "No supported agent harness found" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add a folder/i })).toBeEnabled();
+  });
+
+  it("takes focus back to the dialog whenever the step changes", async () => {
+    let finish: (r: { status: "error"; error: string }) => void = () => {};
+    scanNow.mockReturnValue(
+      new Promise<{ status: "error"; error: string }>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    render(<Onboarding onDone={vi.fn()} />);
+    await waitFor(() => expect(scanButton()).toBeEnabled());
+
+    // Clicking moves focus onto the button; the next step must not leave it
+    // pointing at an element that no longer exists.
+    scanButton().focus();
+    await act(async () => {
+      fireEvent.click(scanButton());
+    });
+
+    expect(screen.getByRole("dialog")).toHaveFocus();
+
+    await act(async () => {
+      finish({ status: "error", error: "no" });
+    });
+  });
+
   it("scans a detected harness without asking for a folder", async () => {
     render(<Onboarding onDone={vi.fn()} />);
 

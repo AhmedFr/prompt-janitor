@@ -15,8 +15,14 @@ export function RuleLink({ rule, navigate }: RuleLinkProps) {
       <span className="setup-rules__layer">{LAYER_LABEL[rule.layer]}</span>
       <span className="setup-rules__name">{rule.name}</span>
       <span className="path setup-rules__path">{rule.path}</span>
-      {/* The DB only writes A–F; the IPC type is a loose string. */}
-      <Grade grade={rule.grade as GradeLetter | null} size="sm" />
+      {/* The DB only writes A–F; the IPC type is a loose string. A rule the
+          grader never scored says so in words — an F-shaped chip would read as
+          a verdict, and a bare dash as a rendering slip. */}
+      {rule.grade ? (
+        <Grade grade={rule.grade as GradeLetter} size="sm" />
+      ) : (
+        <span className="setup-rules__ungraded">ungraded</span>
+      )}
     </>
   );
 

@@ -21,7 +21,8 @@ export function KindSections({ artifacts, filter, costBar, level, navigate }: Ki
       {groups.map(({ kind, items }) => (
         <div key={kind} className="setup-kind">
           <Heading level={level}>
-            {kindHeading(kind)} <span className="faint">{items.length}</span>
+            {kindHeading(kind)}{" "}
+            <span className="setup-kind__count tnum">{items.length}</span>
           </Heading>
           <Card>
             <div className="setup-kind__list">

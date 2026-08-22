@@ -37,6 +37,17 @@ describe("UsageBadge", () => {
     expect(screen.getByText(/used 42×/)).toHaveAttribute("data-tone", "error");
   });
 
+  it("spells out the error rate rather than leaving it to the tone colour", () => {
+    render(<UsageBadge usage={stat({ total: 40, error_rate: 0.42 })} now={now} />);
+    expect(screen.getByText("used 40× · 12 sessions · 42% errored")).toBeInTheDocument();
+  });
+
+  it("spells out staleness rather than leaving it to the tone colour", () => {
+    render(<UsageBadge usage={stat({ last_used: "2026-05-01T00:00:00.000Z" })} now={now} />);
+    const badge = screen.getByText(/stale, last 3mo ago$/);
+    expect(badge).toHaveAttribute("data-tone", "stale");
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<UsageBadge usage={stat()} now={now} />);
     expect(await axe(container)).toHaveNoViolations();

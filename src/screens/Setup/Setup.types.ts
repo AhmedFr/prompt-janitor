@@ -1,5 +1,6 @@
-import type { ArtifactKind, ArtifactView, EffectiveRule, SetupView } from "@/lib/ipc";
+import type { ArtifactKind, ArtifactView, SetupView } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
+import type { EffectiveRules } from "./ProjectRow";
 import type { SetupFilter } from "./setup.util";
 
 export interface SetupProps {
@@ -29,8 +30,11 @@ export interface SetupState {
   filter: SetupFilter;
   setFilter: (filter: SetupFilter) => void;
   refetch: () => Promise<void>;
-  /** Lazily loads (and memoises) the rule stack that applies to one project. */
-  effectiveRulesFor: (harness: string, projectPath: string) => Promise<EffectiveRule[]>;
+  /**
+   * Lazily loads (and memoises) the rule stack that applies to one project.
+   * Resolves to `"error"` when the lookup failed — never to an empty stack.
+   */
+  effectiveRulesFor: (harness: string, projectPath: string) => Promise<EffectiveRules>;
   /** Bumped whenever the memoised rule stacks are dropped, e.g. after a scan. */
   rulesVersion: number;
 }

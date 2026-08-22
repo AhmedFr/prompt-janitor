@@ -33,6 +33,16 @@
   --orange: #f59e0b;
   --red: #ff3b30;
 
+  /* usage-badge tones — opaque tints so the text contrast is a fixed, testable
+     pair rather than whatever the surface behind an alpha wash happens to be.
+     Ratios measured in `usageBadge.contrast.test.ts`; see `UsageBadge.css`. */
+  --tone-never-tint: #f2f2f4;
+  --tone-never-fg: #5c5c61;
+  --tone-error-tint: #ffe7e6;
+  --tone-error-fg: #992620;
+  --tone-stale-tint: #fef1dd;
+  --tone-stale-fg: #7a4a00;
+
   /* grade scale */
   --grade-a: #2fb457;
   --grade-b: #34a8a0;

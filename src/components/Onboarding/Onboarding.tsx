@@ -5,30 +5,48 @@ import { ScoreRing } from "@/components/ScoreRing";
 import { useVerdictHero, verdictSentence } from "@/components/VerdictHero";
 import type { ScanSummary } from "@/lib/ipc";
 import { detectedSummary } from "./onboarding.util";
+import { scanPercent } from "@/lib/useScanProgress";
 import { useOnboarding } from "./useOnboarding";
+import type { OnboardingProps } from "./Onboarding.types";
 import "./Onboarding.css";
 
 const STEPS = ["Detect", "Scan", "Verdict"] as const;
-
-export interface OnboardingProps {
-  onDone: () => void;
-}
 
 /**
  * First-run flow, tuned for time-to-verdict: show what is installed, scan it,
  * and land on the grade. All the detection and scan plumbing lives in
  * {@link useOnboarding}; this is the layout.
  */
-export function Onboarding({ onDone }: OnboardingProps) {
-  const { detected, step, status, progress, summary, failed, start, addFolder } = useOnboarding();
+export function Onboarding({ onDone, state }: OnboardingProps) {
+  const live = useOnboarding();
+  const { detected, step, status, progress, summary, failed, start, addFolder } = state ?? live;
 
   useEffect(() => {
     if (failed) onDone();
   }, [failed, onDone]);
 
+  if (step === "detecting") {
+    return (
+      <Shell step={0} stepKey={step} labelledBy="ob-title" onEscape={onDone}>
+        <div className="ob-body">
+          <div className="ob-logo" aria-hidden="true">
+            🧹
+          </div>
+          <h2 className="ob-title" id="ob-title">
+            Looking for your agent setup…
+          </h2>
+          <p className="muted ob-sub">
+            Checking this machine for a supported coding agent and the prompt files it already
+            loads.
+          </p>
+        </div>
+      </Shell>
+    );
+  }
+
   if (step === "scanning") {
     return (
-      <Shell step={1} labelledBy="ob-title">
+      <Shell step={1} stepKey={step} labelledBy="ob-title">
         <div className="ob-scanning">
           <div className="ob-logo" aria-hidden="true">
             🧹
@@ -39,7 +57,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
           <div className="bar" style={{ width: "100%" }}>
             <i
               style={{
-                width: `${progress && progress.total ? (progress.done / progress.total) * 100 : 8}%`,
+                width: `${scanPercent(progress)}%`,
                 transition: "width .15s",
               }}
             />
@@ -59,7 +77,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
   const found = detected.length > 0;
 
   return (
-    <Shell step={0} labelledBy="ob-title" onEscape={onDone}>
+    <Shell step={0} stepKey={step} labelledBy="ob-title" onEscape={onDone}>
       <div className="ob-body">
         <div className="ob-logo" aria-hidden="true">
           🧹
@@ -107,17 +125,23 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
 /**
  * The modal card and its step indicator — the frame every step renders inside.
- * It takes focus on mount so the keyboard starts inside the dialog rather than
- * behind it. `onEscape` is only wired up where backing out is safe: dismissing
- * mid-scan would leave the scan running with nothing on screen to explain it.
+ * It takes focus on mount, and again whenever the step changes: the card is one
+ * React element across all four screens, so without `stepKey` the focus would
+ * stay wherever the last click left it while the whole dialog swapped contents
+ * underneath the user. `onEscape` is only wired up where backing out is safe:
+ * dismissing mid-scan would leave the scan running with nothing on screen to
+ * explain it.
  */
 function Shell({
   step,
+  stepKey,
   labelledBy,
   onEscape,
   children,
 }: {
   step: number;
+  /** The flow step this frame is showing; a change re-takes focus. */
+  stepKey: string;
   labelledBy: string;
   onEscape?: () => void;
   children: ReactNode;
@@ -126,7 +150,7 @@ function Shell({
 
   useEffect(() => {
     card.current?.focus();
-  }, []);
+  }, [stepKey]);
 
   return (
     <div className="ob-overlay">
@@ -165,7 +189,7 @@ function Reveal({ summary, onDone }: { summary: ScanSummary; onDone: () => void 
     grade === "B" && verdict.loading ? null : verdictSentence(grade, verdict.fixesToA);
 
   return (
-    <Shell step={2} labelledBy="ob-verdict">
+    <Shell step={2} stepKey="reveal" labelledBy="ob-verdict">
       <div className="ob-body ob-reveal">
         <ScoreRing score={summary.overall_score} grade={grade} size={132} />
         <h2 className="ob-verdict" id="ob-verdict">

@@ -30,6 +30,21 @@ describe("formatUsage", () => {
     expect(formatUsage(stat({ last_used: "2026-05-01T00:00:00.000Z" }), now).tone).toBe("stale");
     expect(formatUsage(stat({ last_used: "2026-05-01T00:00:00.000Z" }), now).label).toMatch(/last 3mo ago$/);
   });
+
+  it("says why an artifact is error-toned instead of leaving it to the colour", () => {
+    expect(
+      formatUsage(stat({ total: 40, sessions: 12, error_rate: 0.42 }), now).label,
+    ).toBe("used 40× · 12 sessions · 42% errored");
+  });
+
+  it("says why an artifact is stale-toned instead of leaving it to the colour", () => {
+    expect(
+      formatUsage(
+        stat({ total: 9, sessions: 4, last_used: "2026-04-21T12:00:00.000Z" }),
+        now,
+      ).label,
+    ).toBe("used 9× · 4 sessions · stale, last 4mo ago");
+  });
   it("omits the last-used suffix and stays 'used' toned when last_used is unknown", () => {
     expect(formatUsage(stat({ total: 3, sessions: 2, last_used: null }), now)).toEqual({
       label: "used 3× · 2 sessions",

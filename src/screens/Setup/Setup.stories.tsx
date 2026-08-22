@@ -111,6 +111,14 @@ const populated: SetupView = {
           description: "Branch, PR and status-dashboard update in one go.",
           usage: usage({ total: 11, sessions: 8, avg_turn_tokens: 3000 }),
         }),
+        artifact({
+          id: 9,
+          layer: "project",
+          kind: "agent",
+          name: "release-notes",
+          description: "Drafts the changelog entry for a merged PR.",
+          usage: null,
+        }),
       ],
     },
     {
@@ -165,7 +173,11 @@ type Story = StoryObj<typeof meta>;
 /** A detected harness with a full global layer and two projects. */
 export const Populated: Story = {};
 
-/** The "Never used" chip pinned on: what is installed but has never fired. */
+/**
+ * The "Never used" chip pinned on: what is installed but has never fired.
+ * Projects with nothing in the slice drop out entirely, and the ones that stay
+ * say how much of them the filter kept.
+ */
 export const FilteredToNeverUsed: Story = {
   args: { initialFilter: "never" },
 };

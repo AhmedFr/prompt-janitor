@@ -63,7 +63,9 @@ export function ErrorTooltip({ active, payload }: TipProps) {
     <Tip
       title={bar.target}
       lines={[
-        { text: `${bar.pct.toFixed(1)}% of calls errored` },
+        // "not measured" and "0.0% errored" are different claims; only one of
+        // them is something the harness actually recorded.
+        { text: bar.measured ? `${bar.pct.toFixed(1)}% of calls errored` : "not measured" },
         { text: plural(bar.total, "call") },
       ]}
     />

@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   Line,
   LineChart,
@@ -34,12 +35,14 @@ import {
   BAR_COLOR,
   BAR_RADIUS,
   BAR_RADIUS_HORIZONTAL,
+  CHART_SERIES_LIMIT,
   ERROR_BAR_COLOR,
   GRID_STROKE,
   LINE_WIDTH,
   MAX_BAR_SIZE,
   SERIES_LIMIT,
   SERIES_VARS,
+  UNMEASURED_BAR_COLOR,
 } from "./UsageTab.constants";
 import type { UsageTabBodyProps } from "./UsageTab.types";
 import "./UsageTab.css";
@@ -70,6 +73,8 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
   const series = useMemo(() => data.top.slice(0, SERIES_LIMIT), [data.top]);
   const columns = useMemo(() => seriesColumns(series), [series]);
   const rows = useMemo(() => toStackedSeries(series), [series]);
+  // The chart draws the leading few; the table below carries all of them.
+  const drawn = useMemo(() => columns.slice(0, CHART_SERIES_LIMIT), [columns]);
   const kinds = useMemo(() => kindBars(data.by_kind), [data.by_kind]);
   const errors = useMemo(() => errorRateBars(data.mcp_error_rates), [data.mcp_error_rates]);
   const projects = useMemo(() => sessionBars(data.sessions_per_project), [data.sessions_per_project]);
@@ -99,10 +104,12 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
                     iconType="plainline"
                     formatter={(value) => <span className="usage-legend__text">{value}</span>}
                   />
-                  {columns.map((col, i) => (
+                  {drawn.map((col, i) => (
                     <Line
                       key={col.key}
-                      type="monotone"
+                      // Linear, not monotone: a spline invents curvature
+                      // between two daily counts that the data never had.
+                      type="linear"
                       dataKey={col.key}
                       name={col.label}
                       stroke={SERIES_VARS[i]}
@@ -116,7 +123,10 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
               </ResponsiveContainer>
             </div>
             <details className="usage-details">
-              <summary>Show the numbers</summary>
+              <summary>
+                Show the numbers
+                {columns.length > drawn.length ? ` — all ${columns.length} series` : ""}
+              </summary>
               <table className="usage-table" aria-label="Top targets by invocations">
                 <thead>
                   <tr>
@@ -211,7 +221,16 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
                     fill={ERROR_BAR_COLOR}
                     radius={BAR_RADIUS_HORIZONTAL}
                     maxBarSize={MAX_BAR_SIZE}
-                  />
+                  >
+                    {/* An unmeasured server is greyed, not scored: a critical-red
+                        0% bar would read as a clean bill of health. */}
+                    {errors.map((bar) => (
+                      <Cell
+                        key={bar.target}
+                        fill={bar.measured ? ERROR_BAR_COLOR : UNMEASURED_BAR_COLOR}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -43,14 +43,24 @@ export const SERIES_VARS = [
   "var(--series-8)",
 ] as const;
 
-/** How many lines the top-targets chart will draw. */
+/** How many series the tab considers at all — the backend's own cap on `top`. */
 export const SERIES_LIMIT = SERIES_VARS.length;
+
+/**
+ * How many of those the line chart actually draws. Past five lines the reader
+ * is matching hues against a legend rather than reading a trend, so the rest
+ * are left to the table underneath, which lists every series.
+ */
+export const CHART_SERIES_LIMIT = 5;
 
 /** Slot 1 — the single hue nominal bar charts use, since bar length carries the value. */
 export const BAR_COLOR = SERIES_VARS[0];
 
 /** Error rate is a good/bad measure, so it wears the reserved critical status colour. */
 export const ERROR_BAR_COLOR = "var(--chart-critical)";
+
+/** A row the harness never measured: neutral ink, so it makes no claim either way. */
+export const UNMEASURED_BAR_COLOR = "var(--text-3)";
 
 /** Recharts mark geometry, per the data-viz mark specs. */
 export const MAX_BAR_SIZE = 24;

@@ -57,10 +57,10 @@
     {
       "name": "Phase 7",
       "title": "Setup inventory & usage evidence",
-      "done": 3,
+      "done": 4,
       "total": 6,
       "state": "active",
-      "note": "Spec + plans + process skill landed (#107); harness core landed (#109); Claude Code harness landed (#110); persistence, orchestrator and IPC read models landed (#111). Next: phase 0 (#108), UI (#112), detail/settings/docs (#113)"
+      "note": "Spec + plans + process skill landed (#107); harness core landed (#109); Claude Code harness landed (#110); persistence, orchestrator and IPC read models landed (#111); Setup screen, detection onboarding and the Analytics usage tab are up for review (#112). Next: phase 0 (#108), detail/settings/docs (#113)"
     }
   ],
   "actions": {
@@ -199,6 +199,24 @@
       "note": "Gates open while monetisation is paused (2026-08) — every feature is unlocked regardless of license"
     },
     {
+      "name": "Setup screen — global + per-project inventory with usage evidence",
+      "tier": "free",
+      "status": "pr",
+      "note": "PR for #112 awaiting review"
+    },
+    {
+      "name": "Detection-based onboarding (probe, scan progress, verdict reveal)",
+      "tier": "free",
+      "status": "pr",
+      "note": "PR for #112 awaiting review"
+    },
+    {
+      "name": "Analytics → Usage tab (top targets, kinds, MCP error rate, sessions)",
+      "tier": "free",
+      "status": "pr",
+      "note": "PR for #112 awaiting review"
+    },
+    {
       "name": "License vendor CLI (keygen / mint / verify)",
       "tier": "infra",
       "status": "pr",
@@ -238,7 +256,7 @@
     },
     {
       "name": "Vitest",
-      "result": "118/118 passing (24 files)"
+      "result": "234/234 passing (36 files)"
     },
     {
       "name": "cargo test",
@@ -271,6 +289,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)",
     "2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve",
     "2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard",
     "2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)",

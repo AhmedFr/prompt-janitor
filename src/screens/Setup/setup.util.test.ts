@@ -3,9 +3,11 @@ import type { ArtifactKind, ArtifactView, ProjectSetup, UsageStat } from "@/lib/
 import {
   applyFilter,
   costThreshold,
+  filterCounts,
   groupByKind,
   harnessSummary,
   kindHeading,
+  projectMatchCount,
   relativeSession,
   sessionLabel,
   sortProjects,
@@ -143,6 +145,54 @@ describe("costThreshold", () => {
   it("has no opinion with fewer than two measured artifacts", () => {
     expect(costThreshold([artifact({ usage: usage({ avg_turn_tokens: 900 }) })])).toBeNull();
     expect(costThreshold([])).toBeNull();
+  });
+});
+
+describe("projectMatchCount", () => {
+  const p = project({
+    artifacts: [
+      artifact({ id: 1, name: "never", usage: null }),
+      artifact({ id: 2, name: "errors", usage: usage({ error_rate: 0.4, avg_turn_tokens: 400 }) }),
+      artifact({ id: 3, name: "pricey", usage: usage({ avg_turn_tokens: 4000 }) }),
+    ],
+  });
+
+  it("counts everything for `all`", () => {
+    expect(projectMatchCount(p, "all", 1000)).toBe(3);
+  });
+
+  it("counts only the artifacts the filter keeps", () => {
+    expect(projectMatchCount(p, "never", 1000)).toBe(1);
+    expect(projectMatchCount(p, "errors", 1000)).toBe(1);
+    expect(projectMatchCount(p, "cost", 1000)).toBe(1);
+  });
+
+  it("is zero for a project with nothing in the slice, so the row can be pruned", () => {
+    expect(projectMatchCount(project(), "never", 1000)).toBe(0);
+    expect(projectMatchCount(p, "cost", null)).toBe(0);
+  });
+});
+
+describe("filterCounts", () => {
+  it("counts every chip's slice over the artifacts it is handed", () => {
+    const all = [
+      artifact({ id: 1, usage: null }),
+      artifact({ id: 2, usage: null }),
+      artifact({ id: 3, usage: usage({ error_rate: 0.4, avg_turn_tokens: 400 }) }),
+      artifact({ id: 4, usage: usage({ avg_turn_tokens: 500 }) }),
+      artifact({ id: 5, usage: usage({ avg_turn_tokens: 4000 }) }),
+    ];
+    // Measured costs 400/500/4000 → median 500 → bar 1000.
+    expect(filterCounts(all, costThreshold(all))).toEqual({
+      all: 5,
+      never: 2,
+      errors: 1,
+      cost: 1,
+    });
+  });
+
+  it("reports zeroes rather than blanks for an empty inventory", () => {
+    expect(filterCounts([], null)).toEqual({ all: 0, never: 0, errors: 0, cost: 0 });
   });
 });
 

@@ -37,6 +37,33 @@
   border-color: transparent;
 }
 
+.setup-chip__count {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-chip--on .setup-chip__count {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+/* The same bar onboarding draws, for the same scan events. */
+.setup-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-scan__status {
+  font-size: 12px;
+}
+
 .setup-section {
   margin-bottom: 26px;
 }
@@ -66,6 +93,18 @@
   font-weight: 600;
   color: var(--text-2);
   margin: 0 0 6px;
+}
+
+/* The count is data, not decoration — a muted pill, not a faint stray number. */
+.setup-kind__count {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .setup-kind__empty {
@@ -109,12 +148,23 @@
 }
 
 .setup-project__name {
+  font-family: inherit;
   font-size: 13px;
   font-weight: 600;
+  margin: 0;
 }
 
 .setup-project__meta {
   font-size: 12px;
+}
+
+/* How much of this project the current filter actually kept. */
+.setup-project__matches {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--blue-tint);
+  color: var(--blue-press);
 }
 
 .setup-project__missing {
@@ -195,6 +245,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 45%;
+}
+
+.setup-rules__error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Says out loud what a neutral grade chip could only imply. */
+.setup-rules__ungraded {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--tone-never-tint);
+  color: var(--tone-never-fg);
 }
 
 .setup-empty {

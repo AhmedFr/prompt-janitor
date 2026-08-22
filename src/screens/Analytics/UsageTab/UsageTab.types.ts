@@ -34,6 +34,8 @@ export interface ErrorRateBar {
   target: string;
   total: number;
   pct: number;
+  /** False when the harness recorded no outcome — the bar is greyed, not zero. */
+  measured: boolean;
 }
 
 /** A bar in the "Sessions per project" chart — the IPC row, filtered and ranked. */

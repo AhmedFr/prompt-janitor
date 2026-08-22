@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { render, cleanup } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { UsageTab } from "./UsageTab";
+import { ErrorTooltip } from "./UsageTab.tooltips";
 import type { UsageOverview } from "@/lib/ipc";
+import type { ErrorRateBar } from "./UsageTab.types";
 
 const fullData: UsageOverview = {
   top: [
@@ -41,6 +43,16 @@ const fullData: UsageOverview = {
     { target: "playwright", total: 8, error_rate: 0.25 },
     { target: "supabase", total: 4, error_rate: null },
   ],
+};
+
+/** Eight series is what the backend caps `top` at — the chart's worst case. */
+const eightSeries: UsageOverview = {
+  ...fullData,
+  top: Array.from({ length: 8 }, (_, i) => ({
+    kind: "skill" as const,
+    target: `skill-${i}`,
+    points: [{ day: "2026-08-02", count: i + 1, errors: 0 }],
+  })),
 };
 
 const emptyData: UsageOverview = {
@@ -121,6 +133,19 @@ describe("UsageTab", () => {
     ]);
   });
 
+  it("draws at most five lines but tabulates every series", () => {
+    mockUseUsageTab.mockReturnValue({ data: eightSeries, loading: false });
+    const { container, getByRole } = render(<UsageTab />);
+
+    // Beyond five lines the chart is a colour-matching puzzle, so the extra
+    // series live in the table underneath rather than on top of each other.
+    // The legend has one entry per drawn `<Line>`, so it counts them.
+    expect(container.querySelectorAll(".usage-legend__text")).toHaveLength(5);
+
+    const table = getByRole("table", { name: "Top targets by invocations" });
+    expect(table.querySelectorAll("tbody tr")).toHaveLength(8);
+  });
+
   it("shows the empty state when nothing is indexed", () => {
     mockUseUsageTab.mockReturnValue({ data: emptyData, loading: false });
     const { getByText, queryByRole } = render(<UsageTab />);
@@ -132,6 +157,29 @@ describe("UsageTab", () => {
     mockUseUsageTab.mockReturnValue({ data: null, loading: true });
     const { getByText } = render(<UsageTab />);
     expect(getByText("Loading…")).toBeInTheDocument();
+  });
+
+  it("says an unmeasured MCP server is unmeasured, not error-free", () => {
+    // Recharts types tooltip payloads loosely; the shape below is what the
+    // chart hands the content component for one hovered bar.
+    const Tip = ErrorTooltip as unknown as (p: {
+      active: boolean;
+      payload: { payload: ErrorRateBar }[];
+    }) => JSX.Element;
+    const bar = (measured: boolean): ErrorRateBar => ({
+      target: "supabase",
+      total: 4,
+      pct: 0,
+      measured,
+    });
+
+    const { getByText, rerender, container } = render(
+      <Tip active payload={[{ payload: bar(false) }]} />,
+    );
+    expect(getByText("not measured")).toBeInTheDocument();
+
+    rerender(<Tip active payload={[{ payload: bar(true) }]} />);
+    expect(container).toHaveTextContent("0.0% of calls errored");
   });
 
   it("has no accessibility violations", async () => {
