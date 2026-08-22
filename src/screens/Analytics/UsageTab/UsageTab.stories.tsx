@@ -19,9 +19,11 @@ const sample: UsageOverview = {
   top: [
     seriesFor("dataviz", 1, "skill"),
     seriesFor("playwright", 2, "mcp"),
-    seriesFor("Explore", 3, "agent"),
-    seriesFor("Bash", 4, "builtin"),
-    seriesFor("supabase", 5, "mcp"),
+    // Same name, two kinds — the chart keys columns by kind:target and only
+    // then disambiguates the labels.
+    seriesFor("adapt", 3, "skill"),
+    seriesFor("adapt", 4, "agent"),
+    seriesFor("Bash", 5, "builtin"),
   ],
   by_kind: [
     { kind: "skill", total: 148, avg_turn_tokens: 21480.6 },

@@ -10,7 +10,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  type TooltipContentProps,
 } from "recharts";
 import { Card } from "@/components/Card";
 import { useUsageTab } from "./useUsageTab";
@@ -19,10 +18,17 @@ import {
   isUsageEmpty,
   kindBars,
   kindLabel,
+  seriesColumns,
   sessionBars,
   shortDay,
   toStackedSeries,
 } from "./usageTab.util";
+import {
+  ErrorTooltip,
+  KindTooltip,
+  SeriesTooltip,
+  SessionsTooltip,
+} from "./UsageTab.tooltips";
 import {
   AXIS_TICK,
   BAR_COLOR,
@@ -62,6 +68,7 @@ export function UsageTab() {
 /** The four usage charts, rendered from an overview the caller already has. */
 export function UsageTabBody({ data }: UsageTabBodyProps) {
   const series = useMemo(() => data.top.slice(0, SERIES_LIMIT), [data.top]);
+  const columns = useMemo(() => seriesColumns(series), [series]);
   const rows = useMemo(() => toStackedSeries(series), [series]);
   const kinds = useMemo(() => kindBars(data.by_kind), [data.by_kind]);
   const errors = useMemo(() => errorRateBars(data.mcp_error_rates), [data.mcp_error_rates]);
@@ -92,11 +99,12 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
                     iconType="plainline"
                     formatter={(value) => <span className="usage-legend__text">{value}</span>}
                   />
-                  {series.map((s, i) => (
+                  {columns.map((col, i) => (
                     <Line
-                      key={s.target}
+                      key={col.key}
                       type="monotone"
-                      dataKey={s.target}
+                      dataKey={col.key}
+                      name={col.label}
                       stroke={SERIES_VARS[i]}
                       strokeWidth={LINE_WIDTH}
                       dot={false}
@@ -119,15 +127,15 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {series.map((s, i) => (
-                    <tr key={s.target}>
+                  {columns.map((col, i) => (
+                    <tr key={col.key}>
                       <th scope="row">
                         <span className="usage-swatch" style={{ background: SERIES_VARS[i] }} />
-                        {s.target}
+                        {col.label}
                       </th>
-                      <td>{kindLabel(s.kind)}</td>
-                      <td className="tnum">{sum(s.points.map((p) => p.count))}</td>
-                      <td className="tnum">{sum(s.points.map((p) => p.errors))}</td>
+                      <td>{kindLabel(col.kind)}</td>
+                      <td className="tnum">{col.total}</td>
+                      <td className="tnum">{col.errors}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -259,79 +267,4 @@ function ChartCard({ id, title, children }: { id: string; title: string; childre
 
 function Empty({ children }: { children: ReactNode }) {
   return <div className="muted usage-empty">{children}</div>;
-}
-
-/** Shared tooltip shell: a title plus rows whose colour dot carries identity. */
-function Tip({ title, lines }: { title: string; lines: { text: string; color?: string }[] }) {
-  return (
-    <div className="usage-tip">
-      <div className="usage-tip__title">{title}</div>
-      {lines.map((line) => (
-        <div key={line.text} className="usage-tip__row">
-          {line.color && <span className="usage-swatch" style={{ background: line.color }} />}
-          <span>{line.text}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-type TipProps = TooltipContentProps;
-
-function SeriesTooltip({ active, payload, label }: TipProps) {
-  if (!active || !payload?.length) return null;
-  const lines = [...payload]
-    .sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0))
-    .map((entry) => ({
-      color: entry.color,
-      text: `${entry.name}: ${plural(Number(entry.value ?? 0), "invocation")}`,
-    }));
-  return <Tip title={shortDay(String(label))} lines={lines} />;
-}
-
-function KindTooltip({ active, payload }: TipProps) {
-  if (!active || !payload?.length) return null;
-  const bar = payload[0].payload as { label: string; total: number; avgTurnTokens: number | null };
-  return (
-    <Tip
-      title={bar.label}
-      lines={[
-        { text: plural(bar.total, "invocation") },
-        {
-          text:
-            bar.avgTurnTokens === null
-              ? "avg context tokens / turn: not recorded"
-              : `${bar.avgTurnTokens.toLocaleString()} avg context tokens / turn`,
-        },
-      ]}
-    />
-  );
-}
-
-function ErrorTooltip({ active, payload }: TipProps) {
-  if (!active || !payload?.length) return null;
-  const bar = payload[0].payload as { target: string; total: number; pct: number };
-  return (
-    <Tip
-      title={bar.target}
-      lines={[
-        { text: `${bar.pct.toFixed(1)}% of calls errored` },
-        { text: plural(bar.total, "call") },
-      ]}
-    />
-  );
-}
-
-function SessionsTooltip({ active, payload }: TipProps) {
-  if (!active || !payload?.length) return null;
-  const bar = payload[0].payload as { name: string; path: string; sessions: number };
-  return <Tip title={bar.name} lines={[{ text: plural(bar.sessions, "session") }, { text: bar.path }]} />;
-}
-
-function plural(n: number, noun: string): string {
-  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
-}
-
-function sum(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0);
 }

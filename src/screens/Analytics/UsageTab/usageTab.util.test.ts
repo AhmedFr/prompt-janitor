@@ -5,6 +5,7 @@ import {
   isUsageEmpty,
   kindBars,
   kindLabel,
+  seriesColumns,
   sessionBars,
   shortDay,
   toStackedSeries,
@@ -32,13 +33,29 @@ describe("toStackedSeries", () => {
     expect(rows.map((r) => r.day)).toEqual(["2026-08-01", "2026-08-02", "2026-08-03"]);
   });
 
-  it("zero-fills days a target has no points for", () => {
+  it("zero-fills days a target has no points for, keying columns by kind and target", () => {
     const rows = toStackedSeries(top);
     expect(rows).toEqual([
-      { day: "2026-08-01", adapt: 3, playwright: 0 },
-      { day: "2026-08-02", adapt: 0, playwright: 2 },
-      { day: "2026-08-03", adapt: 5, playwright: 0 },
+      { day: "2026-08-01", "skill:adapt": 3, "mcp:playwright": 0 },
+      { day: "2026-08-02", "skill:adapt": 0, "mcp:playwright": 2 },
+      { day: "2026-08-03", "skill:adapt": 5, "mcp:playwright": 0 },
     ]);
+  });
+
+  it("keeps a skill and an agent of the same name in separate columns", () => {
+    const rows = toStackedSeries([
+      {
+        kind: "skill",
+        target: "adapt",
+        points: [{ day: "2026-08-01", count: 3, errors: 0 }],
+      },
+      {
+        kind: "agent",
+        target: "adapt",
+        points: [{ day: "2026-08-01", count: 7, errors: 0 }],
+      },
+    ]);
+    expect(rows).toEqual([{ day: "2026-08-01", "skill:adapt": 3, "agent:adapt": 7 }]);
   });
 
   it("sorts days even when the series arrive out of order", () => {
@@ -53,8 +70,8 @@ describe("toStackedSeries", () => {
       },
     ]);
     expect(rows).toEqual([
-      { day: "2026-08-02", explore: 4 },
-      { day: "2026-08-10", explore: 1 },
+      { day: "2026-08-02", "agent:explore": 4 },
+      { day: "2026-08-10", "agent:explore": 1 },
     ]);
   });
 
@@ -69,11 +86,37 @@ describe("toStackedSeries", () => {
         ],
       },
     ]);
-    expect(rows).toEqual([{ day: "2026-08-01", adapt: 5 }]);
+    expect(rows).toEqual([{ day: "2026-08-01", "skill:adapt": 5 }]);
   });
 
   it("returns no rows for no series", () => {
     expect(toStackedSeries([])).toEqual([]);
+  });
+});
+
+describe("seriesColumns", () => {
+  it("keys each column by kind and target, and totals its points", () => {
+    expect(seriesColumns(top)).toEqual([
+      { key: "skill:adapt", label: "adapt", kind: "skill", target: "adapt", total: 8, errors: 1 },
+      {
+        key: "mcp:playwright",
+        label: "playwright",
+        kind: "mcp",
+        target: "playwright",
+        total: 2,
+        errors: 2,
+      },
+    ]);
+  });
+
+  it("appends the kind only to labels whose bare target name collides", () => {
+    const columns = seriesColumns([
+      { kind: "skill", target: "adapt", points: [] },
+      { kind: "agent", target: "adapt", points: [] },
+      { kind: "mcp", target: "playwright", points: [] },
+    ]);
+    expect(columns.map((c) => c.label)).toEqual(["adapt (skill)", "adapt (agent)", "playwright"]);
+    expect(columns.map((c) => c.key)).toEqual(["skill:adapt", "agent:adapt", "mcp:playwright"]);
   });
 });
 

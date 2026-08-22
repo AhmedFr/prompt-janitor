@@ -15,6 +15,13 @@ const fullData: UsageOverview = {
       ],
     },
     {
+      // Same bare name as the skill above: the backend groups by (kind, target),
+      // so these must stay two independent lines.
+      kind: "agent",
+      target: "adapt",
+      points: [{ day: "2026-08-02", count: 9, errors: 0 }],
+    },
+    {
       kind: "mcp",
       target: "playwright",
       points: [{ day: "2026-08-02", count: 4, errors: 2 }],
@@ -91,11 +98,27 @@ describe("UsageTab", () => {
     expect(getAllByText("Built-in").length).toBeGreaterThan(0);
   });
 
-  it("lists the top targets in the table view backing the line chart", () => {
+  it("draws one legend entry per series, disambiguating colliding names", () => {
+    const { container } = render(<UsageTab />);
+    // Recharts owns the legend's ordering, so compare the set of labels.
+    const legend = [...container.querySelectorAll(".usage-legend__text")]
+      .map((el) => el.textContent)
+      .sort();
+    expect(legend).toEqual(["adapt (agent)", "adapt (skill)", "playwright"]);
+  });
+
+  it("lists every series in the table view backing the line chart", () => {
     const { getByRole } = render(<UsageTab />);
     const table = getByRole("table", { name: "Top targets by invocations" });
-    expect(table).toHaveTextContent("playwright");
-    expect(table).toHaveTextContent("adapt");
+    const rows = [...table.querySelectorAll("tbody tr")].map((tr) =>
+      [...tr.children].map((cell) => cell.textContent),
+    );
+    // The skill and the agent keep independent totals (9 + 3 vs 9).
+    expect(rows).toEqual([
+      ["adapt (skill)", "Skills", "9", "1"],
+      ["adapt (agent)", "Agents", "9", "0"],
+      ["playwright", "MCP", "4", "2"],
+    ]);
   });
 
   it("shows the empty state when nothing is indexed", () => {
