@@ -1,0 +1,71 @@
+/* One tab strip style for the whole app: a pill-tracked row of tabs above a
+   panel, matching DataTable's toolbar pills so the two feel like one system. */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tabs__list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs__tab--active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.tabs__tab:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.tabs__count {
+  min-width: 1.4em;
+  text-align: center;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--sep);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.tabs__tab--active .tabs__count {
+  background: var(--blue-tint);
+  color: var(--blue-press);
+}
+
+.tabs__panel {
+  min-width: 0;
+}
+
+.tabs__panel:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}

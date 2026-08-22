@@ -20,6 +20,8 @@ export {
   PathCell,
   ActionsCell,
 } from "./DataTable";
+export { Tabs, useTabState } from "./Tabs";
+export { RankedList, rankRows } from "./RankedList";
 
 export type { GradeLetter, GradeSize, GradeProps } from "./Grade";
 export type { SourceId, SourceMeta, SourceBadgeProps } from "./SourceBadge";
@@ -32,3 +34,10 @@ export type { CardProps } from "./Card";
 export type { UsageBadgeProps } from "./UsageBadge";
 export type { ArtifactCardProps } from "./ArtifactCard";
 export type { DataTableProps, DataTableSearch, PillGroup, PillOption, TableState, RowAction } from "./DataTable";
+export type { TabItem, TabsProps } from "./Tabs";
+export type {
+  RankedRow,
+  RankedListProps,
+  RankedListSelector,
+  RankedListDetails,
+} from "./RankedList";
