@@ -1,0 +1,317 @@
+/* One table style for the whole app. Sizes come from the density modifier so a
+   screen switches rhythm with a prop, not with a second stylesheet. */
+
+.dt {
+  --dt-row-pad-y: 10px;
+  --dt-row-pad-x: 12px;
+  --dt-font: 13px;
+  /* Must match ROW_HEIGHT in DataTable.constants.ts: the virtualiser estimates
+     scroll offsets from those numbers, and a row that renders at a different
+     height makes the scrollbar lie. Asserted in DataTable.test.tsx. */
+  --dt-row-h: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dt--compact {
+  --dt-row-pad-y: 5px;
+  --dt-row-pad-x: 9px;
+  --dt-font: 12px;
+  --dt-row-h: 34px;
+}
+
+/* ---------- toolbar ---------- */
+
+.dt__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dt__toolbar-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.dt__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  height: 28px;
+  border-radius: var(--r-ctrl);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text-3);
+}
+
+.dt__search:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-tint);
+}
+
+.dt__search-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  width: 200px;
+  min-width: 0;
+}
+
+.dt__pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The visible boundary between one group of chips and the next — and the
+   accessible name of the group, via aria-labelledby, so it is written once.
+   --text-2 on the toolbar's white ground is 5.07:1 (see
+   dataTable.contrast.test.ts). */
+.dt__pill-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.dt__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+/* --blue-press, not --blue: white on --blue is 3.65:1 — fine for the chip's
+   shape, short of AA for the label inside it; on --blue-press it is 5.62:1.
+   The pressed chip is text first. Measured in dataTable.contrast.test.ts. */
+.dt__pill--on {
+  background: var(--blue-press);
+  color: #fff;
+  border-color: transparent;
+}
+
+.dt__pill:focus-visible,
+.dt__sort:focus-visible,
+.dt__clear:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.dt__pill-count {
+  min-width: 1.4em;
+  text-align: center;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* White on rgba(255,255,255,…) over the chip never clears AA; the active count
+   sits on a darkened patch of --blue-press (composited #004fb7, 7.49:1 against
+   white) and inherits the chip's own white instead — the same pairing
+   `Setup.css` documents. */
+.dt__pill--on .dt__pill-count {
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+}
+
+/* ---------- table ---------- */
+
+.dt__scroll {
+  max-height: var(--dt-max-h, 70vh);
+  overflow: auto;
+  border: 0.5px solid var(--sep);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+
+.dt__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--dt-font);
+  color: var(--text);
+}
+
+.dt__head th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--group);
+  border-bottom: 0.5px solid var(--sep-strong);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px var(--dt-row-pad-x);
+  white-space: nowrap;
+}
+
+.dt__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+/* Unsorted columns keep a quiet glyph rather than none: an indicator that only
+   appears once you have already clicked doesn't tell you the column is
+   sortable in the first place. --text-2 rather than --text-3 because the glyph
+   *is* the affordance — 4.66:1 on the sticky header's --group ground, where
+   --text-3 managed 2.57:1 and missed even the 3:1 non-text floor. Measured in
+   dataTable.contrast.test.ts. */
+.dt__sort-glyph {
+  font-size: 9px;
+  color: var(--text-2);
+}
+
+.dt__sort-glyph[data-sort="ascending"],
+.dt__sort-glyph[data-sort="descending"] {
+  color: var(--blue);
+}
+
+.dt__cell {
+  padding: var(--dt-row-pad-y) var(--dt-row-pad-x);
+  border-bottom: 0.5px solid var(--sep);
+  vertical-align: middle;
+}
+
+.dt__cell--right {
+  text-align: right;
+}
+
+.dt__row:last-child .dt__cell {
+  border-bottom: 0;
+}
+
+/* A floor, not a cap: table layout still grows a row whose content needs it. */
+.dt__row {
+  height: var(--dt-row-h);
+}
+
+.dt__row--clickable {
+  cursor: pointer;
+}
+
+/* The row the screen navigated to. A tint rather than an outline: the row is
+   where you landed, not where focus is. */
+.dt__row--highlight {
+  background: var(--blue-tint);
+}
+
+.dt__row--clickable:hover {
+  background: var(--group);
+}
+
+.dt__row--clickable:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.dt__spacer td {
+  padding: 0;
+  border: 0;
+}
+
+/* ---------- loading ---------- */
+
+/* A body-shaped placeholder, so the table doesn't say "nothing here" before it
+   knows. `aria-hidden` on the rows and `aria-busy` on the table keep the
+   shimmer out of the accessibility tree entirely. */
+.dt__skeleton {
+  display: block;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  animation: dt-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dt-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt__skeleton {
+    animation: none;
+  }
+}
+
+/* ---------- empty + footer ---------- */
+
+/* The empty state sets its own height; the pinned row height would squash it. */
+.dt__empty-row td {
+  border: 0;
+}
+
+.dt__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 34px 16px;
+  text-align: center;
+}
+
+.dt__empty-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.dt__empty-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.dt__clear {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--blue-press);
+  cursor: pointer;
+}
+
+.dt__footer {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}

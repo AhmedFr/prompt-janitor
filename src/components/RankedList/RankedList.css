@@ -1,0 +1,163 @@
+/* label · inline bar · value, the ranked-bar pattern used in Analytics and
+   project Usage tabs. Bars share DataTable's toolbar-pill visual language. */
+
+.rl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rl__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rl__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rl__selector {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rl__chip {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.rl__chip--on {
+  background: var(--blue);
+  color: #fff;
+  border-color: transparent;
+}
+
+.rl__chip:focus-visible,
+.rl__row-btn:focus-visible,
+.rl__details:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.rl__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rl__row {
+  min-width: 0;
+}
+
+.rl__row-inner,
+.rl__row-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.rl__row-btn {
+  cursor: pointer;
+  border-radius: var(--r-ctrl);
+}
+
+.rl__row-btn:hover {
+  background: var(--group);
+}
+
+.rl__glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-2);
+}
+
+.rl__label {
+  flex: 0 0 30%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.rl__bar-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  overflow: hidden;
+}
+
+/* `--bar-fill`/`--bar-fill-error`, not `--blue-tint`/`--tone-error-tint`: those
+   tints are ~12% alpha, legible as a text-label background but well under the
+   3:1 WCAG non-text-contrast floor a bar needs against `.rl__bar-track`'s
+   `--group`. See `rankedList.contrast.test.ts`. */
+.rl__bar {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--bar-fill);
+}
+
+.rl__list[data-variant="error"] .rl__bar {
+  background: var(--bar-fill-error);
+}
+
+.rl__value {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 3ch;
+  text-align: right;
+}
+
+.rl__secondary {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.rl__empty {
+  margin: 0;
+  padding: 20px 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.rl__details {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue-press);
+  cursor: pointer;
+}
