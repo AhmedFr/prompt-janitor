@@ -147,6 +147,12 @@ function buildPills(
  * A fresh `rows` array or `projectNames` map (e.g. after a rescan) is a
  * fresh outer key; the stale entries fall out of both `WeakMap`s once
  * nothing else references the old array/map.
+ *
+ * `rows` and `projectNames` are treated as immutable once handed to
+ * `pillsFor`: the cache keys on their identity, so mutating either in
+ * place — instead of replacing it with a new array/map — would leave
+ * `pillsFor` handing back a cached predicate set built over data that no
+ * longer matches, rather than triggering a rebuild.
  */
 const pillsCache = new WeakMap<
   ArtifactView[],

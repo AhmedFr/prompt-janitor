@@ -74,11 +74,22 @@ function nameColumn(): ColumnDef<ArtifactView, unknown> {
   };
 }
 
+/** Mirrors `ScopeCell`'s own label rule exactly, so sorting the Scope column orders by the same text it renders. */
+function scopeLabel(row: ArtifactView, projectNames: Map<string, string>): string {
+  if (row.layer === "global") return "Global";
+  if (row.layer === "plugin") return "Plugin";
+  return projectNameFor(row.path, projectNames) ?? "Project";
+}
+
 function scopeColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
   return {
     id: "scope",
     header: "Scope",
-    accessorFn: (r) => (r.layer === "project" ? (projectNameFor(r.path, ctx.projectNames) ?? "Project") : r.layer),
+    // Returns the rendered label itself (not the raw `layer` value) so a
+    // header-sort click orders rows exactly the way `ScopeCell` displays
+    // them — "Global" before "Plugin" before a project name, not "global"
+    // before "plugin" before "project".
+    accessorFn: (r) => scopeLabel(r, ctx.projectNames),
     cell: (c) => (
       <ScopeCell layer={c.row.original.layer} projectName={projectNameFor(c.row.original.path, ctx.projectNames)} />
     ),
@@ -89,9 +100,15 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "grade",
     header: "Grade",
-    accessorKey: "grade",
+    // TanStack's default sort comparator isn't transitive over null/
+    // undefined mixed with strings, so ungraded rows scatter mid-table
+    // instead of grouping at the end. "Z" sorts after every real grade
+    // letter (A-F), so ascending order (`defaultSortFor("rule")`) reads
+    // best-grade-first with ungraded rows trailing, deterministically.
+    accessorFn: (r) => r.grade ?? "Z",
     // The DB only ever writes A-F; the IPC type is a looser `string | null`.
-    cell: (c) => <GradeCell grade={c.getValue() as GradeLetter | null} />,
+    // Reads the raw value, not the "Z"-substituted sort key above.
+    cell: (c) => <GradeCell grade={c.row.original.grade as GradeLetter | null} />,
   };
 }
 
@@ -137,12 +154,19 @@ function sizeColumn(): ColumnDef<ArtifactView, unknown> {
 
 /** Plugins' "Uses" slot: how many skills/agents/commands that install bundled, from `ctx.pluginBundleCounts`. */
 function bundledColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
+  const countFor = (row: ArtifactView) => ctx.pluginBundleCounts?.get(row.plugin_name ?? row.name) ?? 0;
   return {
     id: "uses",
     header: "Bundled",
-    accessorFn: (r) => ctx.pluginBundleCounts?.get(r.plugin_name ?? r.name) ?? 0,
+    // Kept for sorting — TanStack memoises this per row and re-derives it
+    // only when the row (or the column defs) change.
+    accessorFn: countFor,
     meta: { align: "right" },
-    cell: (c) => <span className="dt-num">{c.getValue() as number}</span>,
+    // Reads straight from `ctx` rather than trusting the memoised
+    // `getValue()`: `ctx.pluginBundleCounts` can be swapped for a fresher
+    // map (a rescan) without the column defs themselves changing identity,
+    // and the cell should never render a count TanStack cached before that.
+    cell: (c) => <span className="dt-num">{countFor(c.row.original)}</span>,
   };
 }
 
@@ -159,11 +183,15 @@ function actionsColumn(kind: ActionsKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
       if (kind === "rule") {
         if (!row.file_id) return null;
         const fileId = row.file_id;
+        // Every row in a table needs its own accessible name — a column of
+        // identical "Open" buttons is indistinguishable to assistive tech.
         return (
-          <ActionsCell actions={[{ label: "Open", icon: "chevronRight", onClick: () => ctx.onOpen(fileId) }]} />
+          <ActionsCell
+            actions={[{ label: `Open ${row.name}`, icon: "chevronRight", onClick: () => ctx.onOpen(fileId) }]}
+          />
         );
       }
-      const label = kind === "file" ? "Open file" : "Open folder";
+      const label = kind === "file" ? `Open ${row.name}` : `Open folder ${row.name}`;
       const path = row.path;
       return <ActionsCell actions={[{ label, icon: "folder", onClick: () => void openExternal(path) }]} />;
     },
@@ -192,11 +220,10 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
       return [nameColumn(), scopeColumn(ctx), usesColumn(), errorRateColumn(), avgTokensColumn()];
     case "plugin":
       return [nameColumn(), bundledColumn(ctx), actionsColumn("folder", ctx)];
-    default:
-      // `settings` has no tab of its own (not in KIND_TABS) — a conservative
-      // fallback rather than an exhaustive-switch error, in case it's ever
-      // rendered ad hoc (e.g. from Prompts' flat table).
-      return [nameColumn(), scopeColumn(ctx), sizeColumn(), actionsColumn("file", ctx)];
+    case "settings":
+      // Not in `KIND_TABS` — the Setup screen never renders a "settings"
+      // tab — so it gets no columns of its own rather than a guessed shape.
+      return [];
   }
 }
 
@@ -211,6 +238,12 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
  * e.g. via `useMemo`) for the cache to ever hit — a fresh object literal
  * passed in every render defeats it exactly the way an inline
  * `columns={[...]}` would.
+ *
+ * `ctx` (and its `projectNames`/`pluginBundleCounts` maps) is treated as
+ * immutable once handed to `columnsFor`: the cache is keyed on identity, so
+ * mutating a cached `ctx` in place — instead of replacing it with a new
+ * object — would leave every column def reading stale closures over the
+ * old values rather than triggering a rebuild.
  */
 const columnsCache = new WeakMap<ColumnsCtx, Map<ArtifactKind, ColumnDef<ArtifactView, unknown>[]>>();
 
@@ -229,7 +262,12 @@ export function columnsFor(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<Artif
   return defs;
 }
 
-/** Rules read best sorted by grade (worst first); everything else, by how much it's used. */
+/**
+ * Rules read best sorted by grade ascending — `desc: false` puts A before
+ * F, best grade first, with ungraded rows trailing behind the "Z" sentinel
+ * `gradeColumn` sorts them under. Every other kind sorts by how much it's
+ * used, most-used first.
+ */
 export function defaultSortFor(kind: ArtifactKind): { id: string; desc: boolean } {
   return kind === "rule" ? { id: "grade", desc: false } : { id: "uses", desc: true };
 }
