@@ -43,14 +43,21 @@
   padding: 0 5px;
   border-radius: var(--r-pill);
   background: var(--group);
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * White-on-rgba(255,255,255,.24) over --blue is 2.67:1 — nowhere near AA. The
+ * count inside an active chip instead sits in the chip's own foreground
+ * colour (inherited, so still white) on a darker pill: rgba(0,0,0,.18) over
+ * --blue composites to #086cd1, which clears AA against white at 5.15:1.
+ * See setup.contrast.test.ts.
+ */
 .setup-chip--on .setup-chip__count {
-  background: rgba(255, 255, 255, 0.24);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
 }
 
 /* The same bar onboarding draws, for the same scan events. */
@@ -95,13 +102,17 @@
   margin: 0 0 6px;
 }
 
-/* The count is data, not decoration — a muted pill, not a faint stray number. */
+/*
+ * The count is data, not decoration — a muted pill, not a faint stray number.
+ * --text-3 on --group is 2.57:1; --text-2 clears AA at 4.66:1 (see
+ * setup.contrast.test.ts).
+ */
 .setup-kind__count {
   display: inline-block;
   padding: 1px 7px;
   border-radius: var(--r-pill);
   background: var(--group);
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;

@@ -33,7 +33,8 @@ beforeEach(() => {
 describe("useScanProgress", () => {
   it("starts with nothing known about the scan", () => {
     const { result } = renderHook(() => useScanProgress());
-    expect(result.current).toEqual({ phase: null, progress: null });
+    expect(result.current.phase).toBeNull();
+    expect(result.current.progress).toBeNull();
   });
 
   it("tracks the phase and the file counter as the core reports them", () => {
@@ -44,7 +45,33 @@ describe("useScanProgress", () => {
 
     emit("scan-phase", "files");
     emit("scan-progress", { done: 7, total: 20 });
-    expect(result.current).toEqual({ phase: "files", progress: { done: 7, total: 20 } });
+    expect(result.current.phase).toBe("files");
+    expect(result.current.progress).toEqual({ done: 7, total: 20 });
+  });
+
+  it("clears the stale progress counter when a new scan's harness phase starts", () => {
+    const { result } = renderHook(() => useScanProgress());
+
+    emit("scan-phase", "files");
+    emit("scan-progress", { done: 7, total: 20 });
+    expect(result.current.progress).toEqual({ done: 7, total: 20 });
+
+    // A rescan starts back at "harness" — the previous run's done/total pair
+    // is stale and must not linger until the first new scan-progress arrives.
+    emit("scan-phase", "harness");
+    expect(result.current.progress).toBeNull();
+  });
+
+  it("exposes a reset() that clears phase and progress for a caller-triggered restart", () => {
+    const { result } = renderHook(() => useScanProgress());
+
+    emit("scan-phase", "files");
+    emit("scan-progress", { done: 3, total: 9 });
+
+    act(() => result.current.reset());
+
+    expect(result.current.phase).toBeNull();
+    expect(result.current.progress).toBeNull();
   });
 
   it("unsubscribes from both events on unmount", async () => {

@@ -66,8 +66,8 @@
   "actions": {
     "blocking": [
       {
-        "title": "Review & merge the three open PRs",
-        "detail": "PR #69 license vendor CLI (issue #67), PR #70 release workflow + version bump script (issue #29), PR #71 this dashboard (issue #68). All tests green; each PR body lists what was verified.",
+        "title": "Review & merge the Phase 7 PR stack in order",
+        "detail": "#114 docs → #115 phase 0 → #116 harness core → #117 Claude Code harness → #118 persistence/IPC → #112's PR (Setup UI). Merge in that order since each builds on the last; all tests green, each PR body lists what was verified.",
         "kind": "review"
       },
       {

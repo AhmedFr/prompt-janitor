@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { isTauri } from "./ipc";
 
@@ -15,6 +15,12 @@ export interface ScanProgress {
 export interface ScanProgressState {
   phase: ScanPhase | null;
   progress: ScanProgress | null;
+  /**
+   * Clears phase and progress back to "nothing known yet". A caller kicking
+   * off a fresh scan (the Setup Rescan button) calls this before firing it,
+   * so the bar doesn't flash the previous run's counter for a frame.
+   */
+  reset: () => void;
 }
 
 /**
@@ -33,7 +39,13 @@ export function useScanProgress(): ScanProgressState {
     // Outside the desktop runtime there is no event bus to subscribe to, and
     // `listen` would hand back a rejected promise nobody is waiting on.
     if (!isTauri) return;
-    const phases = listen<ScanPhase>("scan-phase", (e) => setPhase(e.payload));
+    const phases = listen<ScanPhase>("scan-phase", (e) => {
+      setPhase(e.payload);
+      // "harness" is where every scan begins. Whatever `progress` held is
+      // the last scan's done/total pair — carrying it forward would show a
+      // stale counter until the new run's first scan-progress arrives.
+      if (e.payload === "harness") setProgress(null);
+    });
     const progresses = listen<ScanProgress>("scan-progress", (e) => setProgress(e.payload));
     return () => {
       void phases.then((fn) => fn());
@@ -41,7 +53,12 @@ export function useScanProgress(): ScanProgressState {
     };
   }, []);
 
-  return { phase, progress };
+  const reset = useCallback(() => {
+    setPhase(null);
+    setProgress(null);
+  }, []);
+
+  return { phase, progress, reset };
 }
 
 const HARNESS_STATUS = (name: string) => `Indexing ${name} sessions…`;

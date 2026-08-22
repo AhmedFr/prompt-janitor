@@ -56,7 +56,14 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
         <h1 className="screen__title">Setup</h1>
         <span className="toolbar-spacer" />
         {detected.length > 0 && (
-          <Button size="sm" disabled={busy} onClick={() => void run(rescan)}>
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => {
+              scan.reset();
+              void run(rescan);
+            }}
+          >
             <Icon name="refresh" /> {busy ? "Scanning…" : "Rescan"}
           </Button>
         )}
