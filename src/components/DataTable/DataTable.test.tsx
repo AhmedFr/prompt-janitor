@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "./DataTable";
 import { ActionsCell } from "./cells";
-import { ROW_HEIGHT } from "./DataTable.constants";
+import { ROW_HEIGHT, SEARCH_DEBOUNCE_MS } from "./DataTable.constants";
 import type { DataTableProps, PillGroup } from "./DataTable.types";
 
 // Passes straight through to the real virtualiser, only counting `measure()`
@@ -74,6 +74,20 @@ const TOGGLE_COLUMN: ColumnDef<Row, any> = {
   ),
 };
 
+/** Counts how often the body re-renders, from inside a cell. */
+const cellRenders = { count: 0 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const COUNTING_COLUMN: ColumnDef<Row, any> = {
+  id: "counted",
+  header: "Counted",
+  enableSorting: false,
+  cell: () => {
+    cellRenders.count += 1;
+    return <span>·</span>;
+  },
+};
+
 const PILLS: PillGroup<Row>[] = [
   {
     id: "kind",
@@ -85,6 +99,21 @@ const PILLS: PillGroup<Row>[] = [
     ],
   },
 ];
+
+/** Two groups, so "faceted" has another group's selection to be faceted by. */
+const TWO_GROUPS: PillGroup<Row>[] = [
+  PILLS[0],
+  {
+    id: "score",
+    label: "Score",
+    options: [
+      { id: "low", label: "Low", predicate: (r) => r.score < 3 },
+      { id: "high", label: "High", predicate: (r) => r.score >= 3 },
+    ],
+  },
+];
+
+const SEARCH = { placeholder: "Search artifacts", keys: ["name" as const] };
 
 function setup(overrides: Partial<DataTableProps<Row>> = {}) {
   const props: DataTableProps<Row> = {
@@ -147,6 +176,7 @@ beforeEach(() => {
   window.sessionStorage.clear();
   onAction.mockClear();
   virtual.measures = 0;
+  cellRenders.count = 0;
 });
 afterEach(cleanup);
 
@@ -486,6 +516,222 @@ describe("DataTable", () => {
 
   it("has no axe violations when clickable rows carry row actions", async () => {
     const { container } = setup({ columns: [...COLUMNS, ACTIONS_COLUMN], onRowClick: vi.fn() });
+    expect(await axe(container)).toHaveNoViolations();
+  });
+  it("hands a group's count off to the chip that owns it", () => {
+    setup({ pills: TWO_GROUPS });
+    const score = screen.getByRole("group", { name: "Score" });
+    expect(within(score).getByRole("button", { name: /Low/ })).toHaveTextContent("2");
+    expect(within(score).getByRole("button", { name: /High/ })).toHaveTextContent("1");
+  });
+
+  it("counts chips over the searched slice, not the whole table", async () => {
+    setup({ pills: PILLS, search: SEARCH });
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "alp" } });
+    await waitFor(() => expect(rowNames()).toEqual(["Alpha"]));
+
+    // Alpha is the only match and it is a rule: a "Prompts 1" chip here would
+    // promise a row the search has already excluded.
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("0");
+  });
+
+  it("counts chips within the other groups' selections", () => {
+    setup({ pills: TWO_GROUPS });
+
+    fireEvent.click(screen.getByRole("button", { name: /High/ }));
+
+    // Only Alpha scores >= 3, and it is a rule.
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("0");
+  });
+
+  it("keeps a group's own chips counted as if nothing in it were selected", () => {
+    setup({ pills: TWO_GROUPS });
+
+    fireEvent.click(screen.getByRole("button", { name: /Rules/ }));
+
+    // Picking Rules must not zero Prompts — that count is the way back out.
+    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("2");
+    // The other group is faceted by the rule selection: Bravo (score 1) is gone.
+    expect(screen.getByRole("button", { name: /Low/ })).toHaveTextContent("1");
+  });
+
+  it("labels each pill group visibly, not only for assistive tech", () => {
+    const { container } = setup({ pills: TWO_GROUPS });
+    const labels = [...container.querySelectorAll(".dt__pill-group-label")].map((el) => el.textContent);
+    expect(labels).toEqual(["Kind", "Score"]);
+    // The visible label is what names the group, so the name is spelled once.
+    expect(screen.getByRole("group", { name: "Score" })).toBeInTheDocument();
+  });
+
+  it("does not carry a half-typed search onto the next table key", async () => {
+    const props: DataTableProps<Row> = {
+      columns: COLUMNS,
+      rows: ROWS,
+      rowId: (r) => r.id,
+      empty: { title: "none" },
+      stateKey: "tab-a",
+      ariaLabel: "Artifacts",
+      search: SEARCH,
+    };
+    const { rerender } = render(<DataTable {...props} />);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "brav" } });
+    rerender(<DataTable {...props} stateKey="tab-b" />);
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS * 3));
+    });
+
+    expect(window.sessionStorage.getItem("pj.table.tab-b")).toBeNull();
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]);
+  });
+
+  it("restores the new key's own remembered search when the key changes", async () => {
+    window.sessionStorage.setItem(
+      "pj.table.tab-b",
+      JSON.stringify({ search: "charl", pills: {}, sort: null }),
+    );
+    const props: DataTableProps<Row> = {
+      columns: COLUMNS,
+      rows: ROWS,
+      rowId: (r) => r.id,
+      empty: { title: "none" },
+      stateKey: "tab-a",
+      ariaLabel: "Artifacts",
+      search: SEARCH,
+    };
+    const { rerender } = render(<DataTable {...props} />);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "brav" } });
+    rerender(<DataTable {...props} stateKey="tab-b" />);
+
+    expect(screen.getByRole("searchbox")).toHaveValue("charl");
+    await waitFor(() => expect(rowNames()).toEqual(["Charlie"]));
+  });
+
+  it("re-renders only the search box while typing, not every row", async () => {
+    setup({ columns: [...COLUMNS, COUNTING_COLUMN], search: SEARCH });
+    const before = cellRenders.count;
+    expect(before).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "brav" } });
+    expect(screen.getByRole("searchbox")).toHaveValue("brav");
+    // Keystrokes live in the search box until the debounce commits; the body
+    // has nothing new to say until then.
+    expect(cellRenders.count).toBe(before);
+
+    await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
+    expect(cellRenders.count).toBeGreaterThan(before);
+  });
+
+  it("virtualises a large table without being asked to", () => {
+    withSizedDom(ROW_HEIGHT.regular, () => {
+      const { container } = setup({ rows: manyRows(500) });
+      const rendered = container.querySelectorAll("tbody tr[data-row-id]");
+      expect(rendered.length).toBeGreaterThan(0);
+      expect(rendered.length).toBeLessThan(100);
+    });
+  });
+
+  it("re-reads a mutated pills array when its group ids change", () => {
+    const pills: PillGroup<Row>[] = [PILLS[0]];
+    const props: DataTableProps<Row> = {
+      columns: COLUMNS,
+      rows: ROWS,
+      rowId: (r) => r.id,
+      empty: { title: "none" },
+      stateKey: "test",
+      ariaLabel: "Artifacts",
+      pills,
+    };
+    const { rerender } = render(<DataTable {...props} />);
+
+    // Same array identity, new contents — the memo has to notice anyway.
+    pills.push(TWO_GROUPS[1]);
+    rerender(<DataTable {...props} />);
+
+    expect(screen.getByRole("button", { name: /High/ })).toHaveTextContent("1");
+  });
+
+  it("re-reads a mutated search config when its key count changes", async () => {
+    const search = { placeholder: "Search artifacts", keys: ["name"] as ("name" | "kind")[] };
+    const props: DataTableProps<Row> = {
+      columns: COLUMNS,
+      rows: ROWS,
+      rowId: (r) => r.id,
+      empty: { title: "none" },
+      stateKey: "test",
+      ariaLabel: "Artifacts",
+      search,
+    };
+    const { rerender } = render(<DataTable {...props} />);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "prompt" } });
+    // "prompt" is Bravo's kind, not its name — nothing matches on name alone.
+    await waitFor(() => expect(screen.getByText(/No rows match/)).toBeInTheDocument());
+
+    // Same object identity, one more key — the memo has to notice anyway.
+    search.keys.push("kind");
+    rerender(<DataTable {...props} />);
+    expect(rowNames()).toEqual(["Bravo"]);
+  });
+
+  it("marks the highlighted row and scrolls it into view", () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      const { container } = setup({ highlightRowId: "2" });
+      const row = container.querySelector(".dt__row--highlight") as HTMLElement;
+      expect(row).toHaveAttribute("data-row-id", "2");
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
+  it("survives a highlight when the environment has no scrollIntoView", () => {
+    expect(() => setup({ highlightRowId: "2" })).not.toThrow();
+  });
+
+  it("lets the caller class rows by what is in them", () => {
+    const { container } = setup({ rowClassName: (r) => (r.kind === "rule" ? "is-rule" : undefined) });
+    const rows = [...container.querySelectorAll("tbody tr[data-row-id]")];
+    expect(rows.map((tr) => tr.classList.contains("is-rule"))).toEqual([true, false, true]);
+  });
+
+  it("renders a busy skeleton instead of rows while loading", () => {
+    const { container } = setup({ loading: true });
+    expect(screen.getByRole("table", { name: "Artifacts" })).toHaveAttribute("aria-busy", "true");
+    expect(container.querySelectorAll(".dt__skeleton-row")).toHaveLength(5);
+    expect(container.querySelectorAll("tbody tr[data-row-id]")).toHaveLength(0);
+    // Not "nothing to show" — the table simply doesn't know yet.
+    expect(screen.queryByText("No artifacts yet")).not.toBeInTheDocument();
+  });
+
+  it("counts nothing while the rows are still loading", () => {
+    window.sessionStorage.setItem(
+      "pj.table.test",
+      JSON.stringify({ search: "alp", pills: {}, sort: null }),
+    );
+    setup({ loading: true, search: SEARCH });
+    expect(screen.queryByText(/of 3 rows/)).not.toBeInTheDocument();
+  });
+
+  it("does not claim to be busy once loading is over", () => {
+    setup();
+    expect(screen.getByRole("table", { name: "Artifacts" })).not.toHaveAttribute("aria-busy");
+  });
+
+  it("has no axe violations while loading", async () => {
+    const { container } = setup({ loading: true, search: SEARCH, pills: PILLS });
     expect(await axe(container)).toHaveNoViolations();
   });
 });

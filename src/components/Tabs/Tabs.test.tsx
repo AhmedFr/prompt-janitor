@@ -206,4 +206,47 @@ describe("Tabs", () => {
     expect(rules).toHaveAttribute("tabindex", "0");
     expect(screen.getByText("Panel: rules")).toBeInTheDocument();
   });
+  it("leaves the panel out of the tab sequence — its content is what you tab to", () => {
+    render(<Controlled />);
+    // A panel whose content is focusable (a table's rows, its search box) must
+    // not also be a tab stop of its own.
+    expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
+  });
+
+  it("renders no panel at all when there are no tabs", () => {
+    const { container } = render(
+      <Tabs items={[]} active="" onChange={vi.fn()} ariaLabel="Setup">
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>,
+    );
+    // An empty strip has no tab to point `aria-labelledby` at, and a panel
+    // labelled by nothing is worse than no panel.
+    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
+    expect(container.querySelector(".tabs__panel")).toBeNull();
+    expect(screen.getByRole("tablist", { name: "Setup" })).toBeInTheDocument();
+  });
+
+  it("has no axe violations with no tabs", async () => {
+    const { container } = render(
+      <Tabs items={[]} active="" onChange={vi.fn()} ariaLabel="Setup">
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("asks the parent to correct a stale tab once, not once per re-render", () => {
+    const onChange = vi.fn();
+    const render_ = (key: number) => (
+      // A fresh array each render, the way a parent that maps its data does.
+      <Tabs items={[...ITEMS]} active="does-not-exist" onChange={onChange} ariaLabel={`Setup ${key}`}>
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>
+    );
+    const { rerender } = render(render_(1));
+    rerender(render_(2));
+    rerender(render_(3));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
 });

@@ -10,19 +10,24 @@ const defaultFormat = (v: number) => v.toLocaleString();
 /**
  * The screenshot pattern: rows of `label · inline bar (share of max) · value`,
  * an optional selector above and a "Details" link below. Bars are
- * `--bar-fill` by default, `--bar-fill-error` under `variant="error"`.
+ * `--bar-fill` by default, `--bar-fill-error` under `variant="error"`; `max`
+ * pins what "full width" means when the values have a natural ceiling.
  */
 export function RankedList({
   title,
   rows,
   selector,
   limit = 10,
+  max: maxProp,
   variant = "default",
   format = defaultFormat,
   details,
   empty,
 }: RankedListProps) {
-  const { rows: ranked, max } = rankRows(rows, limit);
+  const { rows: ranked, max: sliceMax } = rankRows(rows, limit);
+  // A caller's ceiling wins over the slice's own top value; `<= 0` is not a
+  // denominator, so it falls through to "no bar" rather than to NaN.
+  const max = maxProp !== undefined ? maxProp : sliceMax;
   const headingId = useId();
 
   return (
@@ -80,7 +85,7 @@ export function RankedList({
               </>
             );
             return (
-              <li key={row.id} className="rl__row">
+              <li key={row.id} className="rl__row" title={row.title}>
                 {row.onClick ? (
                   <button type="button" className="rl__row-btn" onClick={row.onClick}>
                     {inner}

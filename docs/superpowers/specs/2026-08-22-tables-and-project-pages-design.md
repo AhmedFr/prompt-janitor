@@ -67,9 +67,15 @@ Two constraints the implementation settled (PR 1):
 
 ### 3.2 `Tabs` component (`src/components/Tabs/`)
 
-Accessible tab strip (`role=tablist/tab/tabpanel`, arrow-key navigation), count badge per tab,
-`?tab=` memory via the same `useTableState`. Replaces the ad-hoc strips in Analytics and
-Settings.
+Accessible tab strip (`role=tablist/tab/tabpanel`, arrow-key navigation), count badge per tab.
+Replaces the ad-hoc strips in Analytics and Settings.
+
+Memory landed as its own hook rather than through `useTableState` (PR 1): `useTabState(key,
+initial, validIds)` persists the active tab id under `pj.tabs.<key>` in `sessionStorage`,
+alongside — not inside — the `pj.table.<key>` entry a table on the same screen keeps. A tab
+strip has nothing but a string worth remembering, and a screen with both keeps them
+independent: switching tabs must not disturb the table's search, pills or sort. `Tabs` itself
+stays controlled; `validIds` re-resolves a remembered id that has since dropped out of the set.
 
 ### 3.3 `RankedList` component (`src/components/RankedList/`)
 

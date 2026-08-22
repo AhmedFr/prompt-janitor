@@ -78,33 +78,40 @@ export function useTableState(
   key: string,
   initial: TableState,
 ): [TableState, (patch: Partial<TableState>) => void, () => void] {
-  const [state, setState] = useState<TableState>(() => readStored(key, initial));
-  const [loadedKey, setLoadedKey] = useState(key);
+  // Key and state are one value, not two: a `patch` that read the key from a
+  // closure could write the previous tab's filters under the new tab's key in
+  // the render between them. Held together, every write names the key the
+  // state it merges into was loaded from.
+  const [loaded, setLoaded] = useState<{ key: string; state: TableState }>(() => ({
+    key,
+    state: readStored(key, initial),
+  }));
 
   // One component can render a different table per tab, changing `key` without
   // unmounting. Adjusting during render rather than in an effect keeps the
   // previous tab's filters from being painted under the new tab's key — and
-  // nothing is written back, so the old state never leaks onto the new key.
-  if (loadedKey !== key) {
-    setLoadedKey(key);
-    setState(readStored(key, initial));
+  // the fresh state is returned by *this* pass, so a caller deriving its own
+  // state from ours (the search box) never sees the old table's query.
+  let current = loaded;
+  if (loaded.key !== key) {
+    current = { key, state: readStored(key, initial) };
+    setLoaded(current);
   }
 
-  const patch = useCallback(
-    (next: Partial<TableState>) => {
-      setState((prev) => {
-        const merged = { ...prev, ...next };
-        writeStored(key, merged);
-        return merged;
-      });
-    },
-    [key],
-  );
+  const patch = useCallback((next: Partial<TableState>) => {
+    setLoaded((prev) => {
+      const merged = { ...prev.state, ...next };
+      writeStored(prev.key, merged);
+      return { key: prev.key, state: merged };
+    });
+  }, []);
 
   const reset = useCallback(() => {
-    clearStored(key);
-    setState(initial);
-  }, [key, initial]);
+    setLoaded((prev) => {
+      clearStored(prev.key);
+      return { key: prev.key, state: initial };
+    });
+  }, [initial]);
 
-  return [state, patch, reset];
+  return [current.state, patch, reset];
 }

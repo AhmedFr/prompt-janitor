@@ -4,7 +4,7 @@ import { RankedList } from "./RankedList";
 import type { RankedRow } from "./RankedList.types";
 
 const TOP_ROWS: RankedRow[] = [
-  { id: "1", label: "web-conventions", value: 96, secondary: "9 sessions" },
+  { id: "1", label: "web-conventions", value: 96, secondary: "9 sessions", title: "~/.claude/rules/web-conventions.md" },
   { id: "2", label: "release-checklist", value: 64, secondary: "5 sessions" },
   { id: "3", label: "pdf-extract", value: 41, secondary: "4 sessions" },
   { id: "4", label: "rust-review", value: 28, secondary: "3 sessions" },
@@ -30,11 +30,16 @@ export const Default: Story = {
   args: { title: "Top used", rows: TOP_ROWS, empty: "No usage recorded yet." },
 };
 
+/**
+ * Rates have a ceiling of their own: `max={1}` keeps a 40% error rate drawn as
+ * 40% of what can go wrong, instead of stretching it to the width of the list.
+ */
 export const ErrorVariant: Story = {
   args: {
     title: "Most errors",
     rows: ERROR_ROWS,
     variant: "error",
+    max: 1,
     format: (v) => `${Math.round(v * 100)}%`,
     empty: "No errors recorded yet.",
   },

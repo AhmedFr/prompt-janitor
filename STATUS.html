@@ -409,6 +409,14 @@
       <div class="phase__count">6/6</div>
       <p class="phase__note">Implementation complete across 7 stacked PRs: docs/spec (#114), phase 0 LLM providers (#115), harness core (#116), Claude Code harness (#117), persistence/orchestrator/IPC (#118), Setup UI (#119), and Detail merge position + Settings harness tab + docs (this PR, #113). Awaiting review &amp; merge in order.</p>
     </li>
+    <li class="phase phase--active">
+      <div class="phase__label"><span class="phase__name">Phase 8</span> Tables &amp; project pages</div>
+      <div class="phase__meter" role="img" aria-label="17% complete">
+        <div class="phase__fill" style="width:17%"></div>
+      </div>
+      <div class="phase__count">1/6</div>
+      <p class="phase__note">Six stacked PRs. Done: shared foundation — DataTable (search, faceted pill counts, tri-state sort, virtualisation), Tabs, RankedList and the shared cells (#126 PR). Next: backend read models, Setup tabs, project pages, Rules tabs, ranked analytics.</p>
+    </li>
     </ol>
   </section>
 
@@ -504,6 +512,10 @@
         <td><span class="stamp stamp--warn">PR open</span></td>
       </tr>
       <tr>
+        <td>Shared DataTable/Tabs/RankedList <span class="muted">— PR for #126 awaiting review — the table every screen is rebuilt on</span></td>
+        <td><span class="stamp stamp--warn">PR open</span></td>
+      </tr>
+      <tr>
         <td>Release pipeline (universal macOS DMG on tag) <span class="muted">— PR for #29 awaiting review</span></td>
         <td><span class="stamp stamp--warn">PR open</span></td>
       </tr>
@@ -526,7 +538,7 @@
   <section aria-labelledby="hl">
     <h2 id="hl"><span>Repo health <span class="muted">— as of 2026-08-22</span></span><span class="index">§4</span></h2>
     <div class="badges">
-      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>282/282 passing (40 files)</b></span><span class="badge">cargo test <b>267/267 passing</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
+      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>465/465 passing (51 files)</b></span><span class="badge">cargo test <b>267/267 passing</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
     </div>
   </section>
 
@@ -541,7 +553,7 @@
       <div>
         <h2><span>Recent changes</span><span class="index">§6</span></h2>
         <ul class="plain">
-          <li>2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses</li><li>2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs</li><li>2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)</li><li>2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve</li><li>2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard</li><li>2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)</li><li>2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture</li><li>2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)</li><li>2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused</li><li>2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)</li><li>2026-06-11 — Found &amp; fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)</li><li>2026-06-11 — Found &amp; fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)</li><li>2026-06-11 — This dashboard created (PR #71)</li><li>2026-07-21 — Fixed main CI: rustfmt drift in 3 files, clippy identity-op, landing pnpm allowBuilds placeholder blocked sharp</li>
+          <li>2026-08-22 — Table foundation: DataTable, Tabs, RankedList (#126 PR)</li><li>2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses</li><li>2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs</li><li>2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)</li><li>2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve</li><li>2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard</li><li>2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)</li><li>2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture</li><li>2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)</li><li>2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused</li><li>2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)</li><li>2026-06-11 — Found &amp; fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)</li><li>2026-06-11 — Found &amp; fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)</li><li>2026-06-11 — This dashboard created (PR #71)</li><li>2026-07-21 — Fixed main CI: rustfmt drift in 3 files, clippy identity-op, landing pnpm allowBuilds placeholder blocked sharp</li>
         </ul>
       </div>
     </div>

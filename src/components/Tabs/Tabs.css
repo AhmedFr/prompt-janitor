@@ -46,13 +46,16 @@
   outline-offset: 1px;
 }
 
+/* The number is the point of the badge, so it takes the primary ink: --sep
+   over the strip's --group composites to #dfdfe1, where --text-2 reaches only
+   3.81:1. Ratios measured in tabs.contrast.test.ts. */
 .tabs__count {
   min-width: 1.4em;
   text-align: center;
   padding: 0 5px;
   border-radius: var(--r-pill);
   background: var(--sep);
-  color: var(--text-2);
+  color: var(--text);
   font-size: 11px;
 }
 
@@ -61,11 +64,8 @@
   color: var(--blue-press);
 }
 
+/* Not a tab stop: the panel's content (a table's search box, its rows) owns
+   the focus, and a wrapper that also stops the cursor just adds a step. */
 .tabs__panel {
   min-width: 0;
-}
-
-.tabs__panel:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 2px;
 }

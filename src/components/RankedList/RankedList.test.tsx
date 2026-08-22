@@ -201,4 +201,58 @@ describe("RankedList", () => {
     const { container } = render(<RankedList title="Top used" rows={[]} empty="Nothing yet" />);
     expect(await axe(container)).toHaveNoViolations();
   });
+  it("pins bar widths to a caller-supplied max", () => {
+    const { container } = render(
+      <RankedList
+        title="Most errors"
+        rows={[
+          { id: "a", label: "x", value: 0.4 },
+          { id: "b", label: "y", value: 0.1 },
+        ]}
+        empty="Nothing yet"
+        max={1}
+      />,
+    );
+    const bars = container.querySelectorAll(".rl__bar");
+    // A 40% error rate is 40% of what can go wrong, not 100% of this list.
+    expect((bars[0] as HTMLElement).style.width).toBe("40%");
+    expect((bars[1] as HTMLElement).style.width).toBe("10%");
+  });
+
+  it("falls back to the slice's own max when none is given", () => {
+    const { container } = render(
+      <RankedList
+        title="Most errors"
+        rows={[
+          { id: "a", label: "x", value: 0.4 },
+          { id: "b", label: "y", value: 0.1 },
+        ]}
+        empty="Nothing yet"
+      />,
+    );
+    expect((container.querySelectorAll(".rl__bar")[0] as HTMLElement).style.width).toBe("100%");
+  });
+
+  it("ignores a max of zero rather than dividing by it", () => {
+    const { container } = render(
+      <RankedList title="Top used" rows={[{ id: "a", label: "x", value: 5 }]} empty="Nothing yet" max={0} />,
+    );
+    expect((container.querySelectorAll(".rl__bar")[0] as HTMLElement).style.width).toBe("0%");
+  });
+
+  it("hangs a row's title on the row as a native tooltip", () => {
+    render(
+      <RankedList
+        title="Top used"
+        rows={[{ id: "a", label: "pdf-extract", value: 5, title: "~/.claude/skills/pdf-extract" }]}
+        empty="Nothing yet"
+      />,
+    );
+    expect(screen.getByRole("listitem")).toHaveAttribute("title", "~/.claude/skills/pdf-extract");
+  });
+
+  it("leaves the title off a row that has none", () => {
+    render(<RankedList title="Top used" rows={ROWS} empty="Nothing yet" />);
+    expect(screen.getAllByRole("listitem")[0]).not.toHaveAttribute("title");
+  });
 });

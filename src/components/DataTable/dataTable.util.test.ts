@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import type { PillGroup, TableState } from "./DataTable.types";
-import { applyFilters, matchesPills, matchesSearch, pillCounts } from "./dataTable.util";
+import {
+  applyFilters,
+  facetedPillCounts,
+  matchesPills,
+  matchesSearch,
+  pillCounts,
+} from "./dataTable.util";
 
 interface Row {
   name: string;
@@ -130,5 +136,74 @@ describe("pillCounts", () => {
       ],
     };
     expect(pillCounts(rows, group)).toEqual({ rule: 1, prompt: 1, missing: 0 });
+  });
+});
+
+describe("facetedPillCounts", () => {
+  const kind: PillGroup<Row> = {
+    id: "kind",
+    label: "Kind",
+    multi: true,
+    options: [
+      { id: "rule", label: "Rule", predicate: (r) => r.kind === "rule" },
+      { id: "prompt", label: "Prompt", predicate: (r) => r.kind === "prompt" },
+      { id: "skill", label: "Skill", predicate: (r) => r.kind === "skill" },
+    ],
+  };
+  const status: PillGroup<Row> = {
+    id: "status",
+    label: "Status",
+    options: [
+      { id: "archived", label: "Archived", predicate: (r) => r.archived },
+      { id: "live", label: "Live", predicate: (r) => !r.archived },
+    ],
+  };
+  const search = { placeholder: "Search", keys: ["name" as const] };
+  const st = (patch: Partial<TableState> = {}): TableState => ({
+    search: "",
+    pills: {},
+    sort: null,
+    ...patch,
+  });
+
+  it("counts every option over the whole set when nothing is filtered", () => {
+    expect(facetedPillCounts(rows, [kind, status], st(), search)).toEqual({
+      kind: { rule: 1, prompt: 1, skill: 1 },
+      status: { archived: 1, live: 2 },
+    });
+  });
+
+  it("counts only rows the search kept", () => {
+    const counts = facetedPillCounts(rows, [kind, status], st({ search: "web" }), search);
+    expect(counts.kind).toEqual({ rule: 1, prompt: 0, skill: 0 });
+    expect(counts.status).toEqual({ archived: 0, live: 1 });
+  });
+
+  it("narrows a group's counts by the other groups' selections", () => {
+    const counts = facetedPillCounts(
+      rows,
+      [kind, status],
+      st({ pills: { status: ["archived"] } }),
+      search,
+    );
+    // Only docs-skill is archived, so the kind chips count within that slice.
+    expect(counts.kind).toEqual({ rule: 0, prompt: 0, skill: 1 });
+  });
+
+  it("excludes a group's own selection from its counts, so its chips stay clickable", () => {
+    const counts = facetedPillCounts(rows, [kind, status], st({ pills: { kind: ["rule"] } }), search);
+    // Picking "rule" must not zero out "prompt" — that is how the user un-picks.
+    expect(counts.kind).toEqual({ rule: 1, prompt: 1, skill: 1 });
+    // The other group still narrows to the rule slice.
+    expect(counts.status).toEqual({ archived: 0, live: 1 });
+  });
+
+  it("skips a group that ships its own counts", () => {
+    const precomputed: PillGroup<Row> = {
+      id: "kind",
+      label: "Kind",
+      options: [{ id: "rule", label: "Rule", predicate: () => false, count: 42 }],
+    };
+    expect(facetedPillCounts(rows, [precomputed], st(), search)).toEqual({});
   });
 });

@@ -146,7 +146,15 @@ export function columnsFor(kind: ArtifactKind, ctx: { onOpen: (fileId: string) =
 export function pillsFor(kind: ArtifactKind, rows: ArtifactView[], costBar: number | null, projectNames: Map<string,string>): PillGroup<ArtifactView>[]  // Scope, Never used, Errors, High cost, Plugin-bundled
 export function defaultSortFor(kind: ArtifactKind): { id: string; desc: boolean }   // rules: grade asc; others: uses desc
 ```
-- [ ] Step 1: failing tests — `columnsFor("skill")` ids `["name","scope","uses","errorRate","avgTokens","size","actions"]`; `columnsFor("rule")` includes `grade`, excludes usage; hook rows render "event: cmd" in the name cell; `pillsFor` builds one Scope option per project present + Global; predicates correct; `defaultSortFor`.
+**Memoisation (from PR 1 review):** `DataTableProps.columns/pills/search` are documented as
+identity-stable — `columnsFor`/`pillsFor` must therefore hand back the *same* array for the
+same inputs, not a fresh one per render. Build a module-level cache keyed by kind (plus the
+context the defs close over) and return from it; a screen that calls `columnsFor(kind)` inline
+would rebuild the column model, the filtered set and every chip count on every keystroke. The
+table's memos also key on pill group ids and search key count, so a cache that returns a
+stale-but-stable array is caught — but only for shape changes, not for content.
+
+- [ ] Step 1: failing tests — `columnsFor("skill")` ids `["name","scope","uses","errorRate","avgTokens","size","actions"]`; `columnsFor("rule")` includes `grade`, excludes usage; hook rows render "event: cmd" in the name cell; `pillsFor` builds one Scope option per project present + Global; predicates correct; `defaultSortFor`; `columnsFor`/`pillsFor` return identical references when called twice with the same inputs.
 - [ ] Steps 2–4; commit `feat(setup): column and pill definitions`.
 
 ### Task 9: Setup screen rewrite

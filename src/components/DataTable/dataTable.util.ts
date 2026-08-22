@@ -71,3 +71,29 @@ export function pillCounts<Row>(rows: Row[], group: PillGroup<Row>): Record<stri
   }
   return counts;
 }
+
+/**
+ * Chip counts that answer the only question a chip is ever asked: "how many
+ * rows would I get if I clicked this?". Each group counts over the rows the
+ * search and the *other* groups already kept, excluding its own selection —
+ * so a count is never a promise the table can't keep (a chip reading 12 that
+ * yields 3 once the search is on), and picking one chip in a group never
+ * zeroes its siblings, which is how the user un-picks it.
+ *
+ * A group whose every option ships a `count` (a Rust rollup, say) is skipped:
+ * the caller already knows, and a faceted pass over every row would be waste.
+ */
+export function facetedPillCounts<Row>(
+  rows: Row[],
+  groups: PillGroup<Row>[],
+  state: TableState,
+  search: DataTableProps<Row>["search"] | undefined,
+): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const group of groups) {
+    if (group.options.every((option) => option.count != null)) continue;
+    const others = { ...state, pills: { ...state.pills, [group.id]: [] }, sort: null };
+    out[group.id] = pillCounts(applyFilters(rows, others, search, groups), group);
+  }
+  return out;
+}

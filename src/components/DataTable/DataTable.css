@@ -68,7 +68,21 @@
 .dt__pills {
   display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+/* The visible boundary between one group of chips and the next — and the
+   accessible name of the group, via aria-labelledby, so it is written once.
+   --text-2 on the toolbar's white ground is 5.07:1 (see
+   dataTable.contrast.test.ts). */
+.dt__pill-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 
 .dt__pill {
@@ -84,8 +98,11 @@
   cursor: pointer;
 }
 
+/* --blue-press, not --blue: white on --blue is 3.65:1 — fine for the chip's
+   shape, short of AA for the label inside it; on --blue-press it is 5.62:1.
+   The pressed chip is text first. Measured in dataTable.contrast.test.ts. */
 .dt__pill--on {
-  background: var(--blue);
+  background: var(--blue-press);
   color: #fff;
   border-color: transparent;
 }
@@ -108,9 +125,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* White on rgba(255,255,255,…) over --blue never clears AA; the active count
-   sits on a darkened pill and inherits the chip's own white instead — the
-   same pairing `Setup.css` documents. */
+/* White on rgba(255,255,255,…) over the chip never clears AA; the active count
+   sits on a darkened patch of --blue-press (composited #004fb7, 7.49:1 against
+   white) and inherits the chip's own white instead — the same pairing
+   `Setup.css` documents. */
 .dt__pill--on .dt__pill-count {
   background: rgba(0, 0, 0, 0.18);
   color: inherit;
@@ -164,12 +182,15 @@
   cursor: pointer;
 }
 
-/* Unsorted columns keep a faint glyph rather than none: an indicator that only
+/* Unsorted columns keep a quiet glyph rather than none: an indicator that only
    appears once you have already clicked doesn't tell you the column is
-   sortable in the first place. */
+   sortable in the first place. --text-2 rather than --text-3 because the glyph
+   *is* the affordance — 4.66:1 on the sticky header's --group ground, where
+   --text-3 managed 2.57:1 and missed even the 3:1 non-text floor. Measured in
+   dataTable.contrast.test.ts. */
 .dt__sort-glyph {
   font-size: 9px;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .dt__sort-glyph[data-sort="ascending"],
@@ -200,6 +221,12 @@
   cursor: pointer;
 }
 
+/* The row the screen navigated to. A tint rather than an outline: the row is
+   where you landed, not where focus is. */
+.dt__row--highlight {
+  background: var(--blue-tint);
+}
+
 .dt__row--clickable:hover {
   background: var(--group);
 }
@@ -212,6 +239,35 @@
 .dt__spacer td {
   padding: 0;
   border: 0;
+}
+
+/* ---------- loading ---------- */
+
+/* A body-shaped placeholder, so the table doesn't say "nothing here" before it
+   knows. `aria-hidden` on the rows and `aria-busy` on the table keep the
+   shimmer out of the accessibility tree entirely. */
+.dt__skeleton {
+  display: block;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  animation: dt-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dt-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt__skeleton {
+    animation: none;
+  }
 }
 
 /* ---------- empty + footer ---------- */

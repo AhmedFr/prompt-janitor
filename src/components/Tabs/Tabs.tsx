@@ -22,6 +22,11 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
   const uid = useId();
   const tabEls = useRef<Record<string, HTMLButtonElement | null>>({});
 
+  // The tab set's *identity* changes on every render of a parent that maps its
+  // data; its *contents* are what a correction depends on. Keyed on the ids so
+  // a stale `active` is corrected once, not once per parent render.
+  const itemIds = items.map((item) => item.id).join(" ");
+
   const activeIndex = items.findIndex((item) => item.id === active);
   const effectiveIndex = activeIndex === -1 ? 0 : activeIndex;
   const effectiveActive = items[effectiveIndex]?.id ?? active;
@@ -30,11 +35,12 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
     if (items.length > 0 && !items.some((item) => item.id === active)) {
       onChange(items[0].id);
     }
-    // `onChange` is intentionally excluded: only `active`/`items` going out of
-    // sync should trigger the correction, not the parent handing in a new
-    // (often inline, identity-unstable) function on every render.
+    // `onChange` and `items` are intentionally excluded: only `active` and the
+    // tab *ids* going out of sync should trigger the correction, not a parent
+    // handing in a new (often inline, identity-unstable) function or a freshly
+    // mapped array on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, items]);
+  }, [active, itemIds]);
 
   const selectAt = (index: number) => {
     const item = items[index];
@@ -98,15 +104,20 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
         })}
       </div>
 
-      <div
-        className="tabs__panel"
-        role="tabpanel"
-        id={`${uid}-panel-${effectiveActive}`}
-        aria-labelledby={`${uid}-tab-${effectiveActive}`}
-        tabIndex={0}
-      >
-        {children(effectiveActive)}
-      </div>
+      {/* No tabs, no panel: there would be no tab for `aria-labelledby` to
+          name, and a panel labelled by a missing id is worse than none. The
+          panel is not a tab stop either — what you tab to is the content in
+          it, which owns its own focusables. */}
+      {items.length > 0 && (
+        <div
+          className="tabs__panel"
+          role="tabpanel"
+          id={`${uid}-panel-${effectiveActive}`}
+          aria-labelledby={`${uid}-tab-${effectiveActive}`}
+        >
+          {children(effectiveActive)}
+        </div>
+      )}
     </div>
   );
 }

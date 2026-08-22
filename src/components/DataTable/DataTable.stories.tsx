@@ -202,7 +202,19 @@ export const Empty: Story = {
   },
 };
 
-/** Filters that match nothing: the way out is a button, not a dead end. */
+/** Rows on their way: a skeleton body rather than a premature "nothing here". */
+export const Loading: Story = { args: { ...base, stateKey: "sb-loading", rows: [], loading: true } };
+
+/** Landed on a row from somewhere else: it is tinted and scrolled to. */
+export const Highlighted: Story = {
+  args: { ...base, stateKey: "sb-highlight", highlightRowId: "3", onRowClick: () => {} },
+};
+
+/**
+ * Filters that match nothing: the way out is a button, not a dead end. Every
+ * chip reads 0 — counts are faceted by the search, so none of them promises a
+ * row this view could not produce.
+ */
 export const NoMatches: Story = {
   args: { ...base, stateKey: "sb-nomatch", pills: PILLS },
   decorators: [

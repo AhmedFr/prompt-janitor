@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   type CSSProperties,
   type KeyboardEvent,
@@ -8,13 +9,14 @@ import {
 } from "react";
 import { flexRender, type Header, type Row as TanstackRow } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Icon } from "@/components/Icon";
 import type { DataTableProps } from "./DataTable.types";
 import { useDataTable } from "./useDataTable";
+import { DataTableSearch } from "./DataTableSearch";
 import {
   CLEAR_FILTERS_LABEL,
   NO_MATCH_TITLE,
   ROW_HEIGHT,
+  SKELETON_ROWS,
   VIRTUAL_OVERSCAN,
   VIRTUAL_THRESHOLD,
 } from "./DataTable.constants";
@@ -59,18 +61,21 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     onRowClick,
     empty,
     density = "regular",
-    virtualize,
+    virtualize = true,
     toolbarRight,
     ariaLabel,
     rowId,
     rowLabel,
+    highlightRowId,
+    rowClassName,
+    loading = false,
+    stateKey,
   } = props;
 
   const {
     table,
     state,
-    query,
-    setQuery,
+    setSearch,
     toggleSort,
     togglePill,
     clearFilters,
@@ -81,8 +86,9 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   } = useDataTable(props);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const modelRows = table.getRowModel().rows;
-  const isVirtual = !!virtualize && modelRows.length > VIRTUAL_THRESHOLD;
+  const uid = useId();
+  const modelRows = loading ? [] : table.getRowModel().rows;
+  const isVirtual = virtualize && modelRows.length > VIRTUAL_THRESHOLD;
 
   const virtualizer = useVirtualizer({
     count: isVirtual ? modelRows.length : 0,
@@ -96,6 +102,19 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   useEffect(() => {
     virtualizer.measure();
   }, [density, virtualizer]);
+
+  // Landing on a row is only useful if the row is on screen. Guarded because
+  // jsdom (and any non-browser renderer) has no `scrollIntoView` at all.
+  useEffect(() => {
+    if (!highlightRowId) return;
+    // Matched by dataset rather than by selector: a row id is a file path or
+    // a plugin name, not something that has to survive CSS escaping.
+    const rows = scrollRef.current?.querySelectorAll<HTMLElement>("tr[data-row-id]") ?? [];
+    const row = [...rows].find((el) => el.dataset.rowId === highlightRowId);
+    if (row && typeof row.scrollIntoView === "function") row.scrollIntoView({ block: "center" });
+    // Keyed on the id alone: re-scrolling every time the rows change would
+    // fight the user for the scrollbar.
+  }, [highlightRowId]);
 
   const items = virtualizer.getVirtualItems();
   const padTop = isVirtual && items.length > 0 ? items[0].start : 0;
@@ -141,22 +160,28 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       {(showFilters || toolbarRight) && (
         <div className="dt__toolbar">
           {showFilters && search && (
-            <div className="dt__search">
-              <Icon name="search" size={14} />
-              <input
-                type="search"
-                className="dt__search-input"
-                value={query}
-                placeholder={search.placeholder}
-                aria-label={search.placeholder}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </div>
+            <DataTableSearch
+              placeholder={search.placeholder}
+              value={state.search}
+              onCommit={setSearch}
+              resetKey={stateKey}
+            />
           )}
 
           {showFilters &&
             pills?.map((group) => (
-              <div className="dt__pills" role="group" aria-label={group.label} key={group.id}>
+              <div
+                className="dt__pills"
+                role="group"
+                aria-labelledby={`${uid}-pills-${group.id}`}
+                key={group.id}
+              >
+                {/* The group's name is spelled once, visibly: a "Rules 2" chip
+                    two chips away from "Global 4" is only readable when the
+                    boundary between the two groups is on screen. */}
+                <span className="dt__pill-group-label" id={`${uid}-pills-${group.id}`}>
+                  {group.label}
+                </span>
                 {group.options.map((option) => {
                   const on = (state.pills[group.id] ?? []).includes(option.id);
                   return (
@@ -185,6 +210,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
         <table
           className="dt__table"
           aria-label={ariaLabel}
+          aria-busy={loading || undefined}
           // Only meaningful while rows are missing from the DOM; a full table
           // already tells assistive tech how many rows there are.
           aria-rowcount={isVirtual ? modelRows.length + 1 : undefined}
@@ -226,6 +252,17 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           </thead>
 
           <tbody>
+            {loading &&
+              Array.from({ length: SKELETON_ROWS }, (_, index) => (
+                <tr key={`skeleton-${index}`} className="dt__skeleton-row" aria-hidden="true">
+                  {table.getAllLeafColumns().map((column) => (
+                    <td key={column.id} className="dt__cell">
+                      <span className="dt__skeleton" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
             {padTop > 0 && (
               <tr aria-hidden="true" className="dt__spacer">
                 <td colSpan={columnCount} style={{ height: padTop }} />
@@ -241,7 +278,12 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
                 // the estimate, and unmeasured rows drift the scrollbar.
                 ref={isVirtual ? virtualizer.measureElement : undefined}
                 aria-rowindex={isVirtual ? items[index].index + 2 : undefined}
-                className={cx("dt__row", onRowClick && "dt__row--clickable")}
+                className={cx(
+                  "dt__row",
+                  onRowClick && "dt__row--clickable",
+                  highlightRowId === row.id && "dt__row--highlight",
+                  rowClassName?.(row.original),
+                )}
                 {...(onRowClick
                   ? {
                       tabIndex: 0,
@@ -271,7 +313,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
               </tr>
             )}
 
-            {modelRows.length === 0 && (
+            {!loading && modelRows.length === 0 && (
               <tr className="dt__empty-row">
                 <td colSpan={columnCount}>
                   {total === 0 ? (
@@ -294,7 +336,8 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
         </table>
       </div>
 
-      {isFiltered && rows.length > 0 && (
+      {/* Nothing to count while the rows are still on their way. */}
+      {!loading && isFiltered && rows.length > 0 && (
         <p className="dt__footer">
           {filteredCount} of {total} rows
         </p>

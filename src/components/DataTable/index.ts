@@ -1,13 +1,21 @@
 export { DataTable } from "./DataTable";
-export { useDataTable, SEARCH_DEBOUNCE_MS } from "./useDataTable";
+export { useDataTable } from "./useDataTable";
 export { useTableState } from "./useTableState";
-export { applyFilters, matchesPills, matchesSearch, pillCounts } from "./dataTable.util";
+export {
+  applyFilters,
+  facetedPillCounts,
+  matchesPills,
+  matchesSearch,
+  pillCounts,
+} from "./dataTable.util";
 export {
   VIRTUAL_THRESHOLD,
   ROW_HEIGHT,
   VIRTUAL_OVERSCAN,
   NO_MATCH_TITLE,
   CLEAR_FILTERS_LABEL,
+  SEARCH_DEBOUNCE_MS,
+  SKELETON_ROWS,
 } from "./DataTable.constants";
 export {
   GradeCell,

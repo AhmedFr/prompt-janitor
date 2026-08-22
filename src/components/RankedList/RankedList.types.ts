@@ -8,6 +8,8 @@ export interface RankedRow {
   /** Extra value shown at the row's end, e.g. "12 uses" next to an error rate. */
   secondary?: string;
   glyph?: ReactNode;
+  /** Native tooltip on the row — the full path behind a truncated label. */
+  title?: string;
   /** Makes the row a button — e.g. opening the matching Setup row. */
   onClick?: () => void;
 }
@@ -26,11 +28,12 @@ export interface RankedListDetails {
 }
 
 /**
- * A bar's width is `value / max`, where `max` is the largest value among the
- * rows actually rendered — the `limit`-sliced set, not the full `rows` array
- * (see `rankRows`). Two lists fed the same `rows` but different `limit`s can
- * therefore draw the same row's bar at different widths: cutting the top row
- * out of view changes what "full width" means for everything still on screen.
+ * A bar's width is `value / max`. By default `max` is the largest value among
+ * the rows actually rendered — the `limit`-sliced set, not the full `rows`
+ * array (see `rankRows`). Two lists fed the same `rows` but different `limit`s
+ * can therefore draw the same row's bar at different widths: cutting the top
+ * row out of view changes what "full width" means for everything still on
+ * screen. Pass {@link RankedListProps.max} to pin the denominator instead.
  */
 export interface RankedListProps {
   title: string;
@@ -38,6 +41,12 @@ export interface RankedListProps {
   selector?: RankedListSelector;
   /** Rows shown, sorted desc by value. Defaults to 10 — also the row count `max` is computed over. */
   limit?: number;
+  /**
+   * Pins the denominator every bar is a share of, for values that already have
+   * a natural ceiling — a 40% error rate is 40% of what can go wrong, not
+   * 100% of this particular list. Ignored when `<= 0`.
+   */
+  max?: number;
   /** Tints the bars red for "most errors"-style lists. */
   variant?: "default" | "error";
   /** How a row's `value` renders next to its bar. Defaults to `toLocaleString`. */
