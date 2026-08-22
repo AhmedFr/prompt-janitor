@@ -25,3 +25,5 @@ ordered as a step-by-step ship checklist.
 - Version bumps: `pnpm bump <semver>` (syncs package.json, tauri.conf.json, Cargo.toml, Cargo.lock).
 - Rust: `cargo fmt`, `clippy --all-targets -- -D warnings`, and `cargo test` must pass (CI enforces).
 - License vendor flow: see README "Minting license keys".
+- Harness modules: screens, IPC commands and rules import `crate::harness::model` only — never `crate::harness::claude_code::*`.
+- Status dashboard: every PR updates `docs/status/data.json` + `pnpm status`.

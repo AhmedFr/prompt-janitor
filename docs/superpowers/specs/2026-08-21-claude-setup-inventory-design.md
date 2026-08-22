@@ -65,13 +65,15 @@ A manual "extra folder" remains available in Settings as an escape hatch.
 Slug decoding: `-Users-ahmedabouelleil-code-02-personal-aprocy` → `/Users/ahmedabouelleil/code/02-personal/aprocy`.
 Slugs are lossy — `-` may be a path separator, a literal dash, or a `.` (both
 `/` and `.` are encoded as `-`, so `~/.claude/worktrees/wt` becomes
-`--claude-worktrees-wt`); resolve by walking path components and preferring the
-longest existing prefix. The slug, not the log's `cwd`, is the project's
-identity: a session's `cwd` may be a subdirectory it was started in, or the
-parent repo of a git worktree, so `cwd` and its ancestors are searched for the
-one that re-encodes to this slug and only then does decoding take over. Projects
-whose path no longer exists are kept with `exists = false` (their usage history
-still counts) but are not scanned for files.
+`--claude-worktrees-wt`). The slug directory is the project's identity, but
+`cwd` is the primary slug→path disambiguator: each session log embeds `cwd`,
+and `cwd` (or one of its ancestors, since `cwd` may be a subdirectory the
+session was started in, or the parent repo of a git worktree) is checked first
+for whether it re-encodes to this slug. Only when no session's `cwd` resolves
+the slug does the harness fall back to walking path components and preferring
+the longest existing prefix. Projects whose path no longer exists are kept with
+`exists = false` (their usage history still counts) but are not scanned for
+files.
 
 ### 3.2 Usage depth: counts + outcomes (option B)
 
