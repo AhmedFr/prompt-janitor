@@ -259,6 +259,14 @@ const MIGRATIONS: &[&str] = &[
         SELECT 'extra_scan_folders', json_array(value) FROM settings WHERE key='scan_folder';
     DELETE FROM settings WHERE key='scan_folder';
     ",
+    // v10 — indexes for the per-project usage lookups the project list makes.
+    // `list_projects` runs two correlated subqueries per project: "artifacts
+    // this project configures, of the invocable kinds", and "does this
+    // artifact have a usage_stats row". Both were full table scans.
+    "
+    CREATE INDEX idx_usage_stats_artifact ON usage_stats(artifact_id);
+    CREATE INDEX idx_artifacts_project_kind ON artifacts(project_path, layer, kind);
+    ",
 ];
 
 /// Apply any migrations not yet applied. Idempotent.
@@ -509,6 +517,25 @@ mod tests {
             "idx_usage_stats_identity",
             "idx_sessions_parent",
         ] {
+            let n: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM sqlite_master WHERE type='index' AND name=?1",
+                    [index],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(n, 1, "missing index {index}");
+        }
+    }
+
+    #[test]
+    fn v10_indexes_the_usage_lookups_the_project_list_makes() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        // `list_projects` asks, per project, "which of its artifacts has a
+        // usage_stats row" and "which artifacts does it configure" — both were
+        // full scans before these indexes.
+        for index in ["idx_usage_stats_artifact", "idx_artifacts_project_kind"] {
             let n: i64 = conn
                 .query_row(
                     "SELECT count(*) FROM sqlite_master WHERE type='index' AND name=?1",

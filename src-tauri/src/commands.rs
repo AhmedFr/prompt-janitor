@@ -864,6 +864,7 @@ pub fn get_usage_overview(
 
 /// One project's usage over the last `window_days`, anchored to the current
 /// clock: what `harness` invoked there, and how often it was worked in.
+/// `window_days` is capped at a year — the daily series has a point per day.
 #[tauri::command]
 #[specta::specta]
 pub fn get_project_usage(

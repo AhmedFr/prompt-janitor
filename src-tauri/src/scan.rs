@@ -152,13 +152,31 @@ pub(crate) fn now_epoch() -> String {
         .unwrap_or_else(|_| "0".to_string())
 }
 
+/// Drop a trailing path separator from a directory path.
+///
+/// `git2` reports a worktree root *with* one (`/code/app/`), while every
+/// other place a project directory is recorded — `harness_projects.path`,
+/// `artifacts.project_path`, `sessions.project_path` — has none. Leaving the
+/// separator on `projects.id` makes all of those joins miss silently, so it
+/// is stripped at the single point the id is minted. The filesystem root
+/// (`/`) keeps its separator: there it is the whole path.
+fn trim_trailing_separator(path: &str) -> &str {
+    let trimmed = path.trim_end_matches(std::path::MAIN_SEPARATOR);
+    if trimmed.is_empty() {
+        path
+    } else {
+        trimmed
+    }
+}
+
 /// Resolve the project that owns `path`: `(id, name, root_path)`.
 ///
 /// The project root is the git worktree root (or nearest manifest) from
 /// `find_repo_root`; a loose file with no root falls back to its parent
 /// folder, so every file maps to a project. `id` is the absolute root path
-/// (unique — two same-named repos stay distinct); `name` is the root's final
-/// path component.
+/// with no trailing separator (unique — two same-named repos stay distinct,
+/// and it joins against the harness tables); `name` is the root's final path
+/// component.
 fn resolve_project(path: &Path, roots: &mut RootCache) -> (String, String, String) {
     let root = roots
         .repo_root_for(path)
@@ -167,7 +185,7 @@ fn resolve_project(path: &Path, roots: &mut RootCache) -> (String, String, Strin
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "root".to_string());
-    let root_path = root.display().to_string();
+    let root_path = trim_trailing_separator(&root.display().to_string()).to_string();
     (root_path.clone(), name, root_path)
 }
 
@@ -327,11 +345,15 @@ pub fn run_scan_all(
             ],
         )?;
         for issue in &issues {
+            // `rule_id` is what ties a finding back to the rule that raised it
+            // — the Rules screen's hit counts read it, and dismissing a
+            // finding has to stop counting for that rule.
             conn.execute(
-                "INSERT INTO issues(file_id, line, severity, source, title, why, fix_from, fix_to, dimension)
-                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                "INSERT INTO issues(file_id, rule_id, line, severity, source, title, why, fix_from, fix_to, dimension)
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     file.path,
+                    issue.rule_id,
                     issue.line.map(|l| l as i64),
                     issue.severity.as_str(),
                     issue.source.as_str(),
@@ -781,6 +803,72 @@ For example:
             let (_, name, _) = resolve_project(&f, &mut RootCache::default());
             assert_eq!(name, "scripts");
         }
+    }
+
+    #[test]
+    fn project_id_is_slash_free_so_the_harness_row_joins() {
+        // git2 reports a worktree root with a trailing separator. If that
+        // reaches `projects.id`, every join against a harness-recorded path
+        // (which has none) silently misses — the bug this guards.
+        let conn = crate::store::test_conn();
+        let dir = tempfile::tempdir().unwrap();
+        git2::Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), CLEAN).unwrap();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let id: String = conn
+            .query_row("SELECT id FROM projects", [], |r| r.get(0))
+            .unwrap();
+        assert!(
+            !id.ends_with(std::path::MAIN_SEPARATOR),
+            "project id must not carry the worktree's trailing separator: {id}"
+        );
+
+        // Seeded the way a harness scan records it: no trailing separator.
+        let harness_path = id.trim_end_matches(std::path::MAIN_SEPARATOR).to_string();
+        conn.execute(
+            "INSERT INTO harness_projects(harness, path, exists_on_disk, last_session_at, session_count)
+             VALUES('claude_code', ?1, 1, '2026-08-01T10:00:00Z', 3)",
+            params![harness_path],
+        )
+        .unwrap();
+
+        let projects = crate::query::list_projects(&conn).unwrap();
+        assert_eq!(projects.len(), 1);
+        assert_eq!(projects[0].harness.as_deref(), Some("claude_code"));
+        assert_eq!(projects[0].session_count, 3);
+        assert!(projects[0].exists);
+    }
+
+    #[test]
+    fn deterministic_issues_carry_their_rule_id() {
+        let conn = crate::store::test_conn();
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("CLAUDE.md"), FOCAL).unwrap();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let hits = |conn: &Connection| {
+            crate::query::list_rules(conn)
+                .unwrap()
+                .into_iter()
+                .find(|r| r.id == "no-hardcoded-model")
+                .expect("the deprecated-model rule is in the catalog")
+                .hit_count
+        };
+        assert_eq!(
+            hits(&conn),
+            1,
+            "a deterministic hit must count for its rule"
+        );
+
+        conn.execute(
+            "UPDATE issues SET dismissed_at = '1' WHERE rule_id = 'no-hardcoded-model'",
+            [],
+        )
+        .unwrap();
+        assert_eq!(hits(&conn), 0, "a dismissed finding stops counting");
     }
 
     #[test]

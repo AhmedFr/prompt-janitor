@@ -69,6 +69,9 @@ const manyTargets: UsageOverview = {
   })),
 };
 
+/** A window with charts to draw but nothing ranked in it. */
+const noRanked: UsageOverview = { ...fullData, window_days: 30, ranked: [] };
+
 const emptyData: UsageOverview = {
   window_days: 90,
   ranked: [],
@@ -84,7 +87,7 @@ vi.mock("./useUsageTab", async (orig) => {
 });
 
 const CHART_NAMES = [
-  "Top skills, agents and MCP servers over time",
+  "Top skills, agents and MCP servers",
   "Invocations by kind",
   "MCP error rate",
   "Sessions per project",
@@ -144,6 +147,14 @@ describe("UsageTab", () => {
     const { getByRole } = render(<UsageTab />);
     const list = getByRole("list", { name: "Top targets by invocations" });
     expect(list.querySelectorAll("li")).toHaveLength(8);
+  });
+
+  it("names the window it found no invocations in", () => {
+    // "in the window" makes the reader guess which window; the tab is told
+    // which one it asked for, so it should say.
+    mockUseUsageTab.mockReturnValue({ data: noRanked, loading: false });
+    const { getByText } = render(<UsageTab />);
+    expect(getByText("No invocations in the last 30 days.")).toBeInTheDocument();
   });
 
   it("shows the empty state when nothing is indexed", () => {

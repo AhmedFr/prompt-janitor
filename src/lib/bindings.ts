@@ -138,6 +138,7 @@ export const commands = {
 	/**
 	 *  One project's usage over the last `window_days`, anchored to the current
 	 *  clock: what `harness` invoked there, and how often it was worked in.
+	 *  `window_days` is capped at a year — the daily series has a point per day.
 	 */
 	getProjectUsage: (harness: string, projectPath: string, windowDays: number) => typedError<ProjectUsage, string>(__TAURI_INVOKE("get_project_usage", { harness, projectPath, windowDays })),
 	/**  Every harness we know of, detected or not. */
@@ -482,7 +483,11 @@ export type ProjectUsage = {
 	 *  Sub-agent invocations count — they ran in this project's sessions.
 	 */
 	ranked: RankedTarget[],
-	/**  Top-level sessions per day, oldest day first — the activity sparkline. */
+	/**
+	 *  Top-level sessions per day, oldest day first — the activity sparkline.
+	 *  Zero-filled: one point per day of the window, so a quiet day is a zero
+	 *  the chart can draw rather than a gap it would interpolate across.
+	 */
 	sessions_per_day: DayCount[],
 };
 

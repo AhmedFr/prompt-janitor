@@ -22,6 +22,17 @@ export function topRanked(ranked: RankedTarget[]): RankedTarget[] {
   return ranked.slice(0, RANKED_LIMIT);
 }
 
+/**
+ * How copy names the reporting window: `30` → `last 30 days`.
+ *
+ * Every aggregate is bounded by the same window and the backend echoes it
+ * back, so the tab can say which period it means instead of leaving the reader
+ * to guess at "the window".
+ */
+export function windowLabel(windowDays: number): string {
+  return windowDays === 1 ? "last day" : `last ${windowDays} days`;
+}
+
 /** Invocation kind → the label the UI shows for it. */
 export function kindLabel(kind: InvocationKind): string {
   return KIND_LABEL[kind];

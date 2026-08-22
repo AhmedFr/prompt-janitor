@@ -363,6 +363,11 @@ const INVOCABLE_KINDS: &str = "('skill', 'agent', 'command', 'mcp_server')";
 /// be a project of several harnesses, and joining them all in would multiply
 /// the file rollup. The busiest harness's row wins — SQLite fills the bare
 /// columns of a `max()` group from the row that matched.
+///
+/// Every join onto a harness-recorded directory path goes through
+/// `rtrim(p.id, '/')`: `scan::resolve_project` mints a separator-free id, but
+/// a database written before that fix still holds `/code/app/` rows, and one
+/// stray separator would silently blank the harness columns rather than error.
 pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT p.id, p.name, p.grade, p.score, p.logo,
@@ -370,12 +375,12 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
                 hp.harness, COALESCE(hp.session_count, 0), hp.last_session_at,
                 COALESCE(hp.exists_on_disk, 1),
                 (SELECT COUNT(*) FROM artifacts a
-                  WHERE a.project_path = p.id AND a.layer = 'project'
+                  WHERE a.project_path = rtrim(p.id, '/') AND a.layer = 'project'
                     AND a.kind IN {INVOCABLE_KINDS}
                     AND NOT EXISTS (SELECT 1 FROM usage_stats u
                                      WHERE u.artifact_id = a.id)),
                 (SELECT COUNT(*) FROM artifacts a
-                  WHERE a.project_path = p.id AND a.layer = 'project'
+                  WHERE a.project_path = rtrim(p.id, '/') AND a.layer = 'project'
                     AND a.kind IN {INVOCABLE_KINDS}
                     AND EXISTS (SELECT 1 FROM usage_stats u
                                  WHERE u.artifact_id = a.id AND u.error_rate >= 0.25))
@@ -383,7 +388,7 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
          LEFT JOIN files f ON f.project_id = p.id
          LEFT JOIN (SELECT path, harness, exists_on_disk, last_session_at,
                            max(session_count) AS session_count
-                      FROM harness_projects GROUP BY path) hp ON hp.path = p.id
+                      FROM harness_projects GROUP BY path) hp ON hp.path = rtrim(p.id, '/')
          GROUP BY p.id
          ORDER BY CASE p.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
                   MAX(f.modified_at) DESC"

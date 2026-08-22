@@ -18,6 +18,7 @@ import {
   rankedKey,
   sessionBars,
   topRanked,
+  windowLabel,
 } from "./usageTab.util";
 import { ErrorTooltip, KindTooltip, SessionsTooltip } from "./UsageTab.tooltips";
 import {
@@ -64,9 +65,10 @@ export function UsageTabBody({ data }: UsageTabBodyProps) {
   return (
     <div className="usage">
       {/* A plain ranked list until the shared RankedList component lands. */}
-      <ChartCard id="usage-top" title="Top skills, agents and MCP servers over time">
+      {/* Not "over time": the list is one window's totals, not a series. */}
+      <ChartCard id="usage-top" title="Top skills, agents and MCP servers">
         {ranked.length === 0 ? (
-          <Empty>No invocations in the window.</Empty>
+          <Empty>No invocations in the {windowLabel(data.window_days)}.</Empty>
         ) : (
           <ul className="usage-ranked" aria-label="Top targets by invocations">
             {ranked.map((row) => (

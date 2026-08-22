@@ -9,6 +9,7 @@ import {
   sessionBars,
   shortDay,
   topRanked,
+  windowLabel,
 } from "./usageTab.util";
 
 const ranked: RankedTarget[] = [
@@ -158,5 +159,12 @@ describe("isUsageEmpty", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("windowLabel", () => {
+  it("names the window the copy is about", () => {
+    expect(windowLabel(30)).toBe("last 30 days");
+    expect(windowLabel(1)).toBe("last day");
   });
 });

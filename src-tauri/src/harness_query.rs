@@ -170,8 +170,19 @@ pub struct ProjectUsage {
     /// Sub-agent invocations count — they ran in this project's sessions.
     pub ranked: Vec<RankedTarget>,
     /// Top-level sessions per day, oldest day first — the activity sparkline.
+    /// Zero-filled: one point per day of the window, so a quiet day is a zero
+    /// the chart can draw rather than a gap it would interpolate across.
     pub sessions_per_day: Vec<DayCount>,
 }
+
+/// How many ranked rows one call returns at most. Nothing in the UI reads
+/// past the busiest few dozen, so the rest is payload a Tauri round trip has
+/// to serialize for nobody.
+const RANKED_LIMIT: u32 = 500;
+
+/// The longest daily series [`project_usage`] will build: a year and a leap
+/// day. A caller asking for a decade would otherwise get a decade of points.
+const MAX_WINDOW_DAYS: u32 = 366;
 
 /// `skill, agent, mcp, builtin` — the order the UI legend lists kinds in.
 const KIND_ORDER: [InvocationKind; 4] = [
@@ -420,19 +431,33 @@ pub fn effective_rules(
 /// overview passes `None` and ranks everything. Sessions are counted distinct
 /// — a target invoked ten times in one session is one session's worth of
 /// habit — and sub-agent sessions count, because the work really happened.
+///
+/// `limit` bounds the payload, defaulting to [`RANKED_LIMIT`]: a busy machine
+/// can hold thousands of distinct targets, and nothing downstream renders
+/// past the head of the list.
+///
+/// `artifact_id` is only reported when the whole group resolved to *one*
+/// artifact. Two projects can each configure a skill of the same name, and the
+/// overview groups across projects — picking either of them would link the row
+/// to a file the number does not describe.
 fn ranked_targets(
     conn: &Connection,
     since: &str,
     scope: Option<(&str, &str)>,
+    limit: Option<u32>,
 ) -> rusqlite::Result<Vec<RankedTarget>> {
-    const COLUMNS: &str = "SELECT kind, target, max(artifact_id), count(*),
-                count(DISTINCT session_id), avg(is_error), avg(turn_tokens)
+    const COLUMNS: &str = "SELECT kind, target,
+                CASE WHEN count(DISTINCT artifact_id) = 1 THEN max(artifact_id) END,
+                count(*), count(DISTINCT session_id), avg(is_error), avg(turn_tokens)
            FROM invocations WHERE ts >= ?1";
     const GROUPING: &str = "GROUP BY kind, target ORDER BY count(*) DESC, target";
 
+    let limit = limit.unwrap_or(RANKED_LIMIT);
     let sql = match scope {
-        Some(_) => format!("{COLUMNS} AND harness = ?2 AND project_path = ?3 {GROUPING}"),
-        None => format!("{COLUMNS} {GROUPING}"),
+        Some(_) => {
+            format!("{COLUMNS} AND harness = ?2 AND project_path = ?3 {GROUPING} LIMIT {limit}")
+        }
+        None => format!("{COLUMNS} {GROUPING} LIMIT {limit}"),
     };
     let mut stmt = conn.prepare(&sql)?;
     let read = |r: &Row<'_>| {
@@ -473,11 +498,28 @@ fn ranked_targets(
     Ok(ranked)
 }
 
+/// The `window_days` UTC calendar days ending on the day `now_epoch_secs`
+/// falls in, oldest first. Days are `YYYY-MM-DD`, taken off the same RFC3339
+/// rendering `sessions.started_at` is stored in.
+fn window_calendar_days(now_epoch_secs: i64, window_days: u32) -> Vec<String> {
+    let today_start = now_epoch_secs.div_euclid(86_400) * 86_400;
+    (0..i64::from(window_days))
+        .rev()
+        .map(|back| {
+            let stamp = iso_from_epoch(today_start - back * 86_400);
+            stamp[..10].to_string()
+        })
+        .collect()
+}
+
 /// One project's usage over the `window_days` ending at `now_epoch_secs`: what
 /// `harness` invoked inside `project_path`, and how often it was worked in.
 ///
 /// Scoped to one harness, like [`effective_rules`] — a directory can be a
 /// project of several, and each only accounts for its own sessions.
+///
+/// `window_days` is capped at [`MAX_WINDOW_DAYS`]: the daily series has one
+/// point per day, so an unbounded window is an unbounded payload.
 pub fn project_usage(
     conn: &Connection,
     harness: &str,
@@ -485,8 +527,13 @@ pub fn project_usage(
     now_epoch_secs: i64,
     window_days: u32,
 ) -> rusqlite::Result<ProjectUsage> {
-    let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
-    let ranked = ranked_targets(conn, &since, Some((harness, project_path)))?;
+    let window_days = window_days.clamp(1, MAX_WINDOW_DAYS);
+    // The ranking and the sparkline share one bound: the first calendar day of
+    // the series. Bounding the ranking a few hours earlier would rank work the
+    // sparkline has no bucket for.
+    let days = window_calendar_days(now_epoch_secs, window_days);
+    let since = format!("{}T00:00:00Z", days[0]);
+    let ranked = ranked_targets(conn, &since, Some((harness, project_path)), None)?;
 
     // `started_at` is a fixed-width UTC RFC3339 stamp, so its first ten
     // characters are the UTC calendar day. Top-level only: a sub-agent
@@ -495,16 +542,25 @@ pub fn project_usage(
         "SELECT substr(started_at, 1, 10) AS day, count(*) FROM sessions
           WHERE harness = ?1 AND project_path = ?2 AND parent_session_id IS NULL
             AND started_at >= ?3
-          GROUP BY day ORDER BY day",
+          GROUP BY day",
     )?;
-    let sessions_per_day = days_stmt
-        .query_map(params![harness, project_path, since], |r| {
-            Ok(DayCount {
-                day: r.get(0)?,
-                count: as_u32(r.get(1)?),
-            })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for row in days_stmt.query_map(params![harness, project_path, since], |r| {
+        Ok((r.get::<_, String>(0)?, as_u32(r.get::<_, i64>(1)?)))
+    })? {
+        let (day, count) = row?;
+        counts.insert(day, count);
+    }
+
+    // Zero-filled: a quiet day is a zero in the sparkline, not a point the
+    // chart interpolates over.
+    let sessions_per_day = days
+        .into_iter()
+        .map(|day| {
+            let count = counts.get(&day).copied().unwrap_or(0);
+            DayCount { day, count }
+        })
+        .collect();
 
     Ok(ProjectUsage {
         ranked,
@@ -527,7 +583,7 @@ pub fn usage_overview(
     // strings, so the window bound compares lexicographically.
     let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
 
-    let ranked = ranked_targets(conn, &since, None)?;
+    let ranked = ranked_targets(conn, &since, None, Some(RANKED_LIMIT))?;
 
     // Read the windowed totals into a map and project them onto the fixed kind
     // order: a kind with nothing in the window is a zero, not a missing bar.
@@ -619,6 +675,11 @@ mod tests {
         fn deref(&self) -> &ClaudeHome {
             &self.home
         }
+    }
+
+    /// The days of a zero-filled series that actually saw a session.
+    fn busy_days(days: &[DayCount]) -> Vec<DayCount> {
+        days.iter().filter(|d| d.count > 0).cloned().collect()
     }
 
     /// A database in the state a real scan leaves it in: harness pass
@@ -814,13 +875,55 @@ mod tests {
             "sub-agent invocations belong to the project their session ran in"
         );
         assert_eq!(
-            u.sessions_per_day,
+            busy_days(&u.sessions_per_day),
             vec![DayCount {
                 day: "2026-08-01".into(),
                 count: 1,
             }],
             "top-level sessions only, one bucket per calendar day"
         );
+    }
+
+    /// The daily series is the sparkline's x-axis: it must be the whole
+    /// window, so a quiet day is a gap in the line rather than a missing point
+    /// the chart closes over.
+    #[test]
+    fn project_usage_zero_fills_every_day_in_the_window() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        let u = project_usage(&conn, "claude_code", &app, 1_785_628_800, 7).unwrap();
+
+        assert_eq!(
+            u.sessions_per_day.len(),
+            7,
+            "one point per day in the window"
+        );
+        assert!(
+            u.sessions_per_day.windows(2).all(|w| w[0].day < w[1].day),
+            "oldest day first"
+        );
+        assert_eq!(
+            u.sessions_per_day.last().unwrap().day,
+            "2026-08-02",
+            "the series ends on the day the clock is in"
+        );
+        assert_eq!(
+            busy_days(&u.sessions_per_day),
+            vec![DayCount {
+                day: "2026-08-01".into(),
+                count: 1,
+            }]
+        );
+    }
+
+    /// A caller asking for a decade of days would be handed a decade of
+    /// points; the series is capped at a year's worth.
+    #[test]
+    fn project_usage_caps_the_daily_series_at_a_year() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        let u = project_usage(&conn, "claude_code", &app, 1_785_628_800, 10_000).unwrap();
+        assert_eq!(u.sessions_per_day.len(), 366);
     }
 
     /// The project filter is a filter: a path the harness never ran in has no
@@ -831,18 +934,59 @@ mod tests {
         let gone = home.root.join("work/gone").to_string_lossy().into_owned();
         let u = project_usage(&conn, "claude_code", &gone, 1_785_628_800, 90).unwrap();
         assert!(u.ranked.is_empty());
-        assert!(u.sessions_per_day.is_empty());
+        assert_eq!(u.sessions_per_day.len(), 90);
+        assert!(u.sessions_per_day.iter().all(|d| d.count == 0));
     }
 
-    /// Same window rule as the overview: a clock past the fixture empties both
-    /// halves rather than falling back to all-time.
+    /// Same window rule as the overview: a clock past the fixture empties the
+    /// ranking and flatlines the sparkline rather than falling back to
+    /// all-time.
     #[test]
     fn project_usage_is_windowed() {
         let (conn, home) = seeded();
         let app = home.root.join("work/app").to_string_lossy().into_owned();
         let u = project_usage(&conn, "claude_code", &app, 1_789_430_400, 1).unwrap();
         assert!(u.ranked.is_empty());
-        assert!(u.sessions_per_day.is_empty());
+        assert!(busy_days(&u.sessions_per_day).is_empty());
+    }
+
+    /// Two projects can each configure a skill of the same name. The overview
+    /// groups by `(kind, target)` across every project, so it must not claim
+    /// the pair resolved to one artifact — inside a single project it does.
+    #[test]
+    fn an_ambiguous_target_resolves_to_no_artifact_in_the_overview() {
+        let (conn, home) = seeded();
+        let other = home.root.join("work/other").to_string_lossy().into_owned();
+        conn.execute(
+            "INSERT INTO artifacts(harness, layer, project_path, kind, name, path, bytes, hash, seen_at)
+             VALUES('claude_code', 'project', ?1, 'skill', 'adapt', ?2, 10, 'h2', '2026-08-01T00:00:00Z')",
+            params![other, format!("{other}/.claude/skills/adapt/SKILL.md")],
+        )
+        .unwrap();
+        let other_artifact = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO invocations(harness, session_id, tool_use_id, project_path, ts,
+                                     tool_name, kind, target, artifact_id)
+             VALUES('claude_code', 'other-session', 'tu-1', ?1, '2026-08-01T12:00:01Z',
+                    'Skill', 'skill', 'adapt', ?2)",
+            params![other, other_artifact],
+        )
+        .unwrap();
+
+        let overview = usage_overview(&conn, 1_785_628_800, 90).unwrap();
+        let adapt = overview
+            .ranked
+            .iter()
+            .find(|r| r.target == "adapt")
+            .unwrap();
+        assert_eq!(
+            adapt.artifact_id, None,
+            "two artifacts answer to this name — the overview must not pick one"
+        );
+
+        let scoped = project_usage(&conn, "claude_code", &other, 1_785_628_800, 90).unwrap();
+        let adapt = scoped.ranked.iter().find(|r| r.target == "adapt").unwrap();
+        assert_eq!(adapt.artifact_id, Some(other_artifact as i32));
     }
 
     /// The window bounds every aggregate, not just the ranking: a clock past
