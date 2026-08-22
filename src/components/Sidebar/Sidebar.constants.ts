@@ -3,6 +3,7 @@ import type { NavItem } from "./Sidebar.types";
 /** Primary sidebar destinations. `detail` is intentionally excluded — it opens from Prompts. */
 export const NAV_ITEMS: NavItem[] = [
   { route: "overview", label: "Overview", icon: "dashboard" },
+  { route: "setup", label: "Setup", icon: "layers" },
   { route: "prompts", label: "Prompts", icon: "prompts" },
   { route: "scans", label: "Scans", icon: "scans" },
   { route: "analytics", label: "Analytics", icon: "barChart" },

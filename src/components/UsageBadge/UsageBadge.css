@@ -1,0 +1,41 @@
+/* Tone foregrounds are picked to clear WCAG AA (4.5:1) on their own tint, so
+   the badge stays readable rather than merely coloured. Measured ratios
+   (`src/components/UsageBadge/usageBadge.contrast.test.ts` asserts them):
+
+     used   #0060df on #e2f0ff  →  4.85:1   (--blue-tint over the white card)
+     never  #5c5c61 on #f2f2f4  →  5.95:1
+     error  #992620 on #ffe7e6  →  6.72:1
+     stale  #7a4a00 on #fef1dd  →  6.71:1
+
+   The previous #ff3b30-on-red and #f59e0b-on-amber pairs measured 3.28:1 and
+   1.86:1 — both below AA, and the amber one effectively unreadable. */
+.usage-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  background: var(--tone-never-tint);
+  color: var(--text-2);
+  border: 0.5px solid var(--sep);
+}
+
+.usage-badge[data-tone="never"] {
+  background: var(--tone-never-tint);
+  color: var(--tone-never-fg);
+}
+.usage-badge[data-tone="used"] {
+  background: var(--blue-tint);
+  color: var(--blue-press);
+}
+.usage-badge[data-tone="error"] {
+  background: var(--tone-error-tint);
+  color: var(--tone-error-fg);
+}
+.usage-badge[data-tone="stale"] {
+  background: var(--tone-stale-tint);
+  color: var(--tone-stale-fg);
+}

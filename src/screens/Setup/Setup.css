@@ -1,0 +1,296 @@
+.setup-harnesses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.setup-harness {
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text-2);
+}
+
+.setup-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 18px;
+}
+
+.setup-chip {
+  font-size: 12px;
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  background: #fff;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.setup-chip--on {
+  background: var(--blue);
+  color: #fff;
+  border-color: transparent;
+}
+
+.setup-chip__count {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * White-on-rgba(255,255,255,.24) over --blue is 2.67:1 — nowhere near AA. The
+ * count inside an active chip instead sits in the chip's own foreground
+ * colour (inherited, so still white) on a darker pill: rgba(0,0,0,.18) over
+ * --blue composites to #086cd1, which clears AA against white at 5.15:1.
+ * See setup.contrast.test.ts.
+ */
+.setup-chip--on .setup-chip__count {
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+}
+
+/* The same bar onboarding draws, for the same scan events. */
+.setup-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-scan__status {
+  font-size: 12px;
+}
+
+.setup-section {
+  margin-bottom: 26px;
+}
+
+.setup-section__title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.setup-harness__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 16px 0 8px;
+}
+
+.setup-kind {
+  margin-bottom: 16px;
+}
+
+.setup-kind__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0 0 6px;
+}
+
+/*
+ * The count is data, not decoration — a muted pill, not a faint stray number.
+ * --text-3 on --group is 2.57:1; --text-2 clears AA at 4.66:1 (see
+ * setup.contrast.test.ts).
+ */
+.setup-kind__count {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-kind__empty {
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+.setup-kind__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.setup-project {
+  border: 0.5px solid var(--sep);
+  border-radius: var(--r-card);
+  background: var(--card);
+  margin-bottom: 8px;
+}
+
+.setup-project__summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.setup-project__summary::-webkit-details-marker {
+  display: none;
+}
+
+.setup-project__summary::before {
+  content: "›";
+  color: var(--text-3);
+  transition: transform 0.15s ease;
+}
+
+.setup-project[open] > .setup-project__summary::before {
+  transform: rotate(90deg);
+}
+
+.setup-project__name {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.setup-project__meta {
+  font-size: 12px;
+}
+
+/* How much of this project the current filter actually kept. */
+.setup-project__matches {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--blue-tint);
+  color: var(--blue-press);
+}
+
+.setup-project__missing {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-3);
+}
+
+.setup-project__path {
+  font-size: 11px;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+
+.setup-project__body {
+  padding: 4px 14px 14px;
+  border-top: 0.5px solid var(--sep);
+}
+
+.setup-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setup-rules__item {
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.setup-rules__item:last-child {
+  border-bottom: none;
+}
+
+.setup-rules__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.setup-rules__row--link {
+  cursor: pointer;
+}
+
+.setup-rules__row--link:hover {
+  background: var(--group);
+}
+
+.setup-rules__layer {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--group);
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+
+.setup-rules__name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.setup-rules__path {
+  font-size: 11px;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+
+.setup-rules__error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Says out loud what a neutral grade chip could only imply. */
+.setup-rules__ungraded {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--tone-never-tint);
+  color: var(--tone-never-fg);
+}
+
+.setup-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.setup-empty__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.setup-empty__body {
+  max-width: 420px;
+  margin: 0;
+}

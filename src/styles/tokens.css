@@ -33,6 +33,16 @@
   --orange: #f59e0b;
   --red: #ff3b30;
 
+  /* usage-badge tones — opaque tints so the text contrast is a fixed, testable
+     pair rather than whatever the surface behind an alpha wash happens to be.
+     Ratios measured in `usageBadge.contrast.test.ts`; see `UsageBadge.css`. */
+  --tone-never-tint: #f2f2f4;
+  --tone-never-fg: #5c5c61;
+  --tone-error-tint: #ffe7e6;
+  --tone-error-fg: #992620;
+  --tone-stale-tint: #fef1dd;
+  --tone-stale-fg: #7a4a00;
+
   /* grade scale */
   --grade-a: #2fb457;
   --grade-b: #34a8a0;
@@ -44,6 +54,23 @@
   --sev-hi: #ff3b30;
   --sev-mid: #f59e0b;
   --sev-lo: #34c759;
+
+  /* chart categorical series — a fixed, CVD-validated slot order (protan/deutan
+     ΔE 9.1, normal-vision ΔE 19.6 on the white card surface). Assign in
+     sequence, never cycle, never reorder: the order is the safety mechanism.
+     Slots 3, 4 and 5 sit below 3:1 on white, so charts using them ship a
+     legend and a table view rather than relying on the mark alone. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+
+  /* chart status ink — reserved for good/bad measures, never for a series */
+  --chart-critical: #d03b3b;
 
   /* radii */
   --r-win: 11px;

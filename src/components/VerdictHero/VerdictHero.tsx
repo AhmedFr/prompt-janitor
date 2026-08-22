@@ -67,7 +67,8 @@ export function VerdictHero({
           </div>
           {data.scan_folder && (
             <div className="path faint" style={{ marginTop: 4 }}>
-              {data.scan_folder}
+              {/* The backend labels a harness-covered scan "everything"; say so in words. */}
+              {data.scan_folder === "everything" ? "Everything detected" : data.scan_folder}
             </div>
           )}
         </div>

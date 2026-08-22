@@ -38,3 +38,6 @@ export const Sizes: Story = {
 };
 
 export const Ghost: Story = { args: { grade: "A", ghost: true, size: "lg" } };
+
+/** No grade is its own state — neutral, never the F colour. */
+export const Ungraded: Story = { args: { grade: null } };
