@@ -133,6 +133,33 @@ const populated: SetupView = {
       description: "v6.3.0 · claude-plugins-official",
       path: "/home/u/.claude/plugins/superpowers",
     }),
+    artifact({
+      id: 15,
+      kind: "plugin",
+      name: "posthog",
+      layer: "plugin",
+      plugin_name: "posthog",
+      description: "v2.1.0 · posthog-marketplace",
+      path: "/home/u/.claude/plugins/posthog",
+    }),
+    // Same skill name as superpowers' — only the plugin it came from tells
+    // the two rows apart.
+    artifact({
+      id: 16,
+      kind: "skill",
+      name: "brainstorming",
+      layer: "plugin",
+      plugin_name: "posthog",
+      path: "/home/u/.claude/plugins/posthog/skills/brainstorming/SKILL.md",
+      usage: null,
+    }),
+    artifact({
+      id: 17,
+      kind: "settings",
+      name: "settings.json",
+      path: "/home/u/.claude/settings.json",
+      bytes: 512,
+    }),
   ],
   projects: [
     {
@@ -227,12 +254,13 @@ describe("Setup", () => {
     const tabs = await screen.findByRole("tablist", { name: /setup/i });
     expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Rules2",
-      "Skills4",
+      "Skills5",
       "Agents1",
       "Commands0",
       "Hooks1",
       "MCP1",
-      "Plugins1",
+      "Plugins2",
+      "Settings1",
     ]);
   });
 
@@ -263,8 +291,8 @@ describe("Setup", () => {
     await renderSetup();
     openTab(/^Skills/);
 
-    // 30, 20, then the two never-used rows in inventory order.
-    expect(rowNames()).toEqual(["deploy", "adapt", "sunset", "brainstorming"]);
+    // 30, 20, then the never-used rows in inventory order.
+    expect(rowNames()).toEqual(["deploy", "adapt", "sunset", "brainstorming", "brainstorming"]);
     expect(screen.getByRole("columnheader", { name: /Uses/ })).toHaveAttribute(
       "aria-sort",
       "descending",
@@ -287,7 +315,7 @@ describe("Setup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
 
-    expect(rowNames()).toEqual(["sunset", "brainstorming"]);
+    expect(rowNames()).toEqual(["sunset", "brainstorming", "brainstorming"]);
   });
 
   it("searches a tab by name, description and scope", async () => {
@@ -309,6 +337,60 @@ describe("Setup", () => {
     expect(within(rowFor("superpowers")).getByText("2")).toBeInTheDocument();
   });
 
+  it("names the plugin a bundled row came from, telling same-named skills apart", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    const bundled = bodyRows().filter((row) =>
+      (row.querySelector("td")?.textContent ?? "").startsWith("brainstorming"),
+    );
+    expect(bundled).toHaveLength(2);
+    expect(
+      bundled.map((row) => within(row).getByText(/^(superpowers|posthog)$/).textContent).sort(),
+    ).toEqual(["posthog", "superpowers"]);
+  });
+
+  it("finds a bundled row by the plugin that installed it", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "posthog" } });
+
+    await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
+  });
+
+  it("narrows a tab to one plugin with the Scope pills", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    const scope = screen.getByRole("group", { name: "Scope" });
+    fireEvent.click(within(scope).getByRole("button", { name: /^posthog/ }));
+
+    expect(rowNames()).toEqual(["brainstorming"]);
+    expect(within(rowFor("brainstorming")).getByText("posthog")).toBeInTheDocument();
+  });
+
+  it("gives settings files a tab of their own", async () => {
+    await renderSetup();
+    openTab(/^Settings/);
+
+    expect(rowNames()).toEqual(["settings.json"]);
+    expect(within(rowFor("settings.json")).getByText("Global")).toBeInTheDocument();
+  });
+
+  it("lets a deep link win over the remembered tab", async () => {
+    // The user last left Setup on Skills; arriving from a "show me the MCP
+    // servers" link has to override that, not lose to it.
+    window.sessionStorage.setItem("pj.tabs.setup", "skill");
+    render(<Setup navigate={vi.fn()} initialTab="mcp_server" />);
+    await screen.findByRole("heading", { name: "Setup", level: 1 });
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /^MCP/ })).toHaveAttribute("aria-selected", "true"),
+    );
+    expect(rowNames()).toEqual(["linear"]);
+  });
+
   it("opens a rule's detail when its row is clicked", async () => {
     const { navigate } = await renderSetup();
     await screen.findByRole("tab", { name: /^Rules/ });
@@ -322,8 +404,8 @@ describe("Setup", () => {
     await renderSetup();
     openTab(/^Skills/);
     fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "brain" } });
-    await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "sunset" } });
+    await waitFor(() => expect(rowNames()).toEqual(["sunset"]));
 
     // Agents carries the very same pill group ids ("scope", "status",
     // "bundled") and the same search config, so a table keyed on anything
@@ -341,8 +423,8 @@ describe("Setup", () => {
 
     openTab(/^Skills/);
 
-    expect(rowNames()).toEqual(["brainstorming"]);
-    expect(screen.getByRole("searchbox")).toHaveValue("brain");
+    expect(rowNames()).toEqual(["sunset"]);
+    expect(screen.getByRole("searchbox")).toHaveValue("sunset");
     expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -352,7 +434,7 @@ describe("Setup", () => {
   it("rebuilds the tabs, rows and pill counts from the inventory a scan produced", async () => {
     await renderSetup();
     openTab(/^Skills/);
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used2");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used3");
 
     // The rescan finds one more, never-used skill. Every derived value here
     // is cached on the identity of what it was built from — the row arrays,
@@ -374,10 +456,10 @@ describe("Setup", () => {
 
     await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /^Skills/ })).toHaveTextContent("Skills5"),
+      expect(screen.getByRole("tab", { name: /^Skills/ })).toHaveTextContent("Skills6"),
     );
     expect(rowNames()).toContain("zzz-new");
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used3");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used4");
   });
 
   it("offers a folder picker when no harness was detected", async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
@@ -13,7 +13,7 @@ import {
   type ScanProgress,
 } from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
-import { columnsFor, defaultSortFor, KIND_TABS } from "./setup.columns";
+import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
 import { pillsFor } from "./setup.pills";
 import {
   EMPTY_HINT,
@@ -23,7 +23,7 @@ import {
   TABLE_STATE_PREFIX,
 } from "./Setup.constants";
 import type { SetupProps } from "./Setup.types";
-import { harnessSummary, lastScanAt, projectNameFor, relativeSession } from "./setup.util";
+import { harnessSummary, lastScanAt, relativeSession } from "./setup.util";
 import { useSetup } from "./useSetup";
 import { useSetupTables, type SetupTables } from "./useSetupTables";
 import "./Setup.css";
@@ -179,22 +179,22 @@ function Inventory({
   const tables = useSetupTables(data, openDetail);
   const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
 
+  // A deep link names the tab it means; the remembered one only decides where
+  // an unqualified visit lands. `useTabState` reads storage first, so without
+  // this the link would lose to wherever the user last was.
+  useEffect(() => {
+    if (initialTab) setActive(initialTab);
+  }, [initialTab, setActive]);
+
   // Identity-stable per project set, which is all `DataTable`'s memoised
-  // filtering asks of it — the scope key resolves a row's project by path,
-  // the same way `ScopeCell` renders it.
+  // filtering asks of it. `scopeLabel` is the column's own label rule, so
+  // searching "posthog" or a project name finds exactly the rows whose Scope
+  // cell reads that way; `plugin_name` is searched directly as well, for a
+  // row that names a plugin without being scanned out of one.
   const search = useMemo<DataTableSearch<ArtifactView>>(
     () => ({
       placeholder: SEARCH_PLACEHOLDER,
-      keys: [
-        "name",
-        "description",
-        (row) =>
-          row.layer === "global"
-            ? "Global"
-            : row.layer === "plugin"
-              ? "Plugin"
-              : (projectNameFor(row.path, tables.projectNames) ?? "Project"),
-      ],
+      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, tables.projectNames)],
     }),
     [tables.projectNames],
   );

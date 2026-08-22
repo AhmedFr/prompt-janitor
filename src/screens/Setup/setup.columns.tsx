@@ -5,7 +5,11 @@ import { ActionsCell, GradeCell, PercentCell, ScopeCell, TokensCell, UsageCell }
 import { openExternal } from "@/lib/open-external";
 import { projectNameFor } from "./setup.util";
 
-/** The seven tabs the Setup screen renders, in display order. `settings` artifacts have no tab of their own. */
+/**
+ * The tabs the Setup screen renders, in display order. `settings` comes last:
+ * `settings.json` is where hooks, permissions and MCP wiring actually live, so
+ * a scan that finds one and shows it nowhere leaves the inventory incomplete.
+ */
 export const KIND_TABS: { id: ArtifactKind; label: string }[] = [
   { id: "rule", label: "Rules" },
   { id: "skill", label: "Skills" },
@@ -14,6 +18,7 @@ export const KIND_TABS: { id: ArtifactKind; label: string }[] = [
   { id: "hook", label: "Hooks" },
   { id: "mcp_server", label: "MCP" },
   { id: "plugin", label: "Plugins" },
+  { id: "settings", label: "Settings" },
 ];
 
 /**
@@ -75,9 +80,12 @@ function nameColumn(): ColumnDef<ArtifactView, unknown> {
 }
 
 /** Mirrors `ScopeCell`'s own label rule exactly, so sorting the Scope column orders by the same text it renders. */
-function scopeLabel(row: ArtifactView, projectNames: Map<string, string>): string {
+export function scopeLabel(row: ArtifactView, projectNames: Map<string, string>): string {
   if (row.layer === "global") return "Global";
-  if (row.layer === "plugin") return "Plugin";
+  // The plugin's name, not the word "Plugin": two installs can ship a skill
+  // of the same name, and provenance is the only thing that tells the rows
+  // apart — in the cell, in a sort, and in the screen's search keys.
+  if (row.layer === "plugin") return row.plugin_name ?? "Plugin";
   return projectNameFor(row.path, projectNames) ?? "Project";
 }
 
@@ -91,7 +99,11 @@ function scopeColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
     // before "plugin" before "project".
     accessorFn: (r) => scopeLabel(r, ctx.projectNames),
     cell: (c) => (
-      <ScopeCell layer={c.row.original.layer} projectName={projectNameFor(c.row.original.path, ctx.projectNames)} />
+      <ScopeCell
+        layer={c.row.original.layer}
+        projectName={projectNameFor(c.row.original.path, ctx.projectNames)}
+        pluginName={c.row.original.plugin_name}
+      />
     ),
   };
 }
@@ -221,9 +233,10 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
     case "plugin":
       return [nameColumn(), bundledColumn(ctx), actionsColumn("folder", ctx)];
     case "settings":
-      // Not in `KIND_TABS` — the Setup screen never renders a "settings"
-      // tab — so it gets no columns of its own rather than a guessed shape.
-      return [];
+      // No usage and no grade: a settings file is configuration the harness
+      // reads, never something it invokes. Name, where it applies, how big
+      // it is, and a way to open it is the whole honest story.
+      return [nameColumn(), scopeColumn(ctx), sizeColumn(), actionsColumn("file", ctx)];
   }
 }
 
@@ -266,13 +279,13 @@ export function columnsFor(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<Artif
  * Rules read best sorted by grade ascending — `desc: false` puts A before
  * F, best grade first, with ungraded rows trailing behind the "Z" sentinel
  * `gradeColumn` sorts them under. Hooks have no Uses column to sort by (see
- * `buildColumns`), and naming one TanStack would silently drop leaves the
- * table claiming a sort it does not have — so they sort by name, ascending,
- * which is a column they actually carry. Every other kind sorts by how much
+ * `buildColumns`), and neither do settings files; naming one TanStack would
+ * silently drop leaves the table claiming a sort it does not have — so both
+ * sort by name, ascending, which is a column they actually carry. Every other kind sorts by how much
  * it is used, most-used first.
  */
 export function defaultSortFor(kind: ArtifactKind): { id: string; desc: boolean } {
   if (kind === "rule") return { id: "grade", desc: false };
-  if (kind === "hook") return { id: "name", desc: false };
+  if (kind === "hook" || kind === "settings") return { id: "name", desc: false };
   return { id: "uses", desc: true };
 }

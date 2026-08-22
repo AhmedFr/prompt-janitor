@@ -42,6 +42,33 @@ export function matchesPills<Row>(
   });
 }
 
+/**
+ * Drops selected option ids that no longer exist, and any group left with
+ * nothing selected (or gone from `groups` entirely).
+ *
+ * A table's remembered selection outlives the options it named: a project
+ * pill for a project the last scan removed, a plugin pill for an install
+ * that was uninstalled, a whole group a screen stopped rendering. Left in
+ * place, {@link matchesPills} finds no surviving option to satisfy and fails
+ * *every* row — an empty table, "No rows match", and no chip pressed to
+ * un-press. Pruning is applied to the state the table filters and counts by,
+ * not to the state it persists: nothing is thrown away, it just cannot
+ * filter by a chip that is not on screen.
+ */
+export function prunePills<Row>(
+  selected: Record<string, string[]>,
+  groups: PillGroup<Row>[],
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const group of groups) {
+    const ids = selected[group.id];
+    if (!ids || ids.length === 0) continue;
+    const live = ids.filter((id) => group.options.some((option) => option.id === id));
+    if (live.length > 0) out[group.id] = live;
+  }
+  return out;
+}
+
 /** Composes search and pill filtering into the slice a table actually renders. */
 export function applyFilters<Row>(
   rows: Row[],

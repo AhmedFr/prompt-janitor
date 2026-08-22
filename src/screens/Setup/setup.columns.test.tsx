@@ -81,7 +81,7 @@ function rowNames(): string[] {
 }
 
 describe("KIND_TABS", () => {
-  it("lists the seven artifact tabs in display order, with the exact labels", () => {
+  it("lists every artifact tab in display order, with the exact labels", () => {
     expect(KIND_TABS).toEqual([
       { id: "rule", label: "Rules" },
       { id: "skill", label: "Skills" },
@@ -90,6 +90,7 @@ describe("KIND_TABS", () => {
       { id: "hook", label: "Hooks" },
       { id: "mcp_server", label: "MCP" },
       { id: "plugin", label: "Plugins" },
+      { id: "settings", label: "Settings" },
     ]);
   });
 });
@@ -188,6 +189,42 @@ describe("columnsFor", () => {
   it("labels a global row's Scope cell 'Global'", () => {
     mount("skill", [artifact({ kind: "skill", layer: "global" })]);
     expect(screen.getByText("Global")).toBeInTheDocument();
+  });
+
+  it("names the plugin a bundled row's Scope cell came from", () => {
+    mount("skill", [artifact({ kind: "skill", layer: "plugin", plugin_name: "posthog" })]);
+    expect(screen.getByText("posthog")).toBeInTheDocument();
+  });
+
+  it("tells two same-named skills from different plugins apart in the Scope column", () => {
+    mount("skill", [
+      artifact({ id: 1, kind: "skill", name: "brainstorming", layer: "plugin", plugin_name: "superpowers" }),
+      artifact({ id: 2, kind: "skill", name: "brainstorming", layer: "plugin", plugin_name: "posthog" }),
+    ]);
+    expect(screen.getByText("superpowers")).toBeInTheDocument();
+    expect(screen.getByText("posthog")).toBeInTheDocument();
+  });
+
+  it("falls back to 'Plugin' when a bundled row carries no plugin name", () => {
+    mount("skill", [artifact({ kind: "skill", layer: "plugin", plugin_name: null })]);
+    expect(screen.getByText("Plugin")).toBeInTheDocument();
+  });
+
+  it("gives settings files name, scope, size and an open action", () => {
+    expect(columnsFor("settings", ctx()).map((c) => c.id)).toEqual([
+      "name",
+      "scope",
+      "size",
+      "actions",
+    ]);
+  });
+
+  it("opens a settings file from its actions column", () => {
+    mount("settings", [
+      artifact({ kind: "settings", name: "settings.json", path: "/Users/ada/.claude/settings.json" }),
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Open settings.json" }));
+    expect(openExternal).toHaveBeenCalledWith("/Users/ada/.claude/settings.json");
   });
 
   it("renders grade for rule rows via GradeCell", () => {
@@ -319,10 +356,14 @@ describe("defaultSortFor", () => {
   });
 
   it("sorts every kind that has a Uses column by uses descending", () => {
-    const kinds: ArtifactKind[] = ["skill", "agent", "command", "mcp_server", "plugin", "settings"];
+    const kinds: ArtifactKind[] = ["skill", "agent", "command", "mcp_server", "plugin"];
     for (const kind of kinds) {
       expect(defaultSortFor(kind)).toEqual({ id: "uses", desc: true });
     }
+  });
+
+  it("sorts settings files by name — they have no usage to rank them by", () => {
+    expect(defaultSortFor("settings")).toEqual({ id: "name", desc: false });
   });
 
   it("sorts hooks by name, the only sortable column they carry", () => {

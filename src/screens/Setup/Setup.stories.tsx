@@ -123,6 +123,35 @@ const populated: SetupView = {
       path: "/home/u/.claude/plugins/superpowers/commands/review.md",
       usage: null,
     }),
+    artifact({
+      id: 15,
+      kind: "plugin",
+      layer: "plugin",
+      name: "posthog",
+      plugin_name: "posthog",
+      description: "v2.1.0 · posthog-marketplace",
+      path: "/home/u/.claude/plugins/posthog",
+    }),
+    // Same name as superpowers' skill: the Scope column is the only thing
+    // that says which install each row came from.
+    artifact({
+      id: 16,
+      kind: "skill",
+      layer: "plugin",
+      name: "brainstorming",
+      plugin_name: "posthog",
+      description: "Session-replay-flavoured product brainstorm.",
+      path: "/home/u/.claude/plugins/posthog/skills/brainstorming/SKILL.md",
+      usage: null,
+    }),
+    artifact({
+      id: 17,
+      kind: "settings",
+      name: "settings.json",
+      description: "Permissions, hooks and MCP wiring.",
+      path: "/home/u/.claude/settings.json",
+      bytes: 3072,
+    }),
   ],
   projects: [
     {

@@ -17,13 +17,20 @@ const SCOPED_KINDS: ReadonlySet<ArtifactKind> = new Set([
   "command",
   "hook",
   "mcp_server",
+  "settings",
 ]);
 
+/** Prefix that keeps a plugin option's id from ever colliding with a project's root path. */
+const PLUGIN_OPTION_PREFIX = "plugin:";
+
 /**
- * "Global" plus one option per project that actually has a row in `rows` —
- * a project with nothing in this kind's slice would be an option that could
- * never highlight anything, which is worse than not offering it. `null`
- * for kinds with no Scope column (currently only `plugin`).
+ * "Global", then one option per project that actually has a row in `rows`,
+ * then one per plugin that installed one — an option for a project or plugin
+ * with nothing in this kind's slice could never highlight anything, which is
+ * worse than not offering it. Plugins come last because they are provenance
+ * for a minority of rows, where the project options answer "whose setup is
+ * this?" for the bulk of them. `null` for kinds with no Scope column
+ * (currently only `plugin`, where every row is trivially plugin-layer).
  */
 function scopeGroup(
   kind: ArtifactKind,
@@ -33,7 +40,12 @@ function scopeGroup(
   if (!SCOPED_KINDS.has(kind)) return null;
 
   const present = new Map<string, string>(); // project root path -> display name
+  const plugins = new Set<string>();
   for (const row of rows) {
+    if (row.layer === "plugin") {
+      if (row.plugin_name) plugins.add(row.plugin_name);
+      continue;
+    }
     if (row.layer !== "project") continue;
     const match = matchProject(row.path, projectNames);
     if (match) present.set(match.path, match.name);
@@ -47,6 +59,12 @@ function scopeGroup(
       predicate: (r: ArtifactView) => r.layer === "project" && matchProject(r.path, projectNames)?.path === path,
     }));
 
+  const pluginOptions = [...plugins].sort((a, b) => a.localeCompare(b)).map((name) => ({
+    id: `${PLUGIN_OPTION_PREFIX}${name}`,
+    label: name,
+    predicate: (r: ArtifactView) => r.layer === "plugin" && r.plugin_name === name,
+  }));
+
   return {
     id: "scope",
     label: "Scope",
@@ -54,6 +72,7 @@ function scopeGroup(
     options: [
       { id: "global", label: "Global", predicate: (r: ArtifactView) => r.layer === "global" },
       ...projectOptions,
+      ...pluginOptions,
     ],
   };
 }

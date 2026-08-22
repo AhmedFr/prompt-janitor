@@ -64,6 +64,45 @@ describe("pillsFor: scope group", () => {
     expect(acmeOpt.predicate(global)).toBe(false);
   });
 
+  it("adds one Scope option per plugin present, after the project options", () => {
+    const rows = [
+      artifact({ id: 1, layer: "global" }),
+      artifact({ id: 2, layer: "project", path: "/code/acme-api/.claude/skills/deploy/SKILL.md" }),
+      artifact({ id: 3, layer: "plugin", plugin_name: "superpowers" }),
+      artifact({ id: 4, layer: "plugin", plugin_name: "posthog" }),
+      artifact({ id: 5, layer: "plugin", plugin_name: "posthog" }),
+    ];
+    const [scope] = pillsFor("skill", rows, null, PROJECT_NAMES);
+    expect(scope.options.map((o) => o.id)).toEqual([
+      "global",
+      "/code/acme-api",
+      "plugin:posthog",
+      "plugin:superpowers",
+    ]);
+    expect(scope.options.map((o) => o.label)).toEqual([
+      "Global",
+      "acme-api",
+      "posthog",
+      "superpowers",
+    ]);
+  });
+
+  it("matches only the rows a given plugin installed", () => {
+    const mine = artifact({ id: 1, layer: "plugin", plugin_name: "posthog" });
+    const theirs = artifact({ id: 2, layer: "plugin", plugin_name: "superpowers" });
+    const global = artifact({ id: 3, layer: "global" });
+    const [scope] = pillsFor("skill", [mine, theirs, global], null, PROJECT_NAMES);
+    const posthog = scope.options.find((o) => o.id === "plugin:posthog")!;
+    expect(posthog.predicate(mine)).toBe(true);
+    expect(posthog.predicate(theirs)).toBe(false);
+    expect(posthog.predicate(global)).toBe(false);
+  });
+
+  it("offers a Scope group for settings files, which have a Scope column too", () => {
+    const groups = pillsFor("settings", [artifact({ kind: "settings", layer: "global" })], null, PROJECT_NAMES);
+    expect(groups.find((g) => g.id === "scope")?.options.map((o) => o.id)).toEqual(["global"]);
+  });
+
   it("has no Scope group for the plugin kind", () => {
     const groups = pillsFor("plugin", [artifact({ kind: "plugin" })], null, PROJECT_NAMES);
     expect(groups.find((g) => g.id === "scope")).toBeUndefined();

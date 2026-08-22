@@ -67,7 +67,8 @@ export const AllCells: Story = {
             <ScopeCell layer="global" />
             <ScopeCell layer="project" projectName="acme-api" />
             <ScopeCell layer="project" projectName={null} />
-            <ScopeCell layer="plugin" />
+            <ScopeCell layer="plugin" pluginName="posthog" />
+            <ScopeCell layer="plugin" pluginName={null} />
           </span>
         </Row>
         <Row label="PathCell">

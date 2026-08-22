@@ -8,7 +8,7 @@ import {
   type Updater,
 } from "@tanstack/react-table";
 import type { DataTableProps, TableState } from "./DataTable.types";
-import { applyFilters, facetedPillCounts } from "./dataTable.util";
+import { applyFilters, facetedPillCounts, prunePills } from "./dataTable.util";
 import { useTableState } from "./useTableState";
 
 /** Everything `DataTable` needs to render, with the table wiring kept out of the layout. */
@@ -54,12 +54,22 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
   const pillsKey = (pills ?? []).map((group) => group.id).join(" ");
   const searchKey = search?.keys.length ?? 0;
 
+  // What the table actually filters by: the remembered selection minus any
+  // chip that is no longer on screen. See `prunePills` — an option that
+  // vanished (a rescanned-away project, an uninstalled plugin) would
+  // otherwise empty the table with nothing pressed to un-press.
+  const selectedPills = useMemo(
+    () => prunePills(state.pills, pills ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.pills, pills, pillsKey],
+  );
+
   // Deliberately not keyed on the whole `state`: sorting is TanStack's job,
   // and re-filtering every row because a header was clicked is wasted work.
   const filtered = useMemo(
-    () => applyFilters(rows, { search: state.search, pills: state.pills, sort: null }, search, pills),
+    () => applyFilters(rows, { search: state.search, pills: selectedPills, sort: null }, search, pills),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, state.search, state.pills, search, pills, pillsKey, searchKey],
+    [rows, state.search, selectedPills, search, pills, pillsKey, searchKey],
   );
 
   const sorting = useMemo<SortingState>(
@@ -100,17 +110,19 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     [patch, state.sort],
   );
 
+  // Built on the pruned selection, so pressing any chip also writes the dead
+  // ids out of storage rather than carrying them along forever.
   const togglePill = useCallback(
     (groupId: string, optionId: string, multi: boolean) => {
-      const current = state.pills[groupId] ?? [];
+      const current = selectedPills[groupId] ?? [];
       const next = current.includes(optionId)
         ? current.filter((id) => id !== optionId)
         : multi
           ? [...current, optionId]
           : [optionId];
-      patch({ pills: { ...state.pills, [groupId]: next } });
+      patch({ pills: { ...selectedPills, [groupId]: next } });
     },
-    [patch, state.pills],
+    [patch, selectedPills],
   );
 
   // Clears the *filters*, not the view: the sort is the order the user chose to
@@ -124,19 +136,31 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
       facetedPillCounts(
         rows,
         pills ?? [],
-        { search: state.search, pills: state.pills, sort: null },
+        { search: state.search, pills: selectedPills, sort: null },
         search,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rows, pills, state.search, state.pills, search, pillsKey, searchKey],
+    [rows, pills, state.search, selectedPills, search, pillsKey, searchKey],
+  );
+
+  // A pruned-away selection is not a filter the user can see, so it must not
+  // put the table into the "N of M rows" state either.
+  /**
+   * `state.pills` is the *remembered* selection; what the table filtered and
+   * counted by is the pruned view of it, and that is what `DataTable` has to
+   * read back when deciding which chips look pressed.
+   */
+  const exposedState = useMemo(
+    () => ({ ...state, pills: selectedPills }),
+    [state, selectedPills],
   );
 
   const isFiltered =
-    state.search.trim().length > 0 || Object.values(state.pills).some((ids) => ids.length > 0);
+    state.search.trim().length > 0 || Object.values(selectedPills).some((ids) => ids.length > 0);
 
   return {
     table,
-    state,
+    state: exposedState,
     setSearch,
     toggleSort,
     togglePill,

@@ -29,6 +29,12 @@ export interface ScopeCellProps {
   layer: Layer;
   /** Project the row belongs to, when `layer` is `"project"`. */
   projectName?: string | null;
+  /**
+   * Plugin that installed the row, when `layer` is `"plugin"`. Every bundled
+   * row is a plugin row, so "Plugin" on its own answers a question nobody
+   * asked — which plugin put it there is the provenance the column is for.
+   */
+  pluginName?: string | null;
 }
 
 export interface PathCellProps {

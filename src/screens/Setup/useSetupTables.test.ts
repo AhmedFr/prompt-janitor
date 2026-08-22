@@ -38,6 +38,7 @@ const view: SetupView = {
     artifact({ id: 2, kind: "skill", name: "adapt" }),
     artifact({ id: 3, kind: "plugin", layer: "plugin", name: "sp", plugin_name: "sp" }),
     artifact({ id: 4, kind: "skill", layer: "plugin", name: "brainstorm", plugin_name: "sp" }),
+    artifact({ id: 6, kind: "settings", name: "settings.json" }),
   ],
   projects: [
     project({
@@ -68,6 +69,7 @@ describe("useSetupTables", () => {
       ["Hooks", 0],
       ["MCP", 0],
       ["Plugins", 1],
+      ["Settings", 1],
     ]);
   });
 
@@ -96,7 +98,7 @@ describe("useSetupTables", () => {
     });
     const first = result.current;
 
-    rerender({ data: { ...view, global: [...view.global, artifact({ id: 6, kind: "agent" })] } });
+    rerender({ data: { ...view, global: [...view.global, artifact({ id: 7, kind: "agent" })] } });
 
     expect(result.current.tabs).not.toBe(first.tabs);
     expect(first.tabs.find((tab) => tab.label === "Agents")?.count).toBe(0);
