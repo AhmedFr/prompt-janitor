@@ -7,7 +7,9 @@ import {
   groupByKind,
   harnessSummary,
   kindHeading,
+  matchProject,
   projectMatchCount,
+  projectNameFor,
   relativeSession,
   sessionLabel,
   sortProjects,
@@ -283,5 +285,60 @@ describe("sessionLabel", () => {
     expect(sessionLabel(0)).toBe("0 sessions");
     expect(sessionLabel(1)).toBe("1 session");
     expect(sessionLabel(12)).toBe("12 sessions");
+  });
+});
+
+describe("matchProject", () => {
+  const projectNames = new Map([
+    ["/code/acme-api", "acme-api"],
+    ["/code/acme-api-admin", "acme-api-admin"],
+  ]);
+
+  it("matches a file under a project's root", () => {
+    expect(matchProject("/code/acme-api/.claude/commands/deploy.md", projectNames)).toEqual({
+      path: "/code/acme-api",
+      name: "acme-api",
+    });
+  });
+
+  it("does not treat a sibling with a shared prefix as a match", () => {
+    // "/code/acme-api-admin/..." starts with "/code/acme-api" as a raw string
+    // prefix but is not *inside* that project — the boundary has to be a path
+    // separator, not just any character.
+    expect(matchProject("/code/acme-api-admin/CLAUDE.md", projectNames)).toEqual({
+      path: "/code/acme-api-admin",
+      name: "acme-api-admin",
+    });
+  });
+
+  it("matches the project root path itself", () => {
+    expect(matchProject("/code/acme-api", projectNames)).toEqual({
+      path: "/code/acme-api",
+      name: "acme-api",
+    });
+  });
+
+  it("returns null for a path outside every known project", () => {
+    expect(matchProject("/Users/ada/.claude/rules/web.md", projectNames)).toBeNull();
+  });
+
+  it("prefers the longest matching root for nested projects", () => {
+    const nested = new Map([
+      ["/code", "monorepo"],
+      ["/code/packages/api", "api"],
+    ]);
+    expect(matchProject("/code/packages/api/src/index.ts", nested)?.name).toBe("api");
+  });
+});
+
+describe("projectNameFor", () => {
+  const projectNames = new Map([["/code/acme-api", "acme-api"]]);
+
+  it("resolves to the matching project's name", () => {
+    expect(projectNameFor("/code/acme-api/CLAUDE.md", projectNames)).toBe("acme-api");
+  });
+
+  it("is null outside every known project", () => {
+    expect(projectNameFor("/Users/ada/.claude/rules/web.md", projectNames)).toBeNull();
   });
 });

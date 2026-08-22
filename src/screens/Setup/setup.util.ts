@@ -167,3 +167,30 @@ export function kindHeading(kind: ArtifactKind): string {
   const label = KIND_LABEL[kind];
   return label.endsWith("s") ? label : `${label}s`;
 }
+
+/**
+ * The project (root path, display name) a project-layer artifact's path
+ * falls under, by longest matching path prefix. `ArtifactView` carries no
+ * project reference of its own — only the file's absolute path — so the
+ * lookup works backwards from `projectNames`' keys (project root paths).
+ * `null` for anything not under a known project: global/plugin-layer rows,
+ * or a project the caller didn't pass in. Longest-prefix wins so a nested
+ * project (rare, but not impossible) resolves to its own root rather than
+ * its parent's.
+ */
+export function matchProject(
+  path: string,
+  projectNames: Map<string, string>,
+): { path: string; name: string } | null {
+  let best: { path: string; name: string } | null = null;
+  for (const [projectPath, name] of projectNames) {
+    if (path !== projectPath && !path.startsWith(`${projectPath}/`)) continue;
+    if (!best || projectPath.length > best.path.length) best = { path: projectPath, name };
+  }
+  return best;
+}
+
+/** Convenience wrapper over {@link matchProject} for callers that only need the name (`ScopeCell`). */
+export function projectNameFor(path: string, projectNames: Map<string, string>): string | null {
+  return matchProject(path, projectNames)?.name ?? null;
+}
