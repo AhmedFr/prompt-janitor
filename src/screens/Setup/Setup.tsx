@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { isTauri, type HarnessInfo, type SetupView } from "@/lib/ipc";
+import { DataTable, type DataTableSearch } from "@/components/DataTable";
+import { Tabs, useTabState, type TabItem } from "@/components/Tabs";
+import { isTauri, type ArtifactKind, type ArtifactView, type HarnessInfo, type SetupView } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import {
   scanPercent,
@@ -11,27 +13,28 @@ import {
   type ScanProgress,
 } from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
-import { KindSections, type Level } from "./KindSections";
-import { ProjectRow } from "./ProjectRow";
-import { FILTER_CHIPS } from "./Setup.constants";
-import type { SetupProps, SetupState } from "./Setup.types";
+import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
+import { pillsFor } from "./setup.pills";
 import {
-  costThreshold,
-  filterCounts,
-  harnessSummary,
-  projectMatchCount,
-  sortProjects,
-} from "./setup.util";
+  EMPTY_HINT,
+  EMPTY_TITLE,
+  SEARCH_PLACEHOLDER,
+  TAB_STATE_KEY,
+  TABLE_STATE_PREFIX,
+} from "./Setup.constants";
+import type { SetupProps } from "./Setup.types";
+import { harnessSummary, lastScanAt, relativeSession } from "./setup.util";
 import { useSetup } from "./useSetup";
+import { useSetupTables, type SetupTables } from "./useSetupTables";
 import "./Setup.css";
 
 /**
- * The whole Claude Code setup in one place: what applies everywhere, what each
- * project adds on top, and — annotated onto every piece — whether anything ever
- * actually used it.
+ * The whole Claude Code setup in one place: one table per artifact kind,
+ * sortable and searchable, annotated with whether anything ever actually used
+ * what is installed.
  */
-export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
-  const state = useSetup(initialFilter);
+export function Setup({ navigate, data: override, initialTab }: SetupProps) {
+  const state = useSetup();
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const [busy, setBusy] = useState(false);
@@ -70,7 +73,7 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page setup-page">
           {busy && (
             <ScanBar
               progress={scan.progress}
@@ -88,7 +91,7 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
           ) : detected.length === 0 ? (
             <NoHarness busy={busy} onAddFolder={() => void run(addFolderAndScan)} />
           ) : (
-            <Inventory data={data} detected={detected} state={state} navigate={navigate} />
+            <Inventory data={data} detected={detected} navigate={navigate} initialTab={initialTab} />
           )}
         </div>
       </div>
@@ -154,52 +157,46 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
   );
 }
 
+/** Every tab id, for `useTabState` to resolve a remembered (or passed-in) one against. */
+const TAB_IDS = KIND_TABS.map((tab) => tab.id);
+
+/** A row is its artifact: one database id, unique across the whole inventory. */
+const rowId = (row: ArtifactView) => String(row.id);
+
 function Inventory({
   data,
   detected,
-  state,
   navigate,
+  initialTab,
 }: {
   data: SetupView;
   detected: HarnessInfo[];
-  state: SetupState;
   navigate: Navigate;
+  initialTab?: ArtifactKind;
 }) {
-  const { filter, setFilter, effectiveRulesFor, rulesVersion } = state;
-  // One harness is the common case, and a header repeating its name every time
-  // would be noise. Two or more, and the split is the whole point.
-  const grouped = detected.length > 1;
-  const level: Level = grouped ? 4 : 3;
-  const projects = useMemo(() => sortProjects(data.projects), [data.projects]);
-  const everything = useMemo(
-    () => [...data.global, ...data.projects.flatMap((p) => p.artifacts)],
-    [data],
-  );
-  // One bar for the whole setup: a per-section median would call half of any
-  // list expensive, however cheap the list actually is.
-  const costBar = useMemo(() => costThreshold(everything), [everything]);
-  // What each chip would narrow to, so the choice is informed before the click.
-  const counts = useMemo(() => filterCounts(everything, costBar), [everything, costBar]);
-  // A project with nothing in the current slice is a row the user has to open
-  // to learn it had nothing to say. Drop it instead.
-  const visible = useMemo(
-    () =>
-      filter === "all"
-        ? projects
-        : projects.filter((p) => projectMatchCount(p, filter, costBar) > 0),
-    [projects, filter, costBar],
-  );
+  // Stable so `columnsFor`'s per-`ctx` cache can hit; see `useSetupTables`.
+  const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
+  const tables = useSetupTables(data, openDetail);
+  const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
 
-  const projectRow = (project: SetupView["projects"][number]) => (
-    <ProjectRow
-      key={`${project.harness} ${project.path}`}
-      project={project}
-      filter={filter}
-      costBar={costBar}
-      effectiveRulesFor={effectiveRulesFor}
-      rulesVersion={rulesVersion}
-      navigate={navigate}
-    />
+  // A deep link names the tab it means; the remembered one only decides where
+  // an unqualified visit lands. `useTabState` reads storage first, so without
+  // this the link would lose to wherever the user last was.
+  useEffect(() => {
+    if (initialTab) setActive(initialTab);
+  }, [initialTab, setActive]);
+
+  // Identity-stable per project set, which is all `DataTable`'s memoised
+  // filtering asks of it. `scopeLabel` is the column's own label rule, so
+  // searching "posthog" or a project name finds exactly the rows whose Scope
+  // cell reads that way; `plugin_name` is searched directly as well, for a
+  // row that names a plugin without being scanned out of one.
+  const search = useMemo<DataTableSearch<ArtifactView>>(
+    () => ({
+      placeholder: SEARCH_PLACEHOLDER,
+      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, tables.projectNames)],
+    }),
+    [tables.projectNames],
   );
 
   return (
@@ -210,68 +207,62 @@ function Inventory({
             {harnessSummary(h)}
           </span>
         ))}
+        <span className="setup-harness setup-harness--scan">
+          Last scan {relativeSession(lastScanAt(detected))}
+        </span>
       </p>
 
-      <div className="setup-filters" role="group" aria-label="Filter setup">
-        {FILTER_CHIPS.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            className={"setup-chip" + (filter === chip.id ? " setup-chip--on" : "")}
-            aria-pressed={filter === chip.id}
-            onClick={() => setFilter(chip.id)}
-          >
-            {chip.label} <span className="setup-chip__count tnum">{counts[chip.id]}</span>
-          </button>
-        ))}
-      </div>
-
-      <section className="setup-section" aria-labelledby="setup-global">
-        <h2 id="setup-global" className="setup-section__title">
-          Global
-        </h2>
-        {grouped ? (
-          detected.map((h) => (
-            <div key={h.id}>
-              <h3 className="setup-harness__title">{h.display_name}</h3>
-              <KindSections
-                artifacts={data.global.filter((a) => a.harness === h.id)}
-                filter={filter}
-                costBar={costBar}
-                level={level}
-                navigate={navigate}
-              />
-            </div>
-          ))
-        ) : (
-          <KindSections
-            artifacts={data.global}
-            filter={filter}
-            costBar={costBar}
-            level={level}
-            navigate={navigate}
-          />
-        )}
-      </section>
-
-      <section className="setup-section" aria-labelledby="setup-projects">
-        <h2 id="setup-projects" className="setup-section__title">
-          Projects
-        </h2>
-        {grouped
-          ? detected.map((h) => (
-              <div key={h.id}>
-                <h3 className="setup-harness__title">{h.display_name}</h3>
-                {visible.filter((p) => p.harness === h.id).map(projectRow)}
-              </div>
-            ))
-          : visible.map(projectRow)}
-        {visible.length === 0 && (
-          <p className="muted">
-            {projects.length === 0 ? "No projects seen yet." : "No project matches this filter."}
-          </p>
-        )}
-      </section>
+      <Tabs items={tables.tabs} active={active} onChange={setActive} ariaLabel="Setup kinds">
+        {(id) => {
+          // `Tabs` only ever calls back with an id from `items`, but resolving
+          // it against `KIND_TABS` keeps the kind typed without a cast.
+          const tab = KIND_TABS.find((candidate) => candidate.id === id) ?? KIND_TABS[0];
+          return <KindTable tab={tab} tables={tables} search={search} />;
+        }}
+      </Tabs>
     </>
+  );
+}
+
+/**
+ * One kind's table. Rendered by the tab panel, so a tab switch changes this
+ * component's props rather than remounting it — which is exactly what
+ * `DataTable`'s `stateKey` handling expects: each kind keeps its own search,
+ * pills and sort under `pj.table.setup.<kind>`.
+ */
+function KindTable({
+  tab,
+  tables,
+  search,
+}: {
+  tab: TabItem & { id: ArtifactKind };
+  tables: SetupTables;
+  search: DataTableSearch<ArtifactView>;
+}) {
+  const { rowsFor, ctx, projectNames, costBar } = tables;
+  const rows = rowsFor(tab.id);
+  // Only rules have a graded file behind them to open.
+  const onRowClick =
+    tab.id === "rule"
+      ? (row: ArtifactView) => {
+          if (row.file_id) ctx.onOpen(row.file_id);
+        }
+      : undefined;
+
+  return (
+    <DataTable
+      ariaLabel={tab.label}
+      stateKey={TABLE_STATE_PREFIX + tab.id}
+      columns={columnsFor(tab.id, ctx)}
+      rows={rows}
+      rowId={rowId}
+      search={search}
+      pills={pillsFor(tab.id, rows, costBar, projectNames)}
+      defaultSort={defaultSortFor(tab.id)}
+      onRowClick={onRowClick}
+      density="compact"
+      virtualize
+      empty={{ title: EMPTY_TITLE[tab.id], hint: EMPTY_HINT }}
+    />
   );
 }

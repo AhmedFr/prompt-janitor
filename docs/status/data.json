@@ -65,10 +65,10 @@
     {
       "name": "Phase 8",
       "title": "Tables & project pages",
-      "done": 2,
+      "done": 3,
       "total": 6,
       "state": "active",
-      "note": "Foundation merged (#133). Read models landed (#127 PR). Next: Setup tabs (#128), project pages (#129), rules (#130), analytics (#131)."
+      "note": "Read models merged (#134). Setup tabs (#128 PR). Next: project pages (#129), rules (#130), analytics (#131)."
     }
   ],
   "actions": {
@@ -229,8 +229,8 @@
     {
       "name": "Setup screen — global + per-project inventory with usage evidence",
       "tier": "free",
-      "status": "pr",
-      "note": "PR for #112 awaiting review"
+      "status": "done",
+      "note": "Merged (#114/#121); superseded by per-kind tables (#128)"
     },
     {
       "name": "Detection-based onboarding (probe, scan progress, verdict reveal)",
@@ -265,8 +265,20 @@
     {
       "name": "Shared DataTable/Tabs/RankedList",
       "tier": "infra",
+      "status": "done",
+      "note": "Merged (#133)"
+    },
+    {
+      "name": "Read models for tables and ranked usage",
+      "tier": "infra",
+      "status": "done",
+      "note": "Merged (#134): windowed usage overview, project usage, project list extras, rule hit counts"
+    },
+    {
+      "name": "Setup screen as per-kind tables",
+      "tier": "free",
       "status": "pr",
-      "note": "PR for #126 awaiting review — the table every screen is rebuilt on"
+      "note": "PR for #128 awaiting review — tabs per artifact kind, search, sort, pills"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
@@ -302,7 +314,7 @@
     },
     {
       "name": "Vitest",
-      "result": "464/464 passing (52 files)"
+      "result": "548/548 passing (54 files)"
     },
     {
       "name": "cargo test",
@@ -335,6 +347,7 @@
     }
   ],
   "recent": [
+    "2026-08-22 — Setup screen rebuilt as per-kind tables: Rules · Skills · Agents · Commands · Hooks · MCP · Plugins tabs, search, sort, scope/never-used/errors/cost pills (#128 PR)",
     "2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner's own findings), slash-tolerant project ids across the project-scoped reads",
     "2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions",
     "2026-08-22 — Read models for tables and ranked usage: windowed usage overview, project usage, project list extras, rule hit counts (#127 PR)",

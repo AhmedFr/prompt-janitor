@@ -364,6 +364,33 @@ describe("DataTable", () => {
     expect(screen.getByText("Run a scan to populate this table.")).toBeInTheDocument();
   });
 
+  it("ignores a remembered pill whose option no longer exists", () => {
+    // The kind pill set can shrink under a table that remembered one of its
+    // chips (a project dropped by the last scan, a plugin uninstalled).
+    // Applying it would empty the table with no chip pressed to un-press.
+    window.sessionStorage.setItem(
+      "pj.table.stale-pill",
+      JSON.stringify({ search: "", pills: { kind: ["gone"] }, sort: null }),
+    );
+    setup({ pills: PILLS, stateKey: "stale-pill" });
+
+    expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(screen.queryByText(/No rows match/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByText(/of 3 rows/)).not.toBeInTheDocument();
+  });
+
+  it("still applies the live half of a part-stale selection", () => {
+    window.sessionStorage.setItem(
+      "pj.table.part-stale",
+      JSON.stringify({ search: "", pills: { kind: ["rule", "gone"] }, sort: null }),
+    );
+    setup({ pills: PILLS, stateKey: "part-stale" });
+
+    expect(rowNames()).toEqual(["Alpha", "Charlie"]);
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("offers a clear-filters escape hatch when filters match nothing", async () => {
     setup({ search: { placeholder: "Search artifacts", keys: ["name"] }, pills: PILLS });
 

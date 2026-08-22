@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Setup } from "./Setup";
-import type { ArtifactView, EffectiveRule, SetupView, UsageStat } from "@/lib/ipc";
+import type { ArtifactView, SetupView, UsageStat } from "@/lib/ipc";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
@@ -22,7 +22,6 @@ const emit = async (event: string) => {
 };
 
 const getSetup = vi.hoisted(() => vi.fn());
-const getEffectiveRules = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
@@ -32,7 +31,7 @@ vi.mock("@/lib/ipc", async () => {
   return {
     ...actual,
     isTauri: true,
-    commands: { getSetup, getEffectiveRules, getExtraScanFolders, setExtraScanFolders, scanNow },
+    commands: { getSetup, getExtraScanFolders, setExtraScanFolders, scanNow },
   };
 });
 
@@ -64,23 +63,6 @@ const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   ...o,
 });
 
-const effectiveRules: EffectiveRule[] = [
-  {
-    layer: "global",
-    path: "/home/u/.claude/CLAUDE.md",
-    name: "home CLAUDE.md",
-    grade: "B",
-    file_id: "f-global",
-  },
-  {
-    layer: "project",
-    path: "/repo/web/CLAUDE.md",
-    name: "web CLAUDE.md",
-    grade: "C",
-    file_id: "f-web",
-  },
-];
-
 const populated: SetupView = {
   harnesses: [
     {
@@ -93,13 +75,90 @@ const populated: SetupView = {
     },
   ],
   global: [
-    artifact({ id: 1, kind: "rule", name: "global-style", grade: "B", file_id: "f-global" }),
-    artifact({ id: 2, kind: "skill", name: "debugging", usage: usage({ avg_turn_tokens: 300 }) }),
+    artifact({
+      id: 1,
+      kind: "rule",
+      name: "global-style",
+      path: "/home/u/.claude/CLAUDE.md",
+      grade: "B",
+      file_id: "f-global",
+    }),
+    artifact({
+      id: 2,
+      kind: "skill",
+      name: "adapt",
+      description: "Adapts designs across screen sizes",
+      path: "/home/u/.claude/skills/adapt/SKILL.md",
+      usage: usage({ total: 20, avg_turn_tokens: 300 }),
+    }),
     artifact({
       id: 3,
+      kind: "skill",
+      name: "sunset",
+      path: "/home/u/.claude/skills/sunset/SKILL.md",
+      usage: null,
+    }),
+    artifact({
+      id: 4,
+      kind: "skill",
+      name: "brainstorming",
+      layer: "plugin",
+      plugin_name: "superpowers",
+      path: "/home/u/.claude/plugins/superpowers/skills/brainstorming/SKILL.md",
+      usage: null,
+    }),
+    artifact({
+      id: 5,
+      kind: "agent",
+      name: "code-reviewer",
+      layer: "plugin",
+      plugin_name: "superpowers",
+      path: "/home/u/.claude/plugins/superpowers/agents/code-reviewer.md",
+      usage: null,
+    }),
+    artifact({
+      id: 6,
       kind: "mcp_server",
       name: "linear",
+      path: "/home/u/.claude/mcp/linear",
       usage: usage({ error_rate: 0.5, avg_turn_tokens: 9000 }),
+    }),
+    artifact({ id: 7, kind: "hook", name: "PreToolUse: fmt", path: "/home/u/.claude/settings.json" }),
+    artifact({
+      id: 8,
+      kind: "plugin",
+      name: "superpowers",
+      layer: "plugin",
+      plugin_name: "superpowers",
+      description: "v6.3.0 · claude-plugins-official",
+      path: "/home/u/.claude/plugins/superpowers",
+    }),
+    artifact({
+      id: 15,
+      kind: "plugin",
+      name: "posthog",
+      layer: "plugin",
+      plugin_name: "posthog",
+      description: "v2.1.0 · posthog-marketplace",
+      path: "/home/u/.claude/plugins/posthog",
+    }),
+    // Same skill name as superpowers' — only the plugin it came from tells
+    // the two rows apart.
+    artifact({
+      id: 16,
+      kind: "skill",
+      name: "brainstorming",
+      layer: "plugin",
+      plugin_name: "posthog",
+      path: "/home/u/.claude/plugins/posthog/skills/brainstorming/SKILL.md",
+      usage: null,
+    }),
+    artifact({
+      id: 17,
+      kind: "settings",
+      name: "settings.json",
+      path: "/home/u/.claude/settings.json",
+      bytes: 512,
     }),
   ],
   projects: [
@@ -112,20 +171,21 @@ const populated: SetupView = {
       last_session_at: "2026-08-19T08:00:00.000Z",
       artifacts: [
         artifact({
-          id: 4,
+          id: 9,
           layer: "project",
           kind: "rule",
           name: "web-rules",
+          path: "/repo/web/CLAUDE.md",
           grade: "C",
           file_id: "f-web",
-          usage: usage({ avg_turn_tokens: 300 }),
         }),
         artifact({
-          id: 5,
+          id: 10,
           layer: "project",
           kind: "skill",
-          name: "web-skill",
-          usage: usage({ error_rate: 0.6, avg_turn_tokens: 300 }),
+          name: "deploy",
+          path: "/repo/web/.claude/skills/deploy/SKILL.md",
+          usage: usage({ total: 30, avg_turn_tokens: 300 }),
         }),
       ],
     },
@@ -162,11 +222,23 @@ const renderSetup = async (navigate = vi.fn()) => {
   return { ...view, navigate };
 };
 
+/** Body rows of whichever tab's table is mounted, in render order. */
+const bodyRows = () => [...document.querySelectorAll<HTMLElement>("tbody tr.dt__row")];
+
+/** The name cell's own text, with the muted description suffix stripped. */
+const rowNames = () =>
+  bodyRows().map((row) => row.querySelector("td")?.textContent?.split("·")[0].trim() ?? "");
+
+const rowFor = (name: string) =>
+  bodyRows().find((row) => (row.querySelector("td")?.textContent ?? "").startsWith(name)) as HTMLElement;
+
+const openTab = (label: RegExp) => fireEvent.click(screen.getByRole("tab", { name: label }));
+
 beforeEach(() => {
   vi.clearAllMocks();
   listeners.clear();
+  window.sessionStorage.clear();
   getSetup.mockResolvedValue({ status: "ok", data: populated });
-  getEffectiveRules.mockResolvedValue({ status: "ok", data: effectiveRules });
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "error", error: "no" });
@@ -176,132 +248,229 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Setup", () => {
-  it("renders the harness summary with a Global and a Projects section", async () => {
+  it("renders one tab per artifact kind, counted across global and every project", async () => {
     await renderSetup();
 
-    expect(await screen.findByRole("heading", { name: "Global", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Projects", level: 2 })).toBeInTheDocument();
-    expect(screen.getByText(/Claude Code · 2 projects · 177 sessions/)).toBeInTheDocument();
-    expect(screen.getByText("global-style")).toBeInTheDocument();
-    expect(screen.getByText("linear")).toBeInTheDocument();
+    const tabs = await screen.findByRole("tablist", { name: /setup/i });
+    expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Rules2",
+      "Skills5",
+      "Agents1",
+      "Commands0",
+      "Hooks1",
+      "MCP1",
+      "Plugins2",
+      "Settings1",
+    ]);
   });
 
-  it("narrows the inventory when a filter chip is pressed", async () => {
+  it("summarises the detected harness and when it was last scanned", async () => {
     await renderSetup();
-    await screen.findByText("debugging");
+
+    expect(screen.getByText(/Claude Code · 2 projects · 177 sessions/)).toBeInTheDocument();
+    expect(screen.getByText(/last scan/i)).toBeInTheDocument();
+  });
+
+  it("opens on Rules, ordered best grade first", async () => {
+    await renderSetup();
+    await screen.findByRole("tab", { name: /^Rules/ });
+
+    expect(screen.getByRole("tab", { name: /^Rules/ })).toHaveAttribute("aria-selected", "true");
+    expect(rowNames()).toEqual(["global-style", "web-rules"]);
+  });
+
+  it("scopes each Skills row to the global layer or to its project", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    expect(within(rowFor("adapt")).getByText("Global")).toBeInTheDocument();
+    expect(within(rowFor("deploy")).getByText("web")).toBeInTheDocument();
+  });
+
+  it("sorts every non-rule tab by uses, most-used first", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    // 30, 20, then the never-used rows in inventory order.
+    expect(rowNames()).toEqual(["deploy", "adapt", "sunset", "brainstorming", "brainstorming"]);
+    expect(screen.getByRole("columnheader", { name: /Uses/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+  });
+
+  it("narrows a tab to one project with the Scope pills", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    const scope = screen.getByRole("group", { name: "Scope" });
+    fireEvent.click(within(scope).getByRole("button", { name: /^web/ }));
+
+    expect(rowNames()).toEqual(["deploy"]);
+  });
+
+  it("narrows a tab to what has never been used", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
 
     fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
 
+    expect(rowNames()).toEqual(["sunset", "brainstorming", "brainstorming"]);
+  });
+
+  it("searches a tab by name, description and scope", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "screen sizes" } });
+    await waitFor(() => expect(rowNames()).toEqual(["adapt"]));
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "web" } });
+    await waitFor(() => expect(rowNames()).toEqual(["deploy"]));
+  });
+
+  it("counts what a plugin install bundled on its Plugins row", async () => {
+    await renderSetup();
+    openTab(/^Plugins/);
+
+    // The bundled skill and agent — not the plugin's own manifest row.
+    expect(within(rowFor("superpowers")).getByText("2")).toBeInTheDocument();
+  });
+
+  it("names the plugin a bundled row came from, telling same-named skills apart", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    const bundled = bodyRows().filter((row) =>
+      (row.querySelector("td")?.textContent ?? "").startsWith("brainstorming"),
+    );
+    expect(bundled).toHaveLength(2);
+    expect(
+      bundled.map((row) => within(row).getByText(/^(superpowers|posthog)$/).textContent).sort(),
+    ).toEqual(["posthog", "superpowers"]);
+  });
+
+  it("finds a bundled row by the plugin that installed it", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "posthog" } });
+
+    await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
+  });
+
+  it("narrows a tab to one plugin with the Scope pills", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+
+    const scope = screen.getByRole("group", { name: "Scope" });
+    fireEvent.click(within(scope).getByRole("button", { name: /^posthog/ }));
+
+    expect(rowNames()).toEqual(["brainstorming"]);
+    expect(within(rowFor("brainstorming")).getByText("posthog")).toBeInTheDocument();
+  });
+
+  it("gives settings files a tab of their own", async () => {
+    await renderSetup();
+    openTab(/^Settings/);
+
+    expect(rowNames()).toEqual(["settings.json"]);
+    expect(within(rowFor("settings.json")).getByText("Global")).toBeInTheDocument();
+  });
+
+  it("lets a deep link win over the remembered tab", async () => {
+    // The user last left Setup on Skills; arriving from a "show me the MCP
+    // servers" link has to override that, not lose to it.
+    window.sessionStorage.setItem("pj.tabs.setup", "skill");
+    render(<Setup navigate={vi.fn()} initialTab="mcp_server" />);
+    await screen.findByRole("heading", { name: "Setup", level: 1 });
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /^MCP/ })).toHaveAttribute("aria-selected", "true"),
+    );
+    expect(rowNames()).toEqual(["linear"]);
+  });
+
+  it("opens a rule's detail when its row is clicked", async () => {
+    const { navigate } = await renderSetup();
+    await screen.findByRole("tab", { name: /^Rules/ });
+
+    fireEvent.click(rowFor("web-rules"));
+
+    expect(navigate).toHaveBeenCalledWith("detail", "f-web");
+  });
+
+  it("keeps each tab's filters to itself, even between tabs with the same pill groups", async () => {
+    await renderSetup();
+    openTab(/^Skills/);
+    fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "sunset" } });
+    await waitFor(() => expect(rowNames()).toEqual(["sunset"]));
+
+    // Agents carries the very same pill group ids ("scope", "status",
+    // "bundled") and the same search config, so a table keyed on anything
+    // coarser than its own `stateKey` would arrive here already filtered.
+    openTab(/^Agents/);
+
+    expect(rowNames()).toEqual(["code-reviewer"]);
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    // Nothing was typed or pressed on this tab, so it has nothing to remember.
+    expect(window.sessionStorage.getItem("pj.table.setup.agent")).toBeNull();
+
+    openTab(/^Skills/);
+
+    expect(rowNames()).toEqual(["sunset"]);
+    expect(screen.getByRole("searchbox")).toHaveValue("sunset");
     expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByText("global-style")).toBeInTheDocument();
-    expect(screen.queryByText("debugging")).not.toBeInTheDocument();
-    expect(screen.queryByText("linear")).not.toBeInTheDocument();
   });
 
-  it("marks a project whose folder is gone and shows its session recency", async () => {
+  it("rebuilds the tabs, rows and pill counts from the inventory a scan produced", async () => {
     await renderSetup();
+    openTab(/^Skills/);
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used3");
 
-    const gone = await screen.findByText("gone");
-    expect(gone.closest("summary")).toHaveTextContent("folder missing");
-    expect(screen.getByText("web").closest("summary")).toHaveTextContent("12 sessions");
-  });
+    // The rescan finds one more, never-used skill. Every derived value here
+    // is cached on the identity of what it was built from — the row arrays,
+    // the column context, the pill definitions — so a screen that updated
+    // the inventory in place instead of replacing it would keep showing the
+    // counts, tabs and rows below from before the scan.
+    getSetup.mockResolvedValue({
+      status: "ok",
+      data: {
+        ...populated,
+        global: [
+          ...populated.global,
+          artifact({ id: 99, kind: "skill", name: "zzz-new", path: "/home/u/.claude/skills/zzz-new/SKILL.md" }),
+        ],
+      },
+    });
 
-  it("loads a project's effective rules only once it is expanded", async () => {
-    const { navigate } = await renderSetup();
-    await screen.findByText("web");
-    expect(getEffectiveRules).not.toHaveBeenCalled();
+    await emit("scan-done");
 
-    const web = screen.getByText("web").closest("details") as HTMLDetailsElement;
-    fireEvent.click(screen.getByText("web"));
-
+    await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(getEffectiveRules).toHaveBeenCalledWith("claude_code", "/repo/web"),
+      expect(screen.getByRole("tab", { name: /^Skills/ })).toHaveTextContent("Skills6"),
     );
-    expect(
-      within(web).getByRole("heading", { name: "Effective rules", level: 4 }),
-    ).toBeInTheDocument();
-    expect(await within(web).findByText("home CLAUDE.md")).toBeInTheDocument();
-
-    fireEvent.click(within(web).getByRole("button", { name: /web CLAUDE\.md/ }));
-    expect(navigate).toHaveBeenCalledWith("detail", "f-web");
+    expect(rowNames()).toContain("zzz-new");
+    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used4");
   });
 
   it("offers a folder picker when no harness was detected", async () => {
     getSetup.mockResolvedValue({ status: "ok", data: noHarness });
     await renderSetup();
 
-    expect(
-      await screen.findByText("No supported agent harness found"),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Global", level: 2 })).not.toBeInTheDocument();
+    expect(await screen.findByText("No supported agent harness found")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Add a folder/ }));
     await waitFor(() => expect(open).toHaveBeenCalled());
-  });
-
-
-  it("keeps a collapsed project's artifacts out of the DOM", async () => {
-    await renderSetup();
-    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
-
-    expect(web.querySelectorAll(".artifact-card")).toHaveLength(0);
-
-    fireEvent.click(screen.getByText("web"));
-
-    await waitFor(() => expect(web.querySelectorAll(".artifact-card").length).toBeGreaterThan(0));
-  });
-
-  it("reloads an expanded project's rules after a scan finishes", async () => {
-    await renderSetup();
-    await screen.findByText("web");
-    fireEvent.click(screen.getByText("web"));
-    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(1));
-
-    await emit("scan-done");
-
-    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(2));
-    expect(getEffectiveRules).toHaveBeenLastCalledWith("claude_code", "/repo/web");
-  });
-
-  it("measures high cost against the whole setup, not one section", async () => {
-    await renderSetup();
-    await screen.findByText("linear");
-
-    fireEvent.click(screen.getByRole("button", { name: /^High cost/ }));
-
-    // Turn costs across global + projects are 300, 9000 and 300 — median 300,
-    // so the bar is 600. Scoped to the global list alone the median would be
-    // 4650 and nothing would clear it.
-    expect(screen.getByText("linear")).toBeInTheDocument();
-    expect(screen.queryByText("debugging")).not.toBeInTheDocument();
-  });
-
-  it("says the rule stack could not be read instead of that there is none", async () => {
-    getEffectiveRules.mockRejectedValueOnce(new Error("db is busy"));
-    await renderSetup();
-    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
-
-    fireEvent.click(screen.getByText("web"));
-
-    expect(await within(web).findByText(/couldn.t read the rule stack/i)).toBeInTheDocument();
-    expect(within(web).queryByText(/no rule files apply/i)).toBeNull();
-  });
-
-  it("retries a failed rule lookup in place, without caching the failure", async () => {
-    getEffectiveRules.mockRejectedValueOnce(new Error("db is busy"));
-    await renderSetup();
-    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
-
-    fireEvent.click(screen.getByText("web"));
-    const retry = await within(web).findByRole("button", { name: /try again/i });
-
-    fireEvent.click(retry);
-
-    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(2));
-    expect(await within(web).findByText("home CLAUDE.md")).toBeInTheDocument();
   });
 
   it("stops loading when the setup query fails", async () => {
@@ -312,54 +481,10 @@ describe("Setup", () => {
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
-  it("counts every filter's slice on its chip", async () => {
-    await renderSetup();
-    await screen.findByText("linear");
-
-    // 5 artifacts in all: one never used, two over the error bar (linear and
-    // web-skill), and one over the 600-token cost bar (linear).
-    expect(screen.getByRole("button", { name: "All 5" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Never used 1" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Errors 2" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "High cost 1" })).toBeInTheDocument();
-  });
-
-  it("drops project rows with nothing in the current slice, and counts the rest", async () => {
-    await renderSetup();
-    await screen.findByText("web");
-
-    fireEvent.click(screen.getByRole("button", { name: /^Errors/ }));
-
-    // `gone` holds no artifacts at all, so its row is noise under a filter.
-    expect(screen.queryByText("gone")).not.toBeInTheDocument();
-    expect(screen.getByText("web").closest("summary")).toHaveTextContent("1 match");
-  });
-
-  it("keeps every project row on the unfiltered view", async () => {
-    await renderSetup();
-
-    expect(await screen.findByText("gone")).toBeInTheDocument();
-    expect(screen.getByText("web").closest("summary")).not.toHaveTextContent("match");
-  });
-
-  it("titles a project row as a heading under Projects, without skipping a level", async () => {
-    await renderSetup();
-    await screen.findByText("web");
-
-    expect(screen.getByRole("heading", { name: "web", level: 3 })).toBeInTheDocument();
-    fireEvent.click(screen.getByText("web"));
-
-    const web = screen.getByText("web").closest("details") as HTMLDetailsElement;
-    await waitFor(() =>
-      expect(within(web).getByRole("heading", { name: /^Rules/, level: 4 })).toBeInTheDocument(),
-    );
-  });
-
   it("has no accessibility violations", async () => {
     const { container } = await renderSetup();
-    await screen.findByText("web");
-    fireEvent.click(screen.getByText("web"));
-    await screen.findByText("home CLAUDE.md");
+    await screen.findByRole("tablist", { name: /setup/i });
+    openTab(/^Skills/);
 
     expect(await axe(container)).toHaveNoViolations();
   });

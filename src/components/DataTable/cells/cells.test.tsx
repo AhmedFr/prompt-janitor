@@ -89,6 +89,19 @@ describe("ScopeCell", () => {
     render(<ScopeCell layer="project" projectName={null} />);
     expect(screen.getByText("Project")).toBeInTheDocument();
   });
+
+  it("names the plugin a bundled row was installed by", () => {
+    // "Plugin" alone answers the wrong question: every bundled row in the
+    // table is a plugin row, and which plugin put it there is the provenance
+    // the column exists for.
+    render(<ScopeCell layer="plugin" pluginName="posthog" />);
+    expect(screen.getByText("posthog")).toBeInTheDocument();
+  });
+
+  it("falls back to a generic plugin label when the plugin name is missing", () => {
+    render(<ScopeCell layer="plugin" pluginName={null} />);
+    expect(screen.getByText("Plugin")).toBeInTheDocument();
+  });
 });
 
 describe("truncateMiddle", () => {

@@ -1,6 +1,10 @@
-import type { ArtifactKind, ArtifactView, HarnessInfo, ProjectSetup } from "@/lib/ipc";
-import { KIND_LABEL } from "@/components/ArtifactCard";
-import type { KindGroup } from "./Setup.types";
+import type {
+  ArtifactKind,
+  ArtifactView,
+  HarnessInfo,
+  ProjectSetup,
+  SetupView,
+} from "@/lib/ipc";
 import {
   COST_MEDIAN_MULTIPLIER,
   ERROR_RATE_THRESHOLD,
@@ -10,17 +14,6 @@ import {
 
 /** Which slice of the inventory the screen is showing. */
 export type SetupFilter = "all" | "never" | "errors" | "cost";
-
-/**
- * Buckets artifacts by kind in {@link KIND_ORDER}, dropping kinds nothing
- * landed in so the screen never renders an empty section header.
- */
-export function groupByKind(artifacts: ArtifactView[]): KindGroup[] {
-  return KIND_ORDER.map((kind) => ({
-    kind,
-    items: artifacts.filter((a) => a.kind === kind),
-  })).filter((group) => group.items.length > 0);
-}
 
 /** Middle value of a sorted-ascending copy; the mean of the middle pair when even. */
 function median(values: number[]): number {
@@ -69,19 +62,6 @@ export function applyFilter(
     const cost = a.usage?.avg_turn_tokens;
     return cost != null && cost >= bar;
   });
-}
-
-/**
- * How many of a project's artifacts survive the current filter. Zero means the
- * project has nothing to say about this slice, and the screen drops its row
- * rather than making the user expand it to find out.
- */
-export function projectMatchCount(
-  project: ProjectSetup,
-  filter: SetupFilter,
-  costBar: number | null,
-): number {
-  return applyFilter(project.artifacts, filter, costBar).length;
 }
 
 /**
@@ -162,8 +142,102 @@ export function topRuleGrade(project: ProjectSetup): string | null {
   return project.artifacts.find((a) => a.kind === "rule" && a.grade)?.grade ?? null;
 }
 
-/** Section title for a kind: the shared label, pluralised. */
-export function kindHeading(kind: ArtifactKind): string {
-  const label = KIND_LABEL[kind];
-  return label.endsWith("s") ? label : `${label}s`;
+/**
+ * The project (root path, display name) a project-layer artifact's path
+ * falls under, by longest matching path prefix. `ArtifactView` carries no
+ * project reference of its own — only the file's absolute path — so the
+ * lookup works backwards from `projectNames`' keys (project root paths).
+ * `null` for anything not under a known project: global/plugin-layer rows,
+ * or a project the caller didn't pass in. Longest-prefix wins so a nested
+ * project (rare, but not impossible) resolves to its own root rather than
+ * its parent's.
+ */
+export function matchProject(
+  path: string,
+  projectNames: Map<string, string>,
+): { path: string; name: string } | null {
+  let best: { path: string; name: string } | null = null;
+  for (const [projectPath, name] of projectNames) {
+    if (path !== projectPath && !path.startsWith(`${projectPath}/`)) continue;
+    if (!best || projectPath.length > best.path.length) best = { path: projectPath, name };
+  }
+  return best;
+}
+
+/** Convenience wrapper over {@link matchProject} for callers that only need the name (`ScopeCell`). */
+export function projectNameFor(path: string, projectNames: Map<string, string>): string | null {
+  return matchProject(path, projectNames)?.name ?? null;
+}
+
+/**
+ * The whole inventory as one list: the global layer (which is where
+ * plugin-installed artifacts land too — they have no project of their own)
+ * followed by every project's artifacts. This is the set every Setup table
+ * is a kind-filtered slice of, and the set the shared cost bar is measured
+ * over.
+ */
+export function allArtifacts(view: SetupView): ArtifactView[] {
+  return [...view.global, ...view.projects.flatMap((p) => p.artifacts)];
+}
+
+/**
+ * The inventory bucketed per kind, in one pass, with an entry for *every*
+ * kind — a tab whose kind nothing landed in still has to render (with a
+ * count of zero), unlike the old screen's sections which were dropped when
+ * empty. Order within a bucket is the order the inventory arrived in, which
+ * the backend already sorts by kind then name.
+ */
+export function rowsByKind(artifacts: ArtifactView[]): Map<ArtifactKind, ArtifactView[]> {
+  const out = new Map<ArtifactKind, ArtifactView[]>(KIND_ORDER.map((kind) => [kind, []]));
+  for (const artifact of artifacts) {
+    // A kind outside `KIND_ORDER` cannot exist in the generated bindings, but
+    // a stale database row could still carry one; give it a bucket rather
+    // than dropping it on the floor.
+    const bucket = out.get(artifact.kind);
+    if (bucket) bucket.push(artifact);
+    else out.set(artifact.kind, [artifact]);
+  }
+  return out;
+}
+
+/** Project root path -> display name, the lookup `ScopeCell` and the Scope pills resolve against. */
+export function projectNameMap(projects: ProjectSetup[]): Map<string, string> {
+  return new Map(projects.map((p) => [p.path, p.name]));
+}
+
+/**
+ * Plugin name -> how many artifacts that install bundled: the skills, agents
+ * and commands the harness scanned out of the plugin's own subtrees. The
+ * plugin's manifest row carries its own `plugin_name` too (the scanner gives
+ * every artifact under an install the same context), so `kind === "plugin"`
+ * is excluded — otherwise every plugin would report one more than it ships.
+ * `layer === "plugin"` is required as well: a project file that merely names
+ * a plugin was not installed by it.
+ *
+ * Computed over the whole inventory rather than over the Plugins tab's rows,
+ * which by definition hold nothing but plugin manifests — see `ColumnsCtx`.
+ */
+export function pluginBundleCounts(artifacts: ArtifactView[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const artifact of artifacts) {
+    if (artifact.kind === "plugin" || artifact.layer !== "plugin") continue;
+    const plugin = artifact.plugin_name;
+    if (!plugin) continue;
+    out.set(plugin, (out.get(plugin) ?? 0) + 1);
+  }
+  return out;
+}
+
+/**
+ * The most recent scan across the detected harnesses — the one number the
+ * header can honestly show when more than one harness is installed. `null`
+ * when nothing has been scanned yet, which {@link relativeSession} reads as
+ * "never".
+ */
+export function lastScanAt(harnesses: HarnessInfo[]): string | null {
+  // ISO-8601 timestamps compare lexicographically.
+  return harnesses.reduce<string | null>(
+    (best, h) => (h.last_scan_at != null && (best == null || h.last_scan_at > best) ? h.last_scan_at : best),
+    null,
+  );
 }

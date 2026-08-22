@@ -421,11 +421,11 @@
     </li>
     <li class="phase phase--active">
       <div class="phase__label"><span class="phase__name">Phase 8</span> Tables &amp; project pages</div>
-      <div class="phase__meter" role="img" aria-label="33% complete">
-        <div class="phase__fill" style="width:33%"></div>
+      <div class="phase__meter" role="img" aria-label="50% complete">
+        <div class="phase__fill" style="width:50%"></div>
       </div>
-      <div class="phase__count">2/6</div>
-      <p class="phase__note">Foundation merged (#133). Read models landed (#127 PR). Next: Setup tabs (#128), project pages (#129), rules (#130), analytics (#131).</p>
+      <div class="phase__count">3/6</div>
+      <p class="phase__note">Read models merged (#134). Setup tabs (#128 PR). Next: project pages (#129), rules (#130), analytics (#131).</p>
     </li>
     </ol>
   </section>
@@ -470,8 +470,8 @@
         <td><span class="stamp stamp--ok">shipped</span></td>
       </tr>
       <tr>
-        <td>Setup screen — global + per-project inventory with usage evidence <span class="muted">— PR for #112 awaiting review</span></td>
-        <td><span class="stamp stamp--warn">PR open</span></td>
+        <td>Setup screen — global + per-project inventory with usage evidence <span class="muted">— Merged (#114/#121); superseded by per-kind tables (#128)</span></td>
+        <td><span class="stamp stamp--warn">done</span></td>
       </tr>
       <tr>
         <td>Detection-based onboarding (probe, scan progress, verdict reveal) <span class="muted">— PR for #112 awaiting review</span></td>
@@ -487,6 +487,10 @@
       </tr>
       <tr>
         <td>Settings → harness tab (Claude Code inventory + extra folders) <span class="muted">— PR for #113 awaiting review</span></td>
+        <td><span class="stamp stamp--warn">PR open</span></td>
+      </tr>
+      <tr>
+        <td>Setup screen as per-kind tables <span class="muted">— PR for #128 awaiting review — tabs per artifact kind, search, sort, pills</span></td>
         <td><span class="stamp stamp--warn">PR open</span></td>
       </tr>
       </tbody>
@@ -522,8 +526,12 @@
         <td><span class="stamp stamp--warn">PR open</span></td>
       </tr>
       <tr>
-        <td>Shared DataTable/Tabs/RankedList <span class="muted">— PR for #126 awaiting review — the table every screen is rebuilt on</span></td>
-        <td><span class="stamp stamp--warn">PR open</span></td>
+        <td>Shared DataTable/Tabs/RankedList <span class="muted">— Merged (#133)</span></td>
+        <td><span class="stamp stamp--warn">done</span></td>
+      </tr>
+      <tr>
+        <td>Read models for tables and ranked usage <span class="muted">— Merged (#134): windowed usage overview, project usage, project list extras, rule hit counts</span></td>
+        <td><span class="stamp stamp--warn">done</span></td>
       </tr>
       <tr>
         <td>Release pipeline (universal macOS DMG on tag) <span class="muted">— PR for #29 awaiting review</span></td>
@@ -548,7 +556,7 @@
   <section aria-labelledby="hl">
     <h2 id="hl"><span>Repo health <span class="muted">— as of 2026-08-22</span></span><span class="index">§4</span></h2>
     <div class="badges">
-      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>464/464 passing (52 files)</b></span><span class="badge">cargo test <b>286/286 passing</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
+      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>548/548 passing (54 files)</b></span><span class="badge">cargo test <b>286/286 passing</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
     </div>
   </section>
 
@@ -563,7 +571,7 @@
       <div>
         <h2><span>Recent changes</span><span class="index">§6</span></h2>
         <ul class="plain">
-          <li>2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner&#39;s own findings), slash-tolerant project ids across the project-scoped reads</li><li>2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions</li><li>2026-08-22 — Read models for tables and ranked usage: windowed usage overview, project usage, project list extras, rule hit counts (#127 PR)</li><li>2026-08-22 — Table foundation: DataTable, Tabs, RankedList (#126 PR)</li><li>2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses</li><li>2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs</li><li>2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)</li><li>2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve</li><li>2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard</li><li>2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)</li><li>2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture</li><li>2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)</li><li>2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused</li><li>2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)</li><li>2026-06-11 — Found &amp; fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)</li><li>2026-06-11 — Found &amp; fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)</li><li>2026-06-11 — This dashboard created (PR #71)</li><li>2026-07-21 — Fixed main CI: rustfmt drift in 3 files, clippy identity-op, landing pnpm allowBuilds placeholder blocked sharp</li>
+          <li>2026-08-22 — Setup screen rebuilt as per-kind tables: Rules · Skills · Agents · Commands · Hooks · MCP · Plugins tabs, search, sort, scope/never-used/errors/cost pills (#128 PR)</li><li>2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner&#39;s own findings), slash-tolerant project ids across the project-scoped reads</li><li>2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions</li><li>2026-08-22 — Read models for tables and ranked usage: windowed usage overview, project usage, project list extras, rule hit counts (#127 PR)</li><li>2026-08-22 — Table foundation: DataTable, Tabs, RankedList (#126 PR)</li><li>2026-08-22 — Review fixes on #113: honest merge-position states (unseen folder, below-root rule, unreadable stack), per-folder Remove labels, Settings opens on Harnesses</li><li>2026-08-22 — Detail merge position, Settings harness tab, docs (#113 PR); Phase 7 implementation complete across 7 stacked PRs</li><li>2026-08-22 — Setup screen, detection onboarding, Analytics usage tab (#112 PR)</li><li>2026-08-22 — Scan hardening (#111 branch): single-flight scan guard, file-derived emptiness check, extra folders through the root sieve</li><li>2026-08-22 — Persistence, orchestrator, multi-root scan, IPC read models (#111 PR); folder picker retired; home-dir root guard</li><li>2026-08-21 — Claude Code harness (#110 PR): inventory, plugins, log indexer (real-data fixes: per-block records, worktree slugs, ~/.claude.json MCP, subagent logs)</li><li>2026-08-21 — Harness core landed (#109 PR): neutral model, schema, Claude home + slug decoding, fixture</li><li>2026-08-21 — Phase 0: OpenRouter provider, all Pro gates opened (monetisation paused)</li><li>2026-08-21 — Direction reset: Claude setup inventory + usage analytics epic (#106); spec, plans, shipping-a-feature skill (PR for #107); monetisation paused</li><li>2026-06-11 — Audit: all Phase 0–4 features verified wired end-to-end; suites green (5 JS + 59 Rust tests)</li><li>2026-06-11 — Found &amp; fixed: no way to mint license keys (Pro was unsellable) → license-tool CLI (PR #69)</li><li>2026-06-11 — Found &amp; fixed: no release pipeline (download link pointed at nothing) → release.yml + pnpm bump (PR #70)</li><li>2026-06-11 — This dashboard created (PR #71)</li><li>2026-07-21 — Fixed main CI: rustfmt drift in 3 files, clippy identity-op, landing pnpm allowBuilds placeholder blocked sharp</li>
         </ul>
       </div>
     </div>

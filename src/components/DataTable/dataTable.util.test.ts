@@ -6,6 +6,7 @@ import {
   matchesPills,
   matchesSearch,
   pillCounts,
+  prunePills,
 } from "./dataTable.util";
 
 interface Row {
@@ -205,5 +206,51 @@ describe("facetedPillCounts", () => {
       options: [{ id: "rule", label: "Rule", predicate: () => false, count: 42 }],
     };
     expect(facetedPillCounts(rows, [precomputed], st(), search)).toEqual({});
+  });
+});
+
+describe("prunePills", () => {
+  const groups: PillGroup<Row>[] = [
+    {
+      id: "kind",
+      label: "Kind",
+      options: [
+        { id: "rule", label: "Rule", predicate: (r) => r.kind === "rule" },
+        { id: "prompt", label: "Prompt", predicate: (r) => r.kind === "prompt" },
+      ],
+    },
+    {
+      id: "status",
+      label: "Status",
+      options: [{ id: "archived", label: "Archived", predicate: (r) => r.archived }],
+    },
+  ];
+
+  it("keeps a selection every option of which still exists", () => {
+    expect(prunePills({ kind: ["rule", "prompt"] }, groups)).toEqual({ kind: ["rule", "prompt"] });
+  });
+
+  it("drops ids whose option is gone, keeping the rest of the group", () => {
+    // A remembered project pill for a project the last scan removed: the
+    // option is gone, but "rule" is still a real chip the user can see.
+    expect(prunePills({ kind: ["rule", "/code/deleted"] }, groups)).toEqual({ kind: ["rule"] });
+  });
+
+  it("drops the group entirely when nothing selected in it still exists", () => {
+    // Left in place, `matchesPills` would fail every row against a group
+    // whose selected option no longer has a predicate — an empty table with
+    // no chip pressed and nothing to un-press.
+    expect(prunePills({ kind: ["/code/deleted"], status: ["archived"] }, groups)).toEqual({
+      status: ["archived"],
+    });
+  });
+
+  it("drops a selection for a group that no longer exists at all", () => {
+    expect(prunePills({ bundled: ["plugin"] }, groups)).toEqual({});
+  });
+
+  it("passes an already-clean selection through unchanged, and handles no groups", () => {
+    expect(prunePills({}, groups)).toEqual({});
+    expect(prunePills({ kind: ["rule"] }, [])).toEqual({});
   });
 });

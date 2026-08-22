@@ -7,6 +7,7 @@ export {
   matchesPills,
   matchesSearch,
   pillCounts,
+  prunePills,
 } from "./dataTable.util";
 export {
   VIRTUAL_THRESHOLD,
