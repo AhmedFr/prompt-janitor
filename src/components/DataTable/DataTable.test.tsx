@@ -697,6 +697,35 @@ describe("DataTable", () => {
     }
   });
 
+  it("scrolls to the highlighted row once rows finish loading", () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    try {
+      const props: DataTableProps<Row> = {
+        columns: COLUMNS,
+        rows: ROWS,
+        rowId: (r) => r.id,
+        empty: { title: "No artifacts yet" },
+        stateKey: "test",
+        ariaLabel: "Artifacts",
+        highlightRowId: "2",
+        loading: true,
+      };
+      const { rerender } = render(<DataTable {...props} />);
+      // Nothing to scroll to yet — the table hasn't rendered any rows.
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      rerender(<DataTable {...props} loading={false} />);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
   it("survives a highlight when the environment has no scrollIntoView", () => {
     expect(() => setup({ highlightRowId: "2" })).not.toThrow();
   });

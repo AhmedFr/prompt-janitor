@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { DataTableSearchProps } from "./DataTable.types";
 import { SEARCH_DEBOUNCE_MS } from "./DataTable.constants";
@@ -17,19 +17,42 @@ import { SEARCH_DEBOUNCE_MS } from "./DataTable.constants";
  *
  * - `resetKey` changes (one component rendering a different table per tab):
  *   the half-typed query belonged to the tab the user just left.
- * - `value` changes underneath us (Clear filters, restored state): the table
- *   is filtered by something the box didn't type.
+ * - `value` changes to something this box didn't itself commit (Clear
+ *   filters, restored state): the table is filtered by something the box
+ *   didn't type.
+ *
+ * `value` changing to what this box *did* just commit does not reset the
+ * draft. Without that distinction, a keystroke that lands between the
+ * debounce firing and the parent's re-render — typing "o" right after "brav"
+ * commits — would be wiped out when `value="brav"` arrives, because it looks
+ * indistinguishable from an external reset. `lastCommittedRef` is what makes
+ * the two cases tell apart.
  */
 export function DataTableSearch({ placeholder, value, onCommit, resetKey }: DataTableSearchProps) {
   const [draft, setDraft] = useState(value);
-  const [seen, setSeen] = useState({ key: resetKey, value });
+  const [seenKey, setSeenKey] = useState(resetKey);
+  // Plain refs, not state: both are read-then-written on every render (or on
+  // the debounce timer, off the render cycle entirely) purely to compare
+  // against the *next* render — they never need to cause one themselves.
+  const prevValueRef = useRef(value);
+  const lastCommittedRef = useRef(value);
 
   let current = draft;
-  if (seen.key !== resetKey || seen.value !== value) {
-    setSeen({ key: resetKey, value });
+  const valueChangedFromOutside = value !== prevValueRef.current;
+  // A `value` change is only a reset when it isn't just this box's own
+  // commit echoing back. `lastCommittedRef` is set the moment the debounce
+  // fires, before the parent has re-rendered with it — comparing against it
+  // (rather than against `value` alone) is what keeps that echo from
+  // stomping on a keystroke that landed in between. `prevValueRef` gates the
+  // comparison on the prop having actually changed since the last render, so
+  // an unrelated reset can't be masked by `value` having cycled back to
+  // something equal to a stale `prevValueRef`.
+  if (seenKey !== resetKey || (valueChangedFromOutside && value !== lastCommittedRef.current)) {
+    setSeenKey(resetKey);
     setDraft(value);
     current = value;
   }
+  prevValueRef.current = value;
 
   // Typing updates the box immediately and the table 150 ms later, so a fast
   // typist filters once instead of once per keystroke. `current` rather than
@@ -37,7 +60,13 @@ export function DataTableSearch({ placeholder, value, onCommit, resetKey }: Data
   // to commit, and committing one would write it onto the new table's key.
   useEffect(() => {
     if (current === value) return;
-    const timer = setTimeout(() => onCommit(current), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => {
+      // Recorded before the parent re-renders with this same value, so that
+      // render doesn't mistake our own commit for an external reset and
+      // stomp on whatever's been typed since.
+      lastCommittedRef.current = current;
+      onCommit(current);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [current, value, onCommit]);
 

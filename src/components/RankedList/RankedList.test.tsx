@@ -233,11 +233,13 @@ describe("RankedList", () => {
     expect((container.querySelectorAll(".rl__bar")[0] as HTMLElement).style.width).toBe("100%");
   });
 
-  it("ignores a max of zero rather than dividing by it", () => {
+  it("falls back to the slice max when a caller-supplied max is zero or negative", () => {
     const { container } = render(
       <RankedList title="Top used" rows={[{ id: "a", label: "x", value: 5 }]} empty="Nothing yet" max={0} />,
     );
-    expect((container.querySelectorAll(".rl__bar")[0] as HTMLElement).style.width).toBe("0%");
+    // max<=0 isn't a real ceiling (doc: "Ignored when `<= 0`"), so the row's
+    // own value — the slice max — is what "full width" means here.
+    expect((container.querySelectorAll(".rl__bar")[0] as HTMLElement).style.width).toBe("100%");
   });
 
   it("hangs a row's title on the row as a native tooltip", () => {

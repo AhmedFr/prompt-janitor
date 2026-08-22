@@ -25,9 +25,10 @@ export function RankedList({
   empty,
 }: RankedListProps) {
   const { rows: ranked, max: sliceMax } = rankRows(rows, limit);
-  // A caller's ceiling wins over the slice's own top value; `<= 0` is not a
-  // denominator, so it falls through to "no bar" rather than to NaN.
-  const max = maxProp !== undefined ? maxProp : sliceMax;
+  // A caller's ceiling wins over the slice's own top value, but `<= 0` isn't
+  // a real ceiling — it's ignored (see the `max` doc) in favor of the slice
+  // max, rather than zeroing every bar in the list.
+  const max = maxProp !== undefined && maxProp > 0 ? maxProp : sliceMax;
   const headingId = useId();
 
   return (

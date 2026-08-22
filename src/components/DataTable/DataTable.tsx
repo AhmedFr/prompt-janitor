@@ -103,18 +103,31 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     virtualizer.measure();
   }, [density, virtualizer]);
 
-  // Landing on a row is only useful if the row is on screen. Guarded because
-  // jsdom (and any non-browser renderer) has no `scrollIntoView` at all.
+  // Landing on a row is only useful if the row is on screen — which it isn't
+  // while the table is still loading, so this also has to re-run once
+  // `loading` clears and rows actually land, not just when `highlightRowId`
+  // itself changes (a table that mounts already loading, then gets its rows
+  // a beat later, would otherwise never scroll at all).
   useEffect(() => {
-    if (!highlightRowId) return;
+    if (!highlightRowId || loading || modelRows.length === 0) return;
+    if (isVirtual) {
+      // Virtualised rows outside the overscan window aren't in the DOM yet
+      // to be found by dataset, so the virtualiser has to be asked directly.
+      const index = modelRows.findIndex((row) => row.id === highlightRowId);
+      if (index >= 0) virtualizer.scrollToIndex(index, { align: "center" });
+      return;
+    }
     // Matched by dataset rather than by selector: a row id is a file path or
-    // a plugin name, not something that has to survive CSS escaping.
-    const rows = scrollRef.current?.querySelectorAll<HTMLElement>("tr[data-row-id]") ?? [];
-    const row = [...rows].find((el) => el.dataset.rowId === highlightRowId);
+    // a plugin name, not something that has to survive CSS escaping. Guarded
+    // because jsdom (and any non-browser renderer) has no `scrollIntoView`.
+    const rowEls = scrollRef.current?.querySelectorAll<HTMLElement>("tr[data-row-id]") ?? [];
+    const row = [...rowEls].find((el) => el.dataset.rowId === highlightRowId);
     if (row && typeof row.scrollIntoView === "function") row.scrollIntoView({ block: "center" });
-    // Keyed on the id alone: re-scrolling every time the rows change would
-    // fight the user for the scrollbar.
-  }, [highlightRowId]);
+    // Keyed on row *count* rather than the `modelRows` array itself — that
+    // array is a new reference every render, which would fight the user for
+    // the scrollbar on every keystroke and sort.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightRowId, loading, modelRows.length, isVirtual, virtualizer]);
 
   const items = virtualizer.getVirtualItems();
   const padTop = isVirtual && items.length > 0 ? items[0].start : 0;
