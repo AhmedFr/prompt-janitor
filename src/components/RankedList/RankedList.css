@@ -113,15 +113,19 @@
   overflow: hidden;
 }
 
+/* `--bar-fill`/`--bar-fill-error`, not `--blue-tint`/`--tone-error-tint`: those
+   tints are ~12% alpha, legible as a text-label background but well under the
+   3:1 WCAG non-text-contrast floor a bar needs against `.rl__bar-track`'s
+   `--group`. See `rankedList.contrast.test.ts`. */
 .rl__bar {
   display: block;
   height: 100%;
   border-radius: var(--r-pill);
-  background: var(--blue-tint);
+  background: var(--bar-fill);
 }
 
 .rl__list[data-variant="error"] .rl__bar {
-  background: var(--tone-error-tint);
+  background: var(--bar-fill-error);
 }
 
 .rl__value {

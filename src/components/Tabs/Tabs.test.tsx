@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Tabs } from "./Tabs";
+import { useTabState } from "./useTabState";
 import type { TabItem } from "./Tabs.types";
 
 const ITEMS: TabItem[] = [
@@ -20,6 +21,29 @@ function Controlled({ items = ITEMS, initial = "rules" }: { items?: TabItem[]; i
   );
 }
 
+/** A screen wiring `useTabState` into `Tabs`, the way memory is meant to be used. */
+function StatefulControlled({
+  items = ITEMS,
+  storageKey = "test-tabs",
+}: {
+  items?: TabItem[];
+  storageKey?: string;
+}) {
+  const [active, setActive] = useTabState(
+    storageKey,
+    items[0].id,
+    items.map((item) => item.id),
+  );
+  return (
+    <Tabs items={items} active={active} onChange={setActive} ariaLabel="Setup">
+      {(id) => <p>Panel: {id}</p>}
+    </Tabs>
+  );
+}
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+});
 afterEach(cleanup);
 
 describe("Tabs", () => {
@@ -132,5 +156,54 @@ describe("Tabs", () => {
   it("has no axe violations", async () => {
     const { container } = render(<Controlled />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("treats an unknown active id as the first tab and asks the parent to correct it", () => {
+    const onChange = vi.fn();
+    render(
+      <Tabs items={ITEMS} active="does-not-exist" onChange={onChange} ariaLabel="Setup">
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>,
+    );
+
+    const rules = screen.getByRole("tab", { name: /Rules/ });
+    expect(rules).toHaveAttribute("aria-selected", "true");
+    expect(rules).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: /Skills/ })).toHaveAttribute("aria-selected", "false");
+
+    const panel = screen.getByRole("tabpanel");
+    expect(panel).toHaveAttribute("aria-labelledby", rules.id);
+    expect(rules).toHaveAttribute("aria-controls", panel.id);
+    expect(screen.getByText("Panel: rules")).toBeInTheDocument();
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("rules");
+  });
+
+  it("stops correcting once the parent adopts the first tab as active", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <Tabs items={ITEMS} active="does-not-exist" onChange={onChange} ariaLabel="Setup">
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>,
+    );
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <Tabs items={ITEMS} active="rules" onChange={onChange} ariaLabel="Setup">
+        {(id) => <p>Panel: {id}</p>}
+      </Tabs>,
+    );
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers to the first tab, selected and tabbable, when sessionStorage holds a stale id", () => {
+    window.sessionStorage.setItem("pj.tabs.test-tabs", "removed-tab");
+    render(<StatefulControlled />);
+
+    const rules = screen.getByRole("tab", { name: /Rules/ });
+    expect(rules).toHaveAttribute("aria-selected", "true");
+    expect(rules).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("Panel: rules")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, type KeyboardEvent } from "react";
 import type { TabsProps } from "./Tabs.types";
 import "./Tabs.css";
 
@@ -10,15 +10,31 @@ const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).j
  * tabs pattern), Home/End to the ends. Fully controlled — the caller owns
  * `active`; see `useTabState` in this folder for a `sessionStorage`-backed
  * setter that remembers the choice across remounts.
+ *
+ * `active` is trusted but verified: if it names a tab not in `items` (a
+ * stale id from a parent's own state, a tab set that shrank), the strip
+ * renders as if `items[0]` were active — selected, tabbable, panel wired up,
+ * `children` called with a real id — rather than showing nothing selected.
+ * An effect nudges the parent once via `onChange(items[0].id)` so its state
+ * catches up instead of staying permanently out of sync with what's shown.
  */
 export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps) {
   const uid = useId();
   const tabEls = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const activeIndex = Math.max(
-    0,
-    items.findIndex((item) => item.id === active),
-  );
+  const activeIndex = items.findIndex((item) => item.id === active);
+  const effectiveIndex = activeIndex === -1 ? 0 : activeIndex;
+  const effectiveActive = items[effectiveIndex]?.id ?? active;
+
+  useEffect(() => {
+    if (items.length > 0 && !items.some((item) => item.id === active)) {
+      onChange(items[0].id);
+    }
+    // `onChange` is intentionally excluded: only `active`/`items` going out of
+    // sync should trigger the correction, not the parent handing in a new
+    // (often inline, identity-unstable) function on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, items]);
 
   const selectAt = (index: number) => {
     const item = items[index];
@@ -33,11 +49,11 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
     switch (event.key) {
       case "ArrowRight":
         event.preventDefault();
-        selectAt((activeIndex + 1) % count);
+        selectAt((effectiveIndex + 1) % count);
         break;
       case "ArrowLeft":
         event.preventDefault();
-        selectAt((activeIndex - 1 + count) % count);
+        selectAt((effectiveIndex - 1 + count) % count);
         break;
       case "Home":
         event.preventDefault();
@@ -56,7 +72,7 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
     <div className="tabs">
       <div className="tabs__list" role="tablist" aria-label={ariaLabel}>
         {items.map((item) => {
-          const selected = item.id === active;
+          const selected = item.id === effectiveActive;
           const tabId = `${uid}-tab-${item.id}`;
           const panelId = `${uid}-panel-${item.id}`;
           return (
@@ -85,11 +101,11 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
       <div
         className="tabs__panel"
         role="tabpanel"
-        id={`${uid}-panel-${active}`}
-        aria-labelledby={`${uid}-tab-${active}`}
+        id={`${uid}-panel-${effectiveActive}`}
+        aria-labelledby={`${uid}-tab-${effectiveActive}`}
         tabIndex={0}
       >
-        {children(active)}
+        {children(effectiveActive)}
       </div>
     </div>
   );

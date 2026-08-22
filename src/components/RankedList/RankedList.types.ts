@@ -25,11 +25,18 @@ export interface RankedListDetails {
   onClick: () => void;
 }
 
+/**
+ * A bar's width is `value / max`, where `max` is the largest value among the
+ * rows actually rendered — the `limit`-sliced set, not the full `rows` array
+ * (see `rankRows`). Two lists fed the same `rows` but different `limit`s can
+ * therefore draw the same row's bar at different widths: cutting the top row
+ * out of view changes what "full width" means for everything still on screen.
+ */
 export interface RankedListProps {
   title: string;
   rows: RankedRow[];
   selector?: RankedListSelector;
-  /** Rows shown, sorted desc by value. Defaults to 10. */
+  /** Rows shown, sorted desc by value. Defaults to 10 — also the row count `max` is computed over. */
   limit?: number;
   /** Tints the bars red for "most errors"-style lists. */
   variant?: "default" | "error";

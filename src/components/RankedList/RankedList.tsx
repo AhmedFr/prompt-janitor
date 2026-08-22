@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { RankedListProps } from "./RankedList.types";
 import { rankRows } from "./rankedList.util";
 import "./RankedList.css";
@@ -8,8 +9,8 @@ const defaultFormat = (v: number) => v.toLocaleString();
 
 /**
  * The screenshot pattern: rows of `label · inline bar (share of max) · value`,
- * an optional selector above and a "Details" link below. Bars are `--blue-tint`
- * by default, `--tone-error-tint` under `variant="error"`.
+ * an optional selector above and a "Details" link below. Bars are
+ * `--bar-fill` by default, `--bar-fill-error` under `variant="error"`.
  */
 export function RankedList({
   title,
@@ -22,11 +23,16 @@ export function RankedList({
   empty,
 }: RankedListProps) {
   const { rows: ranked, max } = rankRows(rows, limit);
+  const headingId = useId();
 
   return (
-    <section className="rl" aria-label={title}>
+    // Named via the visible heading rather than a duplicated `aria-label` —
+    // the title only has to be spelled out once, in `.rl__title`.
+    <section className="rl" aria-labelledby={headingId}>
       <header className="rl__header">
-        <h3 className="rl__title">{title}</h3>
+        <h3 className="rl__title" id={headingId}>
+          {title}
+        </h3>
         {selector && (
           <div className="rl__selector" role="group" aria-label={`${title} view`}>
             {selector.options.map((option) => {
@@ -61,6 +67,11 @@ export function RankedList({
                   </span>
                 )}
                 <span className="rl__label">{row.label}</span>
+                {/* `.rl__bar-track` wraps `.rl__bar` — a deviation from the
+                    brief's bare `<div class="rl__bar">` — so the unfilled
+                    share of the row has a visible track to be a share OF;
+                    without it a low-value bar reads as empty space, not as
+                    "small compared to the max". See task-3-report.md. */}
                 <span className="rl__bar-track">
                   <span className="rl__bar" style={{ width: `${width}%` }} />
                 </span>
