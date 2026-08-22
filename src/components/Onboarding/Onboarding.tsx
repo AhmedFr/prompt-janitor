@@ -1,9 +1,10 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { ScoreRing } from "@/components/ScoreRing";
 import { useVerdictHero, verdictSentence } from "@/components/VerdictHero";
-import type { HarnessInfo, ScanSummary } from "@/lib/ipc";
+import type { ScanSummary } from "@/lib/ipc";
+import { detectedSummary } from "./onboarding.util";
 import { useOnboarding } from "./useOnboarding";
 import "./Onboarding.css";
 
@@ -11,18 +12,6 @@ const STEPS = ["Detect", "Scan", "Verdict"] as const;
 
 export interface OnboardingProps {
   onDone: () => void;
-}
-
-/** "1 global setup · 12 projects · 88 sessions", summed over every harness found. */
-function detectedSummary(detected: HarnessInfo[]): string {
-  const projects = detected.reduce((n, h) => n + h.project_count, 0);
-  const sessions = detected.reduce((n, h) => n + h.session_count, 0);
-  const setups = detected.length;
-  return [
-    `${setups} global ${setups === 1 ? "setup" : "setups"}`,
-    `${projects} ${projects === 1 ? "project" : "projects"}`,
-    `${sessions} ${sessions === 1 ? "session" : "sessions"}`,
-  ].join(" · ");
 }
 
 /**
@@ -70,7 +59,7 @@ export function Onboarding({ onDone }: OnboardingProps) {
   const found = detected.length > 0;
 
   return (
-    <Shell step={0} labelledBy="ob-title">
+    <Shell step={0} labelledBy="ob-title" onEscape={onDone}>
       <div className="ob-body">
         <div className="ob-logo" aria-hidden="true">
           🧹
@@ -116,19 +105,44 @@ export function Onboarding({ onDone }: OnboardingProps) {
   );
 }
 
-/** The modal card and its step indicator — the frame every step renders inside. */
+/**
+ * The modal card and its step indicator — the frame every step renders inside.
+ * It takes focus on mount so the keyboard starts inside the dialog rather than
+ * behind it. `onEscape` is only wired up where backing out is safe: dismissing
+ * mid-scan would leave the scan running with nothing on screen to explain it.
+ */
 function Shell({
   step,
   labelledBy,
+  onEscape,
   children,
 }: {
   step: number;
   labelledBy: string;
+  onEscape?: () => void;
   children: ReactNode;
 }) {
+  const card = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    card.current?.focus();
+  }, []);
+
   return (
     <div className="ob-overlay">
-      <div className="ob-card" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
+      <div
+        ref={card}
+        className="ob-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape" || !onEscape) return;
+          e.stopPropagation();
+          onEscape();
+        }}
+      >
         <div className="ob-steps">
           {STEPS.map((s, i) => (
             <span key={s} className={"ob-chip" + (i === step ? " ob-chip--on" : "")}>

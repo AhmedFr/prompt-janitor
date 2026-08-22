@@ -1,35 +1,17 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArtifactCard, KIND_LABEL } from "@/components/ArtifactCard";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { Grade, type GradeLetter } from "@/components/Grade";
 import { Icon } from "@/components/Icon";
-import {
-  isTauri,
-  type ArtifactView,
-  type EffectiveRule,
-  type HarnessInfo,
-  type ProjectSetup,
-  type SetupView,
-} from "@/lib/ipc";
+import { isTauri, type HarnessInfo, type SetupView } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
+import { KindSections, type Level } from "./KindSections";
+import { ProjectRow } from "./ProjectRow";
 import { FILTER_CHIPS } from "./Setup.constants";
 import type { SetupProps, SetupState } from "./Setup.types";
-import {
-  applyFilter,
-  groupByKind,
-  harnessSummary,
-  relativeSession,
-  sessionLabel,
-  sortProjects,
-  type SetupFilter,
-} from "./setup.util";
+import { costThreshold, harnessSummary, sortProjects } from "./setup.util";
 import { useSetup } from "./useSetup";
 import "./Setup.css";
-
-/** Heading depth for a section nested under Global/Projects (h2). */
-type Level = 3 | 4;
 
 /**
  * The whole Claude Code setup in one place: what applies everywhere, what each
@@ -39,6 +21,7 @@ type Level = 3 | 4;
 export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
   const state = useSetup(initialFilter);
   const data = override ?? state.data;
+  const loading = state.loading && !override;
   const [busy, setBusy] = useState(false);
 
   const run = async (action: () => Promise<unknown>) => {
@@ -67,12 +50,14 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
 
       <div className="scroll-area">
         <div className="page" style={{ maxWidth: 1000 }}>
-          {!data ? (
+          {loading ? (
             <Card padded>
               <div className="muted">
                 {isTauri ? "Loading…" : "Open the Prompt Janitor desktop app to see your setup."}
               </div>
             </Card>
+          ) : !data ? (
+            <UnreadableSetup busy={busy} onRetry={() => void run(async () => {})} />
           ) : detected.length === 0 ? (
             <NoHarness busy={busy} onAddFolder={() => void run(addFolderAndScan)} />
           ) : (
@@ -81,6 +66,24 @@ export function Setup({ navigate, data: override, initialFilter }: SetupProps) {
         </div>
       </div>
     </section>
+  );
+}
+
+/** The query failed — say so rather than spinning, and offer the one retry there is. */
+function UnreadableSetup({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
+  return (
+    <Card padded>
+      <div className="setup-empty">
+        <h2 className="setup-empty__title">Setup could not be read</h2>
+        <p className="muted setup-empty__body">
+          The inventory query failed. This is usually a scan still holding the database — try again
+          in a moment.
+        </p>
+        <Button disabled={busy} onClick={onRetry}>
+          <Icon name="refresh" /> Try again
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -113,12 +116,31 @@ function Inventory({
   state: SetupState;
   navigate: Navigate;
 }) {
-  const filter = state.filter;
+  const { filter, setFilter, effectiveRulesFor, rulesVersion } = state;
   // One harness is the common case, and a header repeating its name every time
   // would be noise. Two or more, and the split is the whole point.
   const grouped = detected.length > 1;
   const level: Level = grouped ? 4 : 3;
   const projects = useMemo(() => sortProjects(data.projects), [data.projects]);
+  // One bar for the whole setup: a per-section median would call half of any
+  // list expensive, however cheap the list actually is.
+  const costBar = useMemo(
+    () => costThreshold([...data.global, ...data.projects.flatMap((p) => p.artifacts)]),
+    [data],
+  );
+
+  const projectRow = (project: SetupView["projects"][number]) => (
+    <ProjectRow
+      key={`${project.harness} ${project.path}`}
+      project={project}
+      filter={filter}
+      costBar={costBar}
+      level={level}
+      effectiveRulesFor={effectiveRulesFor}
+      rulesVersion={rulesVersion}
+      navigate={navigate}
+    />
+  );
 
   return (
     <>
@@ -137,7 +159,7 @@ function Inventory({
             type="button"
             className={"setup-chip" + (filter === chip.id ? " setup-chip--on" : "")}
             aria-pressed={filter === chip.id}
-            onClick={() => state.setFilter(chip.id)}
+            onClick={() => setFilter(chip.id)}
           >
             {chip.label}
           </button>
@@ -155,6 +177,7 @@ function Inventory({
               <KindSections
                 artifacts={data.global.filter((a) => a.harness === h.id)}
                 filter={filter}
+                costBar={costBar}
                 level={level}
                 navigate={navigate}
               />
@@ -164,6 +187,7 @@ function Inventory({
           <KindSections
             artifacts={data.global}
             filter={filter}
+            costBar={costBar}
             level={level}
             navigate={navigate}
           />
@@ -174,203 +198,16 @@ function Inventory({
         <h2 id="setup-projects" className="setup-section__title">
           Projects
         </h2>
-        {grouped ? (
-          detected.map((h) => (
-            <div key={h.id}>
-              <h3 className="setup-harness__title">{h.display_name}</h3>
-              {projects
-                .filter((p) => p.harness === h.id)
-                .map((p) => (
-                  <ProjectRow
-                    key={`${p.harness} ${p.path}`}
-                    project={p}
-                    filter={filter}
-                    level={level}
-                    state={state}
-                    navigate={navigate}
-                  />
-                ))}
-            </div>
-          ))
-        ) : (
-          projects.map((p) => (
-            <ProjectRow
-              key={`${p.harness} ${p.path}`}
-              project={p}
-              filter={filter}
-              level={level}
-              state={state}
-              navigate={navigate}
-            />
-          ))
-        )}
+        {grouped
+          ? detected.map((h) => (
+              <div key={h.id}>
+                <h3 className="setup-harness__title">{h.display_name}</h3>
+                {projects.filter((p) => p.harness === h.id).map(projectRow)}
+              </div>
+            ))
+          : projects.map(projectRow)}
         {projects.length === 0 && <p className="muted">No projects seen yet.</p>}
       </section>
     </>
-  );
-}
-
-/** A heading at the depth its surrounding section sits at. */
-function Heading({ level, children }: { level: Level; children: ReactNode }) {
-  const className = "setup-kind__title";
-  return level === 3 ? (
-    <h3 className={className}>{children}</h3>
-  ) : (
-    <h4 className={className}>{children}</h4>
-  );
-}
-
-const kindHeading = (label: string) => (label.endsWith("s") ? label : `${label}s`);
-
-/** The filtered artifacts, one titled block per kind. */
-function KindSections({
-  artifacts,
-  filter,
-  level,
-  navigate,
-}: {
-  artifacts: ArtifactView[];
-  filter: SetupFilter;
-  level: Level;
-  navigate: Navigate;
-}) {
-  const groups = useMemo(() => groupByKind(applyFilter(artifacts, filter)), [artifacts, filter]);
-
-  if (groups.length === 0) {
-    return <p className="muted setup-kind__empty">Nothing matches this filter.</p>;
-  }
-
-  return (
-    <>
-      {groups.map(({ kind, items }) => (
-        <div key={kind} className="setup-kind">
-          <Heading level={level}>
-            {kindHeading(KIND_LABEL[kind])} <span className="faint">{items.length}</span>
-          </Heading>
-          <Card>
-            <div className="setup-kind__list">
-              {items.map((artifact) => (
-                <ArtifactCard
-                  key={artifact.id}
-                  artifact={artifact}
-                  onOpen={(fileId) => navigate("detail", fileId)}
-                />
-              ))}
-            </div>
-          </Card>
-        </div>
-      ))}
-    </>
-  );
-}
-
-/** First graded rule in the project — the closest thing to "how is this set up?". */
-function topRuleGrade(project: ProjectSetup): string | null {
-  return project.artifacts.find((a) => a.kind === "rule" && a.grade)?.grade ?? null;
-}
-
-/**
- * One project, collapsed. Expanding is what pays for the per-project rule-stack
- * query, so the body loads on first open and is kept afterwards.
- */
-function ProjectRow({
-  project,
-  filter,
-  level,
-  state,
-  navigate,
-}: {
-  project: ProjectSetup;
-  filter: SetupFilter;
-  level: Level;
-  state: SetupState;
-  navigate: Navigate;
-}) {
-  const [open, setOpen] = useState(false);
-  const [rules, setRules] = useState<EffectiveRule[] | null>(null);
-  const grade = topRuleGrade(project);
-
-  useEffect(() => {
-    if (!open || rules) return;
-    let live = true;
-    void state.effectiveRulesFor(project.harness, project.path).then((loaded) => {
-      if (live) setRules(loaded);
-    });
-    return () => {
-      live = false;
-    };
-  }, [open, rules, state, project.harness, project.path]);
-
-  return (
-    <details
-      className="setup-project"
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary className="setup-project__summary">
-        <span className="setup-project__name">{project.name}</span>
-        {grade && <Grade grade={grade as GradeLetter} size="sm" />}
-        <span className="faint setup-project__meta">
-          {sessionLabel(project.session_count)} · {relativeSession(project.last_session_at)}
-        </span>
-        {!project.exists && <span className="setup-project__missing">folder missing</span>}
-        <span className="path setup-project__path">{project.path}</span>
-      </summary>
-
-      <div className="setup-project__body">
-        <KindSections
-          artifacts={project.artifacts}
-          filter={filter}
-          level={level}
-          navigate={navigate}
-        />
-        <Heading level={level}>Effective rules</Heading>
-        {rules === null ? (
-          <p className="muted setup-kind__empty">Loading…</p>
-        ) : rules.length === 0 ? (
-          <p className="muted setup-kind__empty">No rule files apply to this project.</p>
-        ) : (
-          <Card>
-            <ol className="setup-rules">
-              {rules.map((rule) => (
-                <li key={rule.path} className="setup-rules__item">
-                  <RuleLink rule={rule} navigate={navigate} />
-                </li>
-              ))}
-            </ol>
-          </Card>
-        )}
-      </div>
-    </details>
-  );
-}
-
-const LAYER_LABEL: Record<EffectiveRule["layer"], string> = {
-  global: "Global",
-  project: "Project",
-  plugin: "Plugin",
-};
-
-/** One rung of the rule stack; clickable when the grader has a file for it. */
-function RuleLink({ rule, navigate }: { rule: EffectiveRule; navigate: Navigate }) {
-  const body = (
-    <>
-      <span className="setup-rules__layer">{LAYER_LABEL[rule.layer]}</span>
-      <span className="setup-rules__name">{rule.name}</span>
-      <span className="path setup-rules__path">{rule.path}</span>
-      <Grade grade={rule.grade as GradeLetter | null} size="sm" />
-    </>
-  );
-
-  if (!rule.file_id) return <span className="setup-rules__row">{body}</span>;
-  const fileId = rule.file_id;
-  return (
-    <button
-      type="button"
-      className="setup-rules__row setup-rules__row--link"
-      onClick={() => navigate("detail", fileId)}
-    >
-      {body}
-    </button>
   );
 }

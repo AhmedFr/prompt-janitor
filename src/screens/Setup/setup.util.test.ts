@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest";
 import type { ArtifactKind, ArtifactView, ProjectSetup, UsageStat } from "@/lib/ipc";
 import {
   applyFilter,
+  costThreshold,
   groupByKind,
   harnessSummary,
+  kindHeading,
   relativeSession,
   sessionLabel,
   sortProjects,
+  topRuleGrade,
 } from "./setup.util";
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
@@ -113,6 +116,62 @@ describe("applyFilter", () => {
   it("matches nothing for `cost` with fewer than two measured artifacts", () => {
     expect(applyFilter([never, pricey], "cost")).toEqual([]);
     expect(applyFilter([never], "cost")).toEqual([]);
+  });
+
+  it("uses a caller-supplied threshold instead of the local median", () => {
+    // The screen computes one threshold over every artifact it knows about, so
+    // a section holding only expensive things must not re-normalise to itself.
+    expect(applyFilter([cheap, pricey], "cost", 600).map((a) => a.name)).toEqual([
+      "pricey",
+    ]);
+    expect(applyFilter([cheap, pricey], "cost", null)).toEqual([]);
+  });
+});
+
+describe("costThreshold", () => {
+  it("doubles the median of the measured artifacts", () => {
+    const at = (id: number, avg: number | null) =>
+      artifact({ id, usage: avg == null ? null : usage({ avg_turn_tokens: avg }) });
+    // Odd count: the middle value.
+    expect(costThreshold([at(1, 100), at(2, 300), at(3, 4000)])).toBe(600);
+    // Even count: the mean of the middle pair — (300 + 500) / 2 = 400.
+    expect(costThreshold([at(1, 100), at(2, 300), at(3, 500), at(4, 4000)])).toBe(800);
+    // Unmeasured artifacts do not drag the median down.
+    expect(costThreshold([at(1, 100), at(2, 300), at(3, null)])).toBe(400);
+  });
+
+  it("has no opinion with fewer than two measured artifacts", () => {
+    expect(costThreshold([artifact({ usage: usage({ avg_turn_tokens: 900 }) })])).toBeNull();
+    expect(costThreshold([])).toBeNull();
+  });
+});
+
+describe("topRuleGrade", () => {
+  it("takes the first graded rule in the project", () => {
+    expect(
+      topRuleGrade(
+        project({
+          artifacts: [
+            artifact({ id: 1, kind: "skill", grade: "A" }),
+            artifact({ id: 2, kind: "rule", grade: null }),
+            artifact({ id: 3, kind: "rule", grade: "C" }),
+          ],
+        }),
+      ),
+    ).toBe("C");
+  });
+
+  it("is null when the project has no graded rule", () => {
+    expect(topRuleGrade(project({ artifacts: [artifact({ kind: "skill", grade: "A" })] }))).toBeNull();
+    expect(topRuleGrade(project())).toBeNull();
+  });
+});
+
+describe("kindHeading", () => {
+  it("pluralises the kind label, leaving already-plural labels alone", () => {
+    expect(kindHeading("rule")).toBe("Rules");
+    expect(kindHeading("mcp_server")).toBe("MCP Servers");
+    expect(kindHeading("settings")).toBe("Settings");
   });
 });
 

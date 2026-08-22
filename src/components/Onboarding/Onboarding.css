@@ -9,6 +9,12 @@
   backdrop-filter: blur(12px);
 }
 
+.ob-card:focus {
+  /* Focus is moved here programmatically when the dialog opens; a ring around
+     the whole card would read as a rendering glitch, not as guidance. */
+  outline: none;
+}
+
 .ob-card {
   width: 560px;
   max-width: 92vw;

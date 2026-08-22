@@ -142,6 +142,40 @@ describe("Onboarding", () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 
+  it("focuses the dialog and closes on Escape from the first step", async () => {
+    const onDone = vi.fn();
+    render(<Onboarding onDone={onDone} />);
+    await waitFor(() => expect(scanButton()).toBeEnabled());
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveFocus();
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape once the scan is running", async () => {
+    let finish: (r: { status: "error"; error: string }) => void = () => {};
+    scanNow.mockReturnValue(
+      new Promise<{ status: "error"; error: string }>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const onDone = vi.fn();
+    render(<Onboarding onDone={onDone} />);
+    await waitFor(() => expect(scanButton()).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(scanButton());
+    });
+
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onDone).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finish({ status: "error", error: "no" });
+    });
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<Onboarding onDone={vi.fn()} />);
     await waitFor(() => expect(scanButton()).toBeEnabled());

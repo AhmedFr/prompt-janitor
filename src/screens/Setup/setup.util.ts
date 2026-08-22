@@ -1,4 +1,5 @@
-import type { ArtifactView, HarnessInfo, ProjectSetup } from "@/lib/ipc";
+import type { ArtifactKind, ArtifactView, HarnessInfo, ProjectSetup } from "@/lib/ipc";
+import { KIND_LABEL } from "@/components/ArtifactCard";
 import type { KindGroup } from "./Setup.types";
 import {
   COST_MEDIAN_MULTIPLIER,
@@ -29,26 +30,44 @@ function median(values: number[]): number {
 }
 
 /**
- * Narrows the inventory to the slice the user asked for. `cost` is relative to
- * the artifacts in `artifacts` themselves — with fewer than
- * {@link MIN_COST_SAMPLES} measured artifacts there is no meaningful typical
- * cost, so nothing matches rather than everything.
+ * What an artifact has to burn per turn to count as expensive: twice what the
+ * typical measured artifact burns. `null` when fewer than
+ * {@link MIN_COST_SAMPLES} artifacts have been measured — there is no typical
+ * cost yet, and inventing one would flag arbitrary rows.
+ *
+ * Compute this once over the whole setup. Per-section medians would re-normalise
+ * every list to itself, so a section holding only expensive things would report
+ * half of them as cheap.
  */
-export function applyFilter(artifacts: ArtifactView[], filter: SetupFilter): ArtifactView[] {
+export function costThreshold(artifacts: ArtifactView[]): number | null {
+  const costs = artifacts
+    .map((a) => a.usage?.avg_turn_tokens)
+    .filter((t): t is number => t != null);
+  if (costs.length < MIN_COST_SAMPLES) return null;
+  return median(costs) * COST_MEDIAN_MULTIPLIER;
+}
+
+/**
+ * Narrows the inventory to the slice the user asked for. Pass `threshold` — the
+ * {@link costThreshold} of the whole setup — so `cost` means the same thing in
+ * every section; omit it and the bar is computed from `artifacts` alone.
+ */
+export function applyFilter(
+  artifacts: ArtifactView[],
+  filter: SetupFilter,
+  threshold?: number | null,
+): ArtifactView[] {
   if (filter === "all") return artifacts;
   if (filter === "never") return artifacts.filter((a) => a.usage == null);
   if (filter === "errors") {
     return artifacts.filter((a) => (a.usage?.error_rate ?? 0) >= ERROR_RATE_THRESHOLD);
   }
 
-  const costs = artifacts
-    .map((a) => a.usage?.avg_turn_tokens)
-    .filter((t): t is number => t != null);
-  if (costs.length < MIN_COST_SAMPLES) return [];
-  const threshold = median(costs) * COST_MEDIAN_MULTIPLIER;
+  const bar = threshold === undefined ? costThreshold(artifacts) : threshold;
+  if (bar == null) return [];
   return artifacts.filter((a) => {
     const cost = a.usage?.avg_turn_tokens;
-    return cost != null && cost >= threshold;
+    return cost != null && cost >= bar;
   });
 }
 
@@ -102,4 +121,18 @@ export function harnessSummary(harness: HarnessInfo): string {
 /** "12 sessions" / "1 session" — the session count as it reads in a project row. */
 export function sessionLabel(count: number): string {
   return plural(count, "session");
+}
+
+/**
+ * The grade of the project's first graded rule — the closest single answer to
+ * "how well is this project set up?" that fits in a collapsed row.
+ */
+export function topRuleGrade(project: ProjectSetup): string | null {
+  return project.artifacts.find((a) => a.kind === "rule" && a.grade)?.grade ?? null;
+}
+
+/** Section title for a kind: the shared label, pluralised. */
+export function kindHeading(kind: ArtifactKind): string {
+  const label = KIND_LABEL[kind];
+  return label.endsWith("s") ? label : `${label}s`;
 }

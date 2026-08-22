@@ -1,12 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Setup } from "./Setup";
 import type { ArtifactView, EffectiveRule, SetupView, UsageStat } from "@/lib/ipc";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
+// One handler registry per test so a case can emit `scan-done` like the core does.
+const listeners = vi.hoisted(() => new Map<string, () => void>());
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((event: string, handler: () => void) => {
+    listeners.set(event, handler);
+    return Promise.resolve(() => listeners.delete(event));
+  }),
+}));
+
+const emit = async (event: string) => {
+  await act(async () => {
+    listeners.get(event)?.();
+  });
+};
 
 const getSetup = vi.hoisted(() => vi.fn());
 const getEffectiveRules = vi.hoisted(() => vi.fn());
@@ -105,6 +118,7 @@ const populated: SetupView = {
           name: "web-rules",
           grade: "C",
           file_id: "f-web",
+          usage: usage({ avg_turn_tokens: 300 }),
         }),
       ],
     },
@@ -143,6 +157,7 @@ const renderSetup = async (navigate = vi.fn()) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listeners.clear();
   getSetup.mockResolvedValue({ status: "ok", data: populated });
   getEffectiveRules.mockResolvedValue({ status: "ok", data: effectiveRules });
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
@@ -218,6 +233,70 @@ describe("Setup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Add a folder/ }));
     await waitFor(() => expect(open).toHaveBeenCalled());
+  });
+
+
+  it("keeps a collapsed project's artifacts out of the DOM", async () => {
+    await renderSetup();
+    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
+
+    expect(web.querySelectorAll(".artifact-card")).toHaveLength(0);
+
+    fireEvent.click(screen.getByText("web"));
+
+    await waitFor(() => expect(web.querySelectorAll(".artifact-card").length).toBeGreaterThan(0));
+  });
+
+  it("reloads an expanded project's rules after a scan finishes", async () => {
+    await renderSetup();
+    await screen.findByText("web");
+    fireEvent.click(screen.getByText("web"));
+    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(1));
+
+    await emit("scan-done");
+
+    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(2));
+    expect(getEffectiveRules).toHaveBeenLastCalledWith("claude_code", "/repo/web");
+  });
+
+  it("measures high cost against the whole setup, not one section", async () => {
+    await renderSetup();
+    await screen.findByText("linear");
+
+    fireEvent.click(screen.getByRole("button", { name: "High cost" }));
+
+    // Turn costs across global + projects are 300, 9000 and 300 — median 300,
+    // so the bar is 600. Scoped to the global list alone the median would be
+    // 4650 and nothing would clear it.
+    expect(screen.getByText("linear")).toBeInTheDocument();
+    expect(screen.queryByText("debugging")).not.toBeInTheDocument();
+  });
+
+  it("does not cache a failed rule lookup", async () => {
+    getEffectiveRules.mockRejectedValueOnce(new Error("db is busy"));
+    await renderSetup();
+    const web = (await screen.findByText("web")).closest("details") as HTMLDetailsElement;
+
+    fireEvent.click(screen.getByText("web"));
+    expect(await within(web).findByText(/no rule files apply/i)).toBeInTheDocument();
+
+    // Collapse and reopen: the failed key must not have been memoised. Wait on
+    // the body unmounting, not on `details.open` — the DOM flag flips
+    // synchronously on click, well before React has seen the toggle event.
+    fireEvent.click(screen.getByText("web"));
+    await waitFor(() => expect(within(web).queryByText(/no rule files apply/i)).toBeNull());
+    fireEvent.click(screen.getByText("web"));
+
+    await waitFor(() => expect(getEffectiveRules).toHaveBeenCalledTimes(2));
+    expect(await within(web).findByText("home CLAUDE.md")).toBeInTheDocument();
+  });
+
+  it("stops loading when the setup query fails", async () => {
+    getSetup.mockRejectedValue(new Error("no database"));
+    await renderSetup();
+
+    expect(await screen.findByText(/setup could not be read/i)).toBeInTheDocument();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

@@ -18,15 +18,24 @@ export function useSetup(initialFilter: SetupFilter = "all"): SetupState {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<SetupFilter>(initialFilter);
   const rules = useRef(new Map<string, Promise<EffectiveRule[]>>());
+  // Bumped alongside every cache clear so open projects know to ask again.
+  const [rulesVersion, setRulesVersion] = useState(0);
 
   const refetch = useCallback(async () => {
     if (!isTauri) {
       setLoading(false);
       return;
     }
-    const res = await commands.getSetup();
-    if (res.status === "ok") setData(res.data);
-    setLoading(false);
+    try {
+      const res = await commands.getSetup();
+      if (res.status === "ok") setData(res.data);
+    } catch {
+      // Surfaced by the screen as the unreadable state; nothing to add here.
+    } finally {
+      // A failed query still ends the load: leaving the spinner up forever
+      // reads as a hang rather than an error.
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -38,6 +47,7 @@ export function useSetup(initialFilter: SetupFilter = "all"): SetupState {
     const unlisten = listen("scan-done", () => {
       // A scan can change the stack; drop the memoised answers with the data.
       rules.current.clear();
+      setRulesVersion((n) => n + 1);
       void refetch();
     });
     return () => {
@@ -53,10 +63,14 @@ export function useSetup(initialFilter: SetupFilter = "all"): SetupState {
       if (!isTauri) return [];
       const res = await commands.getEffectiveRules(harness, projectPath);
       return res.status === "ok" ? res.data : [];
-    })();
+    })().catch(() => {
+      // Never memoise a failure — the next expand should get a real attempt.
+      rules.current.delete(key);
+      return [] as EffectiveRule[];
+    });
     rules.current.set(key, pending);
     return pending;
   }, []);
 
-  return { data, loading, filter, setFilter, refetch, effectiveRulesFor };
+  return { data, loading, filter, setFilter, refetch, effectiveRulesFor, rulesVersion };
 }

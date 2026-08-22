@@ -31,4 +31,6 @@ export interface SetupState {
   refetch: () => Promise<void>;
   /** Lazily loads (and memoises) the rule stack that applies to one project. */
   effectiveRulesFor: (harness: string, projectPath: string) => Promise<EffectiveRule[]>;
+  /** Bumped whenever the memoised rule stacks are dropped, e.g. after a scan. */
+  rulesVersion: number;
 }
