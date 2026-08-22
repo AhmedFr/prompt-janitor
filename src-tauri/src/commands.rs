@@ -849,15 +849,17 @@ pub fn get_effective_rules(
     crate::harness_query::effective_rules(&conn, &harness, &project_path).map_err(|e| e.to_string())
 }
 
-/// Usage aggregates for the Analytics screen, anchored to the current clock.
+/// Usage aggregates for the Analytics screen over the last `window_days`,
+/// anchored to the current clock.
 #[tauri::command]
 #[specta::specta]
 pub fn get_usage_overview(
     db: tauri::State<'_, AppDb>,
+    window_days: u32,
 ) -> Result<crate::harness_query::UsageOverview, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
-    crate::harness_query::usage_overview(&conn, now).map_err(|e| e.to_string())
+    crate::harness_query::usage_overview(&conn, now, window_days).map_err(|e| e.to_string())
 }
 
 /// Every harness we know of, detected or not.

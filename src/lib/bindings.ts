@@ -130,8 +130,11 @@ export const commands = {
 	getSetup: () => typedError<SetupView, string>(__TAURI_INVOKE("get_setup")),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
-	/**  Usage aggregates for the Analytics screen, anchored to the current clock. */
-	getUsageOverview: () => typedError<UsageOverview, string>(__TAURI_INVOKE("get_usage_overview")),
+	/**
+	 *  Usage aggregates for the Analytics screen over the last `window_days`,
+	 *  anchored to the current clock.
+	 */
+	getUsageOverview: (windowDays: number) => typedError<UsageOverview, string>(__TAURI_INVOKE("get_usage_overview", { windowDays })),
 	/**  Every harness we know of, detected or not. */
 	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
 };
@@ -438,6 +441,27 @@ export type ProjectSetup = {
 	artifacts: ArtifactView[],
 };
 
+/**
+ *  One invoked target over the reporting window — the row the ranked usage
+ *  lists render.
+ */
+export type RankedTarget = {
+	kind: InvocationKind,
+	target: string,
+	/**
+	 *  The artifact the target resolved to, when it resolved to one at all —
+	 *  builtins and unlinked targets have none.
+	 */
+	artifact_id: number | null,
+	uses: number,
+	/**  Distinct sessions the target was invoked in (sub-agent sessions count). */
+	sessions: number,
+	/**  Share of invocations that returned an error, 0–1. */
+	error_rate: number | null,
+	/**  Mean context tokens per turn, over the turns that recorded any. */
+	avg_turn_tokens: number | null,
+};
+
 /**  A rule (built-in or custom) with its current enabled state. */
 export type RuleInfo = {
 	id: string,
@@ -532,34 +556,27 @@ export type TrendPoint = {
 	score: number,
 };
 
-/**  What the Analytics usage tab renders. */
+/**
+ *  What the Analytics usage tab renders. Every aggregate is bounded by the
+ *  same `window_days`, so the four of them always describe one period.
+ */
 export type UsageOverview = {
-	/**  Top 8 targets by volume over the last 90 days, bucketed by day. */
-	top: UsageSeries[],
 	/**
-	 *  All-time totals per invocation kind, in `skill, agent, mcp, builtin`
-	 *  order.
+	 *  The window every aggregate below was computed over, echoed back so the
+	 *  UI can label what it is showing.
+	 */
+	window_days: number,
+	/**  Every `(kind, target)` invoked in the window, busiest first. */
+	ranked: RankedTarget[],
+	/**
+	 *  Totals per invocation kind in `skill, agent, mcp, builtin` order —
+	 *  always four rows, zeroed for a kind the window holds nothing of.
 	 */
 	by_kind: KindTotal[],
-	/**  Top-level sessions per project. */
+	/**  Top-level sessions started in the window, per project. */
 	sessions_per_project: ProjectSessions[],
-	/**  All-time error rate per MCP server, busiest first. */
+	/**  Error rate per MCP server over the window, busiest first. */
 	mcp_error_rates: TargetRate[],
-};
-
-/**  One day's invocations of a target. */
-export type UsagePoint = {
-	/**  `YYYY-MM-DD`. */
-	day: string,
-	count: number,
-	errors: number,
-};
-
-/**  A target's daily usage over the reporting window. */
-export type UsageSeries = {
-	kind: InvocationKind,
-	target: string,
-	points: UsagePoint[],
 };
 
 /**  The rollup row for one artifact (`usage_stats`). */

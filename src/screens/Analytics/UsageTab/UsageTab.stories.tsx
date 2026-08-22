@@ -2,28 +2,30 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { UsageTabBody } from "./UsageTab";
 import type { UsageOverview } from "@/lib/ipc";
 
-const DAYS = Array.from({ length: 14 }, (_, i) => `2026-08-${String(i + 1).padStart(2, "0")}`);
-
 /** Deterministic pseudo-usage so the story never churns between snapshots. */
-const seriesFor = (target: string, seed: number, kind: UsageOverview["top"][number]["kind"]) => ({
+const rankedRow = (
+  target: string,
+  uses: number,
+  kind: UsageOverview["ranked"][number]["kind"],
+): UsageOverview["ranked"][number] => ({
   kind,
   target,
-  points: DAYS.filter((_, i) => (i + seed) % 3 !== 0).map((day, i) => ({
-    day,
-    count: 2 + ((i * seed) % 9),
-    errors: (i * seed) % 5 === 0 ? 1 : 0,
-  })),
+  artifact_id: null,
+  uses,
+  sessions: Math.max(1, Math.round(uses / 4)),
+  error_rate: (uses % 5) / 10,
+  avg_turn_tokens: uses % 2 === 0 ? null : uses * 210,
 });
 
 const sample: UsageOverview = {
-  top: [
-    seriesFor("dataviz", 1, "skill"),
-    seriesFor("playwright", 2, "mcp"),
-    // Same name, two kinds — the chart keys columns by kind:target and only
-    // then disambiguates the labels.
-    seriesFor("adapt", 3, "skill"),
-    seriesFor("adapt", 4, "agent"),
-    seriesFor("Bash", 5, "builtin"),
+  window_days: 90,
+  ranked: [
+    rankedRow("dataviz", 61, "skill"),
+    rankedRow("playwright", 48, "mcp"),
+    // Same name, two kinds — the list keys rows by kind:target.
+    rankedRow("adapt", 33, "skill"),
+    rankedRow("adapt", 21, "agent"),
+    rankedRow("Bash", 12, "builtin"),
   ],
   by_kind: [
     { kind: "skill", total: 148, avg_turn_tokens: 21480.6 },
@@ -67,6 +69,11 @@ export const Default: Story = {};
 
 export const SingleTarget: Story = {
   args: {
-    data: { ...sample, top: [sample.top[0]], mcp_error_rates: [], sessions_per_project: [] },
+    data: {
+      ...sample,
+      ranked: [sample.ranked[0]],
+      mcp_error_rates: [],
+      sessions_per_project: [],
+    },
   },
 };

@@ -7,26 +7,36 @@ import type { UsageOverview } from "@/lib/ipc";
 import type { ErrorRateBar } from "./UsageTab.types";
 
 const fullData: UsageOverview = {
-  top: [
+  window_days: 90,
+  ranked: [
     {
       kind: "skill",
       target: "adapt",
-      points: [
-        { day: "2026-08-01", count: 3, errors: 0 },
-        { day: "2026-08-02", count: 6, errors: 1 },
-      ],
+      artifact_id: 7,
+      uses: 9,
+      sessions: 4,
+      error_rate: 0.11,
+      avg_turn_tokens: 1840,
     },
     {
       // Same bare name as the skill above: the backend groups by (kind, target),
-      // so these must stay two independent lines.
+      // so these stay two independent rows.
       kind: "agent",
       target: "adapt",
-      points: [{ day: "2026-08-02", count: 9, errors: 0 }],
+      artifact_id: 8,
+      uses: 9,
+      sessions: 2,
+      error_rate: 0,
+      avg_turn_tokens: null,
     },
     {
       kind: "mcp",
       target: "playwright",
-      points: [{ day: "2026-08-02", count: 4, errors: 2 }],
+      artifact_id: null,
+      uses: 4,
+      sessions: 1,
+      error_rate: 0.5,
+      avg_turn_tokens: null,
     },
   ],
   by_kind: [
@@ -45,18 +55,23 @@ const fullData: UsageOverview = {
   ],
 };
 
-/** Eight series is what the backend caps `top` at — the chart's worst case. */
-const eightSeries: UsageOverview = {
+/** More targets than the list shows — it keeps the busiest eight. */
+const manyTargets: UsageOverview = {
   ...fullData,
-  top: Array.from({ length: 8 }, (_, i) => ({
+  ranked: Array.from({ length: 12 }, (_, i) => ({
     kind: "skill" as const,
     target: `skill-${i}`,
-    points: [{ day: "2026-08-02", count: i + 1, errors: 0 }],
+    artifact_id: null,
+    uses: 12 - i,
+    sessions: 1,
+    error_rate: 0,
+    avg_turn_tokens: null,
   })),
 };
 
 const emptyData: UsageOverview = {
-  top: [],
+  window_days: 90,
+  ranked: [],
   by_kind: [],
   sessions_per_project: [],
   mcp_error_rates: [],
@@ -110,40 +125,25 @@ describe("UsageTab", () => {
     expect(getAllByText("Built-in").length).toBeGreaterThan(0);
   });
 
-  it("draws one legend entry per series, disambiguating colliding names", () => {
-    const { container } = render(<UsageTab />);
-    // Recharts owns the legend's ordering, so compare the set of labels.
-    const legend = [...container.querySelectorAll(".usage-legend__text")]
-      .map((el) => el.textContent)
-      .sort();
-    expect(legend).toEqual(["adapt (agent)", "adapt (skill)", "playwright"]);
-  });
-
-  it("lists every series in the table view backing the line chart", () => {
+  it("lists each ranked target with its use count, busiest first", () => {
     const { getByRole } = render(<UsageTab />);
-    const table = getByRole("table", { name: "Top targets by invocations" });
-    const rows = [...table.querySelectorAll("tbody tr")].map((tr) =>
-      [...tr.children].map((cell) => cell.textContent),
+    const list = getByRole("list", { name: "Top targets by invocations" });
+    const rows = [...list.querySelectorAll("li")].map((li) =>
+      [...li.children].map((cell) => cell.textContent),
     );
-    // The skill and the agent keep independent totals (9 + 3 vs 9).
+    // A skill and an agent of the same name are two rows, not one.
     expect(rows).toEqual([
-      ["adapt (skill)", "Skills", "9", "1"],
-      ["adapt (agent)", "Agents", "9", "0"],
-      ["playwright", "MCP", "4", "2"],
+      ["adapt", "9"],
+      ["adapt", "9"],
+      ["playwright", "4"],
     ]);
   });
 
-  it("draws at most five lines but tabulates every series", () => {
-    mockUseUsageTab.mockReturnValue({ data: eightSeries, loading: false });
-    const { container, getByRole } = render(<UsageTab />);
-
-    // Beyond five lines the chart is a colour-matching puzzle, so the extra
-    // series live in the table underneath rather than on top of each other.
-    // The legend has one entry per drawn `<Line>`, so it counts them.
-    expect(container.querySelectorAll(".usage-legend__text")).toHaveLength(5);
-
-    const table = getByRole("table", { name: "Top targets by invocations" });
-    expect(table.querySelectorAll("tbody tr")).toHaveLength(8);
+  it("lists at most the eight busiest targets", () => {
+    mockUseUsageTab.mockReturnValue({ data: manyTargets, loading: false });
+    const { getByRole } = render(<UsageTab />);
+    const list = getByRole("list", { name: "Top targets by invocations" });
+    expect(list.querySelectorAll("li")).toHaveLength(8);
   });
 
   it("shows the empty state when nothing is indexed", () => {

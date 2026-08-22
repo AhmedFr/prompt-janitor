@@ -2,63 +2,24 @@ import type {
   InvocationKind,
   KindTotal,
   ProjectSessions,
+  RankedTarget,
   TargetRate,
   UsageOverview,
-  UsageSeries,
 } from "@/lib/ipc";
-import type { ErrorRateBar, KindBar, SeriesColumn, SessionBar, StackedRow } from "./UsageTab.types";
-import { KIND_LABEL, MAX_PROJECT_BARS, MONTHS } from "./UsageTab.constants";
+import type { ErrorRateBar, KindBar, SessionBar } from "./UsageTab.types";
+import { KIND_LABEL, MAX_PROJECT_BARS, MONTHS, RANKED_LIMIT } from "./UsageTab.constants";
 
 /**
- * The column key for a series. Usage is grouped by `(kind, target)`, so a
- * skill and an agent may share a target name and must stay separate columns.
+ * The key for a ranked row. Usage is grouped by `(kind, target)`, so a skill
+ * and an agent may share a target name and must stay separate rows.
  */
-export function seriesKey(series: Pick<UsageSeries, "kind" | "target">): string {
-  return `${series.kind}:${series.target}`;
+export function rankedKey(row: Pick<RankedTarget, "kind" | "target">): string {
+  return `${row.kind}:${row.target}`;
 }
 
-/**
- * Describes each line of the top-targets chart. Labels stay as short as the
- * data allows: the bare target name, with the kind appended only where two
- * kinds share that name.
- */
-export function seriesColumns(top: UsageSeries[]): SeriesColumn[] {
-  const seen = new Map<string, number>();
-  for (const series of top) seen.set(series.target, (seen.get(series.target) ?? 0) + 1);
-
-  return top.map((series) => ({
-    key: seriesKey(series),
-    label: (seen.get(series.target) ?? 0) > 1 ? `${series.target} (${series.kind})` : series.target,
-    kind: series.kind,
-    target: series.target,
-    total: sum(series.points.map((p) => p.count)),
-    errors: sum(series.points.map((p) => p.errors)),
-  }));
-}
-
-/**
- * Pivots per-target day series into chart rows: one row per day across the
- * union of every series' days (ascending), one numeric column per
- * `kind:target`, zero-filled where a series has no invocations that day.
- */
-export function toStackedSeries(top: UsageSeries[]): StackedRow[] {
-  const days = [...new Set(top.flatMap((s) => s.points.map((p) => p.day)))].sort();
-  const rows = new Map<string, StackedRow>(
-    days.map((day) => [
-      day,
-      { day, ...Object.fromEntries(top.map((s) => [seriesKey(s), 0])) } as StackedRow,
-    ]),
-  );
-
-  for (const series of top) {
-    const key = seriesKey(series);
-    for (const point of series.points) {
-      const row = rows.get(point.day);
-      if (row) row[key] = (row[key] as number) + point.count;
-    }
-  }
-
-  return days.map((day) => rows.get(day) as StackedRow);
+/** The busiest targets in the window — the backend already ordered them. */
+export function topRanked(ranked: RankedTarget[]): RankedTarget[] {
+  return ranked.slice(0, RANKED_LIMIT);
 }
 
 /** Invocation kind → the label the UI shows for it. */
@@ -108,16 +69,17 @@ export function sessionBars(projects: ProjectSessions[]): SessionBar[] {
     .slice(0, MAX_PROJECT_BARS);
 }
 
-/** True when the harness index holds no usage at all — the tab's empty state. */
+/**
+ * True when the window holds no usage at all — the tab's empty state.
+ *
+ * `by_kind` always carries its four legend rows, so an empty window shows up
+ * as four zero totals rather than as a missing array.
+ */
 export function isUsageEmpty(data: UsageOverview): boolean {
   return (
-    data.top.length === 0 &&
-    data.by_kind.length === 0 &&
+    data.ranked.length === 0 &&
+    data.by_kind.every((k) => k.total === 0) &&
     data.sessions_per_project.length === 0 &&
     data.mcp_error_rates.length === 0
   );
-}
-
-function sum(values: number[]): number {
-  return values.reduce((a, b) => a + b, 0);
 }

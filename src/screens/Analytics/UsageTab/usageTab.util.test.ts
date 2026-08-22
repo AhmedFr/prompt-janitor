@@ -1,122 +1,57 @@
 import { describe, it, expect } from "vitest";
-import type { ProjectSessions, TargetRate, UsageOverview, UsageSeries } from "@/lib/ipc";
+import type { ProjectSessions, RankedTarget, TargetRate, UsageOverview } from "@/lib/ipc";
 import {
   errorRateBars,
   isUsageEmpty,
   kindBars,
   kindLabel,
-  seriesColumns,
+  rankedKey,
   sessionBars,
   shortDay,
-  toStackedSeries,
+  topRanked,
 } from "./usageTab.util";
 
-const top: UsageSeries[] = [
+const ranked: RankedTarget[] = [
   {
     kind: "skill",
     target: "adapt",
-    points: [
-      { day: "2026-08-01", count: 3, errors: 0 },
-      { day: "2026-08-03", count: 5, errors: 1 },
-    ],
+    artifact_id: 7,
+    uses: 8,
+    sessions: 3,
+    error_rate: 0.125,
+    avg_turn_tokens: 1840,
   },
   {
     kind: "mcp",
     target: "playwright",
-    points: [{ day: "2026-08-02", count: 2, errors: 2 }],
+    artifact_id: null,
+    uses: 2,
+    sessions: 1,
+    error_rate: 1,
+    avg_turn_tokens: null,
   },
 ];
 
-describe("toStackedSeries", () => {
-  it("emits one row per day across the union of days, in ascending order", () => {
-    const rows = toStackedSeries(top);
-    expect(rows.map((r) => r.day)).toEqual(["2026-08-01", "2026-08-02", "2026-08-03"]);
-  });
-
-  it("zero-fills days a target has no points for, keying columns by kind and target", () => {
-    const rows = toStackedSeries(top);
-    expect(rows).toEqual([
-      { day: "2026-08-01", "skill:adapt": 3, "mcp:playwright": 0 },
-      { day: "2026-08-02", "skill:adapt": 0, "mcp:playwright": 2 },
-      { day: "2026-08-03", "skill:adapt": 5, "mcp:playwright": 0 },
-    ]);
-  });
-
-  it("keeps a skill and an agent of the same name in separate columns", () => {
-    const rows = toStackedSeries([
-      {
-        kind: "skill",
-        target: "adapt",
-        points: [{ day: "2026-08-01", count: 3, errors: 0 }],
-      },
-      {
-        kind: "agent",
-        target: "adapt",
-        points: [{ day: "2026-08-01", count: 7, errors: 0 }],
-      },
-    ]);
-    expect(rows).toEqual([{ day: "2026-08-01", "skill:adapt": 3, "agent:adapt": 7 }]);
-  });
-
-  it("sorts days even when the series arrive out of order", () => {
-    const rows = toStackedSeries([
-      {
-        kind: "agent",
-        target: "explore",
-        points: [
-          { day: "2026-08-10", count: 1, errors: 0 },
-          { day: "2026-08-02", count: 4, errors: 0 },
-        ],
-      },
-    ]);
-    expect(rows).toEqual([
-      { day: "2026-08-02", "agent:explore": 4 },
-      { day: "2026-08-10", "agent:explore": 1 },
-    ]);
-  });
-
-  it("sums duplicate points for the same target and day", () => {
-    const rows = toStackedSeries([
-      {
-        kind: "skill",
-        target: "adapt",
-        points: [
-          { day: "2026-08-01", count: 2, errors: 0 },
-          { day: "2026-08-01", count: 3, errors: 0 },
-        ],
-      },
-    ]);
-    expect(rows).toEqual([{ day: "2026-08-01", "skill:adapt": 5 }]);
-  });
-
-  it("returns no rows for no series", () => {
-    expect(toStackedSeries([])).toEqual([]);
+describe("rankedKey", () => {
+  it("keys by kind and target, so a skill and an agent of one name stay apart", () => {
+    expect(rankedKey({ kind: "skill", target: "adapt" })).toBe("skill:adapt");
+    expect(rankedKey({ kind: "agent", target: "adapt" })).toBe("agent:adapt");
   });
 });
 
-describe("seriesColumns", () => {
-  it("keys each column by kind and target, and totals its points", () => {
-    expect(seriesColumns(top)).toEqual([
-      { key: "skill:adapt", label: "adapt", kind: "skill", target: "adapt", total: 8, errors: 1 },
-      {
-        key: "mcp:playwright",
-        label: "playwright",
-        kind: "mcp",
-        target: "playwright",
-        total: 2,
-        errors: 2,
-      },
-    ]);
+describe("topRanked", () => {
+  it("keeps the backend's busiest-first order", () => {
+    expect(topRanked(ranked).map((r) => r.target)).toEqual(["adapt", "playwright"]);
   });
 
-  it("appends the kind only to labels whose bare target name collides", () => {
-    const columns = seriesColumns([
-      { kind: "skill", target: "adapt", points: [] },
-      { kind: "agent", target: "adapt", points: [] },
-      { kind: "mcp", target: "playwright", points: [] },
-    ]);
-    expect(columns.map((c) => c.label)).toEqual(["adapt (skill)", "adapt (agent)", "playwright"]);
-    expect(columns.map((c) => c.key)).toEqual(["skill:adapt", "agent:adapt", "mcp:playwright"]);
+  it("lists at most eight targets", () => {
+    const many: RankedTarget[] = Array.from({ length: 12 }, (_, i) => ({
+      ...ranked[0],
+      target: `t${i}`,
+      uses: 12 - i,
+    }));
+    expect(topRanked(many)).toHaveLength(8);
+    expect(topRanked(many)[7].target).toBe("t7");
   });
 });
 
@@ -194,17 +129,34 @@ describe("sessionBars", () => {
 
 describe("isUsageEmpty", () => {
   const empty: UsageOverview = {
-    top: [],
+    window_days: 90,
+    ranked: [],
     by_kind: [],
     sessions_per_project: [],
     mcp_error_rates: [],
   };
 
-  it("is true only when every array is empty", () => {
+  it("is true only when the window holds nothing at all", () => {
     expect(isUsageEmpty(empty)).toBe(true);
-    expect(isUsageEmpty({ ...empty, top })).toBe(false);
-    expect(isUsageEmpty({ ...empty, by_kind: [{ kind: "skill", total: 1, avg_turn_tokens: null }] })).toBe(
-      false,
-    );
+    expect(isUsageEmpty({ ...empty, ranked })).toBe(false);
+    expect(
+      isUsageEmpty({ ...empty, by_kind: [{ kind: "skill", total: 1, avg_turn_tokens: null }] }),
+    ).toBe(false);
+  });
+
+  it("reads the backend's four always-present zero kind rows as empty", () => {
+    // `by_kind` is always four rows, so its length says nothing about the
+    // window — only the totals do.
+    expect(
+      isUsageEmpty({
+        ...empty,
+        by_kind: [
+          { kind: "skill", total: 0, avg_turn_tokens: null },
+          { kind: "agent", total: 0, avg_turn_tokens: null },
+          { kind: "mcp", total: 0, avg_turn_tokens: null },
+          { kind: "builtin", total: 0, avg_turn_tokens: null },
+        ],
+      }),
+    ).toBe(true);
   });
 });

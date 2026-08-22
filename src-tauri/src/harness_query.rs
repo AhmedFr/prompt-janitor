@@ -98,21 +98,22 @@ pub struct EffectiveRule {
     pub file_id: Option<String>,
 }
 
-/// One day's invocations of a target.
+/// One invoked target over the reporting window — the row the ranked usage
+/// lists render.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
-pub struct UsagePoint {
-    /// `YYYY-MM-DD`.
-    pub day: String,
-    pub count: u32,
-    pub errors: u32,
-}
-
-/// A target's daily usage over the reporting window.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
-pub struct UsageSeries {
+pub struct RankedTarget {
     pub kind: InvocationKind,
     pub target: String,
-    pub points: Vec<UsagePoint>,
+    /// The artifact the target resolved to, when it resolved to one at all —
+    /// builtins and unlinked targets have none.
+    pub artifact_id: Option<i32>,
+    pub uses: u32,
+    /// Distinct sessions the target was invoked in (sub-agent sessions count).
+    pub sessions: u32,
+    /// Share of invocations that returned an error, 0–1.
+    pub error_rate: f64,
+    /// Mean context tokens per turn, over the turns that recorded any.
+    pub avg_turn_tokens: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
@@ -136,24 +137,31 @@ pub struct TargetRate {
     pub error_rate: f64,
 }
 
-/// What the Analytics usage tab renders.
+/// What the Analytics usage tab renders. Every aggregate is bounded by the
+/// same `window_days`, so the four of them always describe one period.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
 pub struct UsageOverview {
-    /// Top 8 targets by volume over the last 90 days, bucketed by day.
-    pub top: Vec<UsageSeries>,
-    /// All-time totals per invocation kind, in `skill, agent, mcp, builtin`
-    /// order.
+    /// The window every aggregate below was computed over, echoed back so the
+    /// UI can label what it is showing.
+    pub window_days: u32,
+    /// Every `(kind, target)` invoked in the window, busiest first.
+    pub ranked: Vec<RankedTarget>,
+    /// Totals per invocation kind in `skill, agent, mcp, builtin` order —
+    /// always four rows, zeroed for a kind the window holds nothing of.
     pub by_kind: Vec<KindTotal>,
-    /// Top-level sessions per project.
+    /// Top-level sessions started in the window, per project.
     pub sessions_per_project: Vec<ProjectSessions>,
-    /// All-time error rate per MCP server, busiest first.
+    /// Error rate per MCP server over the window, busiest first.
     pub mcp_error_rates: Vec<TargetRate>,
 }
 
-/// How many days of daily buckets `usage_overview` reports.
-const WINDOW_DAYS: i64 = 90;
-/// How many series the top chart can legibly hold.
-const TOP_SERIES: usize = 8;
+/// `skill, agent, mcp, builtin` — the order the UI legend lists kinds in.
+const KIND_ORDER: [InvocationKind; 4] = [
+    InvocationKind::Skill,
+    InvocationKind::Agent,
+    InvocationKind::Mcp,
+    InvocationKind::Builtin,
+];
 
 /// `CASE <col> WHEN 'rule' THEN 0 …` so SQL can order artifacts by
 /// [`ArtifactKind::ALL`] rather than alphabetically.
@@ -387,73 +395,65 @@ pub fn effective_rules(
     Ok(out)
 }
 
-/// Usage aggregates for the Analytics screen. `now_epoch_secs` anchors the
-/// 90-day window the `top` series is bucketed over; the other aggregates are
-/// all-time.
-pub fn usage_overview(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Result<UsageOverview> {
-    // `invocations.ts` is a fixed-width UTC RFC3339 string, so the window bound
-    // compares lexicographically.
-    let since = iso_from_epoch(now_epoch_secs - WINDOW_DAYS * 86_400);
+/// Usage aggregates for the Analytics screen, over the `window_days` ending at
+/// `now_epoch_secs`.
+///
+/// The window bounds all four aggregates: invocations by `invocations.ts`,
+/// projects by `sessions.started_at`. Nothing here is all-time, so the ranked
+/// list, the kind totals and the error rates can be read against each other.
+pub fn usage_overview(
+    conn: &Connection,
+    now_epoch_secs: i64,
+    window_days: u32,
+) -> rusqlite::Result<UsageOverview> {
+    // `invocations.ts` and `sessions.started_at` are fixed-width UTC RFC3339
+    // strings, so the window bound compares lexicographically.
+    let since = iso_from_epoch(now_epoch_secs - i64::from(window_days) * 86_400);
 
-    // One (kind, target) per group of adjacent rows — the query orders by
-    // kind, target, day, so a series' buckets arrive together and in order.
-    let mut series: Vec<(UsageSeries, u32)> = Vec::new();
-    let mut st = conn.prepare(
-        "SELECT kind, target, substr(ts, 1, 10) AS day, count(*), sum(is_error)
+    // One row per (kind, target). Sessions are counted distinct — a target
+    // invoked ten times in one session is one session's worth of habit.
+    let mut ranked_stmt = conn.prepare(
+        "SELECT kind, target, max(artifact_id), count(*), count(DISTINCT session_id),
+                avg(is_error), avg(turn_tokens)
            FROM invocations WHERE ts >= ?1
-          GROUP BY kind, target, day ORDER BY kind, target, day",
+          GROUP BY kind, target ORDER BY count(*) DESC, target",
     )?;
-    let rows = st.query_map(params![since], |r| {
+    let mut ranked = Vec::new();
+    for row in ranked_stmt.query_map(params![since], |r| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, String>(1)?,
-            r.get::<_, String>(2)?,
+            r.get::<_, Option<i64>>(2)?,
             r.get::<_, i64>(3)?,
             r.get::<_, i64>(4)?,
+            r.get::<_, Option<f64>>(5)?,
+            r.get::<_, Option<f64>>(6)?,
         ))
-    })?;
-    for row in rows {
-        let (kind, target, day, count, errors) = row?;
+    })? {
+        let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens) = row?;
+        // A kind outside the model is dropped rather than guessed at.
         let Some(kind) = InvocationKind::parse(&kind) else {
             continue;
         };
-        let count = as_u32(count);
-        let fresh = !matches!(series.last(), Some((s, _)) if s.kind == kind && s.target == target);
-        if fresh {
-            series.push((
-                UsageSeries {
-                    kind,
-                    target,
-                    points: Vec::new(),
-                },
-                0,
-            ));
-        }
-        let Some((s, total)) = series.last_mut() else {
-            continue;
-        };
-        s.points.push(UsagePoint {
-            day,
-            count,
-            errors: as_u32(errors),
+        ranked.push(RankedTarget {
+            kind,
+            target,
+            artifact_id: artifact_id.map(|id| id.clamp(i32::MIN as i64, i32::MAX as i64) as i32),
+            uses: as_u32(uses),
+            sessions: as_u32(sessions),
+            error_rate: error_rate.unwrap_or(0.0),
+            avg_turn_tokens,
         });
-        *total += count;
     }
-    // Busiest first; ties broken by target so the chart is stable run to run.
-    series.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.target.cmp(&b.0.target)));
-    let top = series
-        .into_iter()
-        .take(TOP_SERIES)
-        .map(|(s, _)| s)
-        .collect();
 
-    let mut kind_stmt = conn.prepare(&format!(
+    // Read the windowed totals into a map and project them onto the fixed kind
+    // order: a kind with nothing in the window is a zero, not a missing bar.
+    let mut kind_stmt = conn.prepare(
         "SELECT kind, count(*), avg(turn_tokens) FROM invocations
-          GROUP BY kind ORDER BY {}",
-        kind_case()
-    ))?;
-    let mut by_kind = Vec::new();
-    for row in kind_stmt.query_map([], |r| {
+          WHERE ts >= ?1 GROUP BY kind",
+    )?;
+    let mut totals: HashMap<String, (i64, Option<f64>)> = HashMap::new();
+    for row in kind_stmt.query_map(params![since], |r| {
         Ok((
             r.get::<_, String>(0)?,
             r.get::<_, i64>(1)?,
@@ -461,22 +461,29 @@ pub fn usage_overview(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Resul
         ))
     })? {
         let (kind, total, avg) = row?;
-        if let Some(kind) = InvocationKind::parse(&kind) {
-            by_kind.push(KindTotal {
+        totals.insert(kind, (total, avg));
+    }
+    let by_kind = KIND_ORDER
+        .iter()
+        .map(|&kind| {
+            let (total, avg) = totals.get(kind.as_str()).copied().unwrap_or((0, None));
+            KindTotal {
                 kind,
                 total: as_u32(total),
                 avg_turn_tokens: avg,
-            });
-        }
-    }
+            }
+        })
+        .collect();
 
-    // `harness_projects.session_count` already excludes sub-agent transcripts.
+    // Counted off `sessions` rather than the `harness_projects` rollup, which
+    // is all-time; top-level only, so sub-agent transcripts don't inflate it.
     let mut sessions_stmt = conn.prepare(
-        "SELECT path, sum(session_count) AS n FROM harness_projects
-          GROUP BY path ORDER BY n DESC, path",
+        "SELECT project_path, count(*) AS n FROM sessions
+          WHERE parent_session_id IS NULL AND started_at >= ?1
+          GROUP BY project_path ORDER BY n DESC, project_path",
     )?;
     let sessions_per_project = sessions_stmt
-        .query_map([], |r| {
+        .query_map(params![since], |r| {
             let path: String = r.get(0)?;
             Ok(ProjectSessions {
                 name: last_component(&path),
@@ -488,10 +495,10 @@ pub fn usage_overview(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Resul
 
     let mut mcp_stmt = conn.prepare(
         "SELECT target, count(*) AS n, avg(is_error) FROM invocations
-          WHERE kind = 'mcp' GROUP BY target ORDER BY n DESC, target",
+          WHERE kind = 'mcp' AND ts >= ?1 GROUP BY target ORDER BY n DESC, target",
     )?;
     let mcp_error_rates = mcp_stmt
-        .query_map([], |r| {
+        .query_map(params![since], |r| {
             Ok(TargetRate {
                 target: r.get(0)?,
                 total: as_u32(r.get(1)?),
@@ -501,27 +508,12 @@ pub fn usage_overview(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Resul
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     Ok(UsageOverview {
-        top,
+        window_days,
+        ranked,
         by_kind,
         sessions_per_project,
         mcp_error_rates,
     })
-}
-
-/// `skill, agent, mcp, builtin` — the order the UI legend lists kinds in.
-fn kind_case() -> String {
-    let order = [
-        InvocationKind::Skill,
-        InvocationKind::Agent,
-        InvocationKind::Mcp,
-        InvocationKind::Builtin,
-    ];
-    let mut sql = String::from("CASE kind ");
-    for (i, k) in order.iter().enumerate() {
-        sql.push_str(&format!("WHEN '{}' THEN {i} ", k.as_str()));
-    }
-    sql.push_str("ELSE 99 END");
-    sql
 }
 
 #[cfg(test)]
@@ -651,9 +643,10 @@ mod tests {
     }
 
     #[test]
-    fn usage_overview_buckets_by_day() {
+    fn usage_overview_windows_every_aggregate() {
         let (conn, _home) = seeded();
-        let u = usage_overview(&conn, 1_785_628_800).unwrap();
+        let u = usage_overview(&conn, 1_785_628_800, 90).unwrap();
+        assert_eq!(u.window_days, 90);
         assert_eq!(
             u.by_kind
                 .iter()
@@ -672,15 +665,74 @@ mod tests {
             .find(|t| t.target == "playwright")
             .unwrap();
         assert!((pw.error_rate - 1.0).abs() < f64::EPSILON);
-        let top = u.top.iter().find(|s| s.target == "adapt").unwrap();
-        assert_eq!(
-            top.points,
-            vec![UsagePoint {
-                day: "2026-08-01".into(),
-                count: 1,
-                errors: 0
-            }]
-        );
+        assert_eq!(u.sessions_per_project.len(), 1);
+        assert_eq!(u.sessions_per_project[0].name, "app");
         assert_eq!(u.sessions_per_project[0].sessions, 1);
+    }
+
+    #[test]
+    fn usage_overview_ranks_every_target_in_the_window() {
+        let (conn, _home) = seeded();
+        let u = usage_overview(&conn, 1_785_628_800, 90).unwrap();
+        // Every fixture target is invoked exactly once, so the whole list is
+        // the tie-break: target ascending, in SQLite's binary collation.
+        assert_eq!(
+            u.ranked
+                .iter()
+                .map(|r| r.target.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Bash",
+                "Read",
+                "adapt",
+                "playwright",
+                "reviewer",
+                "superpowers:brainstorming",
+            ]
+        );
+
+        let pw = u.ranked.iter().find(|r| r.target == "playwright").unwrap();
+        assert_eq!(pw.kind, InvocationKind::Mcp);
+        assert_eq!((pw.uses, pw.sessions), (1, 1));
+        assert!((pw.error_rate - 1.0).abs() < f64::EPSILON);
+
+        let adapt = u.ranked.iter().find(|r| r.target == "adapt").unwrap();
+        assert_eq!(adapt.kind, InvocationKind::Skill);
+        assert_eq!(adapt.error_rate, 0.0);
+        assert!(
+            adapt.artifact_id.is_some(),
+            "a skill that resolved to a file carries the artifact it resolved to"
+        );
+        assert!(adapt.avg_turn_tokens.is_some());
+
+        let bash = u.ranked.iter().find(|r| r.target == "Bash").unwrap();
+        assert_eq!(bash.kind, InvocationKind::Builtin);
+        assert_eq!(bash.artifact_id, None, "a builtin resolves to no artifact");
+    }
+
+    /// The window bounds every aggregate, not just the ranking: a clock past
+    /// the fixture's only session empties all four of them.
+    #[test]
+    fn usage_overview_outside_the_window_is_empty_but_still_shaped() {
+        let (conn, _home) = seeded();
+        // 2026-09-15T00:00:00Z, one day back — six weeks past the fixture.
+        let u = usage_overview(&conn, 1_789_430_400, 1).unwrap();
+        assert_eq!(u.window_days, 1);
+        assert!(u.ranked.is_empty());
+        assert!(u.sessions_per_project.is_empty());
+        assert!(u.mcp_error_rates.is_empty());
+        // `by_kind` keeps its fixed legend order — an empty window reads as
+        // four zeroes, not as four missing kinds.
+        assert_eq!(
+            u.by_kind,
+            KIND_ORDER
+                .iter()
+                .map(|&kind| KindTotal {
+                    kind,
+                    total: 0,
+                    avg_turn_tokens: None,
+                })
+                .collect::<Vec<_>>()
+        );
     }
 }

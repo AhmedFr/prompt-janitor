@@ -4,9 +4,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,30 +15,19 @@ import {
   errorRateBars,
   isUsageEmpty,
   kindBars,
-  kindLabel,
-  seriesColumns,
+  rankedKey,
   sessionBars,
-  shortDay,
-  toStackedSeries,
+  topRanked,
 } from "./usageTab.util";
-import {
-  ErrorTooltip,
-  KindTooltip,
-  SeriesTooltip,
-  SessionsTooltip,
-} from "./UsageTab.tooltips";
+import { ErrorTooltip, KindTooltip, SessionsTooltip } from "./UsageTab.tooltips";
 import {
   AXIS_TICK,
   BAR_COLOR,
   BAR_RADIUS,
   BAR_RADIUS_HORIZONTAL,
-  CHART_SERIES_LIMIT,
   ERROR_BAR_COLOR,
   GRID_STROKE,
-  LINE_WIDTH,
   MAX_BAR_SIZE,
-  SERIES_LIMIT,
-  SERIES_VARS,
   UNMEASURED_BAR_COLOR,
 } from "./UsageTab.constants";
 import type { UsageTabBodyProps } from "./UsageTab.types";
@@ -68,90 +54,28 @@ export function UsageTab() {
   return <UsageTabBody data={data} />;
 }
 
-/** The four usage charts, rendered from an overview the caller already has. */
+/** The ranked targets plus the three usage charts, from an overview the caller has. */
 export function UsageTabBody({ data }: UsageTabBodyProps) {
-  const series = useMemo(() => data.top.slice(0, SERIES_LIMIT), [data.top]);
-  const columns = useMemo(() => seriesColumns(series), [series]);
-  const rows = useMemo(() => toStackedSeries(series), [series]);
-  // The chart draws the leading few; the table below carries all of them.
-  const drawn = useMemo(() => columns.slice(0, CHART_SERIES_LIMIT), [columns]);
+  const ranked = useMemo(() => topRanked(data.ranked), [data.ranked]);
   const kinds = useMemo(() => kindBars(data.by_kind), [data.by_kind]);
   const errors = useMemo(() => errorRateBars(data.mcp_error_rates), [data.mcp_error_rates]);
   const projects = useMemo(() => sessionBars(data.sessions_per_project), [data.sessions_per_project]);
 
   return (
     <div className="usage">
+      {/* A plain ranked list until the shared RankedList component lands. */}
       <ChartCard id="usage-top" title="Top skills, agents and MCP servers over time">
-        {series.length === 0 ? (
-          <Empty>No invocations in the last 90 days.</Empty>
+        {ranked.length === 0 ? (
+          <Empty>No invocations in the window.</Empty>
         ) : (
-          <>
-            <div className="usage-chart usage-chart--tall">
-              <ResponsiveContainer>
-                <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke={GRID_STROKE} vertical={false} />
-                  <XAxis
-                    dataKey="day"
-                    tickFormatter={shortDay}
-                    tick={AXIS_TICK}
-                    tickLine={false}
-                    axisLine={{ stroke: GRID_STROKE }}
-                    minTickGap={28}
-                  />
-                  <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <Tooltip content={SeriesTooltip} cursor={{ stroke: GRID_STROKE }} />
-                  <Legend
-                    iconType="plainline"
-                    formatter={(value) => <span className="usage-legend__text">{value}</span>}
-                  />
-                  {drawn.map((col, i) => (
-                    <Line
-                      key={col.key}
-                      // Linear, not monotone: a spline invents curvature
-                      // between two daily counts that the data never had.
-                      type="linear"
-                      dataKey={col.key}
-                      name={col.label}
-                      stroke={SERIES_VARS[i]}
-                      strokeWidth={LINE_WIDTH}
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--card)" }}
-                      isAnimationActive={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <details className="usage-details">
-              <summary>
-                Show the numbers
-                {columns.length > drawn.length ? ` — all ${columns.length} series` : ""}
-              </summary>
-              <table className="usage-table" aria-label="Top targets by invocations">
-                <thead>
-                  <tr>
-                    <th scope="col">Target</th>
-                    <th scope="col">Kind</th>
-                    <th scope="col">Invocations</th>
-                    <th scope="col">Errors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {columns.map((col, i) => (
-                    <tr key={col.key}>
-                      <th scope="row">
-                        <span className="usage-swatch" style={{ background: SERIES_VARS[i] }} />
-                        {col.label}
-                      </th>
-                      <td>{kindLabel(col.kind)}</td>
-                      <td className="tnum">{col.total}</td>
-                      <td className="tnum">{col.errors}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          </>
+          <ul className="usage-ranked" aria-label="Top targets by invocations">
+            {ranked.map((row) => (
+              <li key={rankedKey(row)} className="usage-ranked__row">
+                <span>{row.target}</span>
+                <span className="tnum">{row.uses}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </ChartCard>
 

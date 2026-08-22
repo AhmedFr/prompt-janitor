@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri, type UsageOverview } from "@/lib/ipc";
+import { USAGE_WINDOW_DAYS } from "./UsageTab.constants";
 
 /**
- * Loads the harness usage overview for the Analytics → Usage tab, refetching
- * whenever a scan finishes (the scan is what re-indexes the transcripts).
+ * Loads the harness usage overview for the Analytics → Usage tab over the last
+ * `USAGE_WINDOW_DAYS`, refetching whenever a scan finishes (the scan is what
+ * re-indexes the transcripts).
  */
 export function useUsageTab() {
   const [data, setData] = useState<UsageOverview | null>(null);
@@ -15,7 +17,7 @@ export function useUsageTab() {
       setLoading(false);
       return;
     }
-    const res = await commands.getUsageOverview();
+    const res = await commands.getUsageOverview(USAGE_WINDOW_DAYS);
     if (res.status === "ok") setData(res.data);
     setLoading(false);
   }, []);
