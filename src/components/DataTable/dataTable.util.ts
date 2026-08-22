@@ -51,9 +51,9 @@ export function matchesPills<Row>(
  * that was uninstalled, a whole group a screen stopped rendering. Left in
  * place, {@link matchesPills} finds no surviving option to satisfy and fails
  * *every* row — an empty table, "No rows match", and no chip pressed to
- * un-press. Pruning is applied to the state the table filters and counts by,
- * not to the state it persists: nothing is thrown away, it just cannot
- * filter by a chip that is not on screen.
+ * un-press. Pruning is applied to the state the table filters and counts by;
+ * the remembered selection is only rewritten on the next chip toggle, so a
+ * chip whose option comes back after a rescan is still remembered until then.
  */
 export function prunePills<Row>(
   selected: Record<string, string[]>,
