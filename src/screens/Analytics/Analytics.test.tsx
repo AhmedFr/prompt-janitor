@@ -46,6 +46,10 @@ vi.mock("./useAnalytics", async (orig) => {
   return { ...mod, useAnalytics: (rangeDays: number) => mockUseAnalytics(rangeDays) };
 });
 
+// The Usage tab has its own suite; here it only needs to be reachable, and
+// stubbing it keeps this screen's tests off the harness-usage IPC call.
+vi.mock("./UsageTab", () => ({ UsageTab: () => <div>usage panel</div> }));
+
 describe("Analytics", () => {
   beforeAll(() => {
     // Recharts' ResponsiveContainer sizes itself from getBoundingClientRect;
@@ -89,6 +93,18 @@ describe("Analytics", () => {
     expect(mockUseAnalytics).toHaveBeenLastCalledWith(90);
     expect(getByRole("button", { name: "90d" })).toHaveClass("on");
     expect(getByRole("button", { name: "30d" })).not.toHaveClass("on");
+  });
+
+  it("defaults to the Quality view and switches to Usage on click", () => {
+    const { getByRole, getByText, queryByRole } = render(<Analytics navigate={vi.fn()} />);
+    expect(getByRole("button", { name: "Quality" })).toHaveClass("on");
+
+    fireEvent.click(getByRole("button", { name: "Usage" }));
+
+    expect(getByText("usage panel")).toBeInTheDocument();
+    expect(getByRole("button", { name: "Usage" })).toHaveClass("on");
+    // The range toggle only windows the quality metrics, so it steps aside.
+    expect(queryByRole("group", { name: "Time range" })).not.toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

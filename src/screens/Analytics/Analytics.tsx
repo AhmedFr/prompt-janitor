@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { TrendChart } from "@/components/TrendChart";
 import { isTauri, type Analytics as AnalyticsData } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
+import { UsageTab } from "./UsageTab";
 import { useAnalytics } from "./useAnalytics";
 import { gradeBars, issueBars } from "./analytics.util";
 import "./Analytics.css";
@@ -13,6 +14,14 @@ import "./Analytics.css";
 export interface AnalyticsProps {
   navigate: Navigate;
 }
+
+/** The two halves of the screen: prompt quality, and what the harness ran. */
+type AnalyticsView = "quality" | "usage";
+
+const VIEWS: [AnalyticsView, string][] = [
+  ["quality", "Quality"],
+  ["usage", "Usage"],
+];
 
 /** range_days options for the toolbar toggle. */
 const RANGES: [number, string][] = [
@@ -31,6 +40,7 @@ const DELTA_CAPTION: Record<number, string> = {
 };
 
 export function Analytics({ navigate }: AnalyticsProps) {
+  const [view, setView] = useState<AnalyticsView>("quality");
   const [rangeDays, setRangeDays] = useState(DEFAULT_RANGE_DAYS);
   const { data, loading } = useAnalytics(rangeDays);
 
@@ -38,19 +48,33 @@ export function Analytics({ navigate }: AnalyticsProps) {
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Analytics</h1>
-        <span className="toolbar-spacer" />
-        <div className="seg" role="group" aria-label="Time range">
-          {RANGES.map(([days, label]) => (
+        <div className="seg an-views" role="group" aria-label="Analytics view">
+          {VIEWS.map(([id, label]) => (
             <button
-              key={days}
-              className={rangeDays === days ? "on" : ""}
-              aria-pressed={rangeDays === days}
-              onClick={() => setRangeDays(days)}
+              key={id}
+              className={view === id ? "on" : ""}
+              aria-pressed={view === id}
+              onClick={() => setView(id)}
             >
               {label}
             </button>
           ))}
         </div>
+        <span className="toolbar-spacer" />
+        {view === "quality" && (
+          <div className="seg" role="group" aria-label="Time range">
+            {RANGES.map(([days, label]) => (
+              <button
+                key={days}
+                className={rangeDays === days ? "on" : ""}
+                aria-pressed={rangeDays === days}
+                onClick={() => setRangeDays(days)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <div className="scroll-area">
@@ -59,6 +83,8 @@ export function Analytics({ navigate }: AnalyticsProps) {
             <Card padded>
               <div className="muted">Open the desktop app to see analytics.</div>
             </Card>
+          ) : view === "usage" ? (
+            <UsageTab />
           ) : loading ? (
             <Card padded>
               <div className="muted">Loading…</div>
