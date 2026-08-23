@@ -888,3 +888,15 @@ pub fn list_harnesses(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     crate::harness_query::list_harnesses(&conn).map_err(|e| e.to_string())
 }
+
+/// Everything the menu-bar panel renders, anchored to the current clock (the
+/// "sessions today" boundary is a UTC calendar day).
+#[tauri::command]
+#[specta::specta]
+pub fn get_panel_snapshot(
+    db: tauri::State<'_, AppDb>,
+) -> Result<crate::panel_query::PanelSnapshot, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::panel_query::panel_snapshot(&conn, now).map_err(|e| e.to_string())
+}

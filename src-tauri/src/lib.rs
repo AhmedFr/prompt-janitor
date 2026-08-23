@@ -16,6 +16,7 @@ mod harness_store;
 mod ipc;
 pub mod license;
 mod notify;
+mod panel_query;
 mod project_logo;
 mod query;
 mod repo_root;
