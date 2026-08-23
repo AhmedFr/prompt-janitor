@@ -68,6 +68,22 @@ describe("Tabs", () => {
     expect(screen.getByRole("tab", { name: "Agents" })).toHaveTextContent("Agents");
   });
 
+  /**
+   * The badge sits inside the button, so its digits ran straight into the
+   * label: screen readers announced the Rules tab as "Rules12". The badge is
+   * hidden from the accessible name and the button spells the two out.
+   */
+  it("names a tab by its label and its count, not by the two run together", () => {
+    render(<Controlled />);
+    expect(screen.getByRole("tab", { name: "Rules, 12" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Skills, 3" })).toBeInTheDocument();
+  });
+
+  it("names a badgeless tab by its label alone", () => {
+    render(<Controlled />);
+    expect(screen.getByRole("tab", { name: "Agents" })).toBeInTheDocument();
+  });
+
   it("renders a countLabel badge verbatim, for counts a single number can't say", () => {
     const items: TabItem[] = [
       { id: "builtin", label: "Built-in", countLabel: "12/20" },
@@ -76,6 +92,8 @@ describe("Tabs", () => {
     render(<Controlled items={items} initial="builtin" />);
     expect(screen.getByRole("tab", { name: /Built-in/ })).toHaveTextContent("12/20");
     expect(screen.getByRole("tab", { name: /Custom/ })).toHaveTextContent("0/0");
+    // The spelled-out count reaches the accessible name too.
+    expect(screen.getByRole("tab", { name: "Built-in, 12/20" })).toBeInTheDocument();
   });
 
   it("prefers countLabel over count when a tab carries both", () => {

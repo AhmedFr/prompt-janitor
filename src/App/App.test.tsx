@@ -105,6 +105,16 @@ describe("App", () => {
     expect(propsOf("setup").initialTab).toBeUndefined();
   });
 
+  /**
+   * The target arrives as a bare string from anywhere in the app; a typo or a
+   * stale link would otherwise be stored as a kind tab that does not exist.
+   */
+  it("ignores a `setup` target that names no kind tab", () => {
+    render(<App />);
+    go("setup", "not-a-kind");
+    expect(propsOf("setup").initialTab).toBeUndefined();
+  });
+
   it("keeps the file id when `detail` is reached without one", () => {
     render(<App />);
     go("detail", "/code/web-app/CLAUDE.md");

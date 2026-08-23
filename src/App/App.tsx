@@ -13,9 +13,16 @@ import { Rules } from "@/screens/Rules";
 import { RulesNew } from "@/screens/RulesNew";
 import { Settings } from "@/screens/Settings";
 import { isTauri, type ArtifactKind } from "@/lib/ipc";
+// Deep import, not the screen barrel: this is the tab strip's own id list,
+// and the barrel would pull the whole Setup screen in behind it.
+import { KIND_TABS } from "@/screens/Setup/setup.columns";
 import type { Route } from "./App.types";
 
 const ONBOARDED_KEY = "pj-onboarded";
+
+/** A `setup` target only counts when it names a kind the tab strip actually has. */
+const isKindTab = (value: string | undefined): value is ArtifactKind =>
+  KIND_TABS.some((tab) => tab.id === value);
 
 export function App() {
   const [route, setRoute] = useState<Route>("overview");
@@ -38,10 +45,11 @@ export function App() {
     if (next === "detail" && target !== undefined) setDetailId(target);
     if (next === "settings") setSettingsTab(target);
     // Which kind tab Setup opens on — a ranked usage row links to the tab
-    // that holds it. Cleared by an untargeted visit (the sidebar), so a deep
-    // link cannot keep reopening a kind the user asked for once; `Setup`
-    // itself re-resolves an id its tab set does not have.
-    if (next === "setup") setSetupTab(target as ArtifactKind | undefined);
+    // that holds it. Validated rather than cast: the target is a bare string
+    // from anywhere in the app, and a typo stored as a tab id would open a
+    // kind that does not exist. Cleared by an untargeted visit (the sidebar),
+    // so a deep link cannot keep reopening a kind the user asked for once.
+    if (next === "setup") setSetupTab(isKindTab(target) ? target : undefined);
     if (next === "prompts") setPromptsTarget(target);
     // Unlike `detail`, an untargeted `project` clears rather than keeps: the
     // screen is addressed by path, and carrying the last one forward would

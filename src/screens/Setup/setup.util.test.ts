@@ -234,6 +234,12 @@ describe("sessionLabel", () => {
     expect(sessionLabel(1)).toBe("1 session");
     expect(sessionLabel(12)).toBe("12 sessions");
   });
+
+  it("groups a count that runs into the thousands", () => {
+    // A real machine's session count does; "1204 sessions" is read digit by
+    // digit, so the shared formatter groups.
+    expect(sessionLabel(1204)).toBe("1,204 sessions");
+  });
 });
 
 describe("matchProject", () => {

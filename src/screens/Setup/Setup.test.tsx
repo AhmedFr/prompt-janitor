@@ -252,16 +252,23 @@ describe("Setup", () => {
     await renderSetup();
 
     const tabs = await screen.findByRole("tablist", { name: /setup/i });
-    expect(within(tabs).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Rules2",
-      "Skills5",
-      "Agents1",
-      "Commands0",
-      "Hooks1",
-      "MCP1",
-      "Plugins2",
-      "Settings1",
+    // Accessible names, not text content: the badge is hidden from the name
+    // and spelled out, so a tab reads as "Rules, 2" rather than "Rules2".
+    expect(
+      within(tabs)
+        .getAllByRole("tab")
+        .map((tab) => tab.getAttribute("aria-label")),
+    ).toEqual([
+      "Rules, 2",
+      "Skills, 5",
+      "Agents, 1",
+      "Commands, 0",
+      "Hooks, 1",
+      "MCP, 1",
+      "Plugins, 2",
+      "Settings, 1",
     ]);
+    expect(within(tabs).getByRole("tab", { name: "Rules, 2" })).toBeInTheDocument();
   });
 
   it("summarises the detected harness and when it was last scanned", async () => {
@@ -456,7 +463,7 @@ describe("Setup", () => {
 
     await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /^Skills/ })).toHaveTextContent("Skills6"),
+      expect(screen.getByRole("tab", { name: "Skills, 6" })).toHaveTextContent("Skills6"),
     );
     expect(rowNames()).toContain("zzz-new");
     expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used4");

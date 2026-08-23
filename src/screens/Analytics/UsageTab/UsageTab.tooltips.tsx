@@ -1,5 +1,8 @@
 import type { TooltipContentProps } from "recharts";
 import type { KindBar, SessionBar } from "./UsageTab.types";
+// A deep import rather than the screen barrel: `plural` is a pure formatter,
+// and the barrel would pull a whole screen in behind it.
+import { plural } from "@/screens/Setup/setup.util";
 
 type TipProps = TooltipContentProps;
 
@@ -49,8 +52,4 @@ export function SessionsTooltip({ active, payload }: TipProps) {
   return (
     <Tip title={bar.name} lines={[plural(bar.sessions, "session"), bar.path]} />
   );
-}
-
-function plural(n: number, noun: string): string {
-  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
 }
