@@ -11,7 +11,7 @@ import { KIND_LABEL, rankedKey } from "@/lib/usage";
 // and the barrel would pull a whole screen in behind it.
 import { plural } from "@/screens/Setup/setup.util";
 import type { KindBar, RankedBy, SessionBar } from "./UsageTab.types";
-import { MAX_PROJECT_BARS, RANKED_LIMIT } from "./UsageTab.constants";
+import { MAX_PROJECT_BARS } from "./UsageTab.constants";
 
 /**
  * How copy names the reporting window: `30` → `last 30 days`.
@@ -27,11 +27,6 @@ export function windowLabel(windowDays: number): string {
 /** Pins a piece of empty copy to the window that produced it. */
 export function inWindow(text: string, windowDays: number): string {
   return `${text} in the ${windowLabel(windowDays)}.`;
-}
-
-/** Invocation kind → the label the UI shows for it. */
-export function kindLabel(kind: InvocationKind): string {
-  return KIND_LABEL[kind];
 }
 
 /** `12.5` → `12.5%`, `50` → `50%` — a whole percentage carries no false precision. */
@@ -80,12 +75,17 @@ function errorPct(rate: number): number {
  *
  * The sort is stable, so targets tied on a value keep the backend's own
  * busiest-first order rather than shuffling between renders.
+ *
+ * Ranks all of them: how many rows fit on screen is `RankedList`'s `limit`,
+ * the one place the tab states it, so the two cannot drift into cutting at
+ * different depths. `limit` here is for a caller that needs a hard cut of its
+ * own — it defaults to no cut, not to a second opinion on the display depth.
  */
 export function rankedFor(
   ranked: RankedTarget[],
   kind: InvocationKind | "all",
   by: RankedBy,
-  limit: number = RANKED_LIMIT,
+  limit?: number,
 ): RankedRow[] {
   return ranked
     .filter((row) => (kind === "all" || row.kind === kind) && measured(row, by))
@@ -97,7 +97,7 @@ export function rankedFor(
       title: targetDetail(row),
     }))
     .sort((a, b) => b.value - a.value)
-    .slice(0, Math.max(0, limit));
+    .slice(0, limit === undefined ? undefined : Math.max(0, limit));
 }
 
 /** Whether this row has the measure the list ranks on. */
@@ -118,7 +118,7 @@ function valueOf(row: RankedTarget, by: RankedBy): number {
 export function kindBars(byKind: KindTotal[]): KindBar[] {
   return byKind.map(({ kind, total, avg_turn_tokens }) => ({
     kind,
-    label: kindLabel(kind),
+    label: KIND_LABEL[kind],
     total,
     avgTurnTokens: avg_turn_tokens === null ? null : Math.round(avg_turn_tokens),
   }));

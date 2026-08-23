@@ -68,6 +68,36 @@ describe("useUsageTab", () => {
     expect(getUsageOverview).toHaveBeenLastCalledWith(90);
   });
 
+  /**
+   * The reads outlive the window they were started for: switching 7d → 90d
+   * leaves the 7d read in flight, and without a generation gate it lands last
+   * and wins — painting a week of usage under a toolbar that says 90d.
+   */
+  it("discards a superseded window's read even when it answers last", async () => {
+    const pending = new Map<number, (data: UsageOverview) => void>();
+    getUsageOverview.mockImplementation(
+      (windowDays: number) =>
+        new Promise((resolve) => {
+          pending.set(windowDays, (data) => resolve({ status: "ok", data }));
+        }),
+    );
+
+    const { result, rerender } = renderHook(({ days }) => useUsageTab(days), {
+      initialProps: { days: 7 },
+    });
+    await waitFor(() => expect(pending.has(7)).toBe(true));
+
+    rerender({ days: 90 });
+    await waitFor(() => expect(pending.has(90)).toBe(true));
+
+    // The current window answers first, the superseded one after it.
+    await act(async () => pending.get(90)?.(overview(90)));
+    await act(async () => pending.get(7)?.(overview(7)));
+
+    expect(result.current.data?.window_days).toBe(90);
+    expect(result.current.loading).toBe(false);
+  });
+
   it("refetches the same window when a scan re-indexes the transcripts", async () => {
     const { result } = renderHook(() => useUsageTab(30));
     await waitFor(() => expect(result.current.loading).toBe(false));

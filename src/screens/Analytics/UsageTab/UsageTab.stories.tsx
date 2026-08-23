@@ -73,7 +73,7 @@ export const Default: Story = {};
  * A window that ran clean and unmeasured: one target, no errors, no recorded
  * token averages — every list has to say which of those it means.
  */
-export const Empty: Story = {
+export const NothingToReport: Story = {
   args: {
     data: {
       ...sample,

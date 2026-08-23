@@ -1,17 +1,20 @@
 import type { TooltipContentProps } from "recharts";
-import type { KindBar, SessionBar, TipLine } from "./UsageTab.types";
+import type { KindBar, SessionBar } from "./UsageTab.types";
 
 type TipProps = TooltipContentProps;
 
-/** Shared tooltip shell: a title plus rows whose colour dot carries identity. */
-export function Tip({ title, lines }: { title: string; lines: TipLine[] }) {
+/**
+ * Shared tooltip shell: a title over one line per fact. Both charts are
+ * single-series, so a hovered mark is named by the title alone — there is no
+ * second series for a colour swatch to tell it apart from.
+ */
+function Tip({ title, lines }: { title: string; lines: string[] }) {
   return (
     <div className="usage-tip">
       <div className="usage-tip__title">{title}</div>
       {lines.map((line) => (
-        <div key={line.text} className="usage-tip__row">
-          {line.color && <span className="usage-swatch" style={{ background: line.color }} />}
-          <span>{line.text}</span>
+        <div key={line} className="usage-tip__row">
+          {line}
         </div>
       ))}
     </div>
@@ -34,10 +37,7 @@ export function KindTooltip({ active, payload }: TipProps) {
   return (
     <Tip
       title={bar.label}
-      lines={[
-        { text: plural(bar.total, "invocation") },
-        { text: `avg context tokens / turn: ${tokens}` },
-      ]}
+      lines={[plural(bar.total, "invocation"), `avg context tokens / turn: ${tokens}`]}
     />
   );
 }
@@ -47,7 +47,7 @@ export function SessionsTooltip({ active, payload }: TipProps) {
   const bar = hoveredRow<SessionBar>(payload);
   if (!active || !bar) return null;
   return (
-    <Tip title={bar.name} lines={[{ text: plural(bar.sessions, "session") }, { text: bar.path }]} />
+    <Tip title={bar.name} lines={[plural(bar.sessions, "session"), bar.path]} />
   );
 }
 

@@ -3,23 +3,11 @@ import type { InvocationKind } from "@/lib/ipc";
 /** "Sessions per project" shows at most this many bars. */
 export const MAX_PROJECT_BARS = 10;
 
-/** Categorical series slots, in the fixed CVD-safe order (see `tokens.css`). */
-export const SERIES_VARS = [
-  "var(--series-1)",
-  "var(--series-2)",
-  "var(--series-3)",
-  "var(--series-4)",
-  "var(--series-5)",
-  "var(--series-6)",
-  "var(--series-7)",
-  "var(--series-8)",
-] as const;
-
 /** How many rows each ranked list shows. */
 export const RANKED_LIMIT = 10;
 
-/** Slot 1 — the single hue nominal bar charts use, since bar length carries the value. */
-export const BAR_COLOR = SERIES_VARS[0];
+/** Series slot 1 — the single hue nominal bar charts use, since bar length carries the value. */
+export const BAR_COLOR = "var(--series-1)";
 
 /** Recharts mark geometry, per the data-viz mark specs. */
 export const MAX_BAR_SIZE = 24;

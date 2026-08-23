@@ -4,7 +4,6 @@ import {
   inWindow,
   isUsageEmpty,
   kindBars,
-  kindLabel,
   percentValue,
   rankedFor,
   sessionBars,
@@ -93,11 +92,13 @@ describe("rankedFor", () => {
     expect(rows.some((r) => r.id === "mcp:playwright")).toBe(false);
   });
 
-  it("lists ten rows by default and honours a smaller limit", () => {
+  it("ranks every match, leaving the display cut to RankedList's own limit", () => {
+    // Two owners of "how deep does this list go" drift; the component's
+    // `limit` is the one the tab states, so the util does not second-guess it.
     const many = Array.from({ length: 14 }, (_, i) =>
       row({ kind: "skill", target: `s${i}`, uses: 14 - i }),
     );
-    expect(rankedFor(many, "skill", "uses")).toHaveLength(10);
+    expect(rankedFor(many, "skill", "uses")).toHaveLength(14);
     expect(rankedFor(many, "skill", "uses", 3).map((r) => r.label)).toEqual(["s0", "s1", "s2"]);
   });
 
@@ -145,15 +146,6 @@ describe("percentValue", () => {
 describe("tokenValue", () => {
   it("rounds to whole tokens and groups them", () => {
     expect(tokenValue(21480.6)).toBe("21,481");
-  });
-});
-
-describe("kindLabel", () => {
-  it("maps all four invocation kinds", () => {
-    expect(kindLabel("skill")).toBe("Skills");
-    expect(kindLabel("agent")).toBe("Agents");
-    expect(kindLabel("mcp")).toBe("MCP");
-    expect(kindLabel("builtin")).toBe("Built-in");
   });
 });
 

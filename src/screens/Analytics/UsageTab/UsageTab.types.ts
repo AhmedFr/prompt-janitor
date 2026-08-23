@@ -17,12 +17,6 @@ export interface KindBar {
 /** A bar in the "Sessions per project" chart — the IPC row, filtered and ranked. */
 export type SessionBar = ProjectSessions;
 
-/** One line of a chart tooltip; the colour dot (not the text) carries identity. */
-export interface TipLine {
-  text: string;
-  color?: string;
-}
-
 /** The tab, windowed by the Analytics toolbar's range toggle. */
 export interface UsageTabProps {
   /** Days of usage to ask the backend for — the toolbar's 7 / 30 / 90. */
