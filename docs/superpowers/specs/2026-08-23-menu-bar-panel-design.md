@@ -65,8 +65,8 @@ pub struct PanelSnapshot {
   has_data: bool,
   overall_grade: Grade, overall_score: u32, delta: i32,      // from get_overview
   last_scan_at: Option<String>,                             // harnesses max(last_scan_at) else scans max(finished_at)
-  top_fixes: Vec<PanelFix>,                                 // ≤ 3, worst grade then most issues
-  never_used_skills: u32,                                   // artifacts kind=skill with no usage row, all layers
+  top_fixes: Vec<PanelFix>,                                 // ≤ 3, issue_count > 0, worst grade then most issues
+  never_used_skills: u32,                                   // artifacts kind=skill with no usage row, all non-plugin layers
   mcp_erroring: u32,                                        // mcp_server artifacts with error_rate ≥ 0.25 (shared threshold)
   sessions_today: u32,                                      // sessions started since local midnight (UTC day like project_usage)
 }

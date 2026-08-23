@@ -459,9 +459,17 @@ export type PanelSnapshot = {
 	 *  other `last_scan_at` on the frontend is formatted from.
 	 */
 	last_scan_at: string | null,
-	/**  At most three files, worst grade first then most issues. */
+	/**
+	 *  At most three files that have issues, worst grade first then most
+	 *  issues. Empty when there is nothing to fix.
+	 */
 	top_fixes: PanelFix[],
-	/**  Skills, any layer, that no invocation has ever resolved to. */
+	/**
+	 *  Skills the user authored — any layer but `plugin` — that no
+	 *  invocation has ever resolved to. Plugin-bundled skills are excluded
+	 *  on purpose: installing a plugin ships dozens the user never chose,
+	 *  and counting them buries the handful they wrote and forgot.
+	 */
 	never_used_skills: number,
 	/**  MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`]. */
 	mcp_erroring: number,

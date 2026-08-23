@@ -13,6 +13,10 @@
 //! * sessions are counted top-level only (`parent_session_id IS NULL`) —
 //!   a sub-agent transcript is not a session the user started.
 //!
+//! Every count is filtered down to what the user can actually act on:
+//! plugin-bundled skills and issue-free files are noise in a popover that
+//! has room for three rows.
+//!
 //! Nothing here writes.
 
 use rusqlite::Connection;
@@ -51,9 +55,13 @@ pub struct PanelSnapshot {
     /// Newest of the harness and file scans, as RFC3339 — the shape every
     /// other `last_scan_at` on the frontend is formatted from.
     pub last_scan_at: Option<String>,
-    /// At most three files, worst grade first then most issues.
+    /// At most three files that have issues, worst grade first then most
+    /// issues. Empty when there is nothing to fix.
     pub top_fixes: Vec<PanelFix>,
-    /// Skills, any layer, that no invocation has ever resolved to.
+    /// Skills the user authored — any layer but `plugin` — that no
+    /// invocation has ever resolved to. Plugin-bundled skills are excluded
+    /// on purpose: installing a plugin ships dozens the user never chose,
+    /// and counting them buries the handful they wrote and forgot.
     pub never_used_skills: u32,
     /// MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`].
     pub mcp_erroring: u32,
@@ -71,30 +79,44 @@ fn as_u32(v: i64) -> u32 {
 /// Newest of `harnesses.last_scan_at` and `scans.finished_at`, rendered as
 /// RFC3339.
 ///
-/// Both columns hold epoch seconds as text, so they are compared numerically
-/// rather than lexicographically — a text `MAX()` across the two would start
-/// lying the day the epoch gains a digit, and would rank an unparseable legacy
-/// value above a real one.
+/// Both columns hold epoch seconds as *text*, which rules out a plain
+/// `MAX()`: text ordering ranks any non-numeric legacy value above every real
+/// stamp (`'legacy' > '1785672000'`), so one stale row would blank the panel's
+/// "last scanned" line for good. `GLOB '[0-9]*'` drops those rows and the
+/// `CAST` makes the comparison numeric, which also keeps working the day the
+/// epoch gains a digit.
 fn last_scan_at(conn: &Connection) -> rusqlite::Result<Option<String>> {
-    let newest = |sql: &str| -> rusqlite::Result<Option<i64>> {
-        let raw: Option<String> = conn.query_row(sql, [], |r| r.get(0))?;
-        Ok(raw.and_then(|s| s.parse::<i64>().ok()))
-    };
-    let harness = newest("SELECT MAX(last_scan_at) FROM harnesses")?;
-    let files = newest("SELECT MAX(finished_at) FROM scans")?;
+    let newest =
+        |sql: &str| -> rusqlite::Result<Option<i64>> { conn.query_row(sql, [], |r| r.get(0)) };
+    let harness = newest(
+        "SELECT MAX(CAST(last_scan_at AS INTEGER)) FROM harnesses
+          WHERE last_scan_at GLOB '[0-9]*'",
+    )?;
+    let files = newest(
+        "SELECT MAX(CAST(finished_at AS INTEGER)) FROM scans
+          WHERE finished_at GLOB '[0-9]*'",
+    )?;
     Ok(harness.max(files).map(iso_from_epoch))
 }
 
 /// The files the panel offers to fix: worst grade first, then the most issues.
 ///
-/// A missing `grade` reads as `F`, the same way [`grade_from_db`] treats it —
-/// an ungraded file is not a good file.
+/// Only files that actually have issues — a row the user cannot act on is not
+/// a fix, so a clean database yields an empty list rather than three A-graded
+/// placeholders.
+///
+/// The ordering names `A`..`D` explicitly and lets everything else — `F`, a
+/// `NULL` grade, a value written by a future schema — fall to `ELSE 0`, the
+/// worst bucket. That is the same "unknown is not good" reading
+/// [`grade_from_db`] applies, so a row can never sort as an `A` while
+/// rendering as an `F`.
 fn top_fixes(conn: &Connection) -> rusqlite::Result<Vec<PanelFix>> {
     let mut stmt = conn.prepare(
         "SELECT f.id, f.path, p.name, COALESCE(f.grade, 'F'), f.issue_count
            FROM files f JOIN projects p ON p.id = f.project_id
-          ORDER BY CASE COALESCE(f.grade, 'F')
-                     WHEN 'F' THEN 0 WHEN 'D' THEN 1 WHEN 'C' THEN 2 WHEN 'B' THEN 3 ELSE 4 END,
+          WHERE f.issue_count > 0
+          ORDER BY CASE f.grade
+                     WHEN 'A' THEN 4 WHEN 'B' THEN 3 WHEN 'C' THEN 2 WHEN 'D' THEN 1 ELSE 0 END,
                    f.issue_count DESC, f.id
           LIMIT ?1",
     )?;
@@ -117,9 +139,13 @@ fn top_fixes(conn: &Connection) -> rusqlite::Result<Vec<PanelFix>> {
 pub fn panel_snapshot(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Result<PanelSnapshot> {
     let overview = get_overview(conn)?;
 
+    // `layer <> 'plugin'` is what makes this chip actionable rather than
+    // alarming: a plugin install ships skills wholesale, so on a real setup
+    // they are the overwhelming majority of "never used" and none of them are
+    // something the user can act on.
     let never_used_skills: i64 = conn.query_row(
         "SELECT COUNT(*) FROM artifacts a
-          WHERE a.kind = 'skill'
+          WHERE a.kind = 'skill' AND a.layer <> 'plugin'
             AND NOT EXISTS (SELECT 1 FROM usage_stats u WHERE u.artifact_id = a.id)",
         [],
         |r| r.get(0),
@@ -190,6 +216,16 @@ mod tests {
         .unwrap();
     }
 
+    /// A file the grader never wrote a grade for — it must sort as `F`.
+    fn ungraded_file(conn: &Connection, project_id: &str, path: &str, issues: i64) {
+        conn.execute(
+            "INSERT INTO files(id, project_id, path, kind, grade, score, issue_count, modified_at)
+             VALUES(?1, ?2, ?1, 'rule', NULL, NULL, ?3, '2026-08-01T00:00:00Z')",
+            params![path, project_id, issues],
+        )
+        .unwrap();
+    }
+
     /// One artifact row; returns its rowid so a usage rollup can be linked.
     fn artifact(conn: &Connection, kind: &str, name: &str, layer: &str) -> i64 {
         conn.execute(
@@ -244,6 +280,7 @@ mod tests {
         file(&conn, "/code/app", "/code/app/CLAUDE.md", "F", 3);
         file(&conn, "/code/app", "/code/app/AGENTS.md", "F", 7);
         file(&conn, "/code/api", "/code/api/CLAUDE.md", "D", 9);
+        // Clean and issue-free: excluded twice over.
         file(&conn, "/code/api", "/code/api/README.md", "A", 0);
 
         let s = panel_snapshot(&conn, NOW).unwrap();
@@ -269,6 +306,43 @@ mod tests {
         assert_eq!(s.top_fixes[0].file_id, "/code/app/AGENTS.md");
     }
 
+    /// An unknown grade is not a good grade: a NULL sorts into the same worst
+    /// bucket `grade_from_db` renders it as, ahead of a graded file carrying
+    /// more issues.
+    #[test]
+    fn top_fixes_rank_an_ungraded_file_as_worst() {
+        let conn = test_conn();
+        project(&conn, "/code/app", "app");
+        file(&conn, "/code/app", "/code/app/CLAUDE.md", "D", 20);
+        ungraded_file(&conn, "/code/app", "/code/app/AGENTS.md", 1);
+
+        let s = panel_snapshot(&conn, NOW).unwrap();
+
+        assert_eq!(
+            s.top_fixes
+                .iter()
+                .map(|f| (f.name.as_str(), f.grade))
+                .collect::<Vec<_>>(),
+            vec![("AGENTS.md", Grade::F), ("CLAUDE.md", Grade::D)],
+        );
+    }
+
+    /// Nothing to fix must read as nothing to fix — not three A-graded rows
+    /// the user cannot act on.
+    #[test]
+    fn top_fixes_skip_files_with_nothing_to_fix() {
+        let conn = test_conn();
+        project(&conn, "/code/app", "app");
+        file(&conn, "/code/app", "/code/app/CLAUDE.md", "A", 0);
+        file(&conn, "/code/app", "/code/app/AGENTS.md", "A", 0);
+        file(&conn, "/code/app", "/code/app/README.md", "B", 0);
+
+        let s = panel_snapshot(&conn, NOW).unwrap();
+
+        assert!(s.has_data, "a scanned but clean setup still has data");
+        assert!(s.top_fixes.is_empty());
+    }
+
     #[test]
     fn never_used_skills_counts_skills_with_no_usage_row() {
         let conn = test_conn();
@@ -277,11 +351,17 @@ mod tests {
         artifact(&conn, "skill", "project-skill", "project");
         // A never-invoked agent is not a skill, so it must not be counted.
         artifact(&conn, "agent", "unused-agent", "global");
+        // Plugin-bundled skills arrive by the dozen with an install; the user
+        // never chose them, so they are noise rather than a finding.
+        artifact(&conn, "skill", "plugin-skill", "plugin");
         usage(&conn, used, "skill", "adapt", 0.0);
 
         let s = panel_snapshot(&conn, NOW).unwrap();
 
-        assert_eq!(s.never_used_skills, 2, "both layers, skills only");
+        assert_eq!(
+            s.never_used_skills, 2,
+            "global and project skills only — plugin-bundled ones are excluded"
+        );
     }
 
     #[test]
@@ -338,6 +418,39 @@ mod tests {
         let s = panel_snapshot(&conn, NOW).unwrap();
 
         assert_eq!(s.last_scan_at.as_deref(), Some("2026-08-02T12:00:00.000Z"));
+    }
+
+    /// The other direction, plus the row that breaks a text `MAX()`: a
+    /// non-numeric legacy stamp sorts above every real one, so it has to be
+    /// filtered out rather than parsed and discarded.
+    #[test]
+    fn last_scan_at_takes_the_file_scan_when_it_is_the_newer_one() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO scans(started_at, finished_at, files_scanned) VALUES('1785672000', '1785672000', 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO harnesses(id, display_name, detected, last_scan_at)
+             VALUES('claude_code', 'Claude Code', 1, '1785628800')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO harnesses(id, display_name, detected, last_scan_at)
+             VALUES('codex', 'Codex', 1, 'legacy')",
+            [],
+        )
+        .unwrap();
+
+        let s = panel_snapshot(&conn, NOW).unwrap();
+
+        assert_eq!(
+            s.last_scan_at.as_deref(),
+            Some("2026-08-02T12:00:00.000Z"),
+            "newest of both columns, ignoring the unparseable legacy stamp"
+        );
     }
 
     #[test]
