@@ -65,10 +65,10 @@
     {
       "name": "Phase 8",
       "title": "Tables & project pages",
-      "done": 4,
+      "done": 5,
       "total": 6,
       "state": "active",
-      "note": "Read models (#134) and Setup tabs (#135) merged. Project pages + flat prompts (#129 PR). Next: rules (#130), analytics (#131)."
+      "note": "Read models (#134) and Setup tabs (#135) merged. Project pages + flat prompts (#129 PR). Rules tabs + tables (#130 branch). Next: /rules/new, analytics (#131)."
     }
   ],
   "actions": {
@@ -287,6 +287,12 @@
       "note": "PR for #129 awaiting review — /projects table, dedicated project page (Rules · Effective rules · Setup · Usage), Prompts as a flat files table"
     },
     {
+      "name": "Rules screen as tabs of tables",
+      "tier": "free",
+      "status": "pr",
+      "note": "Branch for #130 \u2014 Built-in / Custom / AI standards tabs badged enabled/total, one DataTable each (switch, title, source, severity, hits, actions), source/severity/enabled/has-hits pills, pattern-aware search; the add-rule composer moves to /rules/new"
+    },
+    {
       "name": "Release pipeline (universal macOS DMG on tag)",
       "tier": "infra",
       "status": "pr",
@@ -320,7 +326,7 @@
     },
     {
       "name": "Vitest",
-      "result": "720/720 passing (62 files)"
+      "result": "778/778 passing (64 files)"
     },
     {
       "name": "cargo test",
@@ -353,6 +359,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 \u2014 Rules screen rebuilt as tabs of tables: Built-in / Custom / AI standards badged enabled/total, per-tab search, source / severity / enabled / has-hits pills, row switches, delete on custom rules and copy-pattern elsewhere; pack import stays on Built-in and Add rule now routes to /rules/new (#130 branch)",
     "2026-08-23 — PR4 branch-review fix wave: harness-scoped read failures say so instead of collapsing to empty, a failed refetch keeps the loaded page and flags it as the previous scan, project page gains a “See all files” deep link into Prompts, sidebar keeps Prompts lit on a file detail (#129 PR)",
     "2026-08-23 — Prompts screen rebuilt as one flat files table: Name (over its path) · Project chip · Kind · Grade · Issues · Modified, with Kind / Grade / Project (top 12 + Other) / Has-issues pills and path search; the project-group cards are gone and sidebar recents now open the project page (#129 PR)",
     "2026-08-23 — Review round 1 on the project page: a read left in flight by one project no longer overwrites the next one (generation guard), partial read failures covered, missing-folder banner announced as a live region, header and state panels split into their own folders (#129 PR)",

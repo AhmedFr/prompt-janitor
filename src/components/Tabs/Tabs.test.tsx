@@ -68,6 +68,24 @@ describe("Tabs", () => {
     expect(screen.getByRole("tab", { name: "Agents" })).toHaveTextContent("Agents");
   });
 
+  it("renders a countLabel badge verbatim, for counts a single number can't say", () => {
+    const items: TabItem[] = [
+      { id: "builtin", label: "Built-in", countLabel: "12/20" },
+      { id: "custom", label: "Custom", countLabel: "0/0" },
+    ];
+    render(<Controlled items={items} initial="builtin" />);
+    expect(screen.getByRole("tab", { name: /Built-in/ })).toHaveTextContent("12/20");
+    expect(screen.getByRole("tab", { name: /Custom/ })).toHaveTextContent("0/0");
+  });
+
+  it("prefers countLabel over count when a tab carries both", () => {
+    const items: TabItem[] = [{ id: "builtin", label: "Built-in", count: 20, countLabel: "12/20" }];
+    render(<Controlled items={items} initial="builtin" />);
+    const tab = screen.getByRole("tab", { name: /Built-in/ });
+    expect(tab).toHaveTextContent("12/20");
+    expect(tab).not.toHaveTextContent("Built-in20");
+  });
+
   it("renders the active panel's content via the render prop", () => {
     render(<Controlled />);
     expect(screen.getByText("Panel: rules")).toBeInTheDocument();

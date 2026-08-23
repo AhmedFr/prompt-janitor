@@ -31,6 +31,7 @@ export function App() {
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [promptsTarget, setPromptsTarget] = useState<string | undefined>(undefined);
   const [projectPath, setProjectPath] = useState<string | undefined>(undefined);
+  const [rulesTab, setRulesTab] = useState<string | undefined>(undefined);
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
@@ -47,6 +48,9 @@ export function App() {
     // screen is addressed by path, and carrying the last one forward would
     // silently open the wrong project.
     if (next === "project") setProjectPath(target);
+    // Which of the three rule tables to open on — `/rules/new` sends the user
+    // back to the tab their new rule landed in.
+    if (next === "rules") setRulesTab(target);
   }, []);
 
   const finishOnboarding = () => {
@@ -71,7 +75,7 @@ export function App() {
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
         {route === "analytics" && <Analytics navigate={navigate} />}
-        {route === "rules" && <Rules />}
+        {route === "rules" && <Rules navigate={navigate} initialTab={rulesTab} />}
         {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
       </main>
       {showOnboarding && <Onboarding onDone={finishOnboarding} />}

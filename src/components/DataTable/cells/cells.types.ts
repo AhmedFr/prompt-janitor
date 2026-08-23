@@ -48,6 +48,13 @@ export interface RowAction {
   label: string;
   icon: IconName;
   onClick: () => void;
+  /**
+   * The action exists for this column but has nothing to act on in this row
+   * — a rule with no pattern has nothing to copy. Shown greyed rather than
+   * dropped, so the column keeps one button per row and the reader learns
+   * the action is unavailable here, not absent everywhere.
+   */
+  disabled?: boolean;
 }
 
 export interface ActionsCellProps {
