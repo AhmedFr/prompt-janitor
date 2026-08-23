@@ -4,7 +4,7 @@
 }
 
 /* Smaller than the app's section label: the panel is a popover, and a full
-   12 px eyebrow over a 32 px row competes with the row it introduces. */
+   12 px eyebrow over a 34 px row competes with the row it introduces. */
 .panel-fixes__title {
   font-size: 11px;
   color: var(--text-2);

@@ -13,6 +13,13 @@ strokes with round caps, so the rasteriser only needs one primitive — the
 distance to a capsule — and anti-aliasing comes from supersampling 8x and box
 down-sampling, which keeps the hairlines from crawling on a 1x display.
 
+The canvas is 18 pt because that is the only size that survives: tray-icon
+re-encodes the image and pins `NSImage` to `icon_height = 18.0`
+(`platform_impl/macos/mod.rs`), scaling the width to match. Art authored on a
+22 pt canvas therefore arrives letterboxed — its 16 pt of ink lands at ~13 pt,
+noticeably smaller than every neighbour in the bar. Authoring at 18 with 1 pt of
+clear space puts the ink at the size it is actually drawn.
+
 Stdlib only (struct + zlib write the PNG) so the icons can be regenerated on any
 machine with a Python 3, with no wheel to install and nothing to vendor.
 
@@ -34,20 +41,28 @@ GRID = 24.0
 
 #: One stroke: (x1, y1, x2, y2, width, alpha). Straight from the `logo` icon:
 #: three rules, the last at 50% opacity, and the two crossing strokes of the
-#: small x, which are thinner (1.4 against 2).
+#: small x.
+#:
+#: The x is longer and thinner than the on-screen icon's (1.0 against 1.4, over
+#: 3.2 units against 2.1). At 18 pt the original's two 1.4-wide strokes crossing
+#: inside a 2.9 pt box overlap along most of their length and rasterise as a
+#: solid blob — a smudge beside the rules rather than a mark. Stretched and
+#: thinned, the four arms clear each other at 1x and the centre still reads as a
+#: crossing.
 STROKES = [
     (5.0, 6.0, 19.0, 6.0, 2.0, 1.0),
     (5.0, 11.0, 14.0, 11.0, 2.0, 1.0),
     (5.0, 16.0, 9.0, 16.0, 2.0, 0.5),
-    (15.0, 15.5, 16.5, 17.0, 1.4, 1.0),
-    (16.5, 15.5, 15.0, 17.0, 1.4, 1.0),
+    (14.6, 14.8, 17.8, 18.0, 1.0, 1.0),
+    (17.8, 14.8, 14.6, 18.0, 1.0, 1.0),
 ]
 
-#: Canvas edge in points. 22 is the macOS status-item size.
-CANVAS = 22.0
-#: Clear space between the ink and the canvas edge, in points. The menu bar
-#: crowds an icon that runs to its own edge.
-PADDING = 3.0
+#: Canvas edge in points. tray-icon pins the NSImage to 18 pt tall on macOS, so
+#: this is the size the glyph is drawn at whatever it is authored at.
+CANVAS = 18.0
+#: Clear space between the ink and the canvas edge, in points. AppKit already
+#: pads the status item; more than a hairline here only shrinks the glyph.
+PADDING = 1.0
 #: Samples per axis. 8x8 = 64 coverage samples per output pixel.
 SUPERSAMPLE = 8
 
@@ -79,7 +94,12 @@ def placement(edge):
     scale = min(available / (x1 - x0), available / (y1 - y0))
     dx = (edge - (x1 - x0) * scale) / 2.0 - x0 * scale
     dy = (edge - (y1 - y0) * scale) / 2.0 - y0 * scale
-    return scale, dx, dy
+    # Snap the ink to whole pixels. Centring lands the rules on a quarter-pixel
+    # phase, which spreads a 2 pt rule over three rows — one solid and two grey —
+    # and at 18 pt that grey is a third of the mark. Rounding the offset costs a
+    # quarter pixel of centring and buys rules with hard edges. This is the one
+    # hinting step the glyph needs; everything else it does is anti-aliasing.
+    return scale, round(dx), round(dy)
 
 
 def capsule_distance(px, py, x1, y1, x2, y2):
@@ -173,12 +193,28 @@ def write_png(path, edge, alpha):
         handle.write(png)
 
 
+def dump(edge):
+    """The alpha channel as text, for judging the glyph without a menu bar."""
+    ramp = " .:-=+*#%@"
+    alpha = coverage(edge)
+    return "\n".join(
+        "".join(ramp[min(9, alpha[y * edge + x] * 10 // 256)] for x in range(edge))
+        for y in range(edge)
+    )
+
+
 def main():
+    # Only the 2x art is written. tray-icon hands one PNG to `NSImage` and pins
+    # it to 18 pt; a second density is never read, and a file nothing loads is a
+    # file nobody keeps correct. 36 px is what a Retina bar wants, and AppKit
+    # down-samples it for a 1x one.
     out_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    for edge, name in ((22, "trayTemplate.png"), (44, "trayTemplate@2x.png")):
-        path = os.path.join(out_dir, name)
-        write_png(path, edge, coverage(edge))
-        print("wrote {} ({}x{})".format(path, edge, edge))
+    path = os.path.join(out_dir, "trayTemplate@2x.png")
+    write_png(path, 36, coverage(36))
+    print("wrote {} (36x36)".format(path))
+    # The 18 px raster is not written, only shown: it is the glyph at the size
+    # macOS draws it, and the only way to judge it on a headless machine.
+    print("\nalpha at 18 px (the pt size AppKit renders):\n" + dump(18))
 
 
 if __name__ == "__main__":

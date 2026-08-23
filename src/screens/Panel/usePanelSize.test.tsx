@@ -35,6 +35,12 @@ class ResizeObserverStub {
   disconnect() {}
 }
 
+/** jsdom's own `offsetHeight`, put back after each case. */
+const originalOffsetHeight = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "offsetHeight",
+) as PropertyDescriptor;
+
 /** Mounts the hook on a plain div — the card the panel attaches it to in the app. */
 function Card() {
   const ref = usePanelSize<HTMLDivElement>();
@@ -54,7 +60,12 @@ describe("usePanelSize", () => {
     });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    // The stub is installed on the prototype every other component in the suite
+    // shares; leaving a zero-height getter behind would follow them.
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", originalOffsetHeight);
+  });
 
   /** A 480 px window around a 300 px card is 180 px of dead space under the content. */
   it("sizes the window to the card it measured", () => {
