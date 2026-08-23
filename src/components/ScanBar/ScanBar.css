@@ -1,0 +1,17 @@
+.scan-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scan-bar__track {
+  width: 100%;
+}
+
+.scan-bar__fill {
+  transition: width 0.15s;
+}
+
+.scan-bar__status {
+  font-size: 12px;
+}

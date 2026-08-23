@@ -41,10 +41,42 @@ describe("Sidebar", () => {
     expect(getByRole("button", { name: /Prompts.*42/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /Rules.*27/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
-    expect(getByText("Projects")).toBeInTheDocument();
+    // Qualified by class: "Projects" is now both a nav destination and the
+    // heading of the recents list underneath it.
+    expect(getByText("Projects", { selector: ".sidebar__section-label" })).toBeInTheDocument();
   });
 
-  it("routes a project click to Prompts with the project id", () => {
+  it("lists Projects as a destination of its own, right after Setup", () => {
+    const { getAllByRole } = render(<Sidebar active="overview" onNavigate={() => {}} />);
+    const labels = getAllByRole("button").map((b) => b.textContent);
+    expect(labels).toContain("Projects");
+    expect(labels.indexOf("Projects")).toBe(labels.indexOf("Setup") + 1);
+  });
+
+  it("routes the Projects nav item to the projects table", () => {
+    const onNavigate = vi.fn();
+    const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
+    getByRole("button", { name: "Projects" }).click();
+    expect(onNavigate).toHaveBeenCalledWith("projects");
+  });
+
+  it("keeps Projects lit while one project's own page is open", () => {
+    // `project` is not a sidebar destination of its own (see `NAV_ITEMS`), so
+    // without this the whole nav goes dark the moment a project is opened.
+    const { getByRole } = render(<Sidebar active="project" onNavigate={() => {}} />);
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
+  });
+
+  it("keeps Prompts lit while one file's detail page is open", () => {
+    // `detail` is not a destination of its own either; it is opened from a
+    // file list, and Prompts is the list it belongs to.
+    const { getByRole } = render(<Sidebar active="detail" onNavigate={() => {}} />);
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Prompts");
+  });
+
+  it("routes a recent project to its own page", () => {
+    // The Projects table is the canonical list and each project has a page of
+    // its own now; a recent used to land on Prompts filtered to that project.
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({
       counts: {},
@@ -52,7 +84,7 @@ describe("Sidebar", () => {
     });
     const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
     getByRole("button", { name: /web-app/ }).click();
-    expect(onNavigate).toHaveBeenCalledWith("prompts", "/web-app");
+    expect(onNavigate).toHaveBeenCalledWith("project", "/web-app");
   });
 
   it("has no accessibility violations", async () => {

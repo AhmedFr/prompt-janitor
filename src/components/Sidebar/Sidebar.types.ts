@@ -20,7 +20,11 @@ export interface NavItem {
 
 /** A scanned project, rolled up for the sidebar's Projects list. */
 export interface SidebarProject {
-  /** Project id, used to deep-link into the Prompts screen. */
+  /**
+   * The project's root path, which is also its id everywhere else in the app
+   * — what a recent opens its project page by, and the same value the
+   * Projects table navigates with.
+   */
   id: string;
   /** Project name (the on-disk folder). */
   name: string;

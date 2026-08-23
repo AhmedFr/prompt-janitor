@@ -1,41 +1,78 @@
-.p-controls {
+/* Six columns and a path under every name; the default page caps at 920px. */
+.prompts-page {
+  max-width: 1100px;
+}
+
+/*
+ * Name over path. A project holds several files called `CLAUDE.md`, so the
+ * path is what tells the rows apart — small and monospaced (`PathCell`), so it
+ * reads as provenance rather than as a second name.
+ */
+.prompts-name {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
 }
-.p-select, .p-search {
-  font-size: 12px;
-  padding: 5px 9px;
-  border-radius: var(--r-ctrl);
+
+.prompts-name__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.prompts-name__file {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* The way out of this table into the project the row belongs to. */
+.prompts-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
   border: 0.5px solid var(--sep-strong);
-  background: #fff;
-  color: var(--text);
+  background: transparent;
+  color: var(--text-2);
+  white-space: nowrap;
+  cursor: pointer;
 }
-.p-search { min-width: 140px; }
 
-.p-chip {
-  font-size: 12px; padding: 4px 11px; border-radius: var(--r-pill);
-  border: 0.5px solid var(--sep-strong); background: #fff; color: var(--text-2); cursor: pointer;
+.prompts-chip:hover {
+  color: var(--blue);
+  border-color: var(--blue);
 }
-.p-chip--on { background: var(--blue); color: #fff; border-color: transparent; }
 
-.p-group { margin-bottom: 20px; border-radius: var(--r-card); transition: box-shadow 0.3s ease; }
-.p-group--hl { box-shadow: 0 0 0 2px var(--blue); }
-.p-group__head { display: flex; align-items: center; gap: 9px; padding: 4px 4px 10px; }
-.p-group__name { font-family: var(--font-display); font-weight: 600; font-size: 14px; }
-
-.p-row {
-  display: flex; align-items: center; gap: 11px; width: 100%;
-  padding: 10px 14px; border: none; background: transparent; text-align: left;
-  border-bottom: 0.5px solid var(--sep); cursor: pointer;
+.prompts-chip:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
 }
-.p-row:last-child { border-bottom: none; }
-.p-row:hover { background: var(--group); }
-.p-row__main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.p-row__name { font-size: 13px; font-weight: 500; }
-.p-row__path { font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.p-row__issues { font-size: 12px; color: var(--text-3); }
-.p-row__issues--bad { color: var(--red); font-weight: 500; }
-.p-row__age { width: 34px; text-align: right; }
+
+/*
+ * The unreadable state: a short column, left-aligned, so the retry sits
+ * directly under the sentence explaining what it retries. Mirrors the same
+ * panel on the Projects screen.
+ */
+.prompts-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.prompts-panel__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.prompts-panel__body {
+  max-width: 420px;
+  margin: 0;
+}

@@ -1,0 +1,110 @@
+/* Seven columns in the setup table need the width; the default page caps at 920px. */
+.project-page {
+  max-width: 1180px;
+}
+
+/* ---- effective rules ---- */
+
+.project-stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--sep);
+  border: 0.5px solid var(--sep-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.project-stack__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--card);
+  font-size: 13px;
+}
+
+.project-stack__step {
+  min-width: 18px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.project-stack__layer {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/*
+ * The project's own rules are the ones the reader can change from here, so
+ * they carry the accent; the layers above them stay neutral furniture.
+ */
+.project-stack__layer[data-layer="project"] {
+  border-color: var(--text-3);
+  color: var(--text);
+  background: var(--group);
+}
+
+.project-stack__name {
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Pushes the grade chip to the row's end, whatever the path's length. */
+.project-stack__item .dt-path {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---- setup table ---- */
+
+.project-kind {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* ---- usage ---- */
+
+.project-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.project-usage__chart-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* A note that explains an absence, not an error — muted, and never a wall of text. */
+.project-note {
+  margin: 0;
+  max-width: 520px;
+  font-size: 13px;
+}
+
+/*
+ * The absence *is* a failure: a read that did not answer, not a project with
+ * nothing in it. Takes the same contrast-measured error pair the missing-folder
+ * banner does, so the two failures read alike and neither reads as a finding.
+ */
+.project-note--error {
+  color: var(--tone-error-fg);
+}

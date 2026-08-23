@@ -22,6 +22,8 @@ export {
 } from "./DataTable";
 export { Tabs, useTabState } from "./Tabs";
 export { RankedList, rankRows } from "./RankedList";
+export { ScanBar } from "./ScanBar";
+export { TrendChart } from "./TrendChart";
 
 export type { GradeLetter, GradeSize, GradeProps } from "./Grade";
 export type { SourceId, SourceMeta, SourceBadgeProps } from "./SourceBadge";
@@ -41,3 +43,5 @@ export type {
   RankedListSelector,
   RankedListDetails,
 } from "./RankedList";
+export type { ScanBarProps } from "./ScanBar";
+export type { TrendChartProps, TrendDomainBound } from "./TrendChart";

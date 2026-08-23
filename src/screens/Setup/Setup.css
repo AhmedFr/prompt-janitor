@@ -28,17 +28,6 @@
   background: var(--group);
 }
 
-/* The same bar onboarding draws, for the same scan events. */
-.setup-scan {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.setup-scan__status {
-  font-size: 12px;
-}
-
 .setup-empty {
   display: flex;
   flex-direction: column;

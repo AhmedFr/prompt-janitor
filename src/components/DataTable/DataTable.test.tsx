@@ -790,4 +790,56 @@ describe("DataTable", () => {
     const { container } = setup({ loading: true, search: SEARCH, pills: PILLS });
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("applies an initial pill selection on mount", async () => {
+    setup({ pills: PILLS, initialPills: { kind: ["prompt"] } });
+
+    await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
+    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lets an initial pill selection beat the remembered one", async () => {
+    // A deep link names the slice it means; the remembered selection only
+    // decides where an unqualified visit lands.
+    window.sessionStorage.setItem(
+      "pj.table.deep-link",
+      JSON.stringify({ search: "", pills: { kind: ["rule"] }, sort: null }),
+    );
+
+    setup({ pills: PILLS, stateKey: "deep-link", initialPills: { kind: ["prompt"] } });
+
+    await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
+    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("re-applies when a new initial selection arrives", async () => {
+    const { rerender } = setup({ pills: PILLS, initialPills: { kind: ["prompt"] } });
+    await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
+
+    rerender(
+      <DataTable
+        columns={COLUMNS}
+        rows={ROWS}
+        rowId={(r) => r.id}
+        empty={{ title: "No artifacts yet" }}
+        stateKey="test"
+        ariaLabel="Artifacts"
+        pills={PILLS}
+        initialPills={{ kind: ["rule"] }}
+      />,
+    );
+
+    await waitFor(() => expect(rowNames()).toEqual(["Alpha", "Charlie"]));
+  });
+
+  it("leaves the remembered selection alone when no initial one is given", () => {
+    window.sessionStorage.setItem(
+      "pj.table.no-initial",
+      JSON.stringify({ search: "", pills: { kind: ["rule"] }, sort: null }),
+    );
+
+    setup({ pills: PILLS, stateKey: "no-initial" });
+
+    expect(rowNames()).toEqual(["Alpha", "Charlie"]);
+  });
 });

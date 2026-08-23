@@ -1,0 +1,48 @@
+/*
+ * A folder the harness remembers and the disk has lost: the one header state
+ * that is a problem rather than a measurement, so it is the only one that
+ * takes the error tone (the contrast-measured pair in `tokens.css`).
+ */
+.project-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--tone-error-fg);
+}
+
+.project-banner__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.project-banner__body {
+  margin: 3px 0 0;
+  max-width: 560px;
+  font-size: 12px;
+}
+
+.project-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.project-panel__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.project-panel__body {
+  max-width: 460px;
+  margin: 0;
+}
+
+.project-panel__actions {
+  display: flex;
+  gap: 8px;
+}

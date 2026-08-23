@@ -1,7 +1,7 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
 import type { SidebarProps } from "./Sidebar.types";
-import { NAV_ITEMS } from "./Sidebar.constants";
+import { NAV_ITEMS, NAV_OWNER } from "./Sidebar.constants";
 import { useSidebar } from "./useSidebar";
 
 export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
@@ -21,7 +21,7 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
 
       <nav className="sidebar__nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
-          const isActive = active === item.route;
+          const isActive = (NAV_OWNER[active] ?? active) === item.route;
           const count = counts[item.route];
           return (
             <button
@@ -48,7 +48,11 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
                 key={project.id}
                 type="button"
                 className="sidebar__item sidebar__item--project"
-                onClick={() => onNavigate("prompts", project.id)}
+                // The project's own page, not the files table filtered to it:
+                // the page answers the questions a recent project is opened
+                // for (grade, load order, what ran here), and its Rules tab
+                // holds the files anyway.
+                onClick={() => onNavigate("project", project.id)}
               >
                 <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>

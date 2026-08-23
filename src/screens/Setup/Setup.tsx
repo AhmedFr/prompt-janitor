@@ -3,15 +3,11 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
+import { ScanBar } from "@/components/ScanBar";
 import { Tabs, useTabState, type TabItem } from "@/components/Tabs";
 import { isTauri, type ArtifactKind, type ArtifactView, type HarnessInfo, type SetupView } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
-import {
-  scanPercent,
-  scanStatusLine,
-  useScanProgress,
-  type ScanProgress,
-} from "@/lib/useScanProgress";
+import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
 import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
 import { pillsFor } from "./setup.pills";
@@ -102,23 +98,6 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
 /** Whose sessions the scan is indexing right now, for the phase line. */
 function harnessName(detected: HarnessInfo[]): string {
   return detected[0]?.display_name ?? "agent";
-}
-
-/**
- * The same bar onboarding shows, for the same events. A rescan that only
- * greys out a button leaves a long scan indistinguishable from a hang.
- */
-function ScanBar({ progress, status }: { progress: ScanProgress | null; status: string }) {
-  return (
-    <Card padded>
-      <div className="setup-scan">
-        <div className="bar" style={{ width: "100%" }}>
-          <i style={{ width: `${scanPercent(progress)}%`, transition: "width .15s" }} />
-        </div>
-        <div className="faint tnum setup-scan__status">{status}</div>
-      </div>
-    </Card>
-  );
 }
 
 /** The query failed — say so rather than spinning, and offer the one retry there is. */

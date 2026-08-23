@@ -1,0 +1,59 @@
+/* Nine columns need the width; the default page caps at 920px. */
+.projects-page {
+  max-width: 1180px;
+}
+
+.projects-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.projects-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 0.5px solid var(--sep-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/*
+ * A folder the harness remembers and the disk has lost: the one row state on
+ * this table that is a problem rather than a measurement, so it is the only
+ * one that takes the error tone — the same opaque, contrast-measured pair
+ * `UsageBadge` uses (see `tokens.css`).
+ */
+.projects-chip--missing {
+  border-color: transparent;
+  color: var(--tone-error-fg);
+  background: var(--tone-error-tint);
+}
+
+/*
+ * The unreadable state: a short column, left-aligned, so the retry sits
+ * directly under the sentence explaining what it retries. Mirrors the same
+ * panel on the Setup screen.
+ */
+.projects-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.projects-panel__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.projects-panel__body {
+  max-width: 420px;
+  margin: 0;
+}
