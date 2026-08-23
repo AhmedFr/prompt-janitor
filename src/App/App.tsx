@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/Sidebar";
 import { Onboarding } from "@/components/Onboarding";
 import { Overview } from "@/screens/Overview";
@@ -12,10 +13,11 @@ import { Analytics } from "@/screens/Analytics";
 import { Rules } from "@/screens/Rules";
 import { RulesNew } from "@/screens/RulesNew";
 import { Settings } from "@/screens/Settings";
-import { isTauri, type ArtifactKind } from "@/lib/ipc";
+import { isTauri, type ArtifactKind, type NavigateEvent } from "@/lib/ipc";
 // Deep import, not the screen barrel: this is the tab strip's own id list,
 // and the barrel would pull the whole Setup screen in behind it.
 import { KIND_TABS } from "@/screens/Setup/setup.columns";
+import { isRoute } from "./App.constants";
 import type { Route } from "./App.types";
 
 const ONBOARDED_KEY = "pj-onboarded";
@@ -62,6 +64,21 @@ export function App() {
     // which kind of rule the form starts on.
     if (next === "rules-new") setRulesNewTarget(target);
   }, []);
+
+  // The menu-bar panel is a window of its own with no router: a row clicked
+  // there raises this window and sends the destination over as an event.
+  // Deliberately not gated on `isTauri` — this is the shell's own listener,
+  // and outside the desktop runtime `listen` rejects, which the catch absorbs.
+  useEffect(() => {
+    const unlisten = listen<NavigateEvent>("navigate", ({ payload }) => {
+      // The route crossed a window boundary as a bare string: a stale link or
+      // a typo would otherwise blank the shell by matching no screen at all.
+      if (isRoute(payload.route)) navigate(payload.route, payload.target ?? undefined);
+    }).catch(() => () => {});
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [navigate]);
 
   const finishOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, "done");

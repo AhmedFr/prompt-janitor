@@ -1,0 +1,76 @@
+/* The panel window is transparent so the card's rounded corners show the
+   desktop through them. Scoped to the class `main.tsx` sets on the panel
+   window's root element — the main window keeps its own background. */
+html.panel-window,
+html.panel-window body {
+  background: transparent;
+}
+
+/* The card is positioned against the panel window's root rather than the
+   viewport, so a story can render it at the window's real size. */
+html.panel-window #root {
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  /* A small inset all round: the window's own corners stay see-through, which
+     is what makes the card read as a popover rather than as a rectangle. */
+  inset: 4px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--sep);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-pop);
+}
+
+.panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.panel__failure {
+  padding: 18px 16px;
+}
+
+.panel__failure-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.panel__failure-body {
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+.panel__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 14px;
+}
+
+.panel__skeleton {
+  background: var(--group);
+  border-radius: var(--r-ctrl);
+}
+
+.panel__skeleton--ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.panel__skeleton--line {
+  height: 12px;
+  width: 100%;
+}
+
+.panel__skeleton--short {
+  width: 55%;
+}

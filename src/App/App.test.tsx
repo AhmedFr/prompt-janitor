@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, act } from "@testing-library/react";
+import { render, cleanup, screen, act, waitFor } from "@testing-library/react";
+import type { NavigateEvent } from "@/lib/ipc";
 import type { Navigate } from "./App.types";
 import { App } from "./App";
 
@@ -37,6 +38,23 @@ vi.mock("@/lib/ipc", async () => {
   return { ...actual, isTauri: false, commands: {} };
 });
 
+// One handler registry per test so a case can emit `navigate` like the panel does.
+const listeners = vi.hoisted(() => new Map<string, (event: unknown) => void>());
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((event: string, handler: (payload: unknown) => void) => {
+    listeners.set(event, handler);
+    return Promise.resolve(() => listeners.delete(event));
+  }),
+}));
+
+/** The panel's `open_main` arrives here: a route and an optional target. */
+const emitNavigate = async (payload: NavigateEvent) => {
+  await waitFor(() => expect(listeners.has("navigate")).toBe(true));
+  await act(async () => {
+    listeners.get("navigate")?.({ payload });
+  });
+};
+
 /** The props a stubbed screen was rendered with. */
 const propsOf = (testid: string): Record<string, unknown> =>
   JSON.parse(screen.getByTestId(testid).getAttribute("data-props") ?? "{}");
@@ -47,6 +65,7 @@ const go = (route: Parameters<Navigate>[0], target?: string) =>
 describe("App", () => {
   beforeEach(() => {
     nav.current = null;
+    listeners.clear();
     sessionStorage.clear();
   });
 
@@ -121,5 +140,36 @@ describe("App", () => {
     go("overview");
     go("detail");
     expect(propsOf("detail").fileId).toBe("/code/web-app/CLAUDE.md");
+  });
+
+  /**
+   * The menu-bar panel is its own window with no router: a row clicked there
+   * raises this window and sends the destination over as an event.
+   */
+  it("follows a `navigate` event from the panel, target and all", async () => {
+    render(<App />);
+    await emitNavigate({ route: "detail", target: "/code/acme-api/CLAUDE.md" });
+    expect(screen.getByTestId("detail")).toBeInTheDocument();
+    expect(propsOf("detail").fileId).toBe("/code/acme-api/CLAUDE.md");
+  });
+
+  it("follows a targetless `navigate` event", async () => {
+    render(<App />);
+    await emitNavigate({ route: "analytics", target: null });
+    expect(screen.getByTestId("analytics")).toBeInTheDocument();
+  });
+
+  /** The route crosses a window boundary as a bare string; a typo must not blank the shell. */
+  it("ignores a `navigate` event naming a route that does not exist", async () => {
+    render(<App />);
+    await emitNavigate({ route: "not-a-route", target: null });
+    expect(screen.getByTestId("overview")).toBeInTheDocument();
+  });
+
+  it("stops listening for `navigate` once unmounted", async () => {
+    const view = render(<App />);
+    await waitFor(() => expect(listeners.has("navigate")).toBe(true));
+    view.unmount();
+    await waitFor(() => expect(listeners.has("navigate")).toBe(false));
   });
 });
