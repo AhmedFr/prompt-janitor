@@ -17,6 +17,10 @@ const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
   ...o,
 });
 
+/**
+ * Mirrors `list_rules` (`src-tauri/src/query.rs`): built-in *pattern* rules
+ * are Rust code, so they carry no pattern and no row action at all.
+ */
 const builtIn: RuleInfo[] = [
   rule({
     id: "b1",
@@ -24,7 +28,6 @@ const builtIn: RuleInfo[] = [
     description: "A prompt that names your chat tool ages the moment you switch.",
     severity: "hi",
     hit_count: 7,
-    pattern: "slack",
   }),
   rule({
     id: "b2",
@@ -33,7 +36,6 @@ const builtIn: RuleInfo[] = [
     source: "openai",
     severity: "hi",
     hit_count: 4,
-    pattern: "output format",
   }),
   rule({
     id: "b3",
@@ -42,7 +44,6 @@ const builtIn: RuleInfo[] = [
     source: "karpathy",
     severity: "mid",
     hit_count: 2,
-    pattern: "as an ai",
   }),
   rule({
     id: "b4",
@@ -51,25 +52,21 @@ const builtIn: RuleInfo[] = [
     source: "cursor",
     severity: "lo",
     enabled: false,
-    hit_count: 0,
-    pattern: "  \n",
   }),
   rule({
     id: "b5",
     title: "Name the tools it may call",
     description: "An unbounded tool list is an unbounded bill.",
-    source: "anthropic",
     severity: "mid",
-    hit_count: 0,
-    pattern: "tools",
   }),
 ];
 
+/** Everything the user made: `custom`, with a pattern, so both actions apply. */
 const custom: RuleInfo[] = [
   rule({
     id: "c1",
     title: "Never say synergy",
-    description: "House style.",
+    description: "Flags prompts containing “synergy”.",
     source: "custom",
     custom: true,
     severity: "lo",
@@ -79,7 +76,7 @@ const custom: RuleInfo[] = [
   rule({
     id: "c2",
     title: "No internal hostnames",
-    description: "Anything on the corp domain must not reach a prompt file.",
+    description: "Flags prompts containing “corp.internal”.",
     source: "custom",
     custom: true,
     severity: "hi",
@@ -88,28 +85,30 @@ const custom: RuleInfo[] = [
   }),
 ];
 
+/**
+ * Both kinds of standard side by side: the shipped one can only be copied, the
+ * user's own can be copied *and* deleted — which is the row-driven actions
+ * column doing the thing a tab-driven one got wrong.
+ */
 const standards: RuleInfo[] = [
   rule({
     id: "n1",
     title: "Defines an explicit output format",
-    description: "Judged per file by your AI provider.",
-    source: "custom",
-    custom: true,
-    nl: true,
+    description: "Must define an explicit output format",
     severity: "hi",
+    nl: true,
     hit_count: 5,
     pattern: "Must define an explicit output format",
   }),
   rule({
     id: "n2",
     title: "Says what to do when it is unsure",
-    description: "A prompt with no escape hatch invents one.",
+    description: "AI rule — Must say what to do when the answer is not known",
     source: "custom",
     custom: true,
     nl: true,
     severity: "mid",
     enabled: false,
-    hit_count: 0,
     pattern: "Must say what to do when the answer is not known",
   }),
 ];

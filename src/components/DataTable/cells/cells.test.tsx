@@ -157,15 +157,6 @@ describe("ActionsCell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(onRowClick).not.toHaveBeenCalled();
   });
-
-  it("disables an action there is nothing to do, and never fires it", () => {
-    const onClick = vi.fn();
-    render(<ActionsCell actions={[{ label: "Copy pattern", icon: "layers", onClick, disabled: true }]} />);
-    const button = screen.getByRole("button", { name: "Copy pattern" });
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(onClick).not.toHaveBeenCalled();
-  });
 });
 
 describe("cells accessibility", () => {

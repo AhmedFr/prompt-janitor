@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
@@ -10,16 +10,19 @@ import {
   ADD_RULE_LABEL,
   AI_NOTE_NO_PROVIDER,
   AI_NOTE_READY,
+  COPY_FAILED,
+  COPY_OK,
   EMPTY_HINT,
   EMPTY_TITLE,
   FAILED_BODY,
   FAILED_RETRY,
   FAILED_TITLE,
   HIGHLIGHT_KEY,
-  IMPORT_MSG_MS,
   IMPORT_PACK_LABEL,
   SEARCH_PLACEHOLDER,
+  STATUS_MSG_MS,
   TAB_IDS,
+  TAB_LABELS,
   TAB_STATE_KEY,
   TABLE_STATE_PREFIX,
 } from "./Rules.constants";
@@ -51,8 +54,7 @@ const SEARCH: DataTableSearch<RuleInfo> = {
 /** The one row `/rules/new` asked us to land on, consumed on the way past. */
 function takeHighlight(): string | undefined {
   try {
-    const id = window.sessionStorage.getItem(HIGHLIGHT_KEY);
-    return id ?? undefined;
+    return window.sessionStorage.getItem(HIGHLIGHT_KEY) ?? undefined;
   } catch {
     // Storage access denied (private-mode restrictions) — no highlight, no harm.
     return undefined;
@@ -65,11 +67,6 @@ function forgetHighlight(): void {
   } catch {
     // Nothing to clean up if we could not read it in the first place.
   }
-}
-
-/** Guarded because a non-browser renderer (jsdom, Storybook's node pass) has no clipboard. */
-function copyPattern(pattern: string): void {
-  void navigator.clipboard?.writeText?.(pattern);
 }
 
 /** `active` comes back from `Tabs`/`useTabState` as a string; this narrows it without a cast. */
@@ -107,26 +104,41 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
     if (highlight) forgetHighlight();
   }, [highlight]);
 
-  const [importMsg, setImportMsg] = useState<string | null>(null);
-  const { importPack } = state;
+  const status = useStatusLine();
+  const { say } = status;
+  const { importPack, toggle, deleteRule } = state;
+
   const doImport = useCallback(async () => {
     const n = await importPack();
-    if (n > 0) {
-      setImportMsg(`Imported ${n} rule${n === 1 ? "" : "s"}`);
-      window.setTimeout(() => setImportMsg(null), IMPORT_MSG_MS);
-    }
-  }, [importPack]);
+    if (n > 0) say(`Imported ${n} rule${n === 1 ? "" : "s"}`);
+  }, [importPack, say]);
 
-  // Identity-stable so `columnsFor`'s per-`ctx` cache can hit; the hook's own
-  // callbacks already are, so this object is rebuilt only if they change.
-  const { toggle, deleteRule } = state;
+  const copy = useCallback(
+    (pattern: string) => {
+      // Guarded because a non-browser renderer (jsdom, Storybook's node pass)
+      // has no clipboard — and a copy that quietly did nothing is worse than
+      // one that says it could not.
+      const written = navigator.clipboard?.writeText?.(pattern);
+      if (!written) {
+        say(COPY_FAILED);
+        return;
+      }
+      written.then(() => say(COPY_OK)).catch(() => say(COPY_FAILED));
+    },
+    [say],
+  );
+
+  // Identity-stable so `columnsFor`'s per-`ctx` cache can hit; every callback
+  // it closes over is stable, so this object is built once.
   const ctx = useMemo<RuleColumnsCtx>(
     () => ({
+      // `void` is honest here and only here: `useRules` documents that none of
+      // its actions reject — each reports its own failure through `error`.
       toggle: (id, enabled) => void toggle(id, enabled),
       onDelete: (id) => void deleteRule(id),
-      onCopy: copyPattern,
+      onCopy: copy,
     }),
-    [toggle, deleteRule],
+    [toggle, deleteRule, copy],
   );
 
   return (
@@ -156,21 +168,19 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
                       highlight={highlight}
                       toolbarRight={
                         <>
-                          {importMsg && (
-                            <span className="rules-import-msg" role="status">
-                              {importMsg}
-                            </span>
-                          )}
+                          {/* Always present, empty or not: a live region that
+                              appears only once it has something to say has
+                              nothing for assistive tech to be watching. A
+                              write that failed outranks a copy that worked. */}
+                          <span className="rules-status" role="status">
+                            {state.error ?? status.message ?? ""}
+                          </span>
                           {tab === "builtin" && (
                             <Button size="sm" onClick={() => void doImport()}>
                               <Icon name="plus" /> {IMPORT_PACK_LABEL}
                             </Button>
                           )}
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => navigate("rules-new", tab)}
-                          >
+                          <Button variant="primary" size="sm" onClick={() => navigate("rules-new", tab)}>
                             <Icon name="plus" /> {ADD_RULE_LABEL}
                           </Button>
                         </>
@@ -185,6 +195,27 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
       </div>
     </section>
   );
+}
+
+/**
+ * A transient sentence in the toolbar's live region, cleared after
+ * {@link STATUS_MSG_MS}. The timer is owned rather than fired and forgotten:
+ * one that outlives the screen sets state on an unmounted component, and one
+ * that isn't reset lets an old message cut a new one short.
+ */
+function useStatusLine(): { message: string | null; say: (message: string) => void } {
+  const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+
+  const say = useCallback((next: string) => {
+    setMessage(next);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setMessage(null), STATUS_MSG_MS);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  return { message, say };
 }
 
 /**
@@ -214,9 +245,9 @@ function RuleTable({
 
   return (
     <DataTable
-      ariaLabel={`${tab} rules`}
+      ariaLabel={`${TAB_LABELS[tab]} rules`}
       stateKey={TABLE_STATE_PREFIX + tab}
-      columns={columnsFor(tab, ctx)}
+      columns={columnsFor(ctx)}
       rows={rows}
       rowId={rowId}
       search={SEARCH}

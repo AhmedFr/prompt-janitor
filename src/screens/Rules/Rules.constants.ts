@@ -7,6 +7,12 @@ export const RULE_TABS: { id: RuleTabId; label: string }[] = [
   { id: "ai", label: "AI standards" },
 ];
 
+/** Tab id -> the label the strip shows, so a table's accessible name reads the way its tab does. */
+export const TAB_LABELS: Record<RuleTabId, string> = RULE_TABS.reduce(
+  (acc, tab) => ({ ...acc, [tab.id]: tab.label }),
+  {} as Record<RuleTabId, string>,
+);
+
 /** Every tab id, for `useTabState` to resolve a remembered (or passed-in) one against. */
 export const TAB_IDS: RuleTabId[] = RULE_TABS.map((tab) => tab.id);
 
@@ -63,5 +69,18 @@ export const FAILED_BODY =
   "The rule list query failed. This is usually a scan still holding the database — try again.";
 export const FAILED_RETRY = "Try again";
 
-/** How long the import result stays on screen before it stops being news, in ms. */
-export const IMPORT_MSG_MS = 4000;
+/** How long a status line stays on screen before it stops being news, in ms. */
+export const STATUS_MSG_MS = 4000;
+
+/** Clipboard outcomes. Both are said out loud: a copy that silently failed is worse than one that says so. */
+export const COPY_OK = "Pattern copied";
+export const COPY_FAILED = "Couldn't copy";
+
+/**
+ * Mutations are applied optimistically, so a failure has to be both undone
+ * *and* announced — a switch that quietly springs back reads as a bug in the
+ * switch rather than as a write that did not land.
+ */
+export const TOGGLE_FAILED = "Could not change that rule — try again.";
+export const DELETE_FAILED = "Could not delete that rule — try again.";
+export const IMPORT_FAILED = "Could not import that pack — try again.";

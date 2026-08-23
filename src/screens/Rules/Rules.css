@@ -70,17 +70,22 @@
 }
 
 /*
- * Import result, alongside the toolbar buttons that produced it. Reads in
+ * The toolbar's live region — copy result, import result, or a write that did
+ * not land. Always in the DOM, so it collapses to nothing when empty. Reads in
  * `--text-2` rather than `--green`: the palette's only green (#2fb457) is a
- * fill colour and reaches ~2.7:1 as 12px text, and a success message nobody
- * can read is not a success message. The switch below is where the green
- * belongs — as a background, where its contrast is measured against the
- * white thumb.
+ * fill colour and reaches ~2.7:1 as 12px text, and a message nobody can read
+ * is not a message. The switch is where that green belongs — as a background,
+ * measured against the white thumb.
  */
-.rules-import-msg {
+.rules-status {
   font-size: 12px;
   color: var(--text-2);
   align-self: center;
+  text-align: right;
+}
+
+.rules-status:empty {
+  display: none;
 }
 
 /*

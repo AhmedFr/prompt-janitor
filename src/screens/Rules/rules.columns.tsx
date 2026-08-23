@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { ActionsCell, type PillGroup } from "@/components/DataTable";
+import { ActionsCell, type PillGroup, type RowAction } from "@/components/DataTable";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SOURCES, SourceBadge } from "@/components/SourceBadge";
 import type { RuleInfo, Severity, Source } from "@/lib/ipc";
@@ -143,12 +143,18 @@ function hitsColumn(): ColumnDef<RuleInfo, unknown> {
 }
 
 /**
- * A custom rule can be removed; a shipped one cannot, so the useful thing to
- * offer there is the pattern itself — the one part of a rule the table has
- * nowhere to print. Disabled rather than dropped when there is no pattern (a
- * built-in NL standard), so the column keeps one button per row.
+ * Built from the *row*, never from the tab it happens to be sitting on. The
+ * two are not the same question: a natural-language standard the user wrote
+ * (`custom && nl`) lands on the AI tab and is still theirs to delete, and a
+ * tab-driven column would have silently taken that away.
+ *
+ * What a row can offer is exactly what it carries. `list_rules`
+ * (`query.rs`) gives built-in *pattern* rules `pattern: null` — they are Rust
+ * code, not text — so those rows have nothing to copy and nothing to remove,
+ * and get no button at all. A greyed-out button on every built-in row would
+ * be a column of furniture claiming an action that does not exist for them.
  */
-function actionsColumn(tab: RuleTabId, ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown> {
+function actionsColumn(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown> {
   return {
     id: "actions",
     header: "Actions",
@@ -156,70 +162,53 @@ function actionsColumn(tab: RuleTabId, ctx: RuleColumnsCtx): ColumnDef<RuleInfo,
     meta: { align: "right" },
     cell: (c) => {
       const rule = c.row.original;
-      if (tab === "custom") {
-        return (
-          <ActionsCell
-            actions={[{ label: `Delete ${rule.title}`, icon: "x", onClick: () => ctx.onDelete(rule.id) }]}
-          />
-        );
-      }
+      const actions: RowAction[] = [];
+      // Bound outside the closure so the null check narrows it.
       const pattern = rule.pattern;
-      return (
-        <ActionsCell
-          actions={[
-            {
-              label: `Copy pattern ${rule.title}`,
-              icon: "layers",
-              disabled: pattern === null,
-              onClick: () => {
-                if (pattern !== null) ctx.onCopy(pattern);
-              },
-            },
-          ]}
-        />
-      );
+      if (pattern !== null) {
+        actions.push({
+          // Every button in a column of identical icons needs its own name.
+          label: `Copy pattern for ${rule.title}`,
+          icon: "layers",
+          onClick: () => ctx.onCopy(pattern),
+        });
+      }
+      if (rule.custom) {
+        actions.push({ label: `Delete ${rule.title}`, icon: "x", onClick: () => ctx.onDelete(rule.id) });
+      }
+      return actions.length > 0 ? <ActionsCell actions={actions} /> : null;
     },
   };
 }
 
-function buildColumns(tab: RuleTabId, ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown>[] {
-  return [
-    enabledColumn(ctx),
-    titleColumn(),
-    sourceColumn(),
-    severityColumn(),
-    hitsColumn(),
-    actionsColumn(tab, ctx),
-  ];
+function buildColumns(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown>[] {
+  return [enabledColumn(ctx), titleColumn(), sourceColumn(), severityColumn(), hitsColumn(), actionsColumn(ctx)];
 }
 
 /**
  * Identity-stable across calls with the *same* `ctx` object — cached in a
- * `WeakMap<ctx, Map<tab, defs>>`, exactly as `columnsFor` does on the Setup
- * screen and for the same reason: `DataTable` memoises its column model,
- * filtered set and chip counts on this array's identity (see
- * `DataTableProps`), so a screen re-rendering on every keystroke must not
- * hand it a fresh array each time. The screen has to memoise `ctx` for the
- * cache to ever hit, and must replace it rather than mutate it — a mutated
- * `ctx` would leave every cached column reading stale closures.
+ * `WeakMap`, exactly as `columnsFor` does on the Setup screen and for the same
+ * reason: `DataTable` memoises its column model, filtered set and chip counts
+ * on this array's identity (see `DataTableProps`), so a screen re-rendering on
+ * every keystroke must not hand it a fresh array each time. The screen has to
+ * memoise `ctx` for the cache to ever hit, and must replace it rather than
+ * mutate it — a mutated `ctx` would leave every cached column reading stale
+ * closures.
+ *
+ * One set of defs for all three tabs, because a row's actions come from the
+ * row: nothing here varies by tab any more.
  *
  * `RuleInfo` carries no dimension, so there is no Dimension column here
  * despite spec §4.3 listing one; inventing a value would be worse than the
  * gap.
  */
-const columnsCache = new WeakMap<RuleColumnsCtx, Map<RuleTabId, ColumnDef<RuleInfo, unknown>[]>>();
+const columnsCache = new WeakMap<RuleColumnsCtx, ColumnDef<RuleInfo, unknown>[]>();
 
-export function columnsFor(tab: RuleTabId, ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown>[] {
-  let byTab = columnsCache.get(ctx);
-  if (!byTab) {
-    byTab = new Map();
-    columnsCache.set(ctx, byTab);
-  }
-
-  let defs = byTab.get(tab);
+export function columnsFor(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown>[] {
+  let defs = columnsCache.get(ctx);
   if (!defs) {
-    defs = buildColumns(tab, ctx);
-    byTab.set(tab, defs);
+    defs = buildColumns(ctx);
+    columnsCache.set(ctx, defs);
   }
   return defs;
 }

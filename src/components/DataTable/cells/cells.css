@@ -55,15 +55,9 @@
   cursor: pointer;
 }
 
-.dt-actions__btn:hover:not(:disabled) {
+.dt-actions__btn:hover {
   background: var(--group);
   color: var(--text);
-}
-
-/* Present but inert — the row has nothing for this action to work on. */
-.dt-actions__btn:disabled {
-  opacity: 0.35;
-  cursor: default;
 }
 
 .dt-actions__btn:focus-visible {

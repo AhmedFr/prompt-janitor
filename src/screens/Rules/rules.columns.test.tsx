@@ -24,7 +24,9 @@ const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
   enabled: true,
   custom: false,
   nl: false,
-  pattern: "slack",
+  // `list_rules` (query.rs) gives built-in pattern rules no pattern — they are
+  // Rust code, not text — so the default fixture carries none either.
+  pattern: null,
   hit_count: 0,
   ...o,
 });
@@ -39,15 +41,15 @@ const ctx = (o: Partial<RuleColumnsCtx> = {}): RuleColumnsCtx => ({
 let mountCount = 0;
 
 /**
- * Mounts a real `DataTable` with one tab's column defs — the only faithful
+ * Mounts a real `DataTable` with the rule column defs — the only faithful
  * way to see what a cell renders. `stateKey` is suffixed with a counter so
  * each render gets its own `sessionStorage` slot.
  */
-function mount(tab: "builtin" | "custom" | "ai", rows: RuleInfo[], context = ctx()) {
+function mount(rows: RuleInfo[], context = ctx()) {
   mountCount += 1;
   return render(
     <DataTable
-      columns={columnsFor(tab, context)}
+      columns={columnsFor(context)}
       rows={rows}
       rowId={(r) => r.id}
       empty={{ title: "Nothing here" }}
@@ -124,7 +126,7 @@ describe("tabItems", () => {
 
 describe("columnsFor", () => {
   it("lists the rule columns in spec order", () => {
-    expect(columnsFor("builtin", ctx()).map((c) => c.id)).toEqual([
+    expect(columnsFor(ctx()).map((c) => c.id)).toEqual([
       "enabled",
       "title",
       "source",
@@ -135,7 +137,7 @@ describe("columnsFor", () => {
   });
 
   it("headers the columns the way the spec names them", () => {
-    expect(columnsFor("builtin", ctx()).map((c) => c.header)).toEqual([
+    expect(columnsFor(ctx()).map((c) => c.header)).toEqual([
       "Enabled",
       "Title",
       "Source",
@@ -145,78 +147,98 @@ describe("columnsFor", () => {
     ]);
   });
 
-  it("is identity-stable per tab for the same ctx, so DataTable's memos hold", () => {
+  it("is identity-stable for the same ctx, so DataTable's memos hold", () => {
     const context = ctx();
-    expect(columnsFor("builtin", context)).toBe(columnsFor("builtin", context));
-    expect(columnsFor("builtin", context)).not.toBe(columnsFor("custom", context));
-    expect(columnsFor("builtin", context)).not.toBe(columnsFor("builtin", ctx()));
+    // One set of defs for all three tabs: a row's actions come from the row.
+    expect(columnsFor(context)).toBe(columnsFor(context));
+    expect(columnsFor(context)).not.toBe(columnsFor(ctx()));
   });
 
   it("renders the enabled state as a switch named after its rule", () => {
-    mount("builtin", [rule({ title: "No Slack references", enabled: true })]);
+    mount([rule({ title: "No Slack references", enabled: true })]);
     const toggle = screen.getByRole("switch", { name: "Enable No Slack references" });
     expect(toggle).toBeChecked();
   });
 
   it("toggles a rule off through its switch", () => {
     const toggle = vi.fn();
-    mount("builtin", [rule({ id: "r7", title: "Be terse", enabled: true })], ctx({ toggle }));
+    mount([rule({ id: "r7", title: "Be terse", enabled: true })], ctx({ toggle }));
     fireEvent.click(screen.getByRole("switch", { name: "Enable Be terse" }));
     expect(toggle).toHaveBeenCalledWith("r7", false);
   });
 
   it("toggles a disabled rule back on through its switch", () => {
     const toggle = vi.fn();
-    mount("builtin", [rule({ id: "r7", title: "Be terse", enabled: false })], ctx({ toggle }));
+    mount([rule({ id: "r7", title: "Be terse", enabled: false })], ctx({ toggle }));
     fireEvent.click(screen.getByRole("switch", { name: "Enable Be terse" }));
     expect(toggle).toHaveBeenCalledWith("r7", true);
   });
 
   it("renders the title with its description muted beside it", () => {
-    mount("builtin", [rule({ title: "No Slack", description: "Flags any file mentioning Slack." })]);
+    mount([rule({ title: "No Slack", description: "Flags any file mentioning Slack." })]);
     expect(bodyRows()[0][1]).toContain("No Slack");
     expect(bodyRows()[0][1]).toContain("Flags any file mentioning Slack.");
   });
 
   it("renders the source as its attribution badge", () => {
-    mount("builtin", [rule({ source: "karpathy" })]);
+    mount([rule({ source: "karpathy" })]);
     expect(screen.getByText("Karpathy")).toBeInTheDocument();
   });
 
   it("renders the severity as a dot plus its word", () => {
-    mount("builtin", [rule({ severity: "hi" })]);
+    mount([rule({ severity: "hi" })]);
     // The dot carries the accessible name; the label is the visible text.
     expect(screen.getAllByRole("img", { name: "Critical" })).toHaveLength(1);
     expect(bodyRows()[0][3]).toContain("Critical");
   });
 
   it("renders the open-issue count this rule is responsible for", () => {
-    mount("builtin", [rule({ hit_count: 14 })]);
+    mount([rule({ hit_count: 14 })]);
     expect(bodyRows()[0][4]).toBe("14");
   });
 
   it("offers Delete on a custom rule, named after it", () => {
     const onDelete = vi.fn();
-    mount("custom", [rule({ id: "c1", title: "Never say Slack", custom: true })], ctx({ onDelete }));
+    mount([rule({ id: "c1", title: "Never say Slack", custom: true, pattern: "slack" })], ctx({ onDelete }));
     fireEvent.click(screen.getByRole("button", { name: "Delete Never say Slack" }));
     expect(onDelete).toHaveBeenCalledWith("c1");
   });
 
-  it("offers Copy pattern — not Delete — on a rule the user cannot remove", () => {
-    const onCopy = vi.fn();
-    mount("builtin", [rule({ title: "No Slack", pattern: "slack" })], ctx({ onCopy }));
-    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Copy pattern No Slack" }));
-    expect(onCopy).toHaveBeenCalledWith("slack");
+  it("offers both copy and delete on a custom pattern rule", () => {
+    mount([rule({ id: "c1", title: "Never say Slack", custom: true, pattern: "slack" })]);
+    expect(screen.getByRole("button", { name: "Copy pattern for Never say Slack" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Never say Slack" })).toBeInTheDocument();
   });
 
-  it("disables Copy pattern when the rule carries no pattern to copy", () => {
+  it("still offers Delete on a natural-language standard the user wrote", () => {
+    // The row that a tab-driven actions column got wrong: `custom && nl` lands
+    // on the AI tab and is still the user's to remove.
+    const onDelete = vi.fn();
+    mount(
+      [rule({ id: "n2", title: "Names its escape hatch", custom: true, nl: true, pattern: "Must say…" })],
+      ctx({ onDelete }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete Names its escape hatch" }));
+    expect(onDelete).toHaveBeenCalledWith("n2");
+  });
+
+  it("offers Copy pattern — not Delete — on a built-in standard the user cannot remove", () => {
     const onCopy = vi.fn();
-    mount("ai", [rule({ title: "Has an output format", nl: true, pattern: null })], ctx({ onCopy }));
-    const button = screen.getByRole("button", { name: "Copy pattern Has an output format" });
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(onCopy).not.toHaveBeenCalled();
+    mount(
+      [rule({ title: "Has an output format", nl: true, pattern: "Must define an explicit output format" })],
+      ctx({ onCopy }),
+    );
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Copy pattern for Has an output format" }));
+    expect(onCopy).toHaveBeenCalledWith("Must define an explicit output format");
+  });
+
+  it("offers no action at all on a built-in pattern rule — nothing to copy, nothing to remove", () => {
+    mount([rule({ title: "No Slack", custom: false, nl: false, pattern: null })]);
+    expect(screen.queryByRole("button", { name: /^Copy pattern/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+    // The Actions cell is present and empty, not missing.
+    expect(bodyRows()[0][5]).toBe("");
   });
 });
 
@@ -226,7 +248,7 @@ describe("DEFAULT_SORT", () => {
   });
 
   it("orders critical above warning above nit", () => {
-    mount("builtin", [
+    mount([
       rule({ id: "lo", title: "nit", severity: "lo", description: "" }),
       rule({ id: "hi", title: "critical", severity: "hi", description: "" }),
       rule({ id: "mid", title: "warning", severity: "mid", description: "" }),

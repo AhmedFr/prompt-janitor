@@ -25,12 +25,18 @@ export interface RulesState {
   loading: boolean;
   /** The query failed — distinct from "there are no rules", which never happens. */
   failed: boolean;
+  /**
+   * The last mutation that did not land, as a sentence to show. Cleared by the
+   * next one that does. Not the same thing as {@link RulesState.failed}, which
+   * is about the *read* and replaces the whole screen.
+   */
+  error: string | null;
   /** A provider and key are configured, so natural-language standards can actually run. */
   aiReady: boolean;
-  /** Paid licence. Read but deliberately not gated on in the UI — monetisation is paused. */
-  entitled: boolean;
+  /** None of these reject — each owns its failure and reports it through `error`. */
   toggle: (id: string, enabled: boolean) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
+  /** How many rules the chosen pack added; 0 if the picker was dismissed or the import failed. */
   importPack: () => Promise<number>;
   refetch: () => Promise<void>;
 }

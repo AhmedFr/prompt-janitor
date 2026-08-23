@@ -22,7 +22,6 @@ export function ActionsCell({ actions }: ActionsCellProps) {
           className="dt-actions__btn"
           aria-label={action.label}
           title={action.label}
-          disabled={action.disabled}
           onClick={run(action)}
         >
           <Icon name={action.icon} size={15} />
