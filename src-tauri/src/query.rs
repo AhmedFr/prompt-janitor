@@ -3,6 +3,7 @@
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::engine::{grade_for_score, Dimension, Grade, Rule, Severity, Source};
+use crate::harness_query::ERROR_RATE_THRESHOLD;
 use crate::rules::builtin_rules;
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
@@ -258,7 +259,7 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
     })
 }
 
-fn grade_from_db(s: &str) -> Grade {
+pub(crate) fn grade_from_db(s: &str) -> Grade {
     match s {
         "A" => Grade::A,
         "B" => Grade::B,
@@ -386,7 +387,8 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<ProjectRow>> {
                   WHERE a.project_path = rtrim(p.id, '/') AND a.layer = 'project'
                     AND a.kind IN {INVOCABLE_KINDS}
                     AND EXISTS (SELECT 1 FROM usage_stats u
-                                 WHERE u.artifact_id = a.id AND u.error_rate >= 0.25))
+                                 WHERE u.artifact_id = a.id
+                                   AND u.error_rate >= {ERROR_RATE_THRESHOLD}))
          FROM projects p
          LEFT JOIN files f ON f.project_id = p.id
          LEFT JOIN (SELECT path, harness, exists_on_disk, last_session_at,

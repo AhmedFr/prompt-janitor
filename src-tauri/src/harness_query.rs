@@ -184,6 +184,12 @@ const RANKED_LIMIT: u32 = 500;
 /// day. A caller asking for a decade would otherwise get a decade of points.
 const MAX_WINDOW_DAYS: u32 = 366;
 
+/// The `usage_stats.error_rate` at or above which a target counts as
+/// "erroring". Shared by every read model that surfaces the signal — the
+/// project list's error count, the menu-bar panel's MCP chip — so one number
+/// decides what the user is warned about, wherever they see it.
+pub(crate) const ERROR_RATE_THRESHOLD: f64 = 0.25;
+
 /// `skill, agent, mcp, builtin` — the order the UI legend lists kinds in.
 const KIND_ORDER: [InvocationKind; 4] = [
     InvocationKind::Skill,
@@ -205,7 +211,7 @@ fn kind_order(col: &str) -> String {
 
 /// Last path component, for labelling a project. Falls back to the whole path
 /// (a root, or a path that ends in a separator).
-fn last_component(path: &str) -> String {
+pub(crate) fn last_component(path: &str) -> String {
     std::path::Path::new(path)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -508,7 +514,7 @@ fn ranked_targets(
 /// The `window_days` UTC calendar days ending on the day `now_epoch_secs`
 /// falls in, oldest first. Days are `YYYY-MM-DD`, taken off the same RFC3339
 /// rendering `sessions.started_at` is stored in.
-fn window_calendar_days(now_epoch_secs: i64, window_days: u32) -> Vec<String> {
+pub(crate) fn window_calendar_days(now_epoch_secs: i64, window_days: u32) -> Vec<String> {
     let today_start = now_epoch_secs.div_euclid(86_400) * 86_400;
     (0..i64::from(window_days))
         .rev()

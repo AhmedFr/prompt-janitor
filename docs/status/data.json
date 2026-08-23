@@ -67,12 +67,24 @@
       "title": "Tables & project pages",
       "done": 6,
       "total": 6,
-      "state": "active",
-      "note": "Complete: read models (#134), Setup tabs (#135), project pages + prompts table (#137), rules tabs + /rules/new (#138), analytics ranked lists (#131 PR)."
+      "state": "done",
+      "note": "Complete: read models (#134), Setup tabs (#135), project pages + prompts table (#137), rules tabs + /rules/new (#138), analytics ranked lists (#139)."
+    },
+    {
+      "name": "Phase 9",
+      "title": "Menu-bar panel",
+      "done": 1,
+      "total": 2,
+      "note": "Window plumbing + snapshot read model (#141 PR). Next: panel UI (#142).",
+      "state": "active"
     }
   ],
   "actions": {
     "blocking": [
+      {
+        "title": "Verify the menu-bar panel on a real Mac",
+        "detail": "Left-click the tray icon: panel appears under the icon, second click closes it, outside click closes it; far-left/right icon clamps inside the screen; multi-monitor with mixed scale factors opens on the right display; transparent corners (macOSPrivateApi); ⌘W hides the window and drops the Dock icon; tray Open restores both; Quit exits. Checklist: .superpowers/sdd/2026-08-23-menu-bar-panel/task-2-report.md"
+      },
       {
         "title": "Review & merge the Phase 7 PR stack in order",
         "detail": "#114 docs → #115 phase 0 → #116 harness core → #117 Claude Code harness → #118 persistence/IPC → #119 Setup UI → this branch's PR (Detail merge position, Settings harness tab, docs). Merge in that order since each builds on the last; all tests green, each PR body lists what was verified.",
@@ -295,8 +307,14 @@
     {
       "name": "Analytics usage as ranked lists with window",
       "tier": "free",
+      "status": "done",
+      "note": "Merged (#139)"
+    },
+    {
+      "name": "Menu-bar panel (window plumbing, tray click model, Dock policy)",
+      "tier": "free",
       "status": "pr",
-      "note": "PR for #131 awaiting review — Top used / Most errors / Most expensive over 7/30/90 d, Details deep-links into the Setup tab"
+      "note": "PR for #141 awaiting review — floating panel window under the icon, left-click toggles / right-click menu, menu-bar-first when the window is closed, snapshot read model"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
@@ -336,7 +354,7 @@
     },
     {
       "name": "cargo test",
-      "result": "286/286 passing"
+      "result": "308/308 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -390,6 +408,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 — Menu-bar panel plumbing: hidden transparent panel window positioned under the tray icon (logical monitor lookup, blur/click race guarded), left-click toggle, menu-bar-first Dock policy, open_main/quit commands, PanelSnapshot read model (#141 PR)",
     "2026-08-23 — Accessibility fix across the shared table and tab strip: a count badge no longer runs into the label it sits next to, so a tab announces as “Rules, 2” and a filter pill as “AGENTS.md, 4” instead of “Rules2”; the Setup deep link validates its kind against the real tab list; counts in the thousands are grouped; the spec now says Built-in where it said Commands (#131 branch)",
     "2026-08-23 — Phase 8 complete: every list is a DataTable; README screens section rewritten (#131 PR)",
     "2026-08-23 — Usage tab review fix round 1: a superseded window's read can no longer land last and win — switching 7d → 90d retires the 7d read through a generation gate (the same one the project page uses), so a slow read cannot paint a week of usage under a toolbar that says 90d; dead tooltip colour-swatch code, the unused series palette export and the duplicated ranked-limit owner are gone (#131 branch)",

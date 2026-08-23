@@ -143,6 +143,20 @@ export const commands = {
 	getProjectUsage: (harness: string, projectPath: string, windowDays: number) => typedError<ProjectUsage, string>(__TAURI_INVOKE("get_project_usage", { harness, projectPath, windowDays })),
 	/**  Every harness we know of, detected or not. */
 	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
+	/**
+	 *  Everything the menu-bar panel renders, anchored to the current clock (the
+	 *  "sessions today" boundary is a UTC calendar day).
+	 */
+	getPanelSnapshot: () => typedError<PanelSnapshot, string>(__TAURI_INVOKE("get_panel_snapshot")),
+	/**
+	 *  Bring the main window forward on a given screen and close the panel.
+	 * 
+	 *  The panel is a separate window, so the route travels as an event the main
+	 *  webview listens for rather than as a return value.
+	 */
+	openMain: (route: string, target: string | null) => __TAURI_INVOKE<void>("open_main", { route, target }),
+	/**  Quit the app for real (the tray is the only other way out). */
+	quit: () => __TAURI_INVOKE<void>("quit"),
 };
 
 /* Types */
@@ -386,6 +400,16 @@ export type LicenseInfo = {
 	plan: string,
 };
 
+/**
+ *  Where the main window should land, emitted on the `navigate` event when a
+ *  panel row is clicked. `target` is the row the screen should focus (a file
+ *  id, an artifact kind), absent when the route alone is enough.
+ */
+export type NavigateEvent = {
+	route: string,
+	target: string | null,
+};
+
 /**  Result of an NL evaluation run: the verdicts plus the file's new score. */
 export type NlEvalResult = {
 	verdicts: NlVerdict[],
@@ -419,6 +443,57 @@ export type Overview = {
 	trend_delta: number,
 	/**  Most recent scan finish time (epoch seconds string). */
 	last_scan: string | null,
+};
+
+/**  One row of the panel's "fix these next" list. */
+export type PanelFix = {
+	/**  `files.id` — the absolute path, which is also the detail route's target. */
+	file_id: string,
+	/**  File basename, all the width the panel has. */
+	name: string,
+	project_name: string,
+	grade: Grade,
+	issue_count: number,
+};
+
+/**
+ *  Everything the menu-bar panel renders in one payload.
+ * 
+ *  Scan state is deliberately absent: the panel subscribes to the
+ *  `scan-phase` / `scan-progress` / `scan-done` events like the Setup screen
+ *  does, and refetches this snapshot when a scan finishes.
+ */
+export type PanelSnapshot = {
+	/**
+	 *  False before the first scan — the panel shows "No scan yet" instead of
+	 *  a verdict that would read as a perfect score.
+	 */
+	has_data: boolean,
+	overall_grade: Grade,
+	overall_score: number,
+	/**  Change across the trend window (latest − earliest), from `get_overview`. */
+	delta: number,
+	/**
+	 *  Newest of the harness and file scans, as RFC3339 — the shape every
+	 *  other `last_scan_at` on the frontend is formatted from.
+	 */
+	last_scan_at: string | null,
+	/**
+	 *  At most three files that have issues, worst grade first then most
+	 *  issues. Empty when there is nothing to fix.
+	 */
+	top_fixes: PanelFix[],
+	/**
+	 *  Skills the user authored — any layer but `plugin` — that no
+	 *  invocation has ever resolved to. Plugin-bundled skills are excluded
+	 *  on purpose: installing a plugin ships dozens the user never chose,
+	 *  and counting them buries the handful they wrote and forgot.
+	 */
+	never_used_skills: number,
+	/**  MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`]. */
+	mcp_erroring: number,
+	/**  Top-level sessions started since UTC midnight of `now_epoch_secs`. */
+	sessions_today: number,
 };
 
 /**  A project rollup for the sidebar and the Prompts group headers. */

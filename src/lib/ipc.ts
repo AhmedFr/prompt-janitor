@@ -46,6 +46,9 @@ export type {
   ArtifactKind,
   Layer,
   InvocationKind,
+  PanelSnapshot,
+  PanelFix,
+  NavigateEvent,
 } from "./bindings";
 
 /** True when running inside the Tauri runtime (vs. a plain browser dev server). */
