@@ -19,8 +19,11 @@ export function EffectiveRulesTab({ rules, harness }: EffectiveRulesTabProps) {
 
   return (
     <ol className="project-stack" aria-label={EFFECTIVE_TITLE}>
+      {/* The position is part of each key: one file can legitimately appear
+          twice in a load order (a path reachable through two layers), and a
+          key that collided would drop the second occurrence. */}
       {ordered.map((rule, index) => (
-        <li key={`${rule.layer}:${rule.path}`} className="project-stack__item">
+        <li key={`${index}:${rule.layer}:${rule.path}`} className="project-stack__item">
           {/* The position is already the list item's own number to assistive
               tech; drawn here only so the eye can follow the order. */}
           <span className="project-stack__step tnum" aria-hidden="true">

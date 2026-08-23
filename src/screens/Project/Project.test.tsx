@@ -253,6 +253,16 @@ describe("Project", () => {
       );
     });
 
+    it("announces the missing folder rather than leaving it to be noticed", async () => {
+      // The banner appears after the page has already painted — a reader on a
+      // screen reader is past it by then unless it is a live region.
+      listProjects.mockResolvedValue({ status: "ok", data: [project({ exists: false })] });
+      await renderScreen();
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(/Folder missing from disk/),
+      );
+    });
+
     it("says nothing about a missing folder when the folder is there", async () => {
       await renderScreen();
       await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
@@ -482,6 +492,37 @@ describe("Project", () => {
       expect(screen.queryByText(/The project query failed/)).not.toBeInTheDocument();
     });
 
+    it("fails the page when the file list fails, rather than emptying the table", async () => {
+      // One query answering and another not is not "this project has no
+      // files" — it is a read the page cannot honestly render.
+      listFiles.mockResolvedValue({ status: "error", error: "database is locked" });
+      await renderScreen();
+
+      await waitFor(() => expect(screen.getByText(/The project query failed/)).toBeInTheDocument());
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      expect(screen.queryByText(/No prompt files scanned here/)).not.toBeInTheDocument();
+    });
+
+    it("fails the page when the setup query fails, rather than emptying the inventory", async () => {
+      getSetup.mockResolvedValue({ status: "error", error: "database is locked" });
+      await renderScreen();
+
+      await waitFor(() => expect(screen.getByText(/The project query failed/)).toBeInTheDocument());
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Nothing configured in this project/)).not.toBeInTheDocument();
+    });
+
+    it("keeps the page when only the harness-scoped reads fail", async () => {
+      // Those two are scoped to a harness and are allowed to come back empty;
+      // failing them must not take the whole project down with them.
+      getEffectiveRules.mockResolvedValue({ status: "error", error: "no such harness" });
+      getProjectUsage.mockResolvedValue({ status: "error", error: "no such harness" });
+      await renderScreen();
+
+      await waitFor(() => expect(rowNames()).toHaveLength(2));
+      expect(screen.queryByText(/The project query failed/)).not.toBeInTheDocument();
+    });
+
     it("refetches everything when a scan finishes", async () => {
       await renderScreen();
       await waitFor(() => expect(rowNames()).toHaveLength(2));
@@ -493,6 +534,69 @@ describe("Project", () => {
       await emit("scan-done");
 
       await waitFor(() => expect(rowNames()).toHaveLength(3));
+    });
+
+    it("ignores a fetch that lands after the reader moved to another project", async () => {
+      const ALPHA = "/code/alpha";
+      const BETA = "/code/beta";
+      const rows = [
+        project({ id: ALPHA, name: "alpha", score: 11 }),
+        project({ id: BETA, name: "beta", score: 22 }),
+      ];
+      // The first project's read hangs; the second answers immediately.
+      let release!: () => void;
+      listProjects.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ status: "ok", data: rows });
+          }),
+      );
+      listProjects.mockImplementation(async () => ({ status: "ok", data: rows }));
+      const navigate = vi.fn();
+
+      const { rerender } = render(<Project path={ALPHA} navigate={navigate} />);
+      rerender(<Project path={BETA} navigate={navigate} />);
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { level: 1, name: "beta" })).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        release();
+      });
+
+      // The late answer is about a project the reader has already left.
+      expect(screen.getByRole("heading", { level: 1, name: "beta" })).toBeInTheDocument();
+      expect(screen.queryByText("alpha")).not.toBeInTheDocument();
+    });
+
+    it("never flashes the failure panel when a superseded fetch fails", async () => {
+      const ALPHA = "/code/alpha";
+      const BETA = "/code/beta";
+      let reject!: () => void;
+      listProjects.mockImplementationOnce(
+        () =>
+          new Promise((_, r) => {
+            reject = () => r(new Error("database is locked"));
+          }),
+      );
+      listProjects.mockImplementation(async () => ({
+        status: "ok",
+        data: [project({ id: BETA, name: "beta" })],
+      }));
+      const navigate = vi.fn();
+
+      const { rerender } = render(<Project path={ALPHA} navigate={navigate} />);
+      rerender(<Project path={BETA} navigate={navigate} />);
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { level: 1, name: "beta" })).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        reject();
+      });
+
+      expect(screen.queryByText(/The project query failed/)).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "beta" })).toBeInTheDocument();
     });
 
     it("stops listening for scans once it is gone", async () => {

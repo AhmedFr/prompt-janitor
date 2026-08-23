@@ -2,25 +2,17 @@ import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { PathCell } from "@/components/DataTable";
-import { ProjectGlyph } from "@/components/ProjectGlyph";
 import { ScanBar } from "@/components/ScanBar";
-import { ScoreRing } from "@/components/ScoreRing";
 import { Tabs, useTabState, type TabItem } from "@/components/Tabs";
-import type { ArtifactView, ProjectRow } from "@/lib/ipc";
+import type { ArtifactView } from "@/lib/ipc";
 import { rescan } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import type { ColumnsCtx } from "@/screens/Setup/setup.columns";
-import { relativeSession } from "@/screens/Setup/setup.util";
 import {
   BACK_LABEL,
   FAILED_BODY,
   FAILED_RETRY,
   FAILED_TITLE,
-  HEADER_GLYPH_SIZE,
-  HEADER_RING_SIZE,
-  MISSING_FOLDER_BODY,
-  MISSING_FOLDER_TITLE,
   NO_SELECTION_BODY,
   NO_SELECTION_TITLE,
   NOT_FOUND_BODY,
@@ -34,6 +26,8 @@ import {
 } from "./Project.constants";
 import type { ProjectData, ProjectProps } from "./Project.types";
 import { useProject } from "./useProject";
+import { ProjectHeader } from "./ProjectHeader";
+import { MissingFolderBanner, StatePanel } from "./StatePanel";
 import { EffectiveRulesTab } from "./tabs/EffectiveRulesTab";
 import { RulesTab } from "./tabs/RulesTab";
 import { SetupTab } from "./tabs/SetupTab";
@@ -129,24 +123,24 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
             />
           )}
           {path === undefined ? (
-            <Panel title={NO_SELECTION_TITLE} body={NO_SELECTION_BODY} onBack={goBack} />
+            <StatePanel title={NO_SELECTION_TITLE} body={NO_SELECTION_BODY} onBack={goBack} />
           ) : loading ? (
             <Card padded>
               <div className="muted">Loading…</div>
             </Card>
           ) : !data ? (
-            <Panel
+            <StatePanel
               title={FAILED_TITLE}
               body={FAILED_BODY}
               onBack={goBack}
               retry={{ label: FAILED_RETRY, onClick: () => void state.refetch() }}
             />
           ) : !project ? (
-            <Panel title={NOT_FOUND_TITLE} body={NOT_FOUND_BODY} onBack={goBack} />
+            <StatePanel title={NOT_FOUND_TITLE} body={NOT_FOUND_BODY} onBack={goBack} />
           ) : (
             <>
               <ProjectHeader project={project} lastScanAt={data.lastScanAt} />
-              {!project.exists && <MissingFolder />}
+              {!project.exists && <MissingFolderBanner />}
               <Tabs items={tabs} active={active} onChange={setActive} ariaLabel={TABS_LABEL}>
                 {(id) => <TabPanel id={id} data={data} artifacts={artifacts} ctx={ctx} onOpen={openDetail} />}
               </Tabs>
@@ -189,93 +183,4 @@ function TabPanel({
   if (id === "setup") return <SetupTab artifacts={artifacts} ctx={ctx} />;
   if (id === "usage") return <UsageTab usage={data.usage} harness={data.harness} />;
   return <RulesTab files={data.files} onOpen={onOpen} />;
-}
-
-/** Everything true of the project itself, before any tab narrows it down. */
-function ProjectHeader({ project, lastScanAt }: { project: ProjectRow; lastScanAt: string | null }) {
-  return (
-    <Card padded>
-      <div className="project-head">
-        <ProjectGlyph
-          name={project.name}
-          grade={project.grade}
-          logo={project.logo}
-          size={HEADER_GLYPH_SIZE}
-        />
-        <div className="project-head__id">
-          <p className="project-head__name">{project.name}</p>
-          <PathCell path={project.id} />
-        </div>
-        <dl className="project-head__facts">
-          <Fact label="Sessions" value={String(project.session_count)} />
-          <Fact label="Last session" value={relativeSession(project.last_session_at)} />
-          <Fact label="Last scan" value={relativeSession(lastScanAt)} />
-        </dl>
-        <ScoreRing score={project.score} grade={project.grade} size={HEADER_RING_SIZE} />
-      </div>
-    </Card>
-  );
-}
-
-/** One labelled number in the header's fact list. */
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="project-fact">
-      <dt className="project-fact__label">{label}</dt>
-      <dd className="project-fact__value tnum">{value}</dd>
-    </div>
-  );
-}
-
-/** The harness remembers this project and the disk has lost it. */
-function MissingFolder() {
-  return (
-    <Card padded>
-      <div className="project-banner">
-        <Icon name="folder" size={16} />
-        <div>
-          <p className="project-banner__title">{MISSING_FOLDER_TITLE}</p>
-          <p className="muted project-banner__body">{MISSING_FOLDER_BODY}</p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/**
- * The three states that have no project to render: nothing selected, the read
- * failed, and nothing scanned matches the path. Each says which one it is —
- * an empty page would let all three read as "this project is empty" — and
- * each offers the way back, since the toolbar's arrow is not drawn without a
- * project.
- */
-function Panel({
-  title,
-  body,
-  onBack,
-  retry,
-}: {
-  title: string;
-  body: string;
-  onBack: () => void;
-  retry?: { label: string; onClick: () => void };
-}) {
-  return (
-    <Card padded>
-      <div className="project-panel">
-        <h2 className="project-panel__title">{title}</h2>
-        <p className="muted project-panel__body">{body}</p>
-        <div className="project-panel__actions">
-          {retry && (
-            <Button onClick={retry.onClick}>
-              <Icon name="refresh" /> {retry.label}
-            </Button>
-          )}
-          <Button variant={retry ? undefined : "primary"} onClick={onBack}>
-            {BACK_LABEL}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
 }

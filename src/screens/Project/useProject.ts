@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri, type EffectiveRule, type ProjectUsage } from "@/lib/ipc";
 import { USAGE_WINDOW_DAYS } from "./Project.constants";
@@ -26,12 +26,25 @@ function unwrap<T>(res: { status: "ok"; data: T } | { status: "error"; error: un
  *
  * Refetched on `scan-done`: a scan is the only thing that can change a grade,
  * add a file, or notice that a folder is gone.
+ *
+ * Every write is gated on a generation counter, because these reads outlive
+ * the project they were started for. Opening one project from the sidebar
+ * recents and immediately opening another leaves the first read in flight;
+ * without the gate it lands last and wins, painting the previous project's
+ * rows under the current project's name — or, if it fails, flashing the
+ * failure panel over a page that loaded perfectly well.
  */
 export function useProject(path: string | undefined): ProjectState {
   const [data, setData] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped whenever a read is started or superseded; a read may only write
+  // while the counter still holds the value it claimed on entry.
+  const generation = useRef(0);
 
   const refetch = useCallback(async () => {
+    const mine = ++generation.current;
+    const fresh = () => generation.current === mine;
+
     if (!isTauri || path === undefined) {
       setLoading(false);
       return;
@@ -45,8 +58,12 @@ export function useProject(path: string | undefined): ProjectState {
       const rows = unwrap(projects);
       const allFiles = unwrap(files);
       const setupView = unwrap(setup);
+      // One read answering and another not is not "this project is empty":
+      // it is a page that cannot be honestly drawn, so all three fail
+      // together. (TypeScript enforces the null checks below; this is the
+      // runtime half of the same contract.)
       if (!rows || !allFiles || !setupView) {
-        setData(null);
+        if (fresh()) setData(null);
         return;
       }
 
@@ -67,6 +84,7 @@ export function useProject(path: string | undefined): ProjectState {
         usage = unwrap(used);
       }
 
+      if (!fresh()) return;
       setData({
         project,
         files: filesFor(allFiles, path),
@@ -79,17 +97,21 @@ export function useProject(path: string | undefined): ProjectState {
       });
     } catch {
       // Surfaced by the screen as the unreadable state; nothing to add here.
-      setData(null);
+      if (fresh()) setData(null);
     } finally {
       // A failed query still ends the load: leaving the spinner up forever
-      // reads as a hang rather than an error.
-      setLoading(false);
+      // reads as a hang rather than an error. A superseded read must not do
+      // it, though — the read that replaced it owns the spinner now.
+      if (fresh()) setLoading(false);
     }
   }, [path]);
 
   useEffect(() => {
     // A different project is a different page: drop the last one's data
-    // rather than painting it under the new project's name for a frame.
+    // rather than painting it under the new project's name for a frame, and
+    // retire whatever the previous project left in flight before the new
+    // read even starts.
+    generation.current += 1;
     setData(null);
     setLoading(true);
     void refetch();
