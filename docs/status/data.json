@@ -68,7 +68,7 @@
       "done": 5,
       "total": 6,
       "state": "active",
-      "note": "Read models (#134) and Setup tabs (#135) merged. Project pages + flat prompts (#129 PR). Rules tabs + tables (#130 branch). Next: /rules/new, analytics (#131)."
+      "note": "Read models (#134), Setup tabs (#135), project pages (#137) merged. Rules tabs + /rules/new (#130 PR). Next: analytics ranked lists (#131)."
     }
   ],
   "actions": {
@@ -283,14 +283,14 @@
     {
       "name": "Projects table, project page, flat prompts table",
       "tier": "free",
-      "status": "pr",
-      "note": "PR for #129 awaiting review — /projects table, dedicated project page (Rules · Effective rules · Setup · Usage), Prompts as a flat files table"
+      "status": "done",
+      "note": "Merged (#137)"
     },
     {
       "name": "Rules screen as tabs of tables",
       "tier": "free",
       "status": "pr",
-      "note": "Branch for #130 — Built-in / Custom / AI standards tabs badged enabled/total, one DataTable each (switch, title, source, severity, hits, actions), source/severity/enabled/has-hits pills, pattern-aware search; the add-rule composer now lives at /rules/new as a two-step flow that lands back on the tab holding the new rule"
+      "note": "PR for #130 awaiting review — Built-in / Custom / AI standards tabs, switch/hits/actions columns, pills, /rules/new two-step add flow"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
