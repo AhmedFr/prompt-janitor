@@ -1,10 +1,15 @@
 //! The floating menu-bar panel window.
 //!
 //! Owns the `panel` webview window: creating it hidden at startup, placing it
-//! under the tray icon, and toggling it on a left-click. The geometry is a pure
-//! function so the clamping rules can be tested without a window server.
+//! under the tray icon, and toggling it on a left-click. Everything that can be
+//! decided without a window server — the placement clamps, which monitor a point
+//! falls on, whether a click is the tail of a blur — is a pure function with
+//! tests; the rest is a thin shell over the Tauri API.
 
-use tauri::{App, AppHandle, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+use tauri::{App, AppHandle, LogicalPosition, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
 
 /// Window label of the panel.
 pub const PANEL_LABEL: &str = "panel";
@@ -49,12 +54,56 @@ pub fn position_under(icon: Rect, work_area: Rect, size: (f64, f64)) -> (f64, f6
 
     let below = icon.y + icon.h + PANEL_GAP;
     let y = if below + h > work_area.y + work_area.h {
-        icon.y - PANEL_GAP - h
+        // Above the icon instead — but a work area too short for either side
+        // must still start inside it rather than off the top.
+        (icon.y - PANEL_GAP - h).max(work_area.y + PANEL_MARGIN)
     } else {
         below
     };
 
     (x, y)
+}
+
+/// How long after a blur-hide a tray click still counts as "the panel was open".
+const BLUR_TOGGLE_WINDOW: Duration = Duration::from_millis(250);
+
+/// When the blur handler last hid the panel.
+static LAST_BLUR_HIDE: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// Whether a tray click landing at `now` is the tail of the blur that a
+/// mouse-down on the status item already caused.
+///
+/// macOS gives the status item key on mouse-**down**, so an open panel has
+/// blurred itself shut before the mouse-**up** that toggles it arrives. Without
+/// this the click would read the panel as closed and re-open it, and the icon
+/// could never close the panel.
+fn swallow(last: Option<Instant>, now: Instant) -> bool {
+    last.is_some_and(|t| now.saturating_duration_since(t) < BLUR_TOGGLE_WINDOW)
+}
+
+/// Read and clear the blur stamp. Clearing matters: a stamp left behind would
+/// swallow the *next* click too.
+fn take_blur_stamp() -> Option<Instant> {
+    LAST_BLUR_HIDE
+        .lock()
+        .ok()
+        .and_then(|mut stamp| stamp.take())
+}
+
+/// Whether the physical point `(px, py)` falls on a monitor with this physical
+/// origin, physical size and scale factor.
+///
+/// Both the point and the rect are taken into that monitor's own logical space
+/// first: macOS lays displays out in a shared point space and tao reports each
+/// monitor's origin already multiplied by *its own* scale, so physical
+/// coordinates from different displays are not comparable as they stand.
+fn contains_logical(pos: (f64, f64), size: (f64, f64), scale: f64, px: f64, py: f64) -> bool {
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let (x, y) = (pos.0 / scale, pos.1 / scale);
+    let (w, h) = (size.0 / scale, size.1 / scale);
+    let (lx, ly) = (px / scale, py / scale);
+
+    lx >= x && lx < x + w && ly >= y && ly < y + h
 }
 
 /// Create the panel window, hidden. Call once at startup: building it up front
@@ -82,7 +131,9 @@ pub fn toggle(app: &AppHandle, icon: tauri::Rect) {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return;
     };
-    if window.is_visible().unwrap_or(false) {
+    // A blur-hide moments ago means this click closed an *open* panel; treat it
+    // as visible so the click closes rather than re-opens it.
+    if swallow(take_blur_stamp(), Instant::now()) || window.is_visible().unwrap_or(false) {
         let _ = window.hide();
         return;
     }
@@ -94,11 +145,54 @@ pub fn toggle(app: &AppHandle, icon: tauri::Rect) {
     let _ = window.set_focus();
 }
 
-/// Hide the panel if it exists. Used by the blur handler and by `open_main`.
+/// Hide the panel if it exists. Used by `open_main`.
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         let _ = window.hide();
     }
+}
+
+/// The `WindowEvent::Focused(false)` handler: hide, and record when, so the
+/// tray click that caused the blur can tell it closed an open panel.
+pub fn hide_on_blur(app: &AppHandle) {
+    hide(app);
+    if let Ok(mut stamp) = LAST_BLUR_HIDE.lock() {
+        *stamp = Some(Instant::now());
+    }
+}
+
+/// The monitor the physical point `(px, py)` falls on.
+///
+/// `AppHandle::monitor_from_point` cannot be used here: on macOS tao resolves it
+/// with `CGDisplayBounds`, which is point space, while the tray hands us physical
+/// pixels — on a multi-display setup that lands on the wrong screen. Each
+/// candidate is tested in its own logical space instead, and on an overlap the
+/// one whose top edge is nearest the point wins.
+fn monitor_for(app: &AppHandle, px: f64, py: f64) -> Option<Monitor> {
+    let top_distance = |m: &Monitor| {
+        let scale = m.scale_factor();
+        let scale = if scale > 0.0 { scale } else { 1.0 };
+        (py / scale - f64::from(m.position().y) / scale).abs()
+    };
+
+    app.available_monitors()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|m| {
+            contains_logical(
+                (f64::from(m.position().x), f64::from(m.position().y)),
+                (f64::from(m.size().width), f64::from(m.size().height)),
+                m.scale_factor(),
+                px,
+                py,
+            )
+        })
+        .min_by(|a, b| {
+            top_distance(a)
+                .partial_cmp(&top_distance(b))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .or_else(|| app.primary_monitor().ok().flatten())
 }
 
 /// Convert the tray icon's physical rect into logical pixels, alongside the
@@ -112,11 +206,7 @@ fn logical_geometry(app: &AppHandle, icon: tauri::Rect) -> (Rect, Rect) {
     let position = icon.position.to_physical::<f64>(1.0);
     let size = icon.size.to_physical::<f64>(1.0);
 
-    let monitor = app
-        .monitor_from_point(position.x, position.y)
-        .ok()
-        .flatten()
-        .or_else(|| app.primary_monitor().ok().flatten());
+    let monitor = monitor_for(app, position.x, position.y);
 
     let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
     let scale = if scale > 0.0 { scale } else { 1.0 };
@@ -215,5 +305,72 @@ mod tests {
             h: 24.0,
         };
         assert_eq!(position_under(icon, WORK_AREA, SIZE), (532.0, 374.0));
+    }
+
+    #[test]
+    fn keeps_the_flipped_panel_inside_a_work_area_too_short_for_it() {
+        // 300 px tall: neither below (30 + 480) nor above (0 − 6 − 480) fits, so
+        // the panel starts at the top margin instead of off-screen.
+        let short = Rect {
+            y: 25.0,
+            h: 300.0,
+            ..WORK_AREA
+        };
+        assert_eq!(position_under(icon_at(700.0), short, SIZE), (532.0, 33.0));
+    }
+
+    #[test]
+    fn hugs_the_left_margin_when_the_work_area_is_narrower_than_the_panel() {
+        // max_x (300 − 360 − 8) falls below min_x (8): the clamp range is empty.
+        let narrow = Rect {
+            w: 300.0,
+            ..WORK_AREA
+        };
+        assert_eq!(position_under(icon_at(150.0), narrow, SIZE), (8.0, 30.0));
+    }
+
+    #[test]
+    fn swallows_a_click_arriving_inside_the_blur_window() {
+        let blur = Instant::now();
+        assert!(swallow(Some(blur), blur + Duration::from_millis(100)));
+    }
+
+    #[test]
+    fn lets_through_a_click_arriving_after_the_blur_window() {
+        let blur = Instant::now();
+        assert!(!swallow(Some(blur), blur + Duration::from_millis(300)));
+    }
+
+    #[test]
+    fn lets_through_a_click_with_no_recorded_blur() {
+        assert!(!swallow(None, Instant::now()));
+    }
+
+    /// A 1440 × 900 non-Retina display at the origin.
+    const PRIMARY: ((f64, f64), (f64, f64), f64) = ((0.0, 0.0), (1440.0, 900.0), 1.0);
+    /// A 2× display to its right: logical origin 1440, so physical origin 2880.
+    const SECONDARY_2X: ((f64, f64), (f64, f64), f64) = ((2880.0, 0.0), (2560.0, 1440.0), 2.0);
+
+    fn contains(m: ((f64, f64), (f64, f64), f64), px: f64, py: f64) -> bool {
+        contains_logical(m.0, m.1, m.2, px, py)
+    }
+
+    #[test]
+    fn a_point_on_the_primary_display_matches_only_it() {
+        assert!(contains(PRIMARY, 700.0, 5.0));
+        assert!(!contains(SECONDARY_2X, 700.0, 5.0));
+    }
+
+    #[test]
+    fn a_point_on_a_2x_secondary_display_matches_only_it() {
+        // Logical (2000, 5) on the secondary → physical (4000, 10).
+        assert!(contains(SECONDARY_2X, 4000.0, 10.0));
+        assert!(!contains(PRIMARY, 4000.0, 10.0));
+    }
+
+    #[test]
+    fn a_point_past_the_right_edge_matches_nothing() {
+        assert!(!contains(PRIMARY, 6000.0, 5.0));
+        assert!(!contains(SECONDARY_2X, 6000.0, 5.0));
     }
 }

@@ -61,7 +61,7 @@ pub fn run() {
                     window_policy::hide_main(app);
                 }
                 // A popover that outlives its click is a stuck window.
-                (panel::PANEL_LABEL, WindowEvent::Focused(false)) => panel::hide(app),
+                (panel::PANEL_LABEL, WindowEvent::Focused(false)) => panel::hide_on_blur(app),
                 _ => {}
             }
         })
