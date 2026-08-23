@@ -42,8 +42,19 @@ describe("PanelSignals", () => {
     expect(screen.getByText("12 sessions today")).toHaveAttribute("data-tone", "ok");
   });
 
-  it("goes quiet when every count is zero", () => {
-    render(<PanelSignals neverUsedSkills={0} mcpErroring={0} sessionsToday={0} onOpen={() => {}} />);
-    expect(screen.getByText("0 never-used skills")).toHaveAttribute("data-tone", "ok");
+  /** A chip that says "0 never-used skills" spends the panel's width on nothing. */
+  it("drops a problem chip once its count reaches zero", () => {
+    render(<PanelSignals neverUsedSkills={0} mcpErroring={2} sessionsToday={4} onOpen={() => {}} />);
+    expect(screen.queryByText("0 never-used skills")).not.toBeInTheDocument();
+    expect(screen.getByText("2 MCP servers erroring")).toBeInTheDocument();
+    expect(screen.getByText("4 sessions today")).toBeInTheDocument();
+    expect(screen.queryByText("Setup looks clean")).not.toBeInTheDocument();
+  });
+
+  it("says the setup is clean when neither problem is left", () => {
+    render(<PanelSignals neverUsedSkills={0} mcpErroring={0} sessionsToday={4} onOpen={() => {}} />);
+    expect(screen.getByText("Setup looks clean")).toBeInTheDocument();
+    // Today's sessions are context, not a problem — they stay either way.
+    expect(screen.getByRole("button", { name: "4 sessions today — open Analytics" })).toBeInTheDocument();
   });
 });

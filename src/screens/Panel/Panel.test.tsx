@@ -89,6 +89,15 @@ const show = async () => {
   await screen.findByRole("button", { name: "Scan now" });
 };
 
+/** A promise a test resolves by hand, to land two reads in a chosen order. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 const emit = async (event: string) => {
   await act(async () => {
     listeners.get(event)?.();
@@ -118,17 +127,17 @@ describe("Panel", () => {
 
   it("lists the top three fixes with their grades", async () => {
     await show();
-    expect(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open AGENTS.md in web-app" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api — grade F, 6 issues" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open AGENTS.md in web-app — grade D, 4 issues" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Open SKILL.md in web-app" }),
+      screen.getByRole("button", { name: "Open SKILL.md in web-app — grade C, 2 issues" }),
     ).toBeInTheDocument();
     expect(screen.getAllByLabelText("Grade F")).toHaveLength(1);
   });
 
   it("opens the main window on a fix's detail page", async () => {
     await show();
-    fireEvent.click(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api — grade F, 6 issues" }));
     expect(openMain).toHaveBeenCalledWith("detail", "/code/acme-api/CLAUDE.md");
   });
 
@@ -189,6 +198,36 @@ describe("Panel", () => {
       win.onFocus?.({ payload: true });
     });
     await waitFor(() => expect(getPanelSnapshot).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * A focus refetch and a `scan-done` refetch overlap routinely — the panel is
+   * shown while a scan is finishing. Whichever query was *started* last is the
+   * one whose answer is current, however the two reads happen to land.
+   */
+  it("keeps the newest snapshot when two refetches land out of order", async () => {
+    await show();
+
+    const older = deferred<unknown>();
+    const newer = deferred<unknown>();
+    getPanelSnapshot.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+
+    await act(async () => {
+      win.onFocus?.({ payload: true });
+    });
+    await act(async () => {
+      win.onFocus?.({ payload: true });
+    });
+
+    await act(async () => {
+      newer.resolve({ status: "ok", data: snapshot({ overall_grade: "A", overall_score: 95 }) });
+    });
+    await act(async () => {
+      older.resolve({ status: "ok", data: snapshot({ overall_grade: "F", overall_score: 30 }) });
+    });
+
+    expect(screen.getByText("Good enough")).toBeInTheDocument();
+    expect(screen.queryByText("Fix now")).not.toBeInTheDocument();
   });
 
   it("does not refetch when the window loses focus", async () => {

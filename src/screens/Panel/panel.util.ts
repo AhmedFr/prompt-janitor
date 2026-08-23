@@ -1,5 +1,5 @@
 import type { Grade, PanelFix } from "@/lib/ipc";
-import { relativeSession } from "@/screens/Setup/setup.util";
+import { plural, relativeSession } from "@/screens/Setup/setup.util";
 import type { SignalTone, Verdict } from "./Panel.types";
 import { DELTA_DOWN, DELTA_UNCHANGED, DELTA_UP, NEVER_SCANNED, VERDICTS } from "./Panel.constants";
 
@@ -31,11 +31,13 @@ export function signalTone(count: number): SignalTone {
 }
 
 /**
- * The accessible name of a fix row. The row shows the file name and its
- * project in separate columns; a screen reader needs them as one sentence.
+ * The accessible name of a fix row. The row spreads the file, its project, its
+ * grade and its issue count across four columns; the label replaces all of
+ * them for a screen reader, so it has to carry all four — "Open CLAUDE.md" says
+ * nothing about why this row is worth opening first.
  */
 export function fixLabel(fix: PanelFix): string {
-  return `Open ${fix.name} in ${fix.project_name}`;
+  return `Open ${fix.name} in ${fix.project_name} — grade ${fix.grade}, ${plural(fix.issue_count, "issue")}`;
 }
 
 /**

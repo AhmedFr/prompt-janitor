@@ -39,7 +39,9 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
   const openMain = (route: Route, target: string | null = null) => {
     // Outside the desktop runtime there is no other window to raise.
     if (!isTauri) return;
-    void commands.openMain(route, target);
+    // A bare invoke with no `typedError` wrapper: a rejection here is an
+    // unhandled one, and a failed window raise is not worth a crash overlay.
+    commands.openMain(route, target).catch(() => {});
   };
 
   return (
@@ -72,7 +74,7 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
           onScan={() => void state.startScan()}
           onOpenApp={() => openMain("overview")}
           onQuit={() => {
-            if (isTauri) void commands.quit();
+            if (isTauri) commands.quit().catch(() => {});
           }}
         />
       )}

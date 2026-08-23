@@ -21,7 +21,12 @@ type Story = StoryObj<typeof meta>;
 /** Things to deal with: unused skills and an erroring server. */
 export const Problems: Story = {};
 
-/** Nothing wrong — the chips stay neutral. */
+/** One problem left; the other chip is gone rather than reporting a zero. */
+export const OneProblem: Story = {
+  args: { neverUsedSkills: 0, mcpErroring: 2, sessionsToday: 4 },
+};
+
+/** Nothing wrong — one quiet line instead of two chips saying zero. */
 export const Clean: Story = {
   args: { neverUsedSkills: 0, mcpErroring: 0, sessionsToday: 4 },
 };

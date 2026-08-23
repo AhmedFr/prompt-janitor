@@ -38,3 +38,6 @@ export const SIGNALS: SignalSpec[] = [
 
 /** "3 never-used skills — open Setup": the count and where it is dealt with. */
 export const signalLabel = (text: string, destination: string) => `${text} — open ${destination}`;
+
+/** Both problem counts are zero — said once, instead of two chips reporting nothing. */
+export const ALL_CLEAR = "Setup looks clean";

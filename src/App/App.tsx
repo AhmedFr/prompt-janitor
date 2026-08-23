@@ -74,7 +74,13 @@ export function App() {
       // The route crossed a window boundary as a bare string: a stale link or
       // a typo would otherwise blank the shell by matching no screen at all.
       if (isRoute(payload.route)) navigate(payload.route, payload.target ?? undefined);
-    }).catch(() => () => {});
+    }).catch((error) => {
+      // Inside the runtime this is a real failure — the panel's rows would
+      // silently do nothing — so say so rather than swallowing it. Outside it
+      // (a plain dev server) the rejection is expected.
+      if (isTauri) console.error("navigate listener failed", error);
+      return () => {};
+    });
     return () => {
       void unlisten.then((fn) => fn());
     };

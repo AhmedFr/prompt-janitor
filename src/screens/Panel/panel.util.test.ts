@@ -46,8 +46,11 @@ describe("signalTone", () => {
 });
 
 describe("fixLabel", () => {
-  /** The row shows name and project separately; the label has to read as one sentence. */
-  it("names the file and the project it lives in", () => {
+  /**
+   * The row shows name, project, grade and issue count in four columns; the
+   * label has to carry all four, because a screen reader gets the label alone.
+   */
+  it("names the file, its project, its grade and its issue count", () => {
     const fix: PanelFix = {
       file_id: "/code/acme-api/CLAUDE.md",
       name: "CLAUDE.md",
@@ -55,7 +58,18 @@ describe("fixLabel", () => {
       grade: "D",
       issue_count: 4,
     };
-    expect(fixLabel(fix)).toBe("Open CLAUDE.md in acme-api");
+    expect(fixLabel(fix)).toBe("Open CLAUDE.md in acme-api — grade D, 4 issues");
+  });
+
+  it("agrees the issue count with its noun", () => {
+    const fix: PanelFix = {
+      file_id: "/code/web-app/AGENTS.md",
+      name: "AGENTS.md",
+      project_name: "web-app",
+      grade: "F",
+      issue_count: 1,
+    };
+    expect(fixLabel(fix)).toBe("Open AGENTS.md in web-app — grade F, 1 issue");
   });
 });
 

@@ -5,6 +5,12 @@
   padding: 2px 14px 10px;
 }
 
+.panel-signals__clear {
+  font-size: 11px;
+  margin: 0;
+  align-self: center;
+}
+
 .panel-signal {
   border: 1px solid var(--sep);
   border-radius: var(--r-pill);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { commands, isTauri, type PanelSnapshot } from "@/lib/ipc";
@@ -20,14 +20,23 @@ export function usePanel(): PanelState {
   const [scanning, setScanning] = useState(false);
   const scan = useScanProgress();
   const { reset } = scan;
+  /**
+   * Which read is current. A focus refetch and a `scan-done` refetch overlap
+   * routinely — the panel is shown while a scan is finishing — and the reads
+   * can land in either order. The one started last is the one whose answer is
+   * current; every earlier read is retired the moment a newer one begins.
+   */
+  const ticket = useRef(0);
 
   const refetch = useCallback(async () => {
     if (!isTauri) {
       setLoading(false);
       return;
     }
+    const mine = ++ticket.current;
     try {
       const res = await commands.getPanelSnapshot();
+      if (mine !== ticket.current) return;
       // Never clears `data`: a failed refresh must not blank a panel that is
       // already showing a good answer.
       if (res.status === "ok") setData(res.data);
@@ -35,8 +44,9 @@ export function usePanel(): PanelState {
       // Surfaced by the panel as the unreadable state; nothing to add here.
     } finally {
       // A failed query still ends the load — leaving the skeleton up forever
-      // reads as a hang rather than as an error.
-      setLoading(false);
+      // reads as a hang rather than as an error. A superseded read leaves the
+      // flag to the read that replaced it.
+      if (mine === ticket.current) setLoading(false);
     }
   }, []);
 
