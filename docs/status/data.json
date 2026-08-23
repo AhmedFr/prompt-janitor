@@ -68,7 +68,7 @@
       "done": 4,
       "total": 6,
       "state": "active",
-      "note": "Read models merged (#134). Setup tabs (#128 PR), projects table + per-project page (#129 PR). Next: rules (#130), analytics (#131)."
+      "note": "Read models (#134) and Setup tabs (#135) merged. Project pages + flat prompts (#129 PR). Next: rules (#130), analytics (#131)."
     }
   ],
   "actions": {
@@ -277,8 +277,14 @@
     {
       "name": "Setup screen as per-kind tables",
       "tier": "free",
+      "status": "done",
+      "note": "Merged (#135)"
+    },
+    {
+      "name": "Projects table, project page, flat prompts table",
+      "tier": "free",
       "status": "pr",
-      "note": "PR for #128 awaiting review — tabs per artifact kind, search, sort, pills"
+      "note": "PR for #129 awaiting review — /projects table, dedicated project page (Rules · Effective rules · Setup · Usage), Prompts as a flat files table"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
