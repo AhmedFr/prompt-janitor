@@ -159,6 +159,17 @@ const noHarness: ProjectData = {
   harnessName: null,
 };
 
+/**
+ * The project loaded, but the two harness-scoped reads did not. Distinct from
+ * `Empty`: those tabs must say the read failed, never that the project holds
+ * nothing.
+ */
+const harnessReadFailed: ProjectData = {
+  ...populated,
+  effective: null,
+  usage: null,
+};
+
 /** Scanned, and holding nothing at all — every tab has to say so on its own. */
 const empty: ProjectData = {
   project: project({ grade: "F", score: 0, file_count: 0, issue_count: 0, session_count: 0, last_session_at: null, never_used_count: 0 }),
@@ -219,6 +230,9 @@ export const NoHarness: Story = { args: { data: noHarness } };
 
 /** Scanned and empty — every tab says which kind of nothing it is showing. */
 export const Empty: Story = { args: { data: empty } };
+
+/** The load order and usage reads failed; the rest of the page is intact. */
+export const HarnessReadFailed: Story = { args: { data: harnessReadFailed } };
 
 /** The route was reached without a project to open. */
 export const NoSelection: Story = { args: { path: undefined, data: null } };

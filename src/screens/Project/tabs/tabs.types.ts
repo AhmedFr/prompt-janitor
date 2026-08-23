@@ -6,10 +6,13 @@ export interface RulesTabProps {
   files: FileRow[];
   /** Opens one file's Detail screen. Stable, so the table's memos hold. */
   onOpen: (fileId: string) => void;
+  /** Opens the flat Prompts table filtered to this project. */
+  onSeeAll: () => void;
 }
 
 export interface EffectiveRulesTabProps {
-  rules: EffectiveRule[];
+  /** `null` means the read failed — an empty array means nothing loads here. */
+  rules: EffectiveRule[] | null;
   /** The harness whose load order this is; `null` when none has worked here. */
   harness: string | null;
 }
@@ -21,7 +24,7 @@ export interface SetupTabProps {
 }
 
 export interface UsageTabProps {
-  /** `null` when there is no harness to attribute usage to. */
+  /** `null` when the read failed, or when there is no harness to attribute usage to. */
   usage: ProjectUsage | null;
   harness: string | null;
 }

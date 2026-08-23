@@ -99,3 +99,12 @@
   max-width: 520px;
   font-size: 13px;
 }
+
+/*
+ * The absence *is* a failure: a read that did not answer, not a project with
+ * nothing in it. Takes the same contrast-measured error pair the missing-folder
+ * banner does, so the two failures read alike and neither reads as a finding.
+ */
+.project-note--error {
+  color: var(--tone-error-fg);
+}

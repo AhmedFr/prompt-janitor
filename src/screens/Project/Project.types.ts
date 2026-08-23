@@ -31,9 +31,15 @@ export interface ProjectData {
   files: FileRow[];
   /** This project's slice of the setup inventory, when the harness has one. */
   setup: ProjectSetup | null;
-  /** The rule stack the harness loads here, in load order. Empty without a harness. */
-  effective: EffectiveRule[];
-  /** Usage over the trailing window. `null` without a harness to attribute it to. */
+  /**
+   * The rule stack the harness loads here, in load order. `null` means the
+   * read failed — an empty array means the harness genuinely loads nothing
+   * here, and the two must not render alike. Also `null` when there is no
+   * harness, which the tabs distinguish by checking {@link ProjectData.harness}
+   * first.
+   */
+  effective: EffectiveRule[] | null;
+  /** Usage over the trailing window. `null` on a failed read, or with no harness — see {@link ProjectData.effective}. */
   usage: ProjectUsage | null;
   /** When the harness that works here was last scanned. */
   lastScanAt: string | null;
@@ -45,7 +51,17 @@ export interface ProjectData {
 
 /** What {@link useProject} hands the screen. */
 export interface ProjectState {
+  /**
+   * The last snapshot that loaded, kept across a failed refetch — see
+   * {@link ProjectState.error}. `null` only before the first one lands.
+   */
   data: ProjectData | null;
   loading: boolean;
+  /**
+   * The most recent read failed. With `data` still set this means the page on
+   * screen is the previous scan's and says so; with `data` null it means
+   * nothing ever loaded, and the screen shows the failure panel instead.
+   */
+  error: boolean;
   refetch: () => Promise<void>;
 }

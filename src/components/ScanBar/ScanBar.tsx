@@ -5,10 +5,15 @@ import type { ScanBarProps } from "./ScanBar.types";
 import "./ScanBar.css";
 
 /**
- * How a running scan looks, wherever one can be started — onboarding, Setup's
- * Rescan, a project page's Rescan. A rescan that only greys out a button
- * leaves a long scan indistinguishable from a hang, and three screens each
- * drawing their own bar would drift apart, so there is exactly one.
+ * How a running scan looks. A rescan that only greys out a button leaves a
+ * long scan indistinguishable from a hang, and every screen drawing its own
+ * bar would drift apart.
+ *
+ * Used by Setup's Rescan and a project page's Rescan. Onboarding and the
+ * Settings harness tab still draw their own bars inline — they predate this
+ * component and sit in different chrome (neither is inside a `Card`), so
+ * folding them in is a separate change, not something this doc should claim
+ * has already happened.
  *
  * Dumb on purpose: the caller owns {@link useScanProgress} and hands the
  * numbers down, so the bar has nothing to subscribe to and nothing to reset.

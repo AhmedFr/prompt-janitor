@@ -27,5 +27,9 @@ export const RECENT_PROJECTS_LIMIT = 6;
  */
 export const NAV_OWNER: Partial<Record<Route, Route>> = {
   project: "projects",
+  // Reachable from Overview and a project page as well as from Prompts, but
+  // Prompts is the file list a file belongs to — and a nav with nothing lit
+  // is worse than one lit a level up from where the reader came in.
+  detail: "prompts",
   "rules-new": "rules",
 };

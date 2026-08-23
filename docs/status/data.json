@@ -320,7 +320,7 @@
     },
     {
       "name": "Vitest",
-      "result": "713/713 passing (62 files)"
+      "result": "720/720 passing (62 files)"
     },
     {
       "name": "cargo test",
@@ -353,6 +353,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 — PR4 branch-review fix wave: harness-scoped read failures say so instead of collapsing to empty, a failed refetch keeps the loaded page and flags it as the previous scan, project page gains a “See all files” deep link into Prompts, sidebar keeps Prompts lit on a file detail (#129 PR)",
     "2026-08-23 — Prompts screen rebuilt as one flat files table: Name (over its path) · Project chip · Kind · Grade · Issues · Modified, with Kind / Grade / Project (top 12 + Other) / Has-issues pills and path search; the project-group cards are gone and sidebar recents now open the project page (#129 PR)",
     "2026-08-23 — Review round 1 on the project page: a read left in flight by one project no longer overwrites the next one (generation guard), partial read failures covered, missing-folder banner announced as a live region, header and state panels split into their own folders (#129 PR)",
     "2026-08-23 — Dedicated project page: header (grade ring, sessions, last scan, Rescan) plus Rules / Effective rules / Setup / Usage tabs, folder-missing banner and honest not-found + failure states; shared ScanBar extracted, TrendChart made reusable for a count series (#129 PR)",

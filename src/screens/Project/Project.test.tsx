@@ -291,9 +291,22 @@ describe("Project", () => {
       const { navigate } = await renderScreen();
       await waitFor(() => expect(rowNames()).toHaveLength(2));
 
-      fireEvent.click(screen.getByRole("row", { name: "AGENTS.md" }));
+      // Rows are named by path: two files called `CLAUDE.md` in one project
+      // are told apart by nothing else.
+      fireEvent.click(screen.getByRole("row", { name: `${PATH}/AGENTS.md` }));
 
       expect(navigate).toHaveBeenCalledWith("detail", `${PATH}/AGENTS.md`);
+    });
+
+    it("opens the full file list, filtered to this project", async () => {
+      // `Prompts` takes a project target and had no producer for it; this is
+      // the one place a reader is already looking at exactly that project.
+      const { navigate } = await renderScreen();
+      await waitFor(() => expect(rowNames()).toHaveLength(2));
+
+      fireEvent.click(screen.getByRole("button", { name: /See all files/ }));
+
+      expect(navigate).toHaveBeenCalledWith("prompts", PATH);
     });
 
     it("says so when nothing was scanned inside the project", async () => {
@@ -333,6 +346,16 @@ describe("Project", () => {
       openTab("Effective rules");
 
       expect(await screen.findByTitle("/Users/dev/.claude/CLAUDE.md")).toBeInTheDocument();
+    });
+
+    it("says the load order could not be read, rather than that none applies", async () => {
+      getEffectiveRules.mockResolvedValue({ status: "error", error: "database is locked" });
+      await renderScreen();
+      await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
+      openTab("Effective rules");
+
+      expect(await screen.findByText(/load order could not be read/)).toBeInTheDocument();
+      expect(screen.queryByText(/No rule files load in this project/)).not.toBeInTheDocument();
     });
 
     it("says so when no rule file applies here", async () => {
@@ -403,6 +426,18 @@ describe("Project", () => {
       await renderScreen();
       await waitFor(() => expect(getProjectUsage).toHaveBeenCalled());
       expect(getProjectUsage).toHaveBeenCalledWith("claude_code", PATH, 90);
+    });
+
+    it("says usage could not be read, rather than that nothing was invoked", async () => {
+      // "Nothing was invoked here" is a finding about the project. A failed
+      // read is a finding about the database, and they must not look alike.
+      getProjectUsage.mockResolvedValue({ status: "error", error: "database is locked" });
+      await renderScreen();
+      await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
+      openTab("Usage");
+
+      expect(await screen.findByText(/Usage could not be read/)).toBeInTheDocument();
+      expect(screen.queryByText(/Nothing was invoked here/)).not.toBeInTheDocument();
     });
 
     it("says so when nothing was invoked here", async () => {
@@ -534,6 +569,39 @@ describe("Project", () => {
       await emit("scan-done");
 
       await waitFor(() => expect(rowNames()).toHaveLength(3));
+    });
+
+    it("keeps the loaded page when a later refetch fails", async () => {
+      await renderScreen();
+      await waitFor(() => expect(rowNames()).toHaveLength(2));
+
+      listProjects.mockRejectedValue(new Error("database is locked"));
+      await emit("scan-done");
+
+      // Throwing away a page that loaded fine, because the *refresh* failed,
+      // loses the reader everything they had.
+      await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+      expect(rowNames()).toHaveLength(2);
+      expect(screen.queryByText(/The project query failed/)).not.toBeInTheDocument();
+    });
+
+    it("says the page it kept is the previous scan's, not this one's", async () => {
+      await renderScreen();
+      await waitFor(() => expect(rowNames()).toHaveLength(2));
+
+      listProjects.mockRejectedValue(new Error("database is locked"));
+      await emit("scan-done");
+
+      await waitFor(() =>
+        expect(screen.getByRole("status")).toHaveTextContent(/could not be refreshed/),
+      );
+    });
+
+    it("still fails outright when the very first read fails", async () => {
+      listProjects.mockRejectedValue(new Error("database is locked"));
+      await renderScreen();
+
+      await waitFor(() => expect(screen.getByText(/The project query failed/)).toBeInTheDocument());
     });
 
     it("ignores a fetch that lands after the reader moved to another project", async () => {

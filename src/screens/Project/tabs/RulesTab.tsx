@@ -1,7 +1,10 @@
+import { Button } from "@/components/Button";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
+import { Icon } from "@/components/Icon";
 import type { FileRow } from "@/lib/ipc";
 import {
   RULES_EMPTY_HINT,
+  SEE_ALL_FILES_LABEL,
   RULES_EMPTY_TITLE,
   RULES_SEARCH_PLACEHOLDER,
   RULES_TABLE_KEY,
@@ -23,7 +26,7 @@ const SEARCH: DataTableSearch<FileRow> = {
 };
 
 /** The graded prompt files inside this project. A row opens its Detail page. */
-export function RulesTab({ files, onOpen }: RulesTabProps) {
+export function RulesTab({ files, onOpen, onSeeAll }: RulesTabProps) {
   return (
     <DataTable
       ariaLabel="Rule files"
@@ -34,6 +37,15 @@ export function RulesTab({ files, onOpen }: RulesTabProps) {
       search={SEARCH}
       defaultSort={RULES_DEFAULT_SORT}
       onRowClick={(row) => onOpen(row.id)}
+      // Two files called `CLAUDE.md` in one project are told apart by nothing
+      // but their path, and a column of identically-named rows is
+      // indistinguishable to assistive tech.
+      rowLabel={(row) => row.path}
+      toolbarRight={
+        <Button size="sm" onClick={onSeeAll}>
+          <Icon name="prompts" /> {SEE_ALL_FILES_LABEL}
+        </Button>
+      }
       density="compact"
       empty={{ title: RULES_EMPTY_TITLE, hint: RULES_EMPTY_HINT }}
     />

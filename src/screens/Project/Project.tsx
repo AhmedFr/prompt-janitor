@@ -18,6 +18,7 @@ import {
   NOT_FOUND_BODY,
   NOT_FOUND_TITLE,
   PROJECT_TABS,
+  STALE_NOTE,
   RESCAN_BUSY_LABEL,
   RESCAN_LABEL,
   TAB_IDS,
@@ -53,6 +54,10 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const project = data?.project ?? null;
+  // A read failed over a page that had already loaded: the page stays, and
+  // says which scan it is showing. With no snapshot to keep, the failure
+  // panel below owns the state instead.
+  const stale = !override && state.error && data != null;
 
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
@@ -61,6 +66,9 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
   // the `ctx` these close over, and a fresh function every render defeats it.
   const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
   const goBack = useCallback(() => navigate("projects"), [navigate]);
+  // The one place a reader is already looking at exactly this project, which
+  // is what makes it the natural producer of Prompts' project target.
+  const seeAllFiles = useCallback(() => navigate("prompts", path), [navigate, path]);
 
   const artifacts = data?.setup?.artifacts ?? NO_ARTIFACTS;
   // One entry, because every row in this table is in this one project — the
@@ -140,9 +148,25 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
           ) : (
             <>
               <ProjectHeader project={project} lastScanAt={data.lastScanAt} />
+              {stale && (
+                <Card padded>
+                  <p className="project-note project-note--error" role="status">
+                    {STALE_NOTE}
+                  </p>
+                </Card>
+              )}
               {!project.exists && <MissingFolderBanner />}
               <Tabs items={tabs} active={active} onChange={setActive} ariaLabel={TABS_LABEL}>
-                {(id) => <TabPanel id={id} data={data} artifacts={artifacts} ctx={ctx} onOpen={openDetail} />}
+                {(id) => (
+                  <TabPanel
+                    id={id}
+                    data={data}
+                    artifacts={artifacts}
+                    ctx={ctx}
+                    onOpen={openDetail}
+                    onSeeAll={seeAllFiles}
+                  />
+                )}
               </Tabs>
             </>
           )}
@@ -159,7 +183,7 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
  */
 function tabCount(id: string, data: ProjectData | null, artifacts: ArtifactView[]): number | undefined {
   if (!data) return undefined;
-  if (id === "effective") return data.effective.length;
+  if (id === "effective") return data.effective?.length;
   if (id === "setup") return artifacts.length;
   if (id === "usage") return data.usage?.ranked.length;
   return data.files.length;
@@ -172,15 +196,17 @@ function TabPanel({
   artifacts,
   ctx,
   onOpen,
+  onSeeAll,
 }: {
   id: string;
   data: ProjectData;
   artifacts: ArtifactView[];
   ctx: ColumnsCtx;
   onOpen: (fileId: string) => void;
+  onSeeAll: () => void;
 }) {
   if (id === "effective") return <EffectiveRulesTab rules={data.effective} harness={data.harness} />;
   if (id === "setup") return <SetupTab artifacts={artifacts} ctx={ctx} />;
   if (id === "usage") return <UsageTab usage={data.usage} harness={data.harness} />;
-  return <RulesTab files={data.files} onOpen={onOpen} />;
+  return <RulesTab files={data.files} onOpen={onOpen} onSeeAll={onSeeAll} />;
 }

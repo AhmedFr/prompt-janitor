@@ -84,6 +84,18 @@ export const MISSING_FOLDER_BODY =
 export const NO_HARNESS_NOTE =
   "No agent harness has worked in this project, so there is no load order or usage to report.";
 
+/**
+ * A refresh failed over a page that had already loaded. The page keeps what
+ * it has — throwing away a good page because the *refresh* failed loses the
+ * reader everything — but it has to say that the numbers are the previous
+ * scan's, or the failure is invisible and the staleness is a lie.
+ */
+export const STALE_NOTE =
+  "This page could not be refreshed, so it is showing the previous scan. Try rescanning.";
+
+/** Opens the flat Prompts table, filtered to this project. */
+export const SEE_ALL_FILES_LABEL = "See all files";
+
 export const RESCAN_LABEL = "Rescan";
 export const RESCAN_BUSY_LABEL = "Scanning…";
 
@@ -97,6 +109,15 @@ export const SETUP_SEARCH_PLACEHOLDER = "Search name, description or path";
 
 export const EFFECTIVE_TITLE = "Load order";
 export const EFFECTIVE_EMPTY = "No rule files load in this project.";
+
+/**
+ * The harness-scoped read failed. Deliberately not {@link EFFECTIVE_EMPTY}:
+ * "no rule files load here" is a finding about the project, and a failed read
+ * is a finding about the database. A reader who acts on the first when the
+ * second is true goes and writes a rule file they already have.
+ */
+export const EFFECTIVE_UNREADABLE =
+  "The load order could not be read. This is usually a scan still holding the database — rescan to try again.";
 
 /** Which layer a rule in the load-order stack comes from. */
 export const LAYER_LABEL: Record<Layer, string> = {
@@ -118,6 +139,10 @@ export const USAGE_KIND_EMPTY: Record<InvocationKind, string> = {
   mcp: `No MCP tools were called here in the last ${USAGE_WINDOW_DAYS} days.`,
   builtin: `No built-in tools were used here in the last ${USAGE_WINDOW_DAYS} days.`,
 };
+
+/** The usage read failed — see {@link EFFECTIVE_UNREADABLE} for why this is not the empty copy. */
+export const USAGE_UNREADABLE =
+  "Usage could not be read. This is usually a scan still holding the database — rescan to try again.";
 
 export const SESSIONS_CHART_LABEL = "Sessions per day";
 export const SESSIONS_CHART_TITLE = `Sessions per day · last ${USAGE_WINDOW_DAYS} days`;

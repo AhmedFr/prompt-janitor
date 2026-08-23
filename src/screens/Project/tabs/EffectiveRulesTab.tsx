@@ -1,7 +1,13 @@
 import { useMemo } from "react";
 import { GradeCell, PathCell } from "@/components/DataTable";
 import type { GradeLetter } from "@/components/Grade";
-import { EFFECTIVE_EMPTY, EFFECTIVE_TITLE, LAYER_LABEL, NO_HARNESS_NOTE } from "../Project.constants";
+import {
+  EFFECTIVE_EMPTY,
+  EFFECTIVE_TITLE,
+  EFFECTIVE_UNREADABLE,
+  LAYER_LABEL,
+  NO_HARNESS_NOTE,
+} from "../Project.constants";
 import { orderEffectiveRules } from "../project.util";
 import type { EffectiveRulesTabProps } from "./tabs.types";
 
@@ -12,9 +18,12 @@ import type { EffectiveRulesTabProps } from "./tabs.types";
  * grader has not seen still shapes every session run here.
  */
 export function EffectiveRulesTab({ rules, harness }: EffectiveRulesTabProps) {
-  const ordered = useMemo(() => orderEffectiveRules(rules), [rules]);
+  const ordered = useMemo(() => orderEffectiveRules(rules ?? []), [rules]);
 
+  // Three different absences, in the order they explain each other: no
+  // harness to ask, the ask failed, and the ask came back empty.
   if (!harness) return <p className="muted project-note">{NO_HARNESS_NOTE}</p>;
+  if (rules === null) return <p className="project-note project-note--error">{EFFECTIVE_UNREADABLE}</p>;
   if (ordered.length === 0) return <p className="muted project-note">{EFFECTIVE_EMPTY}</p>;
 
   return (

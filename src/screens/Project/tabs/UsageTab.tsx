@@ -12,6 +12,7 @@ import {
   USAGE_KINDS,
   USAGE_LIMIT,
   USAGE_TITLE,
+  USAGE_UNREADABLE,
 } from "../Project.constants";
 import { usageRows } from "../project.util";
 import type { UsageTabProps } from "./tabs.types";
@@ -36,7 +37,9 @@ export function UsageTab({ usage, harness }: UsageTabProps) {
   const rankedCount = usage?.ranked.length ?? 0;
   const days = usage?.sessions_per_day ?? [];
 
+  // Same three absences the load order distinguishes, for the same reason.
   if (!harness) return <p className="muted project-note">{NO_HARNESS_NOTE}</p>;
+  if (!usage) return <p className="project-note project-note--error">{USAGE_UNREADABLE}</p>;
 
   return (
     <div className="project-usage">

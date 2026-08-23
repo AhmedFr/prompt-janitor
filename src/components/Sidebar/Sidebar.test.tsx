@@ -67,6 +67,13 @@ describe("Sidebar", () => {
     expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
   });
 
+  it("keeps Prompts lit while one file's detail page is open", () => {
+    // `detail` is not a destination of its own either; it is opened from a
+    // file list, and Prompts is the list it belongs to.
+    const { getByRole } = render(<Sidebar active="detail" onNavigate={() => {}} />);
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Prompts");
+  });
+
   it("routes a recent project to its own page", () => {
     // The Projects table is the canonical list and each project has a page of
     // its own now; a recent used to land on Prompts filtered to that project.

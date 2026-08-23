@@ -37,6 +37,7 @@ function unwrap<T>(res: { status: "ok"; data: T } | { status: "error"; error: un
 export function useProject(path: string | undefined): ProjectState {
   const [data, setData] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   // Bumped whenever a read is started or superseded; a read may only write
   // while the counter still holds the value it claimed on entry.
   const generation = useRef(0);
@@ -61,9 +62,10 @@ export function useProject(path: string | undefined): ProjectState {
       // One read answering and another not is not "this project is empty":
       // it is a page that cannot be honestly drawn, so all three fail
       // together. (TypeScript enforces the null checks below; this is the
-      // runtime half of the same contract.)
+      // runtime half of the same contract.) `data` is left alone — see the
+      // `catch` below for why a failure never clears a loaded page.
       if (!rows || !allFiles || !setupView) {
-        if (fresh()) setData(null);
+        if (fresh()) setError(true);
         return;
       }
 
@@ -73,18 +75,26 @@ export function useProject(path: string | undefined): ProjectState {
       // Nothing to ask a harness that does not exist: `get_effective_rules`
       // and `get_project_usage` are both keyed by one, so without it the two
       // tabs say why they are empty instead of showing an empty answer.
-      let effective: EffectiveRule[] = [];
+      //
+      // These two are allowed to fail without taking the page down — they are
+      // one tab each, not the whole project. But a failure stays `null`
+      // rather than collapsing to an empty array: an empty load order is a
+      // fact about the project, and the tabs must be able to tell the two
+      // apart. `harness === null` also lands here as `null`, which the tabs
+      // resolve first by checking the harness itself.
+      let effective: EffectiveRule[] | null = null;
       let usage: ProjectUsage | null = null;
       if (harness) {
         const [rules, used] = await Promise.all([
           commands.getEffectiveRules(harness, path),
           commands.getProjectUsage(harness, path, USAGE_WINDOW_DAYS),
         ]);
-        effective = unwrap(rules) ?? [];
+        effective = unwrap(rules);
         usage = unwrap(used);
       }
 
       if (!fresh()) return;
+      setError(false);
       setData({
         project,
         files: filesFor(allFiles, path),
@@ -96,8 +106,11 @@ export function useProject(path: string | undefined): ProjectState {
         harnessName: setupView.harnesses.find((h) => h.id === harness)?.display_name ?? null,
       });
     } catch {
-      // Surfaced by the screen as the unreadable state; nothing to add here.
-      if (fresh()) setData(null);
+      // Never clears `data`: a scan-done refetch that fails must not throw
+      // away a page that loaded perfectly well a moment ago. The screen shows
+      // the failure panel only when there is no snapshot to keep, and marks
+      // the kept one as stale otherwise.
+      if (fresh()) setError(true);
     } finally {
       // A failed query still ends the load: leaving the spinner up forever
       // reads as a hang rather than an error. A superseded read must not do
@@ -113,8 +126,14 @@ export function useProject(path: string | undefined): ProjectState {
     // read even starts.
     generation.current += 1;
     setData(null);
+    setError(false);
     setLoading(true);
     void refetch();
+    // Unmounting retires whatever is in flight too — a read that resolves
+    // after the screen is gone has nothing left to write to.
+    return () => {
+      generation.current += 1;
+    };
   }, [refetch]);
 
   useEffect(() => {
@@ -127,5 +146,5 @@ export function useProject(path: string | undefined): ProjectState {
     };
   }, [refetch, path]);
 
-  return { data, loading, refetch };
+  return { data, loading, error, refetch };
 }
