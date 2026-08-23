@@ -166,8 +166,12 @@ pub fn hide_on_blur(app: &AppHandle) {
 /// `AppHandle::monitor_from_point` cannot be used here: on macOS tao resolves it
 /// with `CGDisplayBounds`, which is point space, while the tray hands us physical
 /// pixels — on a multi-display setup that lands on the wrong screen. Each
-/// candidate is tested in its own logical space instead, and on an overlap the
-/// one whose top edge is nearest the point wins.
+/// candidate is tested in its own logical space instead. Overlaps are broken by
+/// the nearest top edge, which only helps for vertically stacked displays: two
+/// side-by-side displays with different scale factors can both claim a point
+/// (the physical value cannot be inverted without knowing its display), and
+/// then the first monitor reported wins. Owner verifies on-device; an `NSScreen`
+/// lookup from `NSEvent::mouseLocation` would make this exact on macOS.
 fn monitor_for(app: &AppHandle, px: f64, py: f64) -> Option<Monitor> {
     let top_distance = |m: &Monitor| {
         let scale = m.scale_factor();
@@ -238,8 +242,10 @@ fn logical_geometry(app: &AppHandle, icon: tauri::Rect) -> (Rect, Rect) {
                 }
             }
         })
+        // No monitor at all: a synthetic work area centred on the icon, so the
+        // clamp still yields a centred panel.
         .unwrap_or(Rect {
-            x: icon.x,
+            x: icon.x + icon.w / 2.0 - PANEL_SIZE.0 / 2.0 - PANEL_MARGIN,
             y: icon.y,
             w: PANEL_SIZE.0 + 2.0 * PANEL_MARGIN,
             h: PANEL_SIZE.1 + icon.h + PANEL_GAP,
