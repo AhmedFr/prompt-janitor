@@ -1,73 +1,264 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, cleanup, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import type { FileRow } from "@/lib/ipc";
 import { Prompts } from "./Prompts";
-import type { FileRow, ProjectRow } from "@/lib/ipc";
 
-// jsdom does not implement scrollIntoView.
-Element.prototype.scrollIntoView = vi.fn();
+// One handler registry per test so a case can emit `scan-done` like the core does.
+const listeners = vi.hoisted(() => new Map<string, () => void>());
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn((event: string, handler: () => void) => {
+    listeners.set(event, handler);
+    return Promise.resolve(() => listeners.delete(event));
+  }),
+}));
 
-vi.mock("@/lib/ipc", async (orig) => {
-  const mod = await orig<typeof import("@/lib/ipc")>();
+const emit = async (event: string) => {
+  await act(async () => {
+    listeners.get(event)?.();
+  });
+};
+
+const listFiles = vi.hoisted(() => vi.fn());
+const scanNow = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/ipc", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
-    ...mod,
+    ...actual,
     isTauri: true,
-    // useTemplatePicker (invoked by the still-present template flow) fires on
-    // mount; stub its two calls so tests don't hit the real Tauri bridge.
     commands: {
-      ...mod.commands,
+      listFiles,
+      scanNow,
+      // `useTemplatePicker` loads the catalog on mount; keep it off the bridge.
       listTemplates: vi.fn().mockResolvedValue([]),
       getEntitlement: vi.fn().mockResolvedValue({ status: "ok", data: { paid: false, email: null, plan: null } }),
     },
   };
 });
 
-const projects: ProjectRow[] = [
-  {
-    id: "/api", name: "api", grade: "D", score: 52, file_count: 1, issue_count: 5, logo: null, modified: "200",
-    harness: null, session_count: 0, last_session_at: null, never_used_count: 0, error_count: 0, exists: true,
-  },
-];
-const files: FileRow[] = [
-  { id: "/api/CLAUDE.md", name: "CLAUDE.md", path: "/api/CLAUDE.md", project: "api", project_id: "/api", kind: "CLAUDE.md", grade: "D", score: 52, issue_count: 5, modified: "200" },
-];
-vi.mock("./usePromptsList", async (orig) => {
-  const mod = await orig<typeof import("./usePromptsList")>();
-  return { ...mod, usePromptsList: () => ({ files, projects, loading: false, refetch: vi.fn() }) };
+const file = (o: Partial<FileRow> = {}): FileRow => ({
+  id: "/code/api/CLAUDE.md",
+  name: "CLAUDE.md",
+  path: "/code/api/CLAUDE.md",
+  project: "api",
+  project_id: "/code/api",
+  kind: "CLAUDE.md",
+  grade: "B",
+  score: 80,
+  issue_count: 2,
+  modified: "1750000000",
+  ...o,
 });
 
-describe("Prompts", () => {
-  afterEach(cleanup);
+const populated: FileRow[] = [
+  file({
+    id: "/code/web/CLAUDE.md",
+    path: "/code/web/CLAUDE.md",
+    project: "web",
+    project_id: "/code/web",
+    grade: "A",
+    issue_count: 0,
+  }),
+  file({
+    id: "/code/web/docs/CLAUDE.md",
+    path: "/code/web/docs/CLAUDE.md",
+    project: "web",
+    project_id: "/code/web",
+    grade: "A",
+    issue_count: 0,
+  }),
+  file({
+    id: "/code/api/AGENTS.md",
+    name: "AGENTS.md",
+    path: "/code/api/AGENTS.md",
+    kind: "AGENTS.md",
+    grade: "F",
+    issue_count: 4,
+  }),
+];
 
-  it("renders a project group with its file row", () => {
-    const { getByText, getByRole } = render(<Prompts navigate={vi.fn()} />);
-    expect(getByText("api")).toBeInTheDocument();
-    expect(getByRole("button", { name: /CLAUDE\.md/ })).toBeInTheDocument();
+/** The id (= absolute path) of every rendered body row, in order. */
+function rowIds(): string[] {
+  return [...screen.getByRole("table").querySelectorAll("tbody tr[data-row-id]")].map(
+    (tr) => (tr as HTMLElement).dataset.rowId ?? "",
+  );
+}
+
+const renderScreen = async (props: Partial<React.ComponentProps<typeof Prompts>> = {}) => {
+  const navigate = props.navigate ?? vi.fn();
+  const view = render(<Prompts navigate={navigate} {...props} />);
+  await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+  return { ...view, navigate };
+};
+
+describe("Prompts", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    listeners.clear();
+    listFiles.mockReset();
+    scanNow.mockReset();
+    listFiles.mockResolvedValue({ status: "ok", data: populated });
+    scanNow.mockResolvedValue({ status: "ok", data: null });
   });
 
-  it("navigates to detail on row click", () => {
-    const navigate = vi.fn();
-    const { getByRole } = render(<Prompts navigate={navigate} />);
-    getByRole("button", { name: /CLAUDE\.md/ }).click();
-    expect(navigate).toHaveBeenCalledWith("detail", "/api/CLAUDE.md");
+  afterEach(cleanup);
+
+  it("lists every scanned file as one flat table, not grouped under projects", async () => {
+    const { container } = await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+    expect(rowIds()).toEqual(expect.arrayContaining(["/code/web/CLAUDE.md", "/code/api/AGENTS.md"]));
+    expect(container.querySelector(".p-group")).toBeNull();
+  });
+
+  it("names each row by its path — three files called CLAUDE.md are told apart by nothing else", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+    expect(screen.getByRole("row", { name: "/code/web/docs/CLAUDE.md" })).toBeInTheDocument();
+  });
+
+  it("opens the file's detail page on a row click", async () => {
+    const { navigate } = await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("row", { name: "/code/api/AGENTS.md" }));
+
+    expect(navigate).toHaveBeenCalledWith("detail", "/code/api/AGENTS.md");
+  });
+
+  it("opens the project page from the project chip, without also opening the file", async () => {
+    const { navigate } = await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Open project api/ })[0]);
+
+    expect(navigate).toHaveBeenCalledWith("project", "/code/api");
+    expect(navigate).not.toHaveBeenCalledWith("detail", expect.anything());
+  });
+
+  it("searches on the path, so a folder narrows the table", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "/docs/" } });
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/web/docs/CLAUDE.md"]));
+  });
+
+  it("narrows to one kind", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("button", { name: /^AGENTS\.md\s*\d+$/ }));
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+  });
+
+  it("narrows to one grade", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("button", { name: /^F\s*\d+$/ }));
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+  });
+
+  it("narrows to one project", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("button", { name: /^web\s*\d+$/ }));
+
+    await waitFor(() =>
+      expect(rowIds()).toEqual(["/code/web/CLAUDE.md", "/code/web/docs/CLAUDE.md"]),
+    );
+  });
+
+  it("narrows to files with open issues, and drops the clean ones", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    fireEvent.click(screen.getByRole("button", { name: /Has issues/ }));
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+  });
+
+  it("preselects the deep-linked project, over whatever the table last remembered", async () => {
+    window.sessionStorage.setItem(
+      "pj.table.prompts",
+      JSON.stringify({ search: "", pills: { project: ["/code/web"] }, sort: null }),
+    );
+
+    await renderScreen({ target: "/code/api" });
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+    expect(screen.getByRole("button", { name: /^api\s*\d+$/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("leaves the remembered filters alone when no project was deep-linked", async () => {
+    window.sessionStorage.setItem(
+      "pj.table.prompts",
+      JSON.stringify({ search: "", pills: { project: ["/code/web"] }, sort: null }),
+    );
+
+    await renderScreen();
+
+    await waitFor(() =>
+      expect(rowIds()).toEqual(["/code/web/CLAUDE.md", "/code/web/docs/CLAUDE.md"]),
+    );
+  });
+
+  it("refetches when a scan finishes", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+
+    listFiles.mockResolvedValue({
+      status: "ok",
+      data: [...populated, file({ id: "/code/cli/CLAUDE.md", path: "/code/cli/CLAUDE.md" })],
+    });
+    await emit("scan-done");
+
+    await waitFor(() => expect(rowIds()).toHaveLength(4));
+  });
+
+  it("runs a scan from the toolbar", async () => {
+    await renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /Scan now/ }));
+    await waitFor(() => expect(scanNow).toHaveBeenCalled());
+  });
+
+  it("says nothing has been scanned yet rather than showing an empty grid", async () => {
+    listFiles.mockResolvedValue({ status: "ok", data: [] });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText(/No prompt files scanned yet/)).toBeInTheDocument());
+  });
+
+  it("says the query failed rather than claiming nothing is scanned", async () => {
+    listFiles.mockRejectedValue(new Error("database is locked"));
+    render(<Prompts navigate={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText(/The file list query failed/)).toBeInTheDocument());
+    expect(screen.queryByText(/No prompt files scanned yet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("retries the query from the failure panel", async () => {
+    listFiles.mockRejectedValue(new Error("database is locked"));
+    render(<Prompts navigate={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText(/The file list query failed/)).toBeInTheDocument());
+
+    listFiles.mockResolvedValue({ status: "ok", data: populated });
+    fireEvent.click(screen.getByRole("button", { name: /Try again/ }));
+
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
   });
 
   it("has no accessibility violations", async () => {
-    const { container } = render(<Prompts navigate={vi.fn()} />);
+    const { container } = await renderScreen();
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
     expect(await axe(container)).toHaveNoViolations();
-  });
-
-  it("deep-link scrolls to and highlights the target project group", () => {
-    const { getByText } = render(<Prompts navigate={vi.fn()} target="/api" />);
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-    const group = getByText("api").closest(".p-group");
-    expect(group).toHaveClass("p-group--hl");
-  });
-
-  it("does not re-scroll on filter changes after the deep-link target is handled", () => {
-    const { getByLabelText } = render(<Prompts navigate={vi.fn()} target="/api" />);
-    vi.mocked(Element.prototype.scrollIntoView).mockClear();
-    fireEvent.change(getByLabelText("Search prompts"), { target: { value: "CLAUDE" } });
-    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });

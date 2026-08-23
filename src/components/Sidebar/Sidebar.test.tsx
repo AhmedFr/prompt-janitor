@@ -67,7 +67,9 @@ describe("Sidebar", () => {
     expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
   });
 
-  it("routes a project click to Prompts with the project id", () => {
+  it("routes a recent project to its own page", () => {
+    // The Projects table is the canonical list and each project has a page of
+    // its own now; a recent used to land on Prompts filtered to that project.
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({
       counts: {},
@@ -75,7 +77,7 @@ describe("Sidebar", () => {
     });
     const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
     getByRole("button", { name: /web-app/ }).click();
-    expect(onNavigate).toHaveBeenCalledWith("prompts", "/web-app");
+    expect(onNavigate).toHaveBeenCalledWith("project", "/web-app");
   });
 
   it("has no accessibility violations", async () => {

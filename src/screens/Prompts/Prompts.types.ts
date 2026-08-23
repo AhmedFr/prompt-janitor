@@ -1,17 +1,21 @@
-import type { FileRow, ProjectRow, Grade } from "@/lib/ipc";
+import type { FileRow } from "@/lib/ipc";
+import type { Navigate } from "@/App/App.types";
 
-export type PromptTab = "all" | "flagged";
-export type PromptSort = "grade" | "issues" | "recent";
-
-export interface PromptFilters {
-  tab: PromptTab;
-  search: string;
-  provider: string | null; // file kind, or null for any
-  grade: Grade | null;
-  sort: PromptSort;
+export interface PromptsProps {
+  navigate: Navigate;
+  /**
+   * A project id (its absolute root path) the caller wants this table opened
+   * on — the Project pill is preselected to it, over whatever the table last
+   * remembered.
+   */
+  target?: string;
+  /** Override the live data (Storybook only); the hook supplies it in the app. */
+  data?: FileRow[] | null;
 }
 
-export interface ProjectGroup {
-  project: ProjectRow;
-  files: FileRow[];
+/** What {@link usePromptsList} hands the screen. */
+export interface PromptsState {
+  data: FileRow[] | null;
+  loading: boolean;
+  refetch: () => Promise<void>;
 }

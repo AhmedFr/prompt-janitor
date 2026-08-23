@@ -48,7 +48,11 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
                 key={project.id}
                 type="button"
                 className="sidebar__item sidebar__item--project"
-                onClick={() => onNavigate("prompts", project.id)}
+                // The project's own page, not the files table filtered to it:
+                // the page answers the questions a recent project is opened
+                // for (grade, load order, what ran here), and its Rules tab
+                // holds the files anyway.
+                onClick={() => onNavigate("project", project.id)}
               >
                 <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>

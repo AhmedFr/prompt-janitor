@@ -62,6 +62,15 @@ export interface DataTableProps<Row> {
   search?: DataTableSearch<Row>;
   /** Identity-stable, per the note above. */
   pills?: PillGroup<Row>[];
+  /**
+   * Pill selection a deep link asks for, as option ids per {@link PillGroup.id}.
+   * Applied on mount and again whenever this object's identity changes, and it
+   * beats the remembered selection: a link names the slice it means, where the
+   * stored one only decides where an unqualified visit lands. Identity-stable,
+   * per the note above — an inline literal would re-apply on every render and
+   * the user could never un-press the chip.
+   */
+  initialPills?: Record<string, string[]>;
   defaultSort?: { id: string; desc?: boolean };
   /**
    * Makes rows openable. A clickable row gets `tabIndex=0`, an `aria-label`

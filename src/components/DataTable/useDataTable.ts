@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -36,7 +36,7 @@ export interface UseDataTable<Row> {
  * left owning what it is good at — the sorted row model.
  */
 export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row> {
-  const { rows, columns, rowId, search, pills, defaultSort, stateKey } = props;
+  const { rows, columns, rowId, search, pills, initialPills, defaultSort, stateKey } = props;
   const sortId = defaultSort?.id;
   const sortDesc = defaultSort?.desc;
 
@@ -45,6 +45,18 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     [sortId, sortDesc],
   );
   const [state, patch] = useTableState(stateKey, initial);
+
+  // A deep link's selection, written over the remembered one — once per
+  // selection, never per render, so the chip it presses can still be
+  // un-pressed. Tracked by identity rather than by value: the same link
+  // followed twice is the same request, and re-applying it would fight the
+  // user for their own filters.
+  const appliedInitial = useRef<Record<string, string[]> | undefined>(undefined);
+  useEffect(() => {
+    if (!initialPills || appliedInitial.current === initialPills) return;
+    appliedInitial.current = initialPills;
+    patch({ pills: initialPills });
+  }, [initialPills, patch]);
 
   // `pills`/`search` are documented as identity-stable (see `DataTableProps`),
   // but a caller that mutates a stable array in place would otherwise leave
