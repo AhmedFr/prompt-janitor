@@ -290,7 +290,7 @@
       "name": "Rules screen as tabs of tables",
       "tier": "free",
       "status": "pr",
-      "note": "Branch for #130 \u2014 Built-in / Custom / AI standards tabs badged enabled/total, one DataTable each (switch, title, source, severity, hits, actions), source/severity/enabled/has-hits pills, pattern-aware search; the add-rule composer moves to /rules/new"
+      "note": "Branch for #130 — Built-in / Custom / AI standards tabs badged enabled/total, one DataTable each (switch, title, source, severity, hits, actions), source/severity/enabled/has-hits pills, pattern-aware search; the add-rule composer now lives at /rules/new as a two-step flow that lands back on the tab holding the new rule"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
@@ -326,7 +326,7 @@
     },
     {
       "name": "Vitest",
-      "result": "788/788 passing (64 files)"
+      "result": "827/827 passing (67 files)"
     },
     {
       "name": "cargo test",
@@ -359,8 +359,9 @@
     }
   ],
   "recent": [
-    "2026-08-23 \u2014 Rules review fix round 1: row actions come from the row, not the tab (a user-written AI standard kept its Delete), built-in pattern rules show no action since list_rules gives them no pattern, toggle/delete/import failures revert and say so in one live status line, copy confirms or admits it failed (#130 branch)",
-    "2026-08-23 \u2014 Rules screen rebuilt as tabs of tables: Built-in / Custom / AI standards badged enabled/total, per-tab search, source / severity / enabled / has-hits pills, row switches, delete on custom rules and copy-pattern elsewhere; pack import stays on Built-in and Add rule now routes to /rules/new (#130 branch)",
+    "2026-08-23 — Adding a rule is its own screen at /rules/new: pick Pattern rule or Natural-language standard (disabled with a hint until an AI provider is configured), fill name / text / severity, and Save lands back on Rules with the new row highlighted; Cancel and Escape return to the tab you came from (#130 branch)",
+    "2026-08-23 — Rules review fix round 1: row actions come from the row, not the tab (a user-written AI standard kept its Delete), built-in pattern rules show no action since list_rules gives them no pattern, toggle/delete/import failures revert and say so in one live status line, copy confirms or admits it failed (#130 branch)",
+    "2026-08-23 — Rules screen rebuilt as tabs of tables: Built-in / Custom / AI standards badged enabled/total, per-tab search, source / severity / enabled / has-hits pills, row switches, delete on custom rules and copy-pattern elsewhere; pack import stays on Built-in and Add rule now routes to /rules/new (#130 branch)",
     "2026-08-23 — PR4 branch-review fix wave: harness-scoped read failures say so instead of collapsing to empty, a failed refetch keeps the loaded page and flags it as the previous scan, project page gains a “See all files” deep link into Prompts, sidebar keeps Prompts lit on a file detail (#129 PR)",
     "2026-08-23 — Prompts screen rebuilt as one flat files table: Name (over its path) · Project chip · Kind · Grade · Issues · Modified, with Kind / Grade / Project (top 12 + Other) / Has-issues pills and path search; the project-group cards are gone and sidebar recents now open the project page (#129 PR)",
     "2026-08-23 — Review round 1 on the project page: a read left in flight by one project no longer overwrites the next one (generation guard), partial read failures covered, missing-folder banner announced as a live region, header and state panels split into their own folders (#129 PR)",
