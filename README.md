@@ -15,6 +15,7 @@ Every inventory list in the app is the same sortable, searchable, pill-filtered 
 - **Analytics** — health trends and a Usage tab of ranked bars (top used by kind, most errors, most expensive) over a 7/30/90-day window.
 - **Rules** — Built-in · Custom · AI standards tabs with enable switches, hit counts and actions; **Add rule** opens a separate two-step flow (pattern rule or natural-language standard).
 - **Settings** — harnesses, extra folders, AI provider, notifications, schedule.
+- **Menu bar** — left-click the tray icon for a floating panel: verdict and delta, top-3 files to fix, never-used skills / erroring MCP servers / sessions today, Scan now, Open app, Quit. Closing the main window keeps the app running in the menu bar (Dock icon hidden until you open it again); right-click keeps the classic menu.
 
 ## Status
 
