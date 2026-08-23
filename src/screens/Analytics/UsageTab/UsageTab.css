@@ -17,30 +17,9 @@
   height: 200px;
 }
 
-.usage-chart--tall {
-  height: 260px;
-}
-
 .usage-empty {
   padding: 24px 0;
   font-size: 12.5px;
-}
-
-/* ---- ranked list (placeholder until the RankedList component lands) ---- */
-.usage-ranked {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 12.5px;
-}
-
-.usage-ranked__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 5px 0;
-  border-bottom: 0.5px solid var(--sep);
-  color: var(--text-2);
 }
 
 .usage-swatch {

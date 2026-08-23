@@ -19,7 +19,7 @@ export type Route =
 
 /**
  * Navigate to a route, optionally with a target: the file id for `detail`,
- * the project's root path for `project`, or the tab id (e.g. "ai", "license")
- * for `settings`.
+ * the project's root path for `project`, the artifact kind (e.g. "mcp_server")
+ * for `setup`, or the tab id (e.g. "ai", "license") for `settings`.
  */
 export type Navigate = (route: Route, target?: string) => void;

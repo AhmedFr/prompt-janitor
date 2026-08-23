@@ -2,23 +2,19 @@ import { useMemo, useState } from "react";
 import { RankedList } from "@/components/RankedList";
 import { TrendChart } from "@/components/TrendChart";
 import type { InvocationKind } from "@/lib/ipc";
-import { KIND_LABEL } from "@/screens/Analytics/UsageTab/UsageTab.constants";
+import { KIND_OPTIONS, USAGE_KINDS } from "@/lib/usage";
 import {
   NO_HARNESS_NOTE,
   SESSIONS_CHART_LABEL,
   SESSIONS_CHART_TITLE,
   USAGE_EMPTY,
   USAGE_KIND_EMPTY,
-  USAGE_KINDS,
   USAGE_LIMIT,
   USAGE_TITLE,
   USAGE_UNREADABLE,
 } from "../Project.constants";
 import { usageRows } from "../project.util";
 import type { UsageTabProps } from "./tabs.types";
-
-/** The selector chips, built once — the kinds never change. */
-const SELECTOR_OPTIONS = USAGE_KINDS.map((kind) => ({ id: kind, label: KIND_LABEL[kind] }));
 
 /** Sessions have no ceiling, so the chart scales to its own busiest day. */
 const SESSIONS_DOMAIN: [number, "auto"] = [0, "auto"];
@@ -52,7 +48,7 @@ export function UsageTab({ usage, harness }: UsageTabProps) {
         // second is true sends them looking for a scan that already ran.
         empty={rankedCount === 0 ? USAGE_EMPTY : USAGE_KIND_EMPTY[kind]}
         selector={{
-          options: SELECTOR_OPTIONS,
+          options: KIND_OPTIONS,
           active: kind,
           onChange: (id) => setKind(id as InvocationKind),
         }}

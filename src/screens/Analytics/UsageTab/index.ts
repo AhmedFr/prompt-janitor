@@ -1,2 +1,2 @@
 export { UsageTab, UsageTabBody } from "./UsageTab";
-export type { UsageTabBodyProps } from "./UsageTab.types";
+export type { UsageTabBodyProps, UsageTabProps } from "./UsageTab.types";

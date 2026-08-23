@@ -48,7 +48,10 @@ vi.mock("./useAnalytics", async (orig) => {
 
 // The Usage tab has its own suite; here it only needs to be reachable, and
 // stubbing it keeps this screen's tests off the harness-usage IPC call.
-vi.mock("./UsageTab", () => ({ UsageTab: () => <div>usage panel</div> }));
+const mockUsageTab = vi.fn((_props: { windowDays: number }) => <div>usage panel</div>);
+vi.mock("./UsageTab", () => ({
+  UsageTab: (props: { windowDays: number }) => mockUsageTab(props),
+}));
 
 describe("Analytics", () => {
   beforeAll(() => {
@@ -96,15 +99,26 @@ describe("Analytics", () => {
   });
 
   it("defaults to the Quality view and switches to Usage on click", () => {
-    const { getByRole, getByText, queryByRole } = render(<Analytics navigate={vi.fn()} />);
+    const { getByRole, getByText } = render(<Analytics navigate={vi.fn()} />);
     expect(getByRole("button", { name: "Quality" })).toHaveClass("on");
 
     fireEvent.click(getByRole("button", { name: "Usage" }));
 
     expect(getByText("usage panel")).toBeInTheDocument();
     expect(getByRole("button", { name: "Usage" })).toHaveClass("on");
-    // The range toggle only windows the quality metrics, so it steps aside.
-    expect(queryByRole("group", { name: "Time range" })).not.toBeInTheDocument();
+    // One toolbar range for the whole screen: both views answer questions
+    // about the same window, so the toggle stays put across them.
+    expect(getByRole("group", { name: "Time range" })).toBeInTheDocument();
+  });
+
+  it("windows the Usage view with the toolbar range", () => {
+    const { getByRole } = render(<Analytics navigate={vi.fn()} />);
+    fireEvent.click(getByRole("button", { name: "Usage" }));
+    expect(mockUsageTab).toHaveBeenLastCalledWith(expect.objectContaining({ windowDays: 30 }));
+
+    fireEvent.click(getByRole("button", { name: "7d" }));
+
+    expect(mockUsageTab).toHaveBeenLastCalledWith(expect.objectContaining({ windowDays: 7 }));
   });
 
   it("has no accessibility violations", async () => {

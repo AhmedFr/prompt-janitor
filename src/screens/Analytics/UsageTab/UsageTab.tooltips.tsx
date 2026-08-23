@@ -1,5 +1,5 @@
 import type { TooltipContentProps } from "recharts";
-import type { ErrorRateBar, KindBar, SessionBar, TipLine } from "./UsageTab.types";
+import type { KindBar, SessionBar, TipLine } from "./UsageTab.types";
 
 type TipProps = TooltipContentProps;
 
@@ -37,23 +37,6 @@ export function KindTooltip({ active, payload }: TipProps) {
       lines={[
         { text: plural(bar.total, "invocation") },
         { text: `avg context tokens / turn: ${tokens}` },
-      ]}
-    />
-  );
-}
-
-/** One MCP server's error rate, over the call volume it is measured on. */
-export function ErrorTooltip({ active, payload }: TipProps) {
-  const bar = hoveredRow<ErrorRateBar>(payload);
-  if (!active || !bar) return null;
-  return (
-    <Tip
-      title={bar.target}
-      lines={[
-        // "not measured" and "0.0% errored" are different claims; only one of
-        // them is something the harness actually recorded.
-        { text: bar.measured ? `${bar.pct.toFixed(1)}% of calls errored` : "not measured" },
-        { text: plural(bar.total, "call") },
       ]}
     />
   );

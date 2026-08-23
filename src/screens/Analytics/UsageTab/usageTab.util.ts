@@ -3,24 +3,15 @@ import type {
   KindTotal,
   ProjectSessions,
   RankedTarget,
-  TargetRate,
   UsageOverview,
 } from "@/lib/ipc";
-import type { ErrorRateBar, KindBar, SessionBar } from "./UsageTab.types";
-import { KIND_LABEL, MAX_PROJECT_BARS, MONTHS, RANKED_LIMIT } from "./UsageTab.constants";
-
-/**
- * The key for a ranked row. Usage is grouped by `(kind, target)`, so a skill
- * and an agent may share a target name and must stay separate rows.
- */
-export function rankedKey(row: Pick<RankedTarget, "kind" | "target">): string {
-  return `${row.kind}:${row.target}`;
-}
-
-/** The busiest targets in the window — the backend already ordered them. */
-export function topRanked(ranked: RankedTarget[]): RankedTarget[] {
-  return ranked.slice(0, RANKED_LIMIT);
-}
+import type { RankedRow } from "@/components/RankedList";
+import { KIND_LABEL, rankedKey } from "@/lib/usage";
+// A deep import rather than the screen barrel: `plural` is a pure formatter,
+// and the barrel would pull a whole screen in behind it.
+import { plural } from "@/screens/Setup/setup.util";
+import type { KindBar, RankedBy, SessionBar } from "./UsageTab.types";
+import { MAX_PROJECT_BARS, RANKED_LIMIT } from "./UsageTab.constants";
 
 /**
  * How copy names the reporting window: `30` → `last 30 days`.
@@ -33,42 +24,103 @@ export function windowLabel(windowDays: number): string {
   return windowDays === 1 ? "last day" : `last ${windowDays} days`;
 }
 
+/** Pins a piece of empty copy to the window that produced it. */
+export function inWindow(text: string, windowDays: number): string {
+  return `${text} in the ${windowLabel(windowDays)}.`;
+}
+
 /** Invocation kind → the label the UI shows for it. */
 export function kindLabel(kind: InvocationKind): string {
   return KIND_LABEL[kind];
 }
 
-/** `2026-08-02` → `Aug 2`, parsed by hand so the local time zone can't shift it. */
-export function shortDay(day: string): string {
-  const [, month, date] = day.split("-");
-  const name = MONTHS[Number(month) - 1];
-  return name ? `${name} ${Number(date)}` : day;
+/** `12.5` → `12.5%`, `50` → `50%` — a whole percentage carries no false precision. */
+export function percentValue(pct: number): string {
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
 }
 
-/** Shapes all-time kind totals for the bar chart and its token tooltip. */
+/** Context tokens as they read next to a bar: whole tokens, grouped. */
+export function tokenValue(tokens: number): string {
+  return Math.round(tokens).toLocaleString();
+}
+
+/**
+ * The numbers a ranked row's single bar cannot carry, for its hover: the
+ * sessions it spans, how often it failed, and what a turn cost.
+ *
+ * A `null` on either measure says the harness recorded none, which is not the
+ * same claim as a clean 0% or a free turn — so it is said, not zeroed.
+ */
+export function targetDetail(row: RankedTarget): string {
+  return [
+    plural(row.sessions, "session"),
+    row.error_rate === null
+      ? "error rate not measured"
+      : `${percentValue(errorPct(row.error_rate))} errors`,
+    row.avg_turn_tokens === null
+      ? "avg tokens not recorded"
+      : `${tokenValue(row.avg_turn_tokens)} avg tokens`,
+  ].join(" · ");
+}
+
+/** A 0–1 rate as a percentage, rounded to the one decimal the list shows. */
+function errorPct(rate: number): number {
+  return Math.round(rate * 1000) / 10;
+}
+
+/**
+ * The ranked rows one list shows: the targets of `kind` (or every kind),
+ * ordered by `by` and cut to `limit`.
+ *
+ * Two exclusions, both because a zero would be a claim the data does not
+ * make: an error-free (or never-measured) target is not an error finding, and
+ * a target with no recorded token average has no cost to rank — showing
+ * either as `0` pushes a real finding off the list and reads as a clean bill
+ * of health for a row nobody measured.
+ *
+ * The sort is stable, so targets tied on a value keep the backend's own
+ * busiest-first order rather than shuffling between renders.
+ */
+export function rankedFor(
+  ranked: RankedTarget[],
+  kind: InvocationKind | "all",
+  by: RankedBy,
+  limit: number = RANKED_LIMIT,
+): RankedRow[] {
+  return ranked
+    .filter((row) => (kind === "all" || row.kind === kind) && measured(row, by))
+    .map((row) => ({
+      id: rankedKey(row),
+      label: row.target,
+      value: valueOf(row, by),
+      secondary: by === "uses" ? plural(row.sessions, "session") : plural(row.uses, "use"),
+      title: targetDetail(row),
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, Math.max(0, limit));
+}
+
+/** Whether this row has the measure the list ranks on. */
+function measured(row: RankedTarget, by: RankedBy): boolean {
+  if (by === "errors") return row.error_rate !== null && row.error_rate > 0;
+  if (by === "tokens") return row.avg_turn_tokens !== null;
+  return true;
+}
+
+/** Only ever called on a row {@link measured} already vouched for. */
+function valueOf(row: RankedTarget, by: RankedBy): number {
+  if (by === "errors") return errorPct(row.error_rate ?? 0);
+  if (by === "tokens") return row.avg_turn_tokens ?? 0;
+  return row.uses;
+}
+
+/** Shapes windowed kind totals for the bar chart and its token tooltip. */
 export function kindBars(byKind: KindTotal[]): KindBar[] {
   return byKind.map(({ kind, total, avg_turn_tokens }) => ({
     kind,
     label: kindLabel(kind),
     total,
     avgTurnTokens: avg_turn_tokens === null ? null : Math.round(avg_turn_tokens),
-  }));
-}
-
-/**
- * Converts each MCP server's 0–1 error rate into a 0–100 percentage bar.
- *
- * A `null` rate means the harness never recorded an outcome for that server,
- * which is not the same claim as "0% of its calls failed". The row keeps its
- * place in the chart — dropping it would hide a server entirely — but says it
- * is unmeasured so the chart can grey it out instead of vouching for it.
- */
-export function errorRateBars(rates: TargetRate[]): ErrorRateBar[] {
-  return rates.map(({ target, total, error_rate }) => ({
-    target,
-    total,
-    pct: (error_rate ?? 0) * 100,
-    measured: error_rate !== null,
   }));
 }
 

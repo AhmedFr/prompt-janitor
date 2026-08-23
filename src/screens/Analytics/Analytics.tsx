@@ -61,20 +61,21 @@ export function Analytics({ navigate }: AnalyticsProps) {
           ))}
         </div>
         <span className="toolbar-spacer" />
-        {view === "quality" && (
-          <div className="seg" role="group" aria-label="Time range">
-            {RANGES.map(([days, label]) => (
-              <button
-                key={days}
-                className={rangeDays === days ? "on" : ""}
-                aria-pressed={rangeDays === days}
-                onClick={() => setRangeDays(days)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* One range for the whole screen: both views answer questions about
+            the same window, and a toggle that vanishes on Usage would leave
+            the usage lists windowed by something the toolbar no longer says. */}
+        <div className="seg" role="group" aria-label="Time range">
+          {RANGES.map(([days, label]) => (
+            <button
+              key={days}
+              className={rangeDays === days ? "on" : ""}
+              aria-pressed={rangeDays === days}
+              onClick={() => setRangeDays(days)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="scroll-area">
@@ -84,7 +85,7 @@ export function Analytics({ navigate }: AnalyticsProps) {
               <div className="muted">Open the desktop app to see analytics.</div>
             </Card>
           ) : view === "usage" ? (
-            <UsageTab />
+            <UsageTab windowDays={rangeDays} navigate={navigate} />
           ) : loading ? (
             <Card padded>
               <div className="muted">Loading…</div>

@@ -86,6 +86,25 @@ describe("App", () => {
     expect(propsOf("project").path).toBeUndefined();
   });
 
+  it("opens Setup on the kind a deep link names", () => {
+    render(<App />);
+    go("setup", "mcp_server");
+    expect(propsOf("setup").initialTab).toBe("mcp_server");
+  });
+
+  /**
+   * A plain sidebar visit to Setup names no kind, so it must clear the last
+   * deep link's tab — otherwise the strip keeps reopening on a kind the user
+   * asked for once, from a screen they have since left.
+   */
+  it("clears the Setup tab when `setup` is reached without one", () => {
+    render(<App />);
+    go("setup", "mcp_server");
+    go("overview");
+    go("setup");
+    expect(propsOf("setup").initialTab).toBeUndefined();
+  });
+
   it("keeps the file id when `detail` is reached without one", () => {
     render(<App />);
     go("detail", "/code/web-app/CLAUDE.md");
