@@ -922,6 +922,10 @@ pub fn open_main(app: tauri::AppHandle, route: String, target: Option<String>) {
     crate::window_policy::show_main(&app);
     let _ = app.emit_to("main", "navigate", NavigateEvent { route, target });
     crate::panel::hide(&app);
+    // Raising the main window blurs the panel, which stamps a blur the user
+    // never caused. Left behind, it would swallow their next tray click — the
+    // icon would look dead right after a row was clicked.
+    crate::panel::clear_blur_stamp();
 }
 
 /// Quit the app for real (the tray is the only other way out).

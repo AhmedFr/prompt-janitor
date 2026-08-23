@@ -152,6 +152,16 @@ pub fn hide(app: &AppHandle) {
     }
 }
 
+/// Forget any blur stamp, so the next tray click is judged on its own.
+///
+/// Raising the main window blurs the panel, which stamps a blur the user never
+/// caused. Without this, a tray click within the toggle window right after a
+/// panel row was clicked would be read as "this click closed an open panel" and
+/// swallowed, leaving the icon looking dead.
+pub fn clear_blur_stamp() {
+    let _ = take_blur_stamp();
+}
+
 /// The `WindowEvent::Focused(false)` handler: hide, and record when, so the
 /// tray click that caused the blur can tell it closed an open panel.
 pub fn hide_on_blur(app: &AppHandle) {
@@ -350,6 +360,15 @@ mod tests {
     #[test]
     fn lets_through_a_click_with_no_recorded_blur() {
         assert!(!swallow(None, Instant::now()));
+    }
+
+    /// `open_main` hides the panel itself; the blur that raising the main window
+    /// caused must not then eat the user's next tray click.
+    #[test]
+    fn clearing_the_blur_stamp_lets_the_next_click_through() {
+        *LAST_BLUR_HIDE.lock().unwrap() = Some(Instant::now());
+        clear_blur_stamp();
+        assert!(!swallow(take_blur_stamp(), Instant::now()));
     }
 
     /// A 1440 × 900 non-Retina display at the origin.

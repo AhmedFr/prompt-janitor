@@ -4,12 +4,19 @@ import { axe } from "vitest-axe";
 import type { PanelSnapshot } from "@/lib/ipc";
 import { Panel } from "./Panel";
 
-// One handler registry per test so a case can emit `scan-done` like the core does.
-const listeners = vi.hoisted(() => new Map<string, (event?: unknown) => void>());
+/**
+ * One handler registry per test so a case can emit the scan events like the
+ * core does. A set per event, not a single handler: `scan-phase` has two
+ * subscribers (`useScanProgress` and `usePanel`), and keeping only the last
+ * would hide whichever registered first.
+ */
+const listeners = vi.hoisted(() => new Map<string, Set<(event: unknown) => void>>());
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn((event: string, handler: (payload?: unknown) => void) => {
-    listeners.set(event, handler);
-    return Promise.resolve(() => listeners.delete(event));
+  listen: vi.fn((event: string, handler: (payload: unknown) => void) => {
+    const handlers = listeners.get(event) ?? new Set();
+    handlers.add(handler);
+    listeners.set(event, handlers);
+    return Promise.resolve(() => handlers.delete(handler));
   }),
 }));
 
@@ -98,9 +105,9 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const emit = async (event: string) => {
+const emit = async (event: string, payload?: unknown) => {
   await act(async () => {
-    listeners.get(event)?.();
+    for (const handler of listeners.get(event) ?? []) handler({ payload });
   });
 };
 
@@ -161,6 +168,11 @@ describe("Panel", () => {
 
   it("runs a scan, narrates it, and refetches when it finishes", async () => {
     await show();
+    // The command only returns when the whole scan does; `scan-done` arrives
+    // just before it, and is what releases the button.
+    const running = deferred<unknown>();
+    scanNow.mockReturnValue(running.promise);
+
     fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
     expect(scanNow).toHaveBeenCalled();
 
@@ -170,6 +182,40 @@ describe("Panel", () => {
 
     await emit("scan-done");
     await waitFor(() => expect(getPanelSnapshot).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+
+    await act(async () => {
+      running.resolve({ status: "ok", data: {} });
+    });
+  });
+
+  /**
+   * The panel is not the only place a scan starts: the tray, the scheduler and
+   * the Setup screen all fire one. A button that stays live through someone
+   * else's scan invites a second run on top of it.
+   */
+  it("follows a scan it did not start", async () => {
+    await show();
+    await emit("scan-phase", "harness");
+    expect(screen.getByRole("button", { name: "Scanning…" })).toBeDisabled();
+    expect(screen.getByRole("progressbar", { name: "Scan progress" })).toBeInTheDocument();
+
+    await emit("scan-done");
+    expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+  });
+
+  /** Insurance: if `scan-done` is ever dropped, the command returning still frees the button. */
+  it("releases the button when the scan command returns without an event", async () => {
+    await show();
+    const running = deferred<unknown>();
+    scanNow.mockReturnValue(running.promise);
+
+    fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    await screen.findByRole("button", { name: "Scanning…" });
+
+    await act(async () => {
+      running.resolve({ status: "ok", data: {} });
+    });
     expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
   });
 

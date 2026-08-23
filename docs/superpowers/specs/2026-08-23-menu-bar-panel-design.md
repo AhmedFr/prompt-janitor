@@ -86,11 +86,14 @@ Scan state is not in the snapshot: the panel listens to `scan-phase` / `scan-pro
   `Panel.css`, `Panel.test.tsx`, `Panel.stories.tsx`, and sections as folders:
   `PanelHeader/` (mini `ScoreRing` 56 px, verdict line "Good enough" / "Needs work" /
   "Fix now" by grade, delta, last scan relative), `PanelFixes/` (top-3 rows: glyph, name,
-  project, `Grade`, issues → `open_main("detail", file_id)`), `PanelSignals/` (three chips:
-  "N never-used skills" → `open_main("setup","skill")`, "N MCP erroring" →
-  `open_main("setup","mcp_server")`, "N sessions today" → `open_main("analytics")`; tone
-  error when N > 0 for the first two), `PanelFooter/` (Scan now with `ScanBar` while
-  scanning, Open app → `open_main("overview")`, Quit → `commands.quit()` (new, `app.exit(0)`)).
+  project, `Grade`, issues → `open_main("detail", file_id)`), `PanelSignals/` (chips:
+  "N never-used skills" → `open_main("setup","skill")`, "N MCP servers erroring" →
+  `open_main("setup","mcp_server")`, "N sessions today" → `open_main("analytics")`. The two
+  problem chips are toned error and render *only* when N > 0 — a chip reporting the absence
+  of a problem spends the panel's width on nothing; when both are zero a single muted
+  "Setup looks clean" line takes their place, a line rather than a button since there is
+  nowhere to go. The sessions chip is context, not a problem: never toned, always shown),
+  `PanelFooter/` (Scan now with `ScanBar` while scanning, Open app → `open_main("overview")`, Quit → `commands.quit()` (new, `app.exit(0)`)).
 - States: loading skeleton; `!has_data` → "No scan yet" + Scan now; failure panel (shared
   copy pattern); Esc → `getCurrentWindow().hide()`.
 - `App.tsx`: listen to `navigate` and call `navigate(route, target)` with the `Route` guard

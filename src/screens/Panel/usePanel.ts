@@ -65,6 +65,18 @@ export function usePanel(): PanelState {
     };
   }, [refetch]);
 
+  // The panel is not the only place a scan starts — the tray, the scheduler and
+  // the Setup screen all fire one. `scan-phase` is the core announcing that a
+  // scan is under way whoever asked for it, and a button that stays live through
+  // someone else's scan invites a second run on top of it.
+  useEffect(() => {
+    if (!isTauri) return;
+    const unlisten = listen("scan-phase", () => setScanning(true));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
+
   // The panel is shown with focus and hidden on blur, so a focus gain is the
   // one reliable "the user just opened me" signal there is.
   useEffect(() => {
@@ -92,12 +104,14 @@ export function usePanel(): PanelState {
     reset();
     setScanning(true);
     try {
-      // The core emits `scan-done` before the command returns, so the event —
-      // not this promise — is what ends the scanning state. A scan that failed
-      // emits nothing, and still has to release the button.
-      const res = await commands.scanNow();
-      if (res.status === "error") setScanning(false);
+      // The core emits `scan-done` before the command returns, so in practice
+      // the event is what ends the scanning state.
+      await commands.scanNow();
     } catch {
+      // A scan that never started emits nothing at all.
+    } finally {
+      // Insurance, and the whole story for a failed scan: the command has
+      // returned, so nothing is running whether or not the event arrived.
       setScanning(false);
     }
   }, [reset]);
