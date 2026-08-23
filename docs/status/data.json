@@ -75,12 +75,16 @@
       "title": "Menu-bar panel",
       "done": 2,
       "total": 2,
-      "note": "Plumbing merged (#143); panel UI (#142 PR). On-device verification is the remaining owner action.",
-      "state": "active"
+      "note": "Complete: plumbing (#143), panel UI (#144). On-device verification is the remaining owner action.",
+      "state": "done"
     }
   ],
   "actions": {
     "blocking": [
+      {
+        "title": "Fix GitHub Actions billing",
+        "detail": "CI jobs are refused with \"recent account payments have failed or your spending limit needs to be increased\" (GitHub → Settings → Billing & plans). #144 was merged on local gates; re-run the main workflow once fixed."
+      },
       {
         "title": "Verify the menu-bar panel on a real Mac",
         "detail": "Left-click the tray icon: panel appears under the icon, second click closes it, outside click closes it; far-left/right icon clamps inside the screen; multi-monitor with mixed scale factors opens on the right display; transparent corners (macOSPrivateApi); ⌘W hides the window and drops the Dock icon; tray Open restores both; Quit exits. Checklist: .superpowers/sdd/2026-08-23-menu-bar-panel/task-2-report.md — plus, for the panel UI (#142): the card's corners are see-through, Esc hides it, reopening refetches, a fix row / chip / Open app raises the main window on the right screen, Scan now shows the bar and refreshes when the scan ends, Quit exits."
@@ -319,8 +323,8 @@
     {
       "name": "Menu-bar panel UI (verdict, top fixes, usage signals)",
       "tier": "free",
-      "status": "pr",
-      "note": "PR for #142 awaiting review — the popover itself: grade ring + verdict + delta + last scan, top-3 fix rows, never-used/erroring/sessions chips, Scan now with a progress bar, Open app, Quit"
+      "status": "done",
+      "note": "Merged (#144)"
     },
     {
       "name": "Release pipeline (universal macOS DMG on tag)",
@@ -414,6 +418,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 — Menu-bar panel complete (#143 plumbing, #144 UI); #144 merged on local gates because GitHub Actions is blocked on account billing",
     "2026-08-23 — Panel scan state now follows the core rather than only its own button: a scan started from the tray, the scheduler or Setup disables Scan now and shows the bar (scan-phase in, scan-done out), and the command returning frees the button if the event is ever dropped; open_main clears the panel's blur stamp so a tray click straight after a row click is not swallowed; spec §3.4 matches the shipped chips (#142 branch)",
     "2026-08-23 — Panel review polish: overlapping snapshot reads are ticketed so the newest one wins (a focus refetch and a scan-done refetch land in either order), a fix row now announces its grade and issue count, the never-used and erroring chips disappear at zero in favour of one “Setup looks clean” line, and the cross-window invokes no longer reject unhandled (#142 branch)",
     "2026-08-23 — Menu-bar panel UI: the popover itself — grade ring, verdict line, delta and last-scan age, top-3 fix rows that open the main window on that file, never-used / erroring / sessions chips that land on Setup and Analytics, Scan now with a live progress bar, Open app and Quit; the shell now follows the panel's `navigate` event through a route guard (#142 PR)",
