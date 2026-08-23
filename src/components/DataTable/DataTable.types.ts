@@ -69,6 +69,12 @@ export interface DataTableProps<Row> {
    * stored one only decides where an unqualified visit lands. Identity-stable,
    * per the note above — an inline literal would re-apply on every render and
    * the user could never un-press the chip.
+   *
+   * It is *written through*, not layered on top: once applied it becomes the
+   * remembered selection, so coming back to this table without a link lands on
+   * the slice the link left it in. Pass it only for an option the current
+   * `pills` actually offer — a selection nothing matches is pruned from the
+   * view (see `prunePills`) but still stored.
    */
   initialPills?: Record<string, string[]>;
   defaultSort?: { id: string; desc?: boolean };

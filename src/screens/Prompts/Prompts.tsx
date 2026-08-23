@@ -77,11 +77,20 @@ export function Prompts({ navigate, target, data: override }: PromptsProps) {
   // Rebuilt only when a scan swaps the row set, or a new deep link arrives —
   // the chips are derived from the rows themselves.
   const pills = useMemo(() => buildPills(rows, target), [rows, target]);
+  // Only once the chips actually offer the linked project. `initialPills` is
+  // written through — a selection nothing matches would be pruned from the
+  // view but still stored, leaving a filter behind for a project this table
+  // never listed. Also covers the first render, before the rows land.
+  const hasTarget =
+    target != null &&
+    (pills.find((group) => group.id === "project")?.options.some((o) => o.id === target) ?? false);
   // A deep link names the project it means; the remembered selection only
-  // decides where an unqualified visit lands.
+  // decides where an unqualified visit lands. Keyed on `hasTarget` rather than
+  // on `pills`, so a rescan that changes nothing about the link does not
+  // re-apply it over a filter the reader has since changed.
   const initialPills = useMemo(
-    () => (target ? { project: [target] } : undefined),
-    [target],
+    () => (target && hasTarget ? { project: [target] } : undefined),
+    [target, hasTarget],
   );
 
   const scanNow = async () => {

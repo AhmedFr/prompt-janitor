@@ -145,6 +145,16 @@ describe("projectFacets", () => {
       ["cli", 1],
     ]);
   });
+
+  it("breaks a same-name tie by path, so two checkouts of one repo hold their order", () => {
+    // Fed in the order the scan happened to walk them — which is the one thing
+    // the chip order must not depend on.
+    const rows = [
+      file({ id: "/b/app/CLAUDE.md", project: "app", project_id: "/srv/b/app" }),
+      file({ id: "/a/app/CLAUDE.md", project: "app", project_id: "/srv/a/app" }),
+    ];
+    expect(projectFacets(rows).map((f) => f.id)).toEqual(["/srv/a/app", "/srv/b/app"]);
+  });
 });
 
 describe("buildPills", () => {

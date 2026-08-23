@@ -22,8 +22,9 @@ export interface ProjectFacet {
 /**
  * Every project in the row set, busiest first. Counted from the rows rather
  * than read off `ProjectRow.file_count` so the ranking always describes the
- * table it sits above. Ties break by name, so the chip order is stable
- * between scans that change nothing.
+ * table it sits above. Ties break by name and then by id, so the chip order is
+ * stable between scans that change nothing — two checkouts of the same repo
+ * share a name, and insertion order is whatever the scan happened to walk.
  */
 export function projectFacets(rows: FileRow[]): ProjectFacet[] {
   const byId = new Map<string, ProjectFacet>();
@@ -32,7 +33,9 @@ export function projectFacets(rows: FileRow[]): ProjectFacet[] {
     if (found) found.count += 1;
     else byId.set(row.project_id, { id: row.project_id, name: row.project, count: 1 });
   }
-  return [...byId.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return [...byId.values()].sort(
+    (a, b) => b.count - a.count || a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+  );
 }
 
 /**

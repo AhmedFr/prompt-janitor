@@ -134,6 +134,8 @@ describe("Prompts", () => {
 
     expect(navigate).toHaveBeenCalledWith("project", "/code/api");
     expect(navigate).not.toHaveBeenCalledWith("detail", expect.anything());
+    // The chip's click is the chip's alone — the row must not also fire.
+    expect(navigate).toHaveBeenCalledTimes(1);
   });
 
   it("searches on the path, so a folder narrows the table", async () => {
@@ -196,6 +198,28 @@ describe("Prompts", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  it("leaves the deep-linked project selected on the next unqualified visit", async () => {
+    // `initialPills` is written through, not layered on: the link decides where
+    // the table lands, and coming back to it lands where the link left it.
+    const first = await renderScreen({ target: "/code/api" });
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+    first.unmount();
+
+    await renderScreen();
+
+    await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
+  });
+
+  it("ignores a deep link to a project this table does not list", async () => {
+    await renderScreen({ target: "/code/ghost" });
+
+    await waitFor(() => expect(rowIds()).toHaveLength(3));
+    expect(screen.queryByRole("button", { pressed: true })).not.toBeInTheDocument();
+    // And nothing was stored, so the next visit is not filtered to a project
+    // that was never on screen.
+    expect(window.sessionStorage.getItem("pj.table.prompts") ?? "").not.toContain("ghost");
   });
 
   it("leaves the remembered filters alone when no project was deep-linked", async () => {
