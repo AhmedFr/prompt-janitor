@@ -7,33 +7,37 @@ html.panel-window body {
 }
 
 /* The card is positioned against the panel window's root rather than the
-   viewport, so a story can render it at the window's real size. */
+   viewport, so a story can render it at the window's real width. */
 html.panel-window #root {
   position: relative;
 }
 
+/* Natural height, not the window's: `usePanelSize` measures this card and
+   sizes the window to it, so a card that stretched to fill the window would
+   measure the window and never shrink. The 4 px margin is the transparent gap
+   that makes the rounded corners read as a popover rather than as a rectangle
+   with clipped edges. */
 .panel {
-  position: absolute;
-  /* A small inset all round: the window's own corners stay see-through, which
-     is what makes the card read as a popover rather than as a rectangle. */
-  inset: 4px;
+  width: 352px;
+  margin: 4px;
   display: flex;
   flex-direction: column;
+  /* The window stops growing at 600; past that the body scrolls. */
+  max-height: 592px;
   overflow: hidden;
   border: 1px solid var(--sep);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--card);
   box-shadow: var(--shadow-pop);
 }
 
 .panel__body {
-  flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
 .panel__failure {
-  padding: 18px 16px;
+  padding: 16px;
 }
 
 .panel__failure-title {
@@ -52,7 +56,7 @@ html.panel-window #root {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px 14px;
+  padding: 16px;
 }
 
 .panel__skeleton {

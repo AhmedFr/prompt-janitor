@@ -1,10 +1,15 @@
 .panel-fixes {
-  padding: 4px 14px 8px;
+  padding: 2px 16px 10px;
   min-height: 0;
 }
 
+/* Smaller than the app's section label: the panel is a popover, and a full
+   12 px eyebrow over a 34 px row competes with the row it introduces. */
 .panel-fixes__title {
-  margin: 0 0 6px;
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.05em;
+  margin: 0 0 2px;
 }
 
 .panel-fixes__empty {
@@ -18,13 +23,20 @@
   padding: 0;
 }
 
+/* A hairline between rows, never above the first or below the last: the
+   section already has edges, and a rule against them reads as a stray line. */
+.panel-fixes__list li + li {
+  border-top: 1px solid var(--sep);
+}
+
 .panel-fix {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  min-height: 34px;
+  padding: 4px 6px;
   border: 0;
   border-radius: var(--r-ctrl);
   background: transparent;
@@ -49,8 +61,17 @@
   white-space: nowrap;
 }
 
-.panel-fix__project,
+/* The project trails the file name rather than sitting in its own column: it
+   is context for the name, and it is the half worth truncating first. */
+.panel-fix__project {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .panel-fix__issues {
   font-size: 11px;
   white-space: nowrap;
+  justify-self: end;
 }

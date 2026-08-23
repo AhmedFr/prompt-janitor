@@ -30,6 +30,18 @@ describe("PanelFixes", () => {
     expect(screen.getByText("1 issue")).toBeInTheDocument();
   });
 
+  /**
+   * The row used to carry a folder glyph on the left *and* a grade chip on the
+   * right — two marks for one fact, on a 360 px row.
+   */
+  it("marks each row with one grade badge and no project glyph", () => {
+    render(<PanelFixes fixes={fixes} onOpen={() => {}} />);
+    expect(screen.getByLabelText("Grade F")).toBeInTheDocument();
+    expect(screen.getByLabelText("Grade D")).toBeInTheDocument();
+    expect(screen.queryByLabelText("acme-api project")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("web-app project")).not.toBeInTheDocument();
+  });
+
   it("hands the clicked file's id to the caller", () => {
     const onOpen = vi.fn();
     render(<PanelFixes fixes={fixes} onOpen={onOpen} />);

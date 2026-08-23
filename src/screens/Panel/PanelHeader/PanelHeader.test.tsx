@@ -21,12 +21,21 @@ const snapshot = (o: Partial<PanelSnapshot> = {}): PanelSnapshot => ({
 describe("PanelHeader", () => {
   afterEach(cleanup);
 
-  it("turns the grade into a verdict, with the score and the delta beside it", () => {
+  it("turns the grade into a verdict, with the delta and the meta line beside it", () => {
     render(<PanelHeader snapshot={snapshot()} now={NOW} />);
     expect(screen.getByText("Good enough")).toBeInTheDocument();
-    expect(screen.getByText("93/100")).toBeInTheDocument();
     expect(screen.getByText("▼ 2 since last scan")).toBeInTheDocument();
-    expect(screen.getByText("Scanned 2h ago")).toBeInTheDocument();
+    expect(screen.getByText("93/100 · Scanned 2h ago")).toBeInTheDocument();
+  });
+
+  /**
+   * The header's ring is 56 px — too small for the score line the ring draws at
+   * 120 — so the number moves to the meta line rather than disappearing.
+   */
+  it("carries the score once, on the meta line rather than inside the ring", () => {
+    render(<PanelHeader snapshot={snapshot()} now={NOW} />);
+    expect(screen.queryByText("93/100")).not.toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
   });
 
   /** An ungraded setup drawn as a ring reads as a score, and "No data" painted like an A is a lie. */

@@ -1,5 +1,4 @@
 import { Grade } from "@/components/Grade";
-import { ProjectGlyph } from "@/components/ProjectGlyph";
 import { plural } from "@/screens/Setup/setup.util";
 import { fixLabel } from "../panel.util";
 import { FIXES_TITLE, NOTHING_TO_FIX } from "./PanelFixes.constants";
@@ -10,6 +9,12 @@ import "./PanelFixes.css";
  * The three files worth opening the app for. Each row is a button, not a link:
  * clicking it raises the main window on that file's detail page, which is a
  * cross-window action rather than a navigation this window can make.
+ *
+ * One grade badge per row and nothing else: the row used to carry a folder
+ * glyph on the left as well, which is two marks for the one fact that matters
+ * on a 360 px row. The file leads, its project trails it in the muted colour,
+ * and the issue count sits against the right edge where the eye can compare
+ * three rows down a column.
  */
 export function PanelFixes({ fixes, onOpen }: PanelFixesProps) {
   return (
@@ -31,13 +36,12 @@ export function PanelFixes({ fixes, onOpen }: PanelFixesProps) {
                 aria-label={fixLabel(fix)}
                 onClick={() => onOpen(fix.file_id)}
               >
-                <ProjectGlyph name={fix.project_name} grade={fix.grade} size={20} />
+                <Grade grade={fix.grade} size="sm" />
                 <span className="panel-fix__name">{fix.name}</span>
                 <span className="panel-fix__project faint">{fix.project_name}</span>
                 <span className="panel-fix__issues faint tnum">
                   {plural(fix.issue_count, "issue")}
                 </span>
-                <Grade grade={fix.grade} size="sm" />
               </button>
             </li>
           ))}

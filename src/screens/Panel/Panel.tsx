@@ -14,18 +14,22 @@ import {
 } from "./Panel.constants";
 import type { PanelProps } from "./Panel.types";
 import { usePanel } from "./usePanel";
+import { usePanelSize } from "./usePanelSize";
 import "./Panel.css";
 
 /**
  * The menu-bar popover: the whole "is my setup good enough?" answer in one
- * 360 × 480 card, without opening the app.
+ * 360 px-wide card, without opening the app.
  *
- * Layout only — {@link usePanel} owns the snapshot, the scan and the window,
- * and every row hands its click to the main window through `open_main`,
- * because this window has no router of its own to navigate.
+ * Layout only — {@link usePanel} owns the snapshot and the scan,
+ * {@link usePanelSize} keeps the window the height of the card, and every row
+ * hands its click to the main window through `open_main`, because this window
+ * has no router of its own to navigate.
  */
 export function Panel({ data: override, failed: failedOverride, scanning: scanningOverride }: PanelProps) {
   const state = usePanel();
+  // The window hugs this card rather than standing at a fixed 480 px.
+  const cardRef = usePanelSize<HTMLDivElement>();
   const data = override ?? state.data;
   // A story that supplies its own snapshot is never loading; the hook's flag
   // only describes the live fetch.
@@ -45,7 +49,7 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
   };
 
   return (
-    <div className="panel">
+    <div className="panel" ref={cardRef}>
       {loading ? (
         <PanelLoading />
       ) : failed || data == null ? (

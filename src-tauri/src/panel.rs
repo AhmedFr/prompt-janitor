@@ -138,11 +138,23 @@ pub fn toggle(app: &AppHandle, icon: tauri::Rect) {
         return;
     }
     let (icon, work_area) = logical_geometry(app, icon);
-    let (x, y) = position_under(icon, work_area, PANEL_SIZE);
+    // The panel resizes itself to its content, so the constant is only the size
+    // it was *built* at. Placing with it would push a short panel down by the
+    // difference — the gap under the icon is what the clamp is measuring from.
+    let size = live_size(&window).unwrap_or(PANEL_SIZE);
+    let (x, y) = position_under(icon, work_area, size);
     let _ = window.set_position(LogicalPosition::new(x, y));
     let _ = window.show();
     // Focus is what makes the blur handler able to close the panel again.
     let _ = window.set_focus();
+}
+
+/// The panel's current size in logical pixels, or `None` if the window cannot
+/// be measured. No IPC: both values come from the window itself.
+fn live_size(window: &tauri::WebviewWindow) -> Option<(f64, f64)> {
+    let scale = window.scale_factor().ok()?;
+    let size = window.inner_size().ok()?.to_logical::<f64>(scale);
+    Some((size.width, size.height))
 }
 
 /// Hide the panel if it exists. Used by `open_main`.
