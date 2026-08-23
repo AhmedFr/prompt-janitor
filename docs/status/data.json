@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-22",
+  "updated": "2026-08-23",
   "readiness": {
     "percent": 82,
     "label": "Code complete — blocked on human actions to ship v1"
@@ -65,10 +65,10 @@
     {
       "name": "Phase 8",
       "title": "Tables & project pages",
-      "done": 3,
+      "done": 4,
       "total": 6,
       "state": "active",
-      "note": "Read models merged (#134). Setup tabs (#128 PR). Next: project pages (#129), rules (#130), analytics (#131)."
+      "note": "Read models merged (#134). Setup tabs (#128 PR), projects table + per-project page (#129 PR). Next: rules (#130), analytics (#131)."
     }
   ],
   "actions": {
@@ -314,7 +314,7 @@
     },
     {
       "name": "Vitest",
-      "result": "548/548 passing (54 files)"
+      "result": "657/657 passing (60 files)"
     },
     {
       "name": "cargo test",
@@ -347,6 +347,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 — Dedicated project page: header (grade ring, sessions, last scan, Rescan) plus Rules / Effective rules / Setup / Usage tabs, folder-missing banner and honest not-found + failure states; shared ScanBar extracted, TrendChart made reusable for a count series (#129 PR)",
     "2026-08-22 — Setup screen rebuilt as per-kind tables: Rules · Skills · Agents · Commands · Hooks · MCP · Plugins tabs, search, sort, scope/never-used/errors/cost pills (#128 PR)",
     "2026-08-22 — Review round 2 on #127: NL issues get an explicit rule-id marker (an AI re-check was deleting the scanner's own findings), slash-tolerant project ids across the project-scoped reads",
     "2026-08-22 — Review fixes on #127: slash-free project ids (harness joins were always missing), rule_id on deterministic issues (hit counts were always 0), usage indexes, unambiguous artifact ids, zero-filled daily sessions",

@@ -1,7 +1,15 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ArtifactKind, ArtifactView } from "@/lib/ipc";
 import type { GradeLetter } from "@/components/Grade";
-import { ActionsCell, GradeCell, PercentCell, ScopeCell, TokensCell, UsageCell } from "@/components/DataTable";
+import {
+  ActionsCell,
+  EMPTY_MARK,
+  GradeCell,
+  PercentCell,
+  ScopeCell,
+  TokensCell,
+  UsageCell,
+} from "@/components/DataTable";
 import { openExternal } from "@/lib/open-external";
 import { projectNameFor } from "./setup.util";
 
@@ -59,7 +67,7 @@ export function formatSize(bytes: number): string {
   return `${unit === 0 ? value : value.toFixed(1)} ${SIZE_UNITS[unit]}`;
 }
 
-function nameColumn(): ColumnDef<ArtifactView, unknown> {
+export function nameColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "name",
     header: "Name",
@@ -124,17 +132,34 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
   };
 }
 
-function usesColumn(): ColumnDef<ArtifactView, unknown> {
+/**
+ * `applies` narrows which rows the column makes a claim about. Every Setup
+ * table holds one kind, so it is only ever invocable rows there and the
+ * default (always) is right. A table that mixes kinds — the project page's
+ * single combined inventory — needs the guard: `UsageCell` renders "never
+ * used" for a null rollup, which reads as a finding about a rule file rather
+ * than as the fact that rule files are loaded, never called. Guarded-out rows
+ * fall back to the same em dash `PercentCell`/`TokensCell` already use, and
+ * still sort under the never-used sentinel.
+ */
+export function usesColumn(
+  applies?: (row: ArtifactView) => boolean,
+): ColumnDef<ArtifactView, unknown> {
   return {
     id: "uses",
     header: "Uses",
     // Never-used sorts to the bottom of a "Uses desc" default sort.
     accessorFn: (r) => r.usage?.total ?? -1,
-    cell: (c) => <UsageCell usage={c.row.original.usage} />,
+    cell: (c) =>
+      applies && !applies(c.row.original) ? (
+        <span className="muted">{EMPTY_MARK}</span>
+      ) : (
+        <UsageCell usage={c.row.original.usage} />
+      ),
   };
 }
 
-function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
+export function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "errorRate",
     header: "Error %",
@@ -144,7 +169,7 @@ function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
   };
 }
 
-function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
+export function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "avgTokens",
     header: "Avg tokens",
@@ -154,7 +179,7 @@ function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
   };
 }
 
-function sizeColumn(): ColumnDef<ArtifactView, unknown> {
+export function sizeColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "size",
     header: "Size",
@@ -182,9 +207,18 @@ function bundledColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
   };
 }
 
-type ActionsKind = "rule" | "file" | "folder";
+/** What a row's trailing action does: open its graded file, its file on disk, or its folder. */
+export type ActionsKind = "rule" | "file" | "folder";
 
-function actionsColumn(kind: ActionsKind, ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
+/**
+ * `kind` may be one value (a Setup table, where every row is the same kind)
+ * or a per-row resolver (the project page's combined table, where a rule
+ * opens its Detail page and a plugin opens its folder).
+ */
+export function actionsColumn(
+  kind: ActionsKind | ((row: ArtifactView) => ActionsKind),
+  ctx: ColumnsCtx,
+): ColumnDef<ArtifactView, unknown> {
   return {
     id: "actions",
     header: "Actions",
@@ -192,7 +226,8 @@ function actionsColumn(kind: ActionsKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
     meta: { align: "right" },
     cell: (c) => {
       const row = c.row.original;
-      if (kind === "rule") {
+      const resolved = typeof kind === "function" ? kind(row) : kind;
+      if (resolved === "rule") {
         if (!row.file_id) return null;
         const fileId = row.file_id;
         // Every row in a table needs its own accessible name — a column of
@@ -203,7 +238,7 @@ function actionsColumn(kind: ActionsKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
           />
         );
       }
-      const label = kind === "file" ? `Open ${row.name}` : `Open folder ${row.name}`;
+      const label = resolved === "file" ? `Open ${row.name}` : `Open folder ${row.name}`;
       const path = row.path;
       return <ActionsCell actions={[{ label, icon: "folder", onClick: () => void openExternal(path) }]} />;
     },

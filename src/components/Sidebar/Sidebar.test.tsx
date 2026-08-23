@@ -60,6 +60,13 @@ describe("Sidebar", () => {
     expect(onNavigate).toHaveBeenCalledWith("projects");
   });
 
+  it("keeps Projects lit while one project's own page is open", () => {
+    // `project` is not a sidebar destination of its own (see `NAV_ITEMS`), so
+    // without this the whole nav goes dark the moment a project is opened.
+    const { getByRole } = render(<Sidebar active="project" onNavigate={() => {}} />);
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
+  });
+
   it("routes a project click to Prompts with the project id", () => {
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({

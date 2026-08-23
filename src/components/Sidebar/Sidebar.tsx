@@ -1,7 +1,7 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
 import type { SidebarProps } from "./Sidebar.types";
-import { NAV_ITEMS } from "./Sidebar.constants";
+import { NAV_ITEMS, NAV_OWNER } from "./Sidebar.constants";
 import { useSidebar } from "./useSidebar";
 
 export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
@@ -21,7 +21,7 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
 
       <nav className="sidebar__nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
-          const isActive = active === item.route;
+          const isActive = (NAV_OWNER[active] ?? active) === item.route;
           const count = counts[item.route];
           return (
             <button

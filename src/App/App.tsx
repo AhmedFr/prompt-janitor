@@ -4,6 +4,7 @@ import { Onboarding } from "@/components/Onboarding";
 import { Overview } from "@/screens/Overview";
 import { Setup } from "@/screens/Setup";
 import { Projects } from "@/screens/Projects";
+import { Project } from "@/screens/Project";
 import { Prompts } from "@/screens/Prompts";
 import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
@@ -16,14 +17,12 @@ import type { Route } from "./App.types";
 const ONBOARDED_KEY = "pj-onboarded";
 
 /**
- * A route that exists but has no screen yet. `project` (spec §4.2) and
- * `rules-new` (§4.3) are wired end to end here — union member, target state,
- * `navigate` plumbing — so the screens that land next only have to be
- * swapped in. Renders nothing visible; the target rides along on a hidden
- * element rather than being dropped and re-threaded later.
+ * A route that exists but has no screen yet — `rules-new` (spec §4.3) is
+ * wired end to end here (union member, `navigate` plumbing) so the screen
+ * that lands next only has to be swapped in. Renders nothing visible.
  */
-function RoutePending({ target }: { target?: string }) {
-  return <span hidden data-route-target={target} />;
+function RoutePending() {
+  return <span hidden />;
 }
 
 export function App() {
@@ -66,7 +65,7 @@ export function App() {
         {route === "overview" && <Overview navigate={navigate} />}
         {route === "setup" && <Setup navigate={navigate} />}
         {route === "projects" && <Projects navigate={navigate} />}
-        {route === "project" && <RoutePending target={projectPath} />}
+        {route === "project" && <Project path={projectPath} navigate={navigate} />}
         {route === "rules-new" && <RoutePending />}
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}

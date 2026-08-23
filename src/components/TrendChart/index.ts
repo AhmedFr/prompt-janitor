@@ -1,2 +1,2 @@
 export { TrendChart } from "./TrendChart";
-export type { TrendChartProps } from "./TrendChart.types";
+export type { TrendChartProps, TrendDomainBound } from "./TrendChart.types";

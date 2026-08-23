@@ -2,7 +2,15 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup, screen, fireEvent, within } from "@testing-library/react";
 import type { ArtifactKind, ArtifactView, UsageStat } from "@/lib/ipc";
 import { DataTable } from "@/components/DataTable";
-import { columnsFor, defaultSortFor, formatSize, KIND_TABS, type ColumnsCtx } from "./setup.columns";
+import {
+  actionsColumn,
+  columnsFor,
+  defaultSortFor,
+  formatSize,
+  KIND_TABS,
+  usesColumn,
+  type ColumnsCtx,
+} from "./setup.columns";
 
 const openExternal = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock("@/lib/open-external", () => ({ openExternal }));
@@ -404,5 +412,71 @@ describe("formatSize", () => {
   it("renders megabytes to one decimal place", () => {
     expect(formatSize(1024 * 1024)).toBe("1.0 MB");
     expect(formatSize(1024 * 1024 * 2.5)).toBe("2.5 MB");
+  });
+});
+
+/**
+ * The builders the per-kind tables compose are shared with the project page's
+ * single combined table (`projectSetupColumns`), which mixes kinds in one
+ * grid. These are the two seams that mixing opened.
+ */
+describe("shared column builders", () => {
+  /** Mounts an ad-hoc column list — the builders under test, not a whole kind. */
+  function mountColumns(columns: ReturnType<typeof usesColumn>[], rows: ArtifactView[]) {
+    mountCount += 1;
+    return render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowId={(r) => String(r.id)}
+        empty={{ title: "Nothing here" }}
+        stateKey={`test-shared-${mountCount}`}
+        ariaLabel="Artifacts"
+      />,
+    );
+  }
+
+  it("says never used for an artifact that could have been invoked and wasn't", () => {
+    mountColumns([usesColumn()], [artifact({ kind: "skill", usage: null })]);
+    expect(screen.getByText("never used")).toBeInTheDocument();
+  });
+
+  it("makes no usage claim about a kind nothing can invoke", () => {
+    // A rule file is loaded, never called: "never used" would read as a
+    // finding about the rule rather than a fact about the column.
+    mountColumns([usesColumn((r) => r.kind !== "rule")], [artifact({ kind: "rule", usage: null })]);
+    expect(screen.queryByText("never used")).not.toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("still reports usage for an invocable row under the same guard", () => {
+    mountColumns(
+      [usesColumn((r) => r.kind !== "rule")],
+      [artifact({ kind: "skill", usage: usage({ total: 9, sessions: 4 }) })],
+    );
+    expect(screen.getByText(/used 9×/)).toBeInTheDocument();
+  });
+
+  it("resolves the action per row when handed a resolver instead of one kind", () => {
+    const c = ctx();
+    mountColumns(
+      [actionsColumn((r) => (r.kind === "plugin" ? "folder" : "file"), c)],
+      [
+        artifact({ id: 1, kind: "plugin", name: "office" }),
+        artifact({ id: 2, kind: "skill", name: "pdf-extract" }),
+      ],
+    );
+    expect(screen.getByRole("button", { name: "Open folder office" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open pdf-extract" })).toBeInTheDocument();
+  });
+
+  it("opens a rule row's graded file through the resolver too", () => {
+    const onOpen = vi.fn();
+    mountColumns(
+      [actionsColumn((r) => (r.kind === "rule" ? "rule" : "file"), ctx({ onOpen }))],
+      [artifact({ id: 1, kind: "rule", name: "CLAUDE.md", file_id: "f1" })],
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open CLAUDE.md" }));
+    expect(onOpen).toHaveBeenCalledWith("f1");
   });
 });
