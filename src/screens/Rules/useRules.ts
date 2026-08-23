@@ -8,21 +8,28 @@ import type { RulesState } from "./Rules.types";
  * The rule set the screen tables: fetches it, toggles rules, deletes custom
  * ones and imports packs.
  *
+ * Failures are *said*, not stored. `say` is the screen's one live region, and
+ * routing writes through it is what keeps a mutation error from outliving the
+ * moment it belongs to — a sentence held in state has no expiry, so the last
+ * failed toggle stays on screen for the rest of the session and outranks
+ * everything said after it.
+ *
  * Creating rules deliberately isn't here — that lives on `/rules/new` (spec
  * §4.3), so this hook stays the read/maintain surface and the composer state
  * doesn't leak into a screen that no longer composes anything.
  *
  * **None of the actions below reject.** Each one owns its failure: it puts the
- * optimistic change back and writes a sentence into `error`. That is what lets
- * the screen fire them without a rejection handler at every call site, and it
- * is the only way an optimistic UI can be honest — a switch that springs back
- * with no explanation reads as a broken switch, not as a write that failed.
+ * optimistic change back and says what happened. That is what lets the screen
+ * fire them without a rejection handler at every call site, and it is the only
+ * way an optimistic UI can be honest — a switch that springs back with no
+ * explanation reads as a broken switch, not as a write that failed.
+ *
+ * @param say Puts one sentence in the screen's live region, until it expires.
  */
-export function useRules(): RulesState {
+export function useRules(say: (message: string) => void): RulesState {
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [aiReady, setAiReady] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -63,19 +70,21 @@ export function useRules(): RulesState {
     })();
   }, []);
 
-  const toggle = useCallback(async (id: string, enabled: boolean) => {
-    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
-    try {
-      const res = await commands.setRule(id, enabled);
-      if (res.status !== "ok") throw new Error(res.error);
-      setError(null);
-    } catch {
-      // `!enabled` is where the switch was a moment ago — this is the exact
-      // inverse of the optimistic write above, not a guess at the truth.
-      setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !enabled } : r)));
-      setError(TOGGLE_FAILED);
-    }
-  }, []);
+  const toggle = useCallback(
+    async (id: string, enabled: boolean) => {
+      setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled } : r)));
+      try {
+        const res = await commands.setRule(id, enabled);
+        if (res.status !== "ok") throw new Error(res.error);
+      } catch {
+        // `!enabled` is where the switch was a moment ago — this is the exact
+        // inverse of the optimistic write above, not a guess at the truth.
+        setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !enabled } : r)));
+        say(TOGGLE_FAILED);
+      }
+    },
+    [say],
+  );
 
   const deleteRule = useCallback(
     async (id: string) => {
@@ -83,7 +92,6 @@ export function useRules(): RulesState {
       try {
         const res = await commands.deleteCustomRule(id);
         if (res.status !== "ok") throw new Error(res.error);
-        setError(null);
       } catch {
         // Refetched rather than spliced back at its old index: the delete may
         // have half-happened, and the server's list is the only version of the
@@ -92,10 +100,10 @@ export function useRules(): RulesState {
         // identity on every fetch and blow the column cache the screen builds
         // on top of it.
         await refetch();
-        setError(DELETE_FAILED);
+        say(DELETE_FAILED);
       }
     },
-    [refetch],
+    [refetch, say],
   );
 
   const importPack = useCallback(async (): Promise<number> => {
@@ -109,14 +117,13 @@ export function useRules(): RulesState {
       if (typeof path !== "string") return 0;
       const res = await commands.importPack(path);
       if (res.status !== "ok") throw new Error(res.error);
-      setError(null);
       await refetch();
       return res.data;
     } catch {
-      setError(IMPORT_FAILED);
+      say(IMPORT_FAILED);
       return 0;
     }
-  }, [refetch]);
+  }, [refetch, say]);
 
-  return { rules, loading, failed, error, aiReady, toggle, deleteRule, importPack, refetch };
+  return { rules, loading, failed, aiReady, toggle, deleteRule, importPack, refetch };
 }

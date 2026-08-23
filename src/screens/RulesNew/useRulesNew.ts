@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, isTauri } from "@/lib/ipc";
 import { HIGHLIGHT_KEY } from "@/screens/Rules/Rules.constants";
 import type { Navigate } from "@/App/App.types";
@@ -62,6 +62,10 @@ export function useRulesNew({
   const [fetched, setFetched] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mirrors `saving`, and read wherever the answer is needed *now*: two clicks
+  // in one tick both see the old state value, so state alone cannot stop the
+  // second one from starting a duplicate write.
+  const savingRef = useRef(false);
 
   const aiReady = aiOverride !== undefined ? aiOverride : fetched;
 
@@ -88,10 +92,17 @@ export function useRulesNew({
   }, [navigate, initialType]);
 
   // Escape abandons the flow from either step — the same key that dismisses
-  // every other modal surface in the app.
+  // every other modal surface in the app. Three things it must not abandon:
+  // an IME candidate list (`isComposing`, where Escape is closing the
+  // candidate window and never reaches the user's intent), a key something
+  // closer to the user already handled (`defaultPrevented`), and a write
+  // already in flight — by then the rule may exist, and leaving would strand
+  // the user on Rules with no idea whether it landed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") cancel();
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+      if (savingRef.current) return;
+      cancel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -104,10 +115,11 @@ export function useRulesNew({
   }, []);
 
   const save = useCallback(async () => {
-    if (kind === null || saving || !canSave(kind, draft, aiReady)) return;
+    if (kind === null || savingRef.current || !canSave(kind, draft, aiReady)) return;
     const title = draft.title.trim();
     const body = draft.body.trim();
 
+    savingRef.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -122,9 +134,10 @@ export function useRulesNew({
       navigate("rules", TAB_FOR[kind]);
     } catch {
       setError(SAVE_FAILED);
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [kind, saving, draft, aiReady, navigate]);
+  }, [kind, draft, aiReady, navigate]);
 
   return { kind, draft, aiReady, saving, error, choose, back, update, cancel, save };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { RuleInfo } from "@/lib/ipc";
 import { HIGHLIGHT_KEY } from "@/screens/Rules/Rules.constants";
@@ -224,6 +224,53 @@ describe("RulesNew", () => {
     expect(navigate).toHaveBeenCalledWith("rules", "builtin");
   });
 
+  it("leaves an IME candidate list alone — that Escape is not meant for us", () => {
+    const { navigate } = renderScreen({ initialType: "ai" });
+    fireEvent.keyDown(window, { key: "Escape", isComposing: true });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("leaves an Escape something closer to the user already handled", () => {
+    const { navigate } = renderScreen({ initialType: "ai" });
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    event.preventDefault();
+    fireEvent(window, event);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("will not abandon a save that is already in flight", async () => {
+    let land: (value: { status: "ok"; data: null }) => void = () => {};
+    addCustomRule.mockReturnValue(new Promise((resolve) => (land = resolve)));
+    const { navigate } = renderScreen();
+    fireEvent.click(patternCard());
+    fill("Never say synergy", "synergy", /Forbidden text/);
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(addCustomRule).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(navigate).not.toHaveBeenCalled();
+
+    land({ status: "ok", data: null });
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+  });
+
+  it("writes once when Save is pressed twice in the same tick", async () => {
+    renderScreen();
+    fireEvent.click(patternCard());
+    fill("Never say synergy", "synergy", /Forbidden text/);
+
+    // Both clicks land before React re-renders, so the disabled attribute has
+    // not appeared yet — which is the case the state flag cannot catch and the
+    // ref inside `save` has to.
+    const save = saveButton();
+    act(() => {
+      save.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      save.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(addCustomRule).toHaveBeenCalledTimes(1));
+  });
+
   it("cancels on Escape, from either step", () => {
     const { navigate, unmount } = renderScreen({ initialType: "ai" });
     fireEvent.keyDown(window, { key: "Escape" });
@@ -254,6 +301,16 @@ describe("RulesNew", () => {
     const { container } = renderScreen();
     fireEvent.click(patternCard());
     await waitFor(() => expect(getAiConfig).toHaveBeenCalled());
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations on the gated natural-language form", async () => {
+    getAiConfig.mockResolvedValue({ status: "ok", data: { provider: "none", has_key: false } });
+    const { container } = renderScreen({ initialType: "ai" });
+    await waitFor(() => expect(saveButton()).toBeDisabled());
+    // The disabled Save is described by the sentence explaining it, so the
+    // reason is reachable from the control rather than only from the page.
+    expect(saveButton()).toHaveAccessibleDescription(/Connect an AI provider/);
     expect(await axe(container)).toHaveNoViolations();
   });
 });

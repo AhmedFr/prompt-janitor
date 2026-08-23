@@ -81,7 +81,12 @@ function asTab(id: string): RuleTabId {
  * maintaining the set.
  */
 export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
-  const state = useRules();
+  // The status line is built first because `useRules` writes into it: a failed
+  // mutation and a finished copy are the same channel, so a failure expires
+  // like everything else instead of sitting there for the rest of the session.
+  const status = useStatusLine();
+  const { say } = status;
+  const state = useRules(say);
   const rules = override ?? state.rules;
   const loading = state.loading && !override;
   const failed = state.failed && !override;
@@ -104,8 +109,6 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
     if (highlight) forgetHighlight();
   }, [highlight]);
 
-  const status = useStatusLine();
-  const { say } = status;
   const { importPack, toggle, deleteRule } = state;
 
   const doImport = useCallback(async () => {
@@ -170,10 +173,11 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
                         <>
                           {/* Always present, empty or not: a live region that
                               appears only once it has something to say has
-                              nothing for assistive tech to be watching. A
-                              write that failed outranks a copy that worked. */}
+                              nothing for assistive tech to be watching. Copy
+                              results and failed writes share it, so the most
+                              recent thing that happened is what it reads. */}
                           <span className="rules-status" role="status">
-                            {state.error ?? status.message ?? ""}
+                            {status.message ?? ""}
                           </span>
                           {tab === "builtin" && (
                             <Button size="sm" onClick={() => void doImport()}>

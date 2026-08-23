@@ -7,13 +7,25 @@ import type { RuleDraft, RuleKind } from "./RulesNew.types";
  */
 const STAMPED = /^custom-(?:nl-)?(\d+)$/;
 
+/** Below every real stamp *and* below {@link NO_STAMP}, so the first match always takes the slot. */
+const BEFORE_ANY = -2n;
+
+/** An id that carries no stamp still beats nothing, and still loses to one that does. */
+const NO_STAMP = -1n;
+
 /**
- * The nanosecond stamp inside a custom rule's id, or `-1` for an id that does
- * not carry one — which makes any real stamp outrank it under `>=`.
+ * The nanosecond stamp inside a custom rule's id, or {@link NO_STAMP} for an
+ * id that does not carry one.
+ *
+ * A `bigint`, not a `number`: nanoseconds since the epoch passed 2^53 in 1970
+ * + 104 days, so every id this app has ever minted is past the point where
+ * IEEE-754 can hold consecutive integers. As a `number`, two rules created a
+ * nanosecond apart compare equal — which is exactly the case this exists to
+ * decide.
  */
-export function ruleStamp(id: string): number {
+export function ruleStamp(id: string): bigint {
   const match = STAMPED.exec(id);
-  return match ? Number(match[1]) : -1;
+  return match ? BigInt(match[1]) : NO_STAMP;
 }
 
 /**
@@ -30,7 +42,7 @@ export function ruleStamp(id: string): number {
 export function newRuleId(rules: RuleInfo[], title: string, nl: boolean): string | undefined {
   const wanted = title.trim();
   let best: string | undefined;
-  let bestStamp = -Infinity;
+  let bestStamp = BEFORE_ANY;
 
   for (const rule of rules) {
     if (!rule.custom || rule.nl !== nl || rule.title.trim() !== wanted) continue;

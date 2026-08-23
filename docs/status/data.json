@@ -326,7 +326,7 @@
     },
     {
       "name": "Vitest",
-      "result": "827/827 passing (67 files)"
+      "result": "835/835 passing (67 files)"
     },
     {
       "name": "cargo test",
@@ -359,6 +359,7 @@
     }
   ],
   "recent": [
+    "2026-08-23 — Rules polish: Escape no longer abandons an IME candidate list, a key someone else handled, or a save already in flight; double-clicking Save writes once; new-rule ids compare as exact nanosecond stamps (a number loses the last digits); the disabled Save says why via aria-describedby; failed toggles/deletes/imports now expire on the same timer as the copy line instead of sitting there all session (#130 branch)",
     "2026-08-23 — Adding a rule is its own screen at /rules/new: pick Pattern rule or Natural-language standard (disabled with a hint until an AI provider is configured), fill name / text / severity, and Save lands back on Rules with the new row highlighted; Cancel and Escape return to the tab you came from (#130 branch)",
     "2026-08-23 — Rules review fix round 1: row actions come from the row, not the tab (a user-written AI standard kept its Delete), built-in pattern rules show no action since list_rules gives them no pattern, toggle/delete/import failures revert and say so in one live status line, copy confirms or admits it failed (#130 branch)",
     "2026-08-23 — Rules screen rebuilt as tabs of tables: Built-in / Custom / AI standards badged enabled/total, per-tab search, source / severity / enabled / has-hits pills, row switches, delete on custom rules and copy-pattern elsewhere; pack import stays on Built-in and Add rule now routes to /rules/new (#130 branch)",

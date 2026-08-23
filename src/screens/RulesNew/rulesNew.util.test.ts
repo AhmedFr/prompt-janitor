@@ -18,16 +18,31 @@ const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
 
 describe("ruleStamp", () => {
   it("reads the nanosecond stamp out of a pattern rule's id", () => {
-    expect(ruleStamp("custom-1755900000000000000")).toBe(1755900000000000000);
+    expect(ruleStamp("custom-1755900000000000000")).toBe(1755900000000000000n);
   });
 
   it("reads it out of a natural-language rule's id too", () => {
-    expect(ruleStamp("custom-nl-42")).toBe(42);
+    expect(ruleStamp("custom-nl-42")).toBe(42n);
+  });
+
+  /**
+   * The whole reason this returns a `bigint`. Nanoseconds since the epoch are
+   * far past 2^53, so as a `number` these two ids parse to the *same* value
+   * and the newer rule stops being distinguishable from the older one.
+   */
+  it("keeps two ids a nanosecond apart apart", () => {
+    const older = "custom-1755900000000000001";
+    const newer = "custom-1755900000000000002";
+    expect(ruleStamp(newer)).not.toBe(ruleStamp(older));
+    expect(ruleStamp(newer) > ruleStamp(older)).toBe(true);
+    // What a `number` would have done with the same two ids.
+    expect(Number(older.slice(7))).toBe(Number(newer.slice(7)));
   });
 
   it("is -1 for an id it cannot read, so a real stamp always outranks it", () => {
-    expect(ruleStamp("no-slack")).toBe(-1);
-    expect(ruleStamp("custom-")).toBe(-1);
+    expect(ruleStamp("no-slack")).toBe(-1n);
+    expect(ruleStamp("custom-")).toBe(-1n);
+    expect(ruleStamp("custom-0") > ruleStamp("no-slack")).toBe(true);
   });
 });
 
@@ -59,6 +74,14 @@ describe("newRuleId", () => {
   it("is undefined when nothing matches, so the trip loses its highlight and nothing else", () => {
     expect(newRuleId(rows, "Not a rule", false)).toBeUndefined();
     expect(newRuleId([], "Never say synergy", false)).toBeUndefined();
+  });
+
+  it("picks the newer of two rules created a nanosecond apart", () => {
+    const twins = [
+      rule({ id: "custom-1755900000000000002", title: "T" }),
+      rule({ id: "custom-1755900000000000001", title: "T" }),
+    ];
+    expect(newRuleId(twins, "T", false)).toBe("custom-1755900000000000002");
   });
 
   it("falls back to the last match when no id carries a stamp", () => {

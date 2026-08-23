@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { RuleInfo } from "@/lib/ipc";
 import { Rules } from "./Rules";
-import { HIGHLIGHT_KEY, TAB_STATE_KEY } from "./Rules.constants";
+import { HIGHLIGHT_KEY, STATUS_MSG_MS, TAB_STATE_KEY } from "./Rules.constants";
 
 const listRules = vi.hoisted(() => vi.fn());
 const setRule = vi.hoisted(() => vi.fn());
@@ -197,6 +197,28 @@ describe("Rules", () => {
 
     await waitFor(() => expect(statusLine()).toMatch(/Could not change that rule/));
     expect(screen.getByRole("switch", { name: "Enable No Slack references" })).toBeChecked();
+  });
+
+  /**
+   * The failure shares the copy line's timer rather than living in its own
+   * state: a sentence with no expiry sits there for the rest of the session
+   * and outranks everything said after it.
+   */
+  it("stops saying a failed write once the status line expires", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      setRule.mockResolvedValue({ status: "error", error: "database is locked" });
+      await renderScreen();
+      await rowsSettle(2);
+
+      fireEvent.click(screen.getByRole("switch", { name: "Enable No Slack references" }));
+      await waitFor(() => expect(statusLine()).toMatch(/Could not change that rule/));
+
+      act(() => vi.advanceTimersByTime(STATUS_MSG_MS + 100));
+      expect(statusLine()).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("puts the switch back when the command throws, not just when it errors", async () => {

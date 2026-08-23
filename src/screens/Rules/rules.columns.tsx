@@ -11,7 +11,11 @@ import type { RuleTabId } from "./Rules.types";
 export interface RuleColumnsCtx {
   /** Enable or disable the rule, from its switch. */
   toggle: (id: string, enabled: boolean) => void;
-  /** Remove a custom rule. Only ever reachable from the Custom tab. */
+  /**
+   * Remove a custom rule. Offered on whichever tab the row lands on, not just
+   * Custom — a natural-language standard the user wrote sits under AI
+   * standards and is still theirs to delete.
+   */
   onDelete: (id: string) => void;
   /** Put a rule's pattern (or NL instruction) on the clipboard. */
   onCopy: (pattern: string) => void;

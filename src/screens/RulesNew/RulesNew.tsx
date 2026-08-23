@@ -227,7 +227,15 @@ function RuleForm({
 
         <SeverityChoice value={draft.severity} onChange={(severity) => onUpdate({ severity })} />
 
-        {blocked && <p className="rules-new__hint">{NL_HINT}</p>}
+        {/* The id is the disabled Save button's `aria-describedby`: a control
+            that cannot be pressed has to say why, and the sentence saying why
+            is this one. Only one step is ever mounted, so it never collides
+            with the type step's use of the same id. */}
+        {blocked && (
+          <p className="rules-new__hint" id={NL_HINT_ID}>
+            {NL_HINT}
+          </p>
+        )}
         {error && (
           <p className="rules-new__error" role="alert">
             {error}
@@ -242,7 +250,12 @@ function RuleForm({
           <Button type="button" onClick={onCancel}>
             {CANCEL_LABEL}
           </Button>
-          <Button type="submit" variant="primary" disabled={saving || !canSave(kind, draft, aiReady)}>
+          <Button
+            type="submit"
+            variant="primary"
+            aria-describedby={blocked ? NL_HINT_ID : undefined}
+            disabled={saving || !canSave(kind, draft, aiReady)}
+          >
             {saving ? SAVING_LABEL : SAVE_LABEL}
           </Button>
         </div>
