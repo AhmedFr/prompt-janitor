@@ -4,7 +4,17 @@ A macOS desktop app that finds, grades, and helps you fix the AI prompt files sc
 
 It detects your Claude Code setup automatically — no folder picker to configure. On a schedule, it inventories your global and per-project rules, skills, agents, commands, hooks, MCP servers, and plugins, and indexes your Claude Code session logs so you can see which of them are actually used (a manual "extra folder" in Settings remains available for anything outside that automatic scope). Each rule file is graded **A–F** against best-practice standards (Anthropic, OpenAI, Karpathy/community, plus your own rules), with issues surfaced via a cited source and a plain-English explanation, notifications on a calm cadence, and — as a paid upgrade — automatic rewrites for the bad parts.
 
-The **Setup screen** is the home base for this inventory: a global + per-project tree of everything Prompt Janitor found, each item tagged with whether — and how often — it's actually being used.
+## Screens
+
+Every inventory list in the app is the same sortable, searchable, pill-filtered table (`DataTable`, TanStack Table underneath); tables and inventory tabs remember their search, filters, sort and active tab per session.
+
+- **Overview** — the 10-second verdict: is your setup good enough, and what to fix first.
+- **Setup** — the inventory, one tab per artifact kind: Rules · Skills · Agents · Commands · Hooks · MCP · Plugins · Settings, across global and every project, with usage evidence (uses, sessions, last used, error rate, average context tokens), scope/plugin provenance, and never-used / errors / high-cost filters.
+- **Projects** — every scanned project with grade, open issues, sessions, never-used artifacts and folder-missing status; each opens a **project page** with Rules (graded files), Effective rules (load order global → project), Setup (the project's own artifacts) and Usage (top tools + sessions per day).
+- **Prompts** — a flat table of every graded file with project chip, kind, grade, issues and modified date.
+- **Analytics** — health trends and a Usage tab of ranked bars (top used by kind, most errors, most expensive) over a 7/30/90-day window.
+- **Rules** — Built-in · Custom · AI standards tabs with enable switches, hit counts and actions; **Add rule** opens a separate two-step flow (pattern rule or natural-language standard).
+- **Settings** — harnesses, extra folders, AI provider, notifications, schedule.
 
 ## Status
 

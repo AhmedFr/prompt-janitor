@@ -237,6 +237,14 @@ describe("DataTable", () => {
     expect(within(group).getByRole("button", { name: /Prompts/ })).toHaveTextContent("1");
   });
 
+  it("names a pill by its label and its count, not by the two run together", () => {
+    // Same defect as the tab badges: the count concatenated into the name,
+    // so the Rules pill announced as "Rules2".
+    setup({ pills: PILLS });
+    expect(screen.getByRole("button", { name: "Rules, 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Prompts, 1" })).toBeInTheDocument();
+  });
+
   it("prefers a precomputed pill count over recounting the rows", () => {
     setup({
       pills: [

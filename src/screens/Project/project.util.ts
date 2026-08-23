@@ -10,7 +10,7 @@ import type { RankedRow } from "@/components/RankedList";
 // Deep imports rather than the screen barrels: these are pure formatters, and
 // a barrel would pull whole screens in behind them.
 import { lastScanAt, plural } from "@/screens/Setup/setup.util";
-import { rankedKey } from "@/screens/Analytics/UsageTab/usageTab.util";
+import { rankedKey } from "@/lib/usage";
 
 /**
  * This project's scanned files. `FileRow.project_id` is the owning project's

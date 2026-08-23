@@ -100,7 +100,7 @@ describe("Projects", () => {
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
     // The chip's accessible name is its letter followed by the faceted count.
-    fireEvent.click(screen.getByRole("button", { name: /^A\s*\d+$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^A, \d+$/ }));
 
     await waitFor(() => expect(rowNames()).toEqual(["web-app"]));
   });

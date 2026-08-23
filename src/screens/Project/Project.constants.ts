@@ -29,9 +29,6 @@ export const TABS_LABEL = "Project sections";
 /** How many days of usage the page asks the backend for. */
 export const USAGE_WINDOW_DAYS = 90;
 
-/** The invocation kinds the usage selector offers, in `InvocationKind`'s own order. */
-export const USAGE_KINDS: readonly InvocationKind[] = ["skill", "agent", "mcp", "builtin"] as const;
-
 /** How many ranked targets the usage list shows. */
 export const USAGE_LIMIT = 10;
 

@@ -1,78 +1,151 @@
 import { describe, it, expect } from "vitest";
-import type { ProjectSessions, RankedTarget, TargetRate, UsageOverview } from "@/lib/ipc";
+import type { ProjectSessions, RankedTarget, UsageOverview } from "@/lib/ipc";
 import {
-  errorRateBars,
+  inWindow,
   isUsageEmpty,
   kindBars,
-  kindLabel,
-  rankedKey,
+  percentValue,
+  rankedFor,
   sessionBars,
-  shortDay,
-  topRanked,
+  targetDetail,
+  tokenValue,
   windowLabel,
 } from "./usageTab.util";
 
+const row = (over: Partial<RankedTarget> & Pick<RankedTarget, "kind" | "target">): RankedTarget => ({
+  artifact_id: null,
+  uses: 1,
+  sessions: 1,
+  error_rate: 0,
+  avg_turn_tokens: null,
+  ...over,
+});
+
 const ranked: RankedTarget[] = [
-  {
-    kind: "skill",
-    target: "adapt",
-    artifact_id: 7,
-    uses: 8,
-    sessions: 3,
-    error_rate: 0.125,
-    avg_turn_tokens: 1840,
-  },
-  {
-    kind: "mcp",
-    target: "playwright",
-    artifact_id: null,
-    uses: 2,
-    sessions: 1,
-    error_rate: 1,
-    avg_turn_tokens: null,
-  },
+  row({ kind: "skill", target: "adapt", uses: 8, sessions: 3, error_rate: 0.125, avg_turn_tokens: 1840 }),
+  row({ kind: "agent", target: "adapt", uses: 6, sessions: 2, error_rate: 0, avg_turn_tokens: 900 }),
+  row({ kind: "mcp", target: "playwright", uses: 4, sessions: 1, error_rate: 0.5 }),
+  row({ kind: "builtin", target: "Bash", uses: 2, sessions: 1, error_rate: 0.11, avg_turn_tokens: 310 }),
 ];
 
-describe("rankedKey", () => {
-  it("keys by kind and target, so a skill and an agent of one name stay apart", () => {
-    expect(rankedKey({ kind: "skill", target: "adapt" })).toBe("skill:adapt");
-    expect(rankedKey({ kind: "agent", target: "adapt" })).toBe("agent:adapt");
+describe("rankedFor", () => {
+  it("keeps only the asked-for kind", () => {
+    expect(rankedFor(ranked, "skill", "uses").map((r) => r.label)).toEqual(["adapt"]);
+    expect(rankedFor(ranked, "mcp", "uses").map((r) => r.label)).toEqual(["playwright"]);
+  });
+
+  it('ranks every kind together under "all"', () => {
+    expect(rankedFor(ranked, "all", "uses").map((r) => r.id)).toEqual([
+      "skill:adapt",
+      "agent:adapt",
+      "mcp:playwright",
+      "builtin:Bash",
+    ]);
+  });
+
+  it("keys rows by kind and target, so one name in two kinds stays two rows", () => {
+    const rows = rankedFor(ranked, "all", "uses");
+    expect(rows.filter((r) => r.label === "adapt").map((r) => r.id)).toEqual([
+      "skill:adapt",
+      "agent:adapt",
+    ]);
+  });
+
+  it("ranks by uses, busiest first, with the session count alongside", () => {
+    expect(rankedFor(ranked, "all", "uses")[0]).toMatchObject({
+      id: "skill:adapt",
+      label: "adapt",
+      value: 8,
+      secondary: "3 sessions",
+    });
+  });
+
+  it("ranks by error rate as a percentage, with the volume it is measured on", () => {
+    const rows = rankedFor(ranked, "all", "errors");
+    expect(rows.map((r) => [r.label, r.value, r.secondary])).toEqual([
+      ["playwright", 50, "4 uses"],
+      ["adapt", 12.5, "8 uses"],
+      ["Bash", 11, "2 uses"],
+    ]);
+  });
+
+  it("leaves error-free targets out of the error ranking", () => {
+    // A 0% row is not a finding; listing it would push a real one off the list.
+    expect(rankedFor(ranked, "all", "errors").some((r) => r.id === "agent:adapt")).toBe(false);
+  });
+
+  it("leaves a never-measured error rate out of the error ranking", () => {
+    // `null` is "the harness recorded no outcome", which a 0% bar would
+    // silently turn into a clean bill of health.
+    const unmeasured = [row({ kind: "mcp", target: "railway", uses: 3, error_rate: null })];
+    expect(rankedFor(unmeasured, "all", "errors")).toEqual([]);
+  });
+
+  it("ranks by average turn tokens, excluding targets the harness never measured", () => {
+    const rows = rankedFor(ranked, "all", "tokens");
+    expect(rows.map((r) => [r.label, r.value, r.secondary])).toEqual([
+      ["adapt", 1840, "8 uses"],
+      ["adapt", 900, "6 uses"],
+      ["Bash", 310, "2 uses"],
+    ]);
+    // `playwright` has no measured average — a 0 would read as "free".
+    expect(rows.some((r) => r.id === "mcp:playwright")).toBe(false);
+  });
+
+  it("ranks every match, leaving the display cut to RankedList's own limit", () => {
+    // Two owners of "how deep does this list go" drift; the component's
+    // `limit` is the one the tab states, so the util does not second-guess it.
+    const many = Array.from({ length: 14 }, (_, i) =>
+      row({ kind: "skill", target: `s${i}`, uses: 14 - i }),
+    );
+    expect(rankedFor(many, "skill", "uses")).toHaveLength(14);
+    expect(rankedFor(many, "skill", "uses", 3).map((r) => r.label)).toEqual(["s0", "s1", "s2"]);
+  });
+
+  it("keeps tied rows in the order the backend returned them", () => {
+    const tied = [
+      row({ kind: "skill", target: "first", uses: 5 }),
+      row({ kind: "skill", target: "second", uses: 5 }),
+      row({ kind: "skill", target: "third", uses: 5 }),
+    ];
+    expect(rankedFor(tied, "skill", "uses").map((r) => r.label)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+  });
+
+  it("hovers a row with the numbers its bar does not carry", () => {
+    expect(rankedFor(ranked, "skill", "uses")[0].title).toBe(
+      "3 sessions · 12.5% errors · 1,840 avg tokens",
+    );
   });
 });
 
-describe("topRanked", () => {
-  it("keeps the backend's busiest-first order", () => {
-    expect(topRanked(ranked).map((r) => r.target)).toEqual(["adapt", "playwright"]);
+describe("targetDetail", () => {
+  it("says an unmeasured token average is unrecorded, not zero", () => {
+    expect(targetDetail(row({ kind: "mcp", target: "playwright", uses: 4, sessions: 1 }))).toBe(
+      "1 session · 0% errors · avg tokens not recorded",
+    );
   });
 
-  it("lists at most eight targets", () => {
-    const many: RankedTarget[] = Array.from({ length: 12 }, (_, i) => ({
-      ...ranked[0],
-      target: `t${i}`,
-      uses: 12 - i,
-    }));
-    expect(topRanked(many)).toHaveLength(8);
-    expect(topRanked(many)[7].target).toBe("t7");
+  it("says an unmeasured error rate is unmeasured, not error-free", () => {
+    expect(
+      targetDetail(row({ kind: "mcp", target: "railway", uses: 4, error_rate: null })),
+    ).toContain("error rate not measured");
   });
 });
 
-describe("kindLabel", () => {
-  it("maps all four invocation kinds", () => {
-    expect(kindLabel("skill")).toBe("Skills");
-    expect(kindLabel("agent")).toBe("Agents");
-    expect(kindLabel("mcp")).toBe("MCP");
-    expect(kindLabel("builtin")).toBe("Built-in");
+describe("percentValue", () => {
+  it("drops a trailing zero decimal but keeps a meaningful one", () => {
+    expect(percentValue(50)).toBe("50%");
+    expect(percentValue(12.5)).toBe("12.5%");
   });
 });
 
-describe("shortDay", () => {
-  it("abbreviates an ISO day without shifting it across time zones", () => {
-    expect(shortDay("2026-08-02")).toBe("Aug 2");
-    expect(shortDay("2026-01-31")).toBe("Jan 31");
-  });
-
-  it("passes anything unparseable straight through", () => {
-    expect(shortDay("later")).toBe("later");
+describe("tokenValue", () => {
+  it("rounds to whole tokens and groups them", () => {
+    expect(tokenValue(21480.6)).toBe("21,481");
   });
 });
 
@@ -87,26 +160,6 @@ describe("kindBars", () => {
       { kind: "skill", label: "Skills", total: 12, avgTurnTokens: 1841 },
       { kind: "mcp", label: "MCP", total: 4, avgTurnTokens: null },
     ]);
-  });
-});
-
-describe("errorRateBars", () => {
-  const rates: TargetRate[] = [
-    { target: "playwright", total: 8, error_rate: 0.25 },
-    { target: "supabase", total: 4, error_rate: null },
-  ];
-
-  it("converts the 0–1 rate to a percentage and marks an unmeasured row", () => {
-    // A missing rate is not a clean 0% — the harness recorded no outcome at
-    // all — so the row carries the distinction the chart greys it out on.
-    expect(errorRateBars(rates)).toEqual([
-      { target: "playwright", total: 8, pct: 25, measured: true },
-      { target: "supabase", total: 4, pct: 0, measured: false },
-    ]);
-  });
-
-  it("keeps the backend's busiest-first order", () => {
-    expect(errorRateBars(rates).map((b) => b.target)).toEqual(["playwright", "supabase"]);
   });
 });
 
@@ -166,5 +219,13 @@ describe("windowLabel", () => {
   it("names the window the copy is about", () => {
     expect(windowLabel(30)).toBe("last 30 days");
     expect(windowLabel(1)).toBe("last day");
+  });
+});
+
+describe("inWindow", () => {
+  it("pins a piece of empty copy to the window that produced it", () => {
+    // "nothing found" without a window sends the reader looking for a scan
+    // that already ran over a different period.
+    expect(inWindow("Nothing was invoked", 7)).toBe("Nothing was invoked in the last 7 days.");
   });
 });

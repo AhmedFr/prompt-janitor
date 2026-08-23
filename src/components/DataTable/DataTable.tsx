@@ -197,17 +197,22 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
                 </span>
                 {group.options.map((option) => {
                   const on = (state.pills[group.id] ?? []).includes(option.id);
+                  const count = option.count ?? counts[group.id]?.[option.id] ?? 0;
                   return (
                     <button
                       key={option.id}
                       type="button"
                       className={cx("dt__pill", on && "dt__pill--on")}
+                      // Same defect as the tab badges: the count sits inside
+                      // the button, so without this the pill announces as
+                      // "Rules2" rather than "Rules, 2".
+                      aria-label={`${option.label}, ${count}`}
                       aria-pressed={on}
                       onClick={() => togglePill(group.id, option.id, !!group.multi)}
                     >
                       {option.label}
-                      <span className="dt__pill-count">
-                        {option.count ?? counts[group.id]?.[option.id] ?? 0}
+                      <span className="dt__pill-count" aria-hidden="true">
+                        {count}
                       </span>
                     </button>
                   );

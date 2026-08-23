@@ -95,6 +95,10 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
               role="tab"
               id={tabId}
               className={cx("tabs__tab", selected && "tabs__tab--active")}
+              // The badge sits inside the button, so without this its digits
+              // run straight into the label and the tab announces as
+              // "Rules12". Spelled out here, hidden below.
+              aria-label={badge === null ? undefined : `${item.label}, ${badge}`}
               aria-selected={selected}
               aria-controls={panelId}
               tabIndex={selected ? 0 : -1}
@@ -102,7 +106,11 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
               onKeyDown={onKeyDown}
             >
               {item.label}
-              {badge !== null && <span className="tabs__count tnum">{badge}</span>}
+              {badge !== null && (
+                <span className="tabs__count tnum" aria-hidden="true">
+                  {badge}
+                </span>
+              )}
             </button>
           );
         })}

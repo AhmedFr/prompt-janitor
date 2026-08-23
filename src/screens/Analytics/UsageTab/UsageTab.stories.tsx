@@ -1,13 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { UsageTabBody } from "./UsageTab";
-import type { UsageOverview } from "@/lib/ipc";
+import type { RankedTarget, UsageOverview } from "@/lib/ipc";
 
 /** Deterministic pseudo-usage so the story never churns between snapshots. */
 const rankedRow = (
   target: string,
   uses: number,
-  kind: UsageOverview["ranked"][number]["kind"],
-): UsageOverview["ranked"][number] => ({
+  kind: RankedTarget["kind"],
+  over: Partial<RankedTarget> = {},
+): RankedTarget => ({
   kind,
   target,
   artifact_id: null,
@@ -15,10 +16,11 @@ const rankedRow = (
   sessions: Math.max(1, Math.round(uses / 4)),
   error_rate: (uses % 5) / 10,
   avg_turn_tokens: uses % 2 === 0 ? null : uses * 210,
+  ...over,
 });
 
 const sample: UsageOverview = {
-  window_days: 90,
+  window_days: 30,
   ranked: [
     rankedRow("dataviz", 61, "skill"),
     rankedRow("playwright", 48, "mcp"),
@@ -49,7 +51,7 @@ const sample: UsageOverview = {
 const meta = {
   title: "Screens/Analytics/UsageTab",
   component: UsageTabBody,
-  args: { data: sample },
+  args: { data: sample, navigate: () => {} },
   // The tab lives in a full-width screen, not a centred card — render it the
   // way the app does so the axis labels get the room they get in production.
   parameters: { layout: "fullscreen" },
@@ -67,13 +69,33 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const SingleTarget: Story = {
+/**
+ * A window that ran clean and unmeasured: one target, no errors, no recorded
+ * token averages — every list has to say which of those it means.
+ */
+export const NothingToReport: Story = {
   args: {
     data: {
       ...sample,
-      ranked: [sample.ranked[0]],
-      mcp_error_rates: [],
+      window_days: 7,
+      ranked: [rankedRow("dataviz", 4, "skill", { error_rate: 0, avg_turn_tokens: null })],
       sessions_per_project: [],
+    },
+  },
+};
+
+/** A bad week: every kind erroring, so the error list is the one worth reading. */
+export const ErrorsHeavy: Story = {
+  args: {
+    data: {
+      ...sample,
+      ranked: [
+        rankedRow("playwright", 92, "mcp", { error_rate: 0.61, avg_turn_tokens: 4210 }),
+        rankedRow("supabase", 54, "mcp", { error_rate: 0.42, avg_turn_tokens: 3800 }),
+        rankedRow("dataviz", 48, "skill", { error_rate: 0.27, avg_turn_tokens: 12400 }),
+        rankedRow("adapt", 31, "agent", { error_rate: 0.19, avg_turn_tokens: 9100 }),
+        rankedRow("Bash", 24, "builtin", { error_rate: 0.04, avg_turn_tokens: 640 }),
+      ],
     },
   },
 };

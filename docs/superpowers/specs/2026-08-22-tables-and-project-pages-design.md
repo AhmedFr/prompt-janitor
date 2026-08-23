@@ -145,7 +145,7 @@ import stays as a secondary action in the Built-in tab toolbar.
 ### 4.4 Analytics → Usage
 
 Replace the top-targets line chart with three `RankedList`s:
-- **Top used** — selector Skills · Agents · MCP · Commands; rows = target, bar = share of
+- **Top used** — selector Skills · Agents · MCP · Built-in (no `command` invocation kind exists); rows = target, bar = share of
   max, value = uses; hover shows sessions + error % + avg tokens.
 - **Most errors** — MCP/skills with error % > 0, value = error %, secondary = uses.
 - **Most expensive** — by avg context tokens, value = tokens, secondary = uses.

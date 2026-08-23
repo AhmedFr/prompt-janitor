@@ -151,7 +151,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^AGENTS\.md\s*\d+$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^AGENTS\.md, \d+$/ }));
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
   });
@@ -160,7 +160,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^F\s*\d+$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^F, \d+$/ }));
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
   });
@@ -169,7 +169,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^web\s*\d+$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^web, \d+$/ }));
 
     await waitFor(() =>
       expect(rowIds()).toEqual(["/code/web/CLAUDE.md", "/code/web/docs/CLAUDE.md"]),
@@ -194,7 +194,7 @@ describe("Prompts", () => {
     await renderScreen({ target: "/code/api" });
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
-    expect(screen.getByRole("button", { name: /^api\s*\d+$/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^api, \d+$/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

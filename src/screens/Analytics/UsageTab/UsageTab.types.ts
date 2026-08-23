@@ -1,4 +1,8 @@
 import type { InvocationKind, ProjectSessions, UsageOverview } from "@/lib/ipc";
+import type { Navigate } from "@/App/App.types";
+
+/** What a ranked list orders its targets by. */
+export type RankedBy = "uses" | "errors" | "tokens";
 
 /** A bar in the "Invocations by kind" chart. */
 export interface KindBar {
@@ -10,25 +14,18 @@ export interface KindBar {
   avgTurnTokens: number | null;
 }
 
-/** A bar in the "MCP error rate" chart, as a 0–100 percentage. */
-export interface ErrorRateBar {
-  target: string;
-  total: number;
-  pct: number;
-  /** False when the harness recorded no outcome — the bar is greyed, not zero. */
-  measured: boolean;
-}
-
 /** A bar in the "Sessions per project" chart — the IPC row, filtered and ranked. */
 export type SessionBar = ProjectSessions;
 
-/** One line of a chart tooltip; the colour dot (not the text) carries identity. */
-export interface TipLine {
-  text: string;
-  color?: string;
+/** The tab, windowed by the Analytics toolbar's range toggle. */
+export interface UsageTabProps {
+  /** Days of usage to ask the backend for — the toolbar's 7 / 30 / 90. */
+  windowDays: number;
+  navigate: Navigate;
 }
 
-/** Presentational half of the tab — rendered from data the hook already loaded. */
+/** Presentational half of the tab — rendered from an overview the caller has. */
 export interface UsageTabBodyProps {
   data: UsageOverview;
+  navigate: Navigate;
 }

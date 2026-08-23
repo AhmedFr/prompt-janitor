@@ -1,17 +1,23 @@
 import type { TooltipContentProps } from "recharts";
-import type { ErrorRateBar, KindBar, SessionBar, TipLine } from "./UsageTab.types";
+import type { KindBar, SessionBar } from "./UsageTab.types";
+// A deep import rather than the screen barrel: `plural` is a pure formatter,
+// and the barrel would pull a whole screen in behind it.
+import { plural } from "@/screens/Setup/setup.util";
 
 type TipProps = TooltipContentProps;
 
-/** Shared tooltip shell: a title plus rows whose colour dot carries identity. */
-export function Tip({ title, lines }: { title: string; lines: TipLine[] }) {
+/**
+ * Shared tooltip shell: a title over one line per fact. Both charts are
+ * single-series, so a hovered mark is named by the title alone — there is no
+ * second series for a colour swatch to tell it apart from.
+ */
+function Tip({ title, lines }: { title: string; lines: string[] }) {
   return (
     <div className="usage-tip">
       <div className="usage-tip__title">{title}</div>
       {lines.map((line) => (
-        <div key={line.text} className="usage-tip__row">
-          {line.color && <span className="usage-swatch" style={{ background: line.color }} />}
-          <span>{line.text}</span>
+        <div key={line} className="usage-tip__row">
+          {line}
         </div>
       ))}
     </div>
@@ -34,27 +40,7 @@ export function KindTooltip({ active, payload }: TipProps) {
   return (
     <Tip
       title={bar.label}
-      lines={[
-        { text: plural(bar.total, "invocation") },
-        { text: `avg context tokens / turn: ${tokens}` },
-      ]}
-    />
-  );
-}
-
-/** One MCP server's error rate, over the call volume it is measured on. */
-export function ErrorTooltip({ active, payload }: TipProps) {
-  const bar = hoveredRow<ErrorRateBar>(payload);
-  if (!active || !bar) return null;
-  return (
-    <Tip
-      title={bar.target}
-      lines={[
-        // "not measured" and "0.0% errored" are different claims; only one of
-        // them is something the harness actually recorded.
-        { text: bar.measured ? `${bar.pct.toFixed(1)}% of calls errored` : "not measured" },
-        { text: plural(bar.total, "call") },
-      ]}
+      lines={[plural(bar.total, "invocation"), `avg context tokens / turn: ${tokens}`]}
     />
   );
 }
@@ -64,10 +50,6 @@ export function SessionsTooltip({ active, payload }: TipProps) {
   const bar = hoveredRow<SessionBar>(payload);
   if (!active || !bar) return null;
   return (
-    <Tip title={bar.name} lines={[{ text: plural(bar.sessions, "session") }, { text: bar.path }]} />
+    <Tip title={bar.name} lines={[plural(bar.sessions, "session"), bar.path]} />
   );
-}
-
-function plural(n: number, noun: string): string {
-  return `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
 }
