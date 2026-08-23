@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 14px 10px;
+  padding: 16px 16px 8px;
 }
 
 .panel-header--empty {
@@ -22,7 +22,7 @@
 }
 
 .panel-header__delta,
-.panel-header__scanned,
+.panel-header__meta,
 .panel-header__hint {
   font-size: 12px;
   margin: 2px 0 0;

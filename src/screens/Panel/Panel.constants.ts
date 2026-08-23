@@ -29,3 +29,22 @@ export const SCAN_HARNESS = "agent";
 
 /** No scan has ever finished — "Scanned never" reads like a bug. */
 export const NEVER_SCANNED = "Never scanned";
+
+/** Panel window width in logical pixels — the card plus its inset. */
+export const PANEL_WIDTH = 360;
+
+/**
+ * The card's margin, top and bottom together. The window is sized to the card
+ * plus this: the transparent gap is what makes the rounded corners read as a
+ * popover rather than as a rectangle with clipped edges.
+ */
+export const PANEL_CARD_INSET = 8;
+
+/** Shortest the popover gets. Below this a near-empty card reads as a glitch. */
+export const PANEL_MIN_HEIGHT = 240;
+
+/**
+ * Tallest the popover gets; past it the card scrolls instead. A popover taller
+ * than this hangs off the bottom of a laptop display.
+ */
+export const PANEL_MAX_HEIGHT = 600;

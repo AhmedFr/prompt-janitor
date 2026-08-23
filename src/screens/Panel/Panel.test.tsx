@@ -20,15 +20,17 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
-// The panel is the only screen that drives its own window: Esc hides it, and
-// being shown again arrives as a focus change.
+// The panel is the only screen that drives its own window: Esc hides it, being
+// shown again arrives as a focus change, and the window is resized to the card.
 const win = vi.hoisted(() => ({
   hide: vi.fn(),
+  setSize: vi.fn(),
   onFocus: null as null | ((event: { payload: boolean }) => void),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     hide: win.hide,
+    setSize: win.setSize,
     onFocusChanged: (handler: (event: { payload: boolean }) => void) => {
       win.onFocus = handler;
       return Promise.resolve(() => {
@@ -115,6 +117,7 @@ describe("Panel", () => {
   beforeEach(() => {
     listeners.clear();
     win.hide.mockClear();
+    win.setSize.mockReset().mockResolvedValue(undefined);
     win.onFocus = null;
     getPanelSnapshot.mockReset().mockResolvedValue({ status: "ok", data: snapshot() });
     openMain.mockReset().mockResolvedValue(undefined);
@@ -128,8 +131,7 @@ describe("Panel", () => {
     await show();
     expect(screen.getByText("Needs work")).toBeInTheDocument();
     expect(screen.getByText("▲ 3 since last scan")).toBeInTheDocument();
-    expect(screen.getByText("Scanned 2h ago")).toBeInTheDocument();
-    expect(screen.getByText("72/100")).toBeInTheDocument();
+    expect(screen.getByText("72/100 · Scanned 2h ago")).toBeInTheDocument();
   });
 
   it("lists the top three fixes with their grades", async () => {

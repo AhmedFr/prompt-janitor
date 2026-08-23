@@ -49,9 +49,11 @@ const noScan: PanelSnapshot = {
 };
 
 /**
- * The menu-bar popover, at the size the panel window actually is (360 × 480).
- * Storybook feeds it a fixture through the `data` prop — in the app it comes
- * from `usePanel`, which has no Tauri runtime to talk to here.
+ * The menu-bar popover at the width the panel window actually is (360). The
+ * height is the card's own: in the app `usePanelSize` resizes the window to
+ * match, so every story is as tall as its content. Storybook feeds the card a
+ * fixture through the `data` prop — in the app it comes from `usePanel`, which
+ * has no Tauri runtime to talk to here.
  */
 const meta = {
   title: "Screens/Panel",
@@ -60,7 +62,7 @@ const meta = {
   parameters: { layout: "centered" },
   decorators: [
     (Story) => (
-      <div style={{ width: 360, height: 480, position: "relative" }}>
+      <div style={{ width: 360, position: "relative" }}>
         <Story />
       </div>
     ),

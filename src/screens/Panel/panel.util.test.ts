@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PanelFix } from "@/lib/ipc";
-import { deltaCopy, fixLabel, lastScanLine, signalTone, verdictFor } from "./panel.util";
+import { deltaCopy, fixLabel, lastScanLine, metaLine, panelHeight, signalTone, verdictFor } from "./panel.util";
 
 describe("verdictFor", () => {
   it("calls A and B good enough", () => {
@@ -82,5 +82,39 @@ describe("lastScanLine", () => {
   /** "Scanned never" reads like a bug, so the empty case gets its own line. */
   it("says never scanned rather than scanned never", () => {
     expect(lastScanLine(null)).toBe("Never scanned");
+  });
+});
+
+describe("metaLine", () => {
+  /** The ring is too small to carry the number at 56 px, so the header says it instead. */
+  it("puts the score in front of the measurement's age", () => {
+    const now = new Date("2026-08-23T12:00:00.000Z");
+    expect(metaLine(86, "2026-08-22T12:00:00.000Z", now)).toBe("86/100 · Scanned 1d ago");
+  });
+
+  it("still carries the score when nothing has been scanned", () => {
+    expect(metaLine(0, null)).toBe("0/100 · Never scanned");
+  });
+});
+
+describe("panelHeight", () => {
+  /** The window has to clear the card's 4 px margin on both edges. */
+  it("adds the card's inset to the measured content", () => {
+    expect(panelHeight(412)).toBe(420);
+  });
+
+  /** A one-line card floating under the menu bar reads as a glitch, not a popover. */
+  it("never falls below the floor", () => {
+    expect(panelHeight(80)).toBe(240);
+  });
+
+  /** Past the ceiling the card scrolls; a popover taller than that runs off the screen. */
+  it("never passes the ceiling", () => {
+    expect(panelHeight(2000)).toBe(600);
+  });
+
+  /** A fractional layout height would resize the window on every repaint. */
+  it("rounds a sub-pixel measurement", () => {
+    expect(panelHeight(411.4)).toBe(419);
   });
 });
