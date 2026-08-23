@@ -16,6 +16,7 @@ mod harness_store;
 mod ipc;
 pub mod license;
 mod notify;
+mod panel;
 mod panel_query;
 mod project_logo;
 mod query;
@@ -28,10 +29,11 @@ mod store;
 pub mod templates;
 mod tray;
 mod vcs;
+mod window_policy;
 
 use std::sync::Mutex;
 
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 
 /// Build and run the Tauri application.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,6 +51,20 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
+        .on_window_event(|window, event| {
+            let app = window.app_handle();
+            match (window.label(), event) {
+                // Closing the shell puts the app back in the menu bar; only
+                // the tray's Quit and the panel's Quit really exit.
+                (window_policy::MAIN_LABEL, WindowEvent::CloseRequested { api, .. }) => {
+                    api.prevent_close();
+                    window_policy::hide_main(app);
+                }
+                // A popover that outlives its click is a stuck window.
+                (panel::PANEL_LABEL, WindowEvent::Focused(false)) => panel::hide(app),
+                _ => {}
+            }
+        })
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");
             std::fs::create_dir_all(&dir).ok();
@@ -62,6 +78,7 @@ pub fn run() {
             });
             scheduler::start(app.handle().clone());
             tray::setup(app)?;
+            panel::create(app)?;
             Ok(())
         })
         .run(tauri::generate_context!())

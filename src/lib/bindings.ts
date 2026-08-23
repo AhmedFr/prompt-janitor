@@ -148,6 +148,15 @@ export const commands = {
 	 *  "sessions today" boundary is a UTC calendar day).
 	 */
 	getPanelSnapshot: () => typedError<PanelSnapshot, string>(__TAURI_INVOKE("get_panel_snapshot")),
+	/**
+	 *  Bring the main window forward on a given screen and close the panel.
+	 * 
+	 *  The panel is a separate window, so the route travels as an event the main
+	 *  webview listens for rather than as a return value.
+	 */
+	openMain: (route: string, target: string | null) => __TAURI_INVOKE<void>("open_main", { route, target }),
+	/**  Quit the app for real (the tray is the only other way out). */
+	quit: () => __TAURI_INVOKE<void>("quit"),
 };
 
 /* Types */
@@ -389,6 +398,16 @@ export type Layer = "global" | "project" | "plugin";
 export type LicenseInfo = {
 	email: string,
 	plan: string,
+};
+
+/**
+ *  Where the main window should land, emitted on the `navigate` event when a
+ *  panel row is clicked. `target` is the row the screen should focus (a file
+ *  id, an artifact kind), absent when the route alone is enough.
+ */
+export type NavigateEvent = {
+	route: string,
+	target: string | null,
 };
 
 /**  Result of an NL evaluation run: the verdicts plus the file's new score. */

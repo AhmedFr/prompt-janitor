@@ -900,3 +900,33 @@ pub fn get_panel_snapshot(
     let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
     crate::panel_query::panel_snapshot(&conn, now).map_err(|e| e.to_string())
 }
+
+/// Where the main window should land, emitted on the `navigate` event when a
+/// panel row is clicked. `target` is the row the screen should focus (a file
+/// id, an artifact kind), absent when the route alone is enough.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct NavigateEvent {
+    pub route: String,
+    pub target: Option<String>,
+}
+
+/// Bring the main window forward on a given screen and close the panel.
+///
+/// The panel is a separate window, so the route travels as an event the main
+/// webview listens for rather than as a return value.
+#[tauri::command]
+#[specta::specta]
+pub fn open_main(app: tauri::AppHandle, route: String, target: Option<String>) {
+    use tauri::Emitter;
+
+    crate::window_policy::show_main(&app);
+    let _ = app.emit_to("main", "navigate", NavigateEvent { route, target });
+    crate::panel::hide(&app);
+}
+
+/// Quit the app for real (the tray is the only other way out).
+#[tauri::command]
+#[specta::specta]
+pub fn quit(app: tauri::AppHandle) {
+    app.exit(0);
+}

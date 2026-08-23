@@ -1,18 +1,13 @@
 //! System tray icon + menu (the menu-bar presence).
 //!
-//! Left-click shows the main window; right-click opens a menu with quick
-//! actions. The rich floating popover panel is tracked separately (#50).
+//! Left-click toggles the floating panel under the icon; right-click keeps the
+//! native menu for the quick actions the panel does not cover.
 
 use tauri::menu::MenuBuilder;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{App, AppHandle, Manager};
+use tauri::App;
 
-fn show_main(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
+use crate::{panel, window_policy};
 
 /// Build and install the tray icon. Call once at startup.
 pub fn setup(app: &App) -> tauri::Result<()> {
@@ -28,7 +23,7 @@ pub fn setup(app: &App) -> tauri::Result<()> {
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            "open" => show_main(app),
+            "open" => window_policy::show_main(app),
             "scan" => {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
@@ -39,13 +34,16 @@ pub fn setup(app: &App) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            // Only the release of a left-click: the press half of the same
+            // click would toggle the panel straight back shut.
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
             } = event
             {
-                show_main(tray.app_handle());
+                panel::toggle(tray.app_handle(), rect);
             }
         });
 
