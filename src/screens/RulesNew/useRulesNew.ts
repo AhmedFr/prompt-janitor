@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { tableStorageKey } from "@/components/DataTable";
 import { commands, isTauri } from "@/lib/ipc";
-import { HIGHLIGHT_KEY } from "@/screens/Rules/Rules.constants";
+import { HIGHLIGHT_KEY, TABLE_STATE_PREFIX } from "@/screens/Rules/Rules.constants";
 import type { Navigate } from "@/App/App.types";
 import { DEFAULT_TAB, EMPTY_DRAFT, SAVE_FAILED } from "./RulesNew.constants";
 import type { RuleDraft, RuleKind, RulesNewState } from "./RulesNew.types";
@@ -20,6 +21,22 @@ function rememberHighlight(id: string | undefined): void {
     window.sessionStorage.setItem(HIGHLIGHT_KEY, id);
   } catch {
     // Storage denied (private-mode restrictions) — no highlight, no harm.
+  }
+}
+
+/**
+ * Drop what the destination tab's table remembers. Each `DataTable` keeps its
+ * search, pills and sort per tab, and a search left over from an earlier visit
+ * filters the brand-new row straight back out — the user would land on a table
+ * that does not contain the rule they just wrote, with the highlight pointing
+ * at nothing. Clearing costs one stale filter; not clearing costs the whole
+ * point of the trip.
+ */
+function clearTableFilters(tab: string): void {
+  try {
+    window.sessionStorage.removeItem(tableStorageKey(TABLE_STATE_PREFIX + tab));
+  } catch {
+    // See `rememberHighlight` — nothing to clear if storage is denied anyway.
   }
 }
 
@@ -129,6 +146,7 @@ export function useRulesNew({
           : await commands.addCustomRule(title, body, draft.severity);
       if (res.status !== "ok") throw new Error(res.error);
       rememberHighlight(await findNewRuleId(title, kind === "nl"));
+      clearTableFilters(TAB_FOR[kind]);
       // No `setSaving(false)`: the screen is leaving, and the button must not
       // flicker back to enabled on the way out.
       navigate("rules", TAB_FOR[kind]);

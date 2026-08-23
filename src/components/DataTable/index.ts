@@ -1,6 +1,6 @@
 export { DataTable } from "./DataTable";
 export { useDataTable } from "./useDataTable";
-export { useTableState } from "./useTableState";
+export { useTableState, tableStorageKey } from "./useTableState";
 export {
   applyFilters,
   facetedPillCounts,

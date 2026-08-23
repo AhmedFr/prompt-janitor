@@ -14,11 +14,20 @@ const openDialog = vi.hoisted(() => vi.fn());
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openDialog }));
 
+/**
+ * A getter rather than a value: `isTauri` is read at call time inside the
+ * hook, so one test can drop the runtime out from under the screen without a
+ * second mock factory.
+ */
+const runtime = vi.hoisted(() => ({ tauri: true }));
+
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
     ...actual,
-    isTauri: true,
+    get isTauri() {
+      return runtime.tauri;
+    },
     commands: { listRules, setRule, deleteCustomRule, importPack, getAiConfig },
   };
 });
@@ -125,6 +134,7 @@ const statusLine = () => screen.getByRole("status").textContent;
 
 describe("Rules", () => {
   beforeEach(() => {
+    runtime.tauri = true;
     sessionStorage.clear();
     listRules.mockReset().mockResolvedValue({ status: "ok", data: populated });
     setRule.mockReset().mockResolvedValue({ status: "ok", data: null });
@@ -489,6 +499,31 @@ describe("Rules", () => {
 
     await waitFor(() => expect(screen.getByText(/rule list query failed/i)).toBeInTheDocument());
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Outside the desktop app there is no database to read — which is a
+   * different answer from "the read failed", and very different from three
+   * empty tables whose hints blame the rule packs.
+   */
+  it("says which app owns the rules when there is no Tauri behind the window", async () => {
+    runtime.tauri = false;
+    render(<Rules navigate={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Open the desktop app to manage rules/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.queryByText(/rule list query failed/i)).not.toBeInTheDocument();
+    expect(listRules).not.toHaveBeenCalled();
+  });
+
+  it("still tables a fixture in the browser, so Storybook is not the empty state", async () => {
+    runtime.tauri = false;
+    render(<Rules navigate={vi.fn()} rules={populated} />);
+
+    await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+    expect(screen.queryByText(/Open the desktop app/)).not.toBeInTheDocument();
   });
 
   it("retries the query from the failure panel", async () => {

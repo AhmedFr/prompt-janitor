@@ -19,6 +19,7 @@ import {
   FAILED_TITLE,
   HIGHLIGHT_KEY,
   IMPORT_PACK_LABEL,
+  NO_RUNTIME_BODY,
   SEARCH_PLACEHOLDER,
   STATUS_MSG_MS,
   TAB_IDS,
@@ -90,6 +91,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   const rules = override ?? state.rules;
   const loading = state.loading && !override;
   const failed = state.failed && !override;
+  const unavailable = state.unavailable && !override;
 
   const byTab = useMemo(() => rowsByTab(rules), [rules]);
   const tabs = useMemo(() => tabItems(byTab), [byTab]);
@@ -99,7 +101,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   // an unqualified visit lands. `useTabState` reads storage first, so without
   // this the link would lose to wherever the user last was.
   useEffect(() => {
-    if (initialTab) setActive(initialTab);
+    if (initialTab) setActive(asTab(initialTab));
   }, [initialTab, setActive]);
 
   // Read once, on mount, and dropped from storage immediately: a highlight is
@@ -136,7 +138,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   const ctx = useMemo<RuleColumnsCtx>(
     () => ({
       // `void` is honest here and only here: `useRules` documents that none of
-      // its actions reject — each reports its own failure through `error`.
+      // its actions reject — each reports its own failure through `say`.
       toggle: (id, enabled) => void toggle(id, enabled),
       onDelete: (id) => void deleteRule(id),
       onCopy: copy,
@@ -152,7 +154,9 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
 
       <div className="scroll-area">
         <div className="page rules-page">
-          {failed ? (
+          {unavailable ? (
+            <NoDesktopApp />
+          ) : failed ? (
             <UnreadableRules onRetry={() => void state.refetch()} />
           ) : (
             <Tabs items={tabs} active={active} onChange={setActive} ariaLabel="Rule kinds">
@@ -263,6 +267,20 @@ function RuleTable({
       density="compact"
       empty={{ title: EMPTY_TITLE[tab], hint: EMPTY_HINT[tab] }}
     />
+  );
+}
+
+/**
+ * No Tauri behind the window (a plain `vite dev` server, or the Storybook
+ * node pass with no fixture). There is no database to read and no rule to
+ * toggle, so the screen says which app owns them rather than rendering three
+ * empty tables whose hints blame a failed load.
+ */
+function NoDesktopApp() {
+  return (
+    <Card padded>
+      <p className="muted rules-panel__body">{NO_RUNTIME_BODY}</p>
+    </Card>
   );
 }
 

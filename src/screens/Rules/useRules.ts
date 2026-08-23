@@ -32,6 +32,12 @@ export function useRules(say: (message: string) => void): RulesState {
   const [failed, setFailed] = useState(false);
   const [aiReady, setAiReady] = useState(false);
 
+  // Derived, not state: it is a fact about where the code is running, decided
+  // before the first render and never again. The screen shows it instead of a
+  // set of empty tables claiming the rule packs failed to load — outside the
+  // desktop app there is no database to have failed.
+  const unavailable = !isTauri;
+
   const refetch = useCallback(async () => {
     if (!isTauri) {
       setLoading(false);
@@ -125,5 +131,5 @@ export function useRules(say: (message: string) => void): RulesState {
     }
   }, [refetch, say]);
 
-  return { rules, loading, failed, aiReady, toggle, deleteRule, importPack, refetch };
+  return { rules, loading, failed, unavailable, aiReady, toggle, deleteRule, importPack, refetch };
 }

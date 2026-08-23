@@ -60,6 +60,13 @@ export const AI_NOTE_NO_PROVIDER =
   "Not evaluated yet — connect an AI provider in Settings → AI and these standards start running on the files you check.";
 
 /**
+ * A browser, not the desktop app: the rule set lives in a local database the
+ * web build cannot reach. Says so, rather than showing three empty tables
+ * whose hints blame a failed load.
+ */
+export const NO_RUNTIME_BODY = "Open the desktop app to manage rules.";
+
+/**
  * The load finished with nothing to show — not because there are no rules
  * (the app ships with them) but because the read failed. Almost always a scan
  * still holding the database, which is why the only lever offered is a retry.

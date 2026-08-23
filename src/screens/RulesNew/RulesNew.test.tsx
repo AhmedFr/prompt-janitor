@@ -3,12 +3,17 @@ import { act, render, cleanup, screen, fireEvent, waitFor } from "@testing-libra
 import { axe } from "vitest-axe";
 import type { RuleInfo } from "@/lib/ipc";
 import { HIGHLIGHT_KEY } from "@/screens/Rules/Rules.constants";
+import { Rules } from "@/screens/Rules";
 import { RulesNew } from "./RulesNew";
 
 const listRules = vi.hoisted(() => vi.fn());
 const addCustomRule = vi.hoisted(() => vi.fn());
 const addNlRule = vi.hoisted(() => vi.fn());
 const getAiConfig = vi.hoisted(() => vi.fn());
+
+// Pulled in by `useRules` when the Rules screen renders at the end of the
+// round trip below; never called, and never allowed to reach a real dialog.
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
@@ -135,6 +140,41 @@ describe("RulesNew", () => {
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
     expect(sessionStorage.getItem(HIGHLIGHT_KEY)).toBe("custom-700");
+  });
+
+  /**
+   * The round trip, end to end. Each tab's table remembers its own search, so
+   * a search left over from an earlier visit would filter the brand-new row
+   * straight back out — the user lands on a table that does not contain the
+   * rule they just wrote, with the highlight pointing at nothing.
+   */
+  it("clears the destination tab's remembered search, so the new row survives its own arrival", async () => {
+    // The literal key on purpose: this is the contract with `DataTable`, and
+    // composing it here would let both sides drift together unnoticed.
+    sessionStorage.setItem("pj.table.rules.custom", JSON.stringify({ search: "hostnames" }));
+    listRules.mockResolvedValue({
+      status: "ok",
+      data: [
+        rule({ id: "custom-100", title: "No internal hostnames", pattern: "corp.internal" }),
+        rule({ id: "custom-700", title: "Never say synergy" }),
+      ],
+    });
+
+    const { navigate, unmount } = renderScreen();
+    fireEvent.click(patternCard());
+    fill("Never say synergy", "synergy", /Forbidden text/);
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+    expect(sessionStorage.getItem("pj.table.rules.custom")).toBeNull();
+    unmount();
+
+    render(<Rules navigate={vi.fn()} initialTab="custom" />);
+    await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
+    await waitFor(() => {
+      const highlighted = screen.getByRole("table").querySelector(".dt__row--highlight");
+      expect(highlighted?.textContent).toContain("Never say synergy");
+    });
   });
 
   it("saves a natural-language standard and lands on AI standards", async () => {

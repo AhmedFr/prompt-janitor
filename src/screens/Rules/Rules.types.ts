@@ -25,6 +25,12 @@ export interface RulesState {
   loading: boolean;
   /** The query failed — distinct from "there are no rules", which never happens. */
   failed: boolean;
+  /**
+   * Running outside the Tauri runtime, so there is nothing to read and
+   * nothing to write. Distinct from {@link RulesState.failed}: no query has
+   * failed, there is simply no desktop app behind this window.
+   */
+  unavailable: boolean;
   /** A provider and key are configured, so natural-language standards can actually run. */
   aiReady: boolean;
   /**
