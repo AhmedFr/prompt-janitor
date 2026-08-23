@@ -75,8 +75,8 @@
       "title": "Menu-bar panel",
       "done": 2,
       "total": 2,
-      "note": "Window plumbing + snapshot read model (#141 PR) and the panel UI (#142 PR). Awaiting review & merge in that order.",
-      "state": "done"
+      "note": "Plumbing merged (#143); panel UI (#142 PR). On-device verification is the remaining owner action.",
+      "state": "active"
     }
   ],
   "actions": {
@@ -313,8 +313,8 @@
     {
       "name": "Menu-bar panel (window plumbing, tray click model, Dock policy)",
       "tier": "free",
-      "status": "pr",
-      "note": "PR for #141 awaiting review — floating panel window under the icon, left-click toggles / right-click menu, menu-bar-first when the window is closed, snapshot read model"
+      "status": "done",
+      "note": "Merged (#143)"
     },
     {
       "name": "Menu-bar panel UI (verdict, top fixes, usage signals)",
