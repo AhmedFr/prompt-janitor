@@ -81,6 +81,10 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
           const selected = item.id === effectiveActive;
           const tabId = `${uid}-tab-${item.id}`;
           const panelId = `${uid}-panel-${item.id}`;
+          // A tab may carry either form of badge; `countLabel` wins, because a
+          // tab that spells out "12/20" has nothing to gain from also showing
+          // the 20 it already contains.
+          const badge = item.countLabel ?? (item.count !== undefined ? String(item.count) : null);
           return (
             <button
               key={item.id}
@@ -98,7 +102,7 @@ export function Tabs({ items, active, onChange, ariaLabel, children }: TabsProps
               onKeyDown={onKeyDown}
             >
               {item.label}
-              {item.count !== undefined && <span className="tabs__count tnum">{item.count}</span>}
+              {badge !== null && <span className="tabs__count tnum">{badge}</span>}
             </button>
           );
         })}

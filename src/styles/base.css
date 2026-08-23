@@ -238,24 +238,6 @@ button {
   border-color: var(--blue);
 }
 
-/* ---- bare icon button ---- */
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: none;
-  border-radius: var(--r-ctrl);
-  background: none;
-  color: var(--text-3);
-  cursor: pointer;
-}
-.icon-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text);
-}
-
 /* ============================================================
    Accessibility — keyboard focus, reduced motion, skip link.
    ============================================================ */

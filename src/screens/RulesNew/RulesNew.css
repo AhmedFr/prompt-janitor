@@ -1,0 +1,166 @@
+/*
+ * A form, not a table: the page is narrower than the rest of the app so the
+ * measure stays readable and the two option cards sit side by side without
+ * stretching into billboards.
+ */
+.rules-new-page {
+  max-width: 660px;
+}
+
+.rules-new__heading {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.rules-new__blurb {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 0 0 18px;
+  max-width: 46ch;
+}
+
+/* Two columns down to a narrow window, then one — the cards read as prose. */
+.rules-new-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+/*
+ * A card that is a button. Everything the `Card` surface gives is spelled out
+ * here instead of nesting one inside the other: a `<button>` wrapping a `<div>`
+ * is invalid, and the whole card has to be the hit target.
+ */
+.rules-new-choice {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  grid-template-areas:
+    "icon title"
+    ".    blurb";
+  gap: 4px 10px;
+  text-align: left;
+  font: inherit;
+  padding: 16px;
+  border-radius: var(--r-card);
+  border: 0.5px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.rules-new-choice:hover:not(:disabled) {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-tint);
+}
+
+/*
+ * Dimmed but still legible: the card explains a feature the user may want to
+ * go and enable, so its text has to survive being disabled.
+ */
+.rules-new-choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.rules-new-choice__icon {
+  grid-area: icon;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--blue-tint);
+  color: var(--blue);
+}
+
+.rules-new-choice__title {
+  grid-area: title;
+  align-self: center;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.rules-new-choice__blurb {
+  grid-area: blurb;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+/* What a gate is waiting on, or what a save could not do. */
+.rules-new__hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 12px 0 0;
+}
+
+.rules-new__error {
+  font-size: 12.5px;
+  color: var(--red);
+  margin: 12px 0 0;
+}
+
+/* ---- the form ---- */
+
+.rules-new-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rules-new-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rules-new-field__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 0;
+}
+
+.rules-new-field__hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+}
+
+/* A fieldset only for the grouping name; none of its default chrome. */
+.rules-new-severity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rules-new-severity__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* The row of exits. `Change type` sits left, everything that leaves sits right. */
+.rules-new-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rules-new-actions__spacer {
+  flex: 1;
+}

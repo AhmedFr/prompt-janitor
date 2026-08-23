@@ -5,6 +5,16 @@ import type { TableState } from "./DataTable.types";
 const STORAGE_PREFIX = "pj.table.";
 
 /**
+ * Where one table's remembered state lives. Exported so a caller with a
+ * reason to drop it — `useRulesNew` clears the destination tab's filters so a
+ * remembered search cannot hide the row it just created — never has to spell
+ * the prefix out and drift from this file.
+ */
+export function tableStorageKey(stateKey: string): string {
+  return STORAGE_PREFIX + stateKey;
+}
+
+/**
  * Outside the browser (SSR, Storybook's node renderer, tests that stub
  * `window` away) there is no session to persist into.
  */
@@ -40,7 +50,7 @@ function isTableState(value: unknown): value is TableState {
 function readStored(key: string, initial: TableState): TableState {
   if (!canUseStorage()) return initial;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_PREFIX + key);
+    const raw = window.sessionStorage.getItem(tableStorageKey(key));
     if (!raw) return initial;
     const parsed: unknown = JSON.parse(raw);
     return isTableState(parsed) ? parsed : initial;
@@ -53,7 +63,7 @@ function readStored(key: string, initial: TableState): TableState {
 function writeStored(key: string, state: TableState): void {
   if (!canUseStorage()) return;
   try {
-    window.sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(state));
+    window.sessionStorage.setItem(tableStorageKey(key), JSON.stringify(state));
   } catch {
     // Storage full or unavailable — the table just won't remember this session.
   }
@@ -62,7 +72,7 @@ function writeStored(key: string, state: TableState): void {
 function clearStored(key: string): void {
   if (!canUseStorage()) return;
   try {
-    window.sessionStorage.removeItem(STORAGE_PREFIX + key);
+    window.sessionStorage.removeItem(tableStorageKey(key));
   } catch {
     // Nothing to do if removal itself is blocked.
   }

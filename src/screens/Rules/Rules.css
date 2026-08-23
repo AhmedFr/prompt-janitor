@@ -1,0 +1,114 @@
+/* Six columns plus a chip row need the width; the default page caps at 920px. */
+.rules-page {
+  max-width: 1100px;
+}
+
+/*
+ * The Enabled column's switch. `base.css` styles a `<button class="switch">`
+ * — this is the same shape as an `<input type="checkbox" role="switch">`,
+ * which is what a column of toggles wants: the browser owns the checked
+ * state, so the cell has nothing to keep in sync.
+ */
+.rules-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border: none;
+  padding: 0;
+  border-radius: var(--r-pill);
+  background: var(--sep-strong);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.rules-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  transition: left 0.15s;
+}
+
+.rules-switch:checked {
+  background: var(--green);
+}
+
+.rules-switch:checked::after {
+  left: 16px;
+}
+
+.rules-switch:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.rules-severity {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+/*
+ * What the AI tab is waiting on, or what runs it — one line above the table,
+ * because a table of standards that never fire looks identical to one that
+ * does.
+ */
+.rules-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/*
+ * The toolbar's live region — copy result, import result, or a write that did
+ * not land. Always in the DOM, so it collapses to nothing when empty. Reads in
+ * `--text-2` rather than `--green`: the palette's only green (#2fb457) is a
+ * fill colour and reaches ~2.7:1 as 12px text, and a message nobody can read
+ * is not a message. The switch is where that green belongs — as a background,
+ * measured against the white thumb.
+ */
+.rules-status {
+  font-size: 12px;
+  color: var(--text-2);
+  align-self: center;
+  text-align: right;
+}
+
+.rules-status:empty {
+  display: none;
+}
+
+/*
+ * The unreadable state: a short column, left-aligned, so the retry sits
+ * directly under the sentence explaining what it retries. Mirrors the same
+ * panel on Projects and Setup.
+ */
+.rules-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rules-panel__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.rules-panel__body {
+  max-width: 420px;
+  margin: 0;
+}

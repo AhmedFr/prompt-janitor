@@ -10,20 +10,12 @@ import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
 import { Analytics } from "@/screens/Analytics";
 import { Rules } from "@/screens/Rules";
+import { RulesNew } from "@/screens/RulesNew";
 import { Settings } from "@/screens/Settings";
 import { isTauri } from "@/lib/ipc";
 import type { Route } from "./App.types";
 
 const ONBOARDED_KEY = "pj-onboarded";
-
-/**
- * A route that exists but has no screen yet — `rules-new` (spec §4.3) is
- * wired end to end here (union member, `navigate` plumbing) so the screen
- * that lands next only has to be swapped in. Renders nothing visible.
- */
-function RoutePending() {
-  return <span hidden />;
-}
 
 export function App() {
   const [route, setRoute] = useState<Route>("overview");
@@ -31,6 +23,8 @@ export function App() {
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   const [promptsTarget, setPromptsTarget] = useState<string | undefined>(undefined);
   const [projectPath, setProjectPath] = useState<string | undefined>(undefined);
+  const [rulesTab, setRulesTab] = useState<string | undefined>(undefined);
+  const [rulesNewTarget, setRulesNewTarget] = useState<string | undefined>(undefined);
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
@@ -47,6 +41,12 @@ export function App() {
     // screen is addressed by path, and carrying the last one forward would
     // silently open the wrong project.
     if (next === "project") setProjectPath(target);
+    // Which of the three rule tables to open on — `/rules/new` sends the user
+    // back to the tab their new rule landed in.
+    if (next === "rules") setRulesTab(target);
+    // The tab `/rules/new` was opened from: where Cancel returns to, and
+    // which kind of rule the form starts on.
+    if (next === "rules-new") setRulesNewTarget(target);
   }, []);
 
   const finishOnboarding = () => {
@@ -66,12 +66,12 @@ export function App() {
         {route === "setup" && <Setup navigate={navigate} />}
         {route === "projects" && <Projects navigate={navigate} />}
         {route === "project" && <Project path={projectPath} navigate={navigate} />}
-        {route === "rules-new" && <RoutePending />}
+        {route === "rules-new" && <RulesNew initialType={rulesNewTarget} navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
         {route === "analytics" && <Analytics navigate={navigate} />}
-        {route === "rules" && <Rules />}
+        {route === "rules" && <Rules navigate={navigate} initialTab={rulesTab} />}
         {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
       </main>
       {showOnboarding && <Onboarding onDone={finishOnboarding} />}
