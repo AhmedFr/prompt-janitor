@@ -1,7 +1,7 @@
 //! Vendor-side license tool. Generates the Ed25519 signing keypair and mints
 //! the `PJ1.…` license keys customers paste into Settings. The private key
 //! stays on the vendor's machine; only the public half is embedded in the app
-//! (`license.rs`). Run with `cargo run --bin license-tool -- <command>`.
+//! (`license.rs`). Run with `cargo run -p license-tool -- <command>`.
 
 use std::path::Path;
 use std::process::ExitCode;
