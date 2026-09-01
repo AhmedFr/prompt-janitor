@@ -1,8 +1,6 @@
 [package]
 name = "prompt-janitor"
 version = "0.1.1"
-# Two binaries exist (app + license-tool); tell cargo/tauri which one is the app.
-default-run = "prompt-janitor"
 description = "Find, grade, and fix the AI prompt files across your projects."
 authors = ["Ahmed ABOUELLEIL"]
 edition = "2021"
@@ -13,10 +11,6 @@ name = "prompt_janitor_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 # Vendor-side tool: mints the license keys the app verifies offline.
-[[bin]]
-name = "license-tool"
-path = "src/bin/license_tool.rs"
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -63,3 +57,11 @@ strip = true
 # `osascript`/Finder route.
 [target.'cfg(target_os = "macos")'.dependencies]
 trash = "5.2.6"
+
+[features]
+
+# The vendor-side license tool lives in its own crate so the app package has
+# exactly one binary: a universal (lipo) bundle only produces the main binary,
+# and the bundler copies every bin target of the app package.
+[workspace]
+members = [".", "license-tool"]

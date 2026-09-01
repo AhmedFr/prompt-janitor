@@ -1,0 +1,12 @@
+[package]
+name = "license-tool"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Vendor-side tool that mints and verifies Prompt Janitor license keys"
+
+[dependencies]
+prompt-janitor = { path = ".." }
+ed25519-dalek = "2"
+base64 = "0.22"
+getrandom = "0.2"

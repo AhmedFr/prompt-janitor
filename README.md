@@ -53,9 +53,9 @@ Licenses are Ed25519-signed payloads verified offline against the public key emb
 
 ```sh
 cd src-tauri
-cargo run --bin license-tool -- keygen                 # once: writes pj-vendor-key.secret,
+cargo run -p license-tool -- keygen                 # once: writes pj-vendor-key.secret,
                                                        # prints the PUBKEY array for license.rs
-cargo run --bin license-tool -- mint --key pj-vendor-key.secret --email buyer@example.com
+cargo run -p license-tool -- mint --key pj-vendor-key.secret --email buyer@example.com
 cargo run --bin license-tool -- verify "PJ1.…"         # sanity-check against the embedded key
 ```
 
