@@ -424,6 +424,7 @@
     }
   ],
   "recent": [
+    "2026-09-01 — Release run 2 failed at codesign: empty Apple secrets were exported as empty env vars, which the bundler reads as \"signing requested\"; the workflow now exports Apple env only when the secrets are non-empty",
     "2026-09-01 — v0.1.1 release run failed bundling the vendor license-tool binary (universal builds only lipo the app binary); the tool moved to its own workspace crate (`cargo run -p license-tool`), bundle verified locally",
     "2026-09-01 — In-app updates + Settings danger zone merged (#148, CI green — Actions billing fixed); v0.1.1 tagged as the first release with signed updater artifacts",
     "2026-09-01 — Review fixes on #147: uninstall moves the bundle with the `trash` crate (NSFileManager) instead of `osascript`, closing an AppleScript-injection hole that a quote in the bundle path could open and dropping the Apple-events permission a hardened-runtime build would have needed; the order flipped so the bundle is trashed BEFORE any data is deleted (a failed trash step now leaves a working app with all its data); a Gatekeeper-translocated copy is detected and refused with instructions; the app-data wipe is guarded by a bundle-identifier check; uninstall takes two deliberate presses so macOS's default-button Return cannot do it alone; and the reset/uninstall prompts admit the licence key and AI settings go too",
