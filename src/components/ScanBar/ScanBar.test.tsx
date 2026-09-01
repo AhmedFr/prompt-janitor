@@ -35,6 +35,11 @@ describe("ScanBar", () => {
     );
   });
 
+  it("takes a caller's label so a non-scan job is not announced as a scan", () => {
+    render(<ScanBar progress={{ done: 1, total: 2 }} status="Downloading…" label="Update download progress" />);
+    expect(screen.getByRole("progressbar", { name: "Update download progress" })).toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<ScanBar progress={{ done: 1, total: 4 }} status="Grading" />);
     expect(await axe(container)).toHaveNoViolations();

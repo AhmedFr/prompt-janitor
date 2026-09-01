@@ -7,10 +7,11 @@ import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
 import { HarnessTab } from "./HarnessTab";
 import { AiTab } from "./AiTab";
+import { AppTab } from "./AppTab";
 import { LicenseTab } from "./LicenseTab";
 import "./Settings.css";
 
-type Tab = "harnesses" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general";
+type Tab = "harnesses" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general" | "app";
 
 const TABS: [Tab, string, IconName][] = [
   ["harnesses", "Harnesses", "layers"],
@@ -20,6 +21,10 @@ const TABS: [Tab, string, IconName][] = [
   ["ai", "AI", "sparkles"],
   ["license", "License", "check"],
   ["general", "General", "settings"],
+  // Last: version, updates and the destructive actions are the things a user
+  // reaches for least often, and the ones that should not sit next to a
+  // toggle they click every week.
+  ["app", "App", "refresh"],
 ];
 
 const FREQS: [string, string, string][] = [
@@ -154,14 +159,15 @@ export function Settings({ navigate, initialTab }: SettingsProps) {
                 />
               )}
 
+              {tab === "app" && <AppTab />}
+
               {tab === "general" && (
                 <>
+                  {/* The version moved to the App tab, where it sits next to
+                      the button that changes it — and where it is read from
+                      the running bundle instead of being retyped by hand. */}
                   <h2 className="set-sec">About</h2>
                   <Card>
-                    <div className="set-row">
-                      <span className="grow">Version</span>
-                      <span className="faint tnum">0.1.0</span>
-                    </div>
                     <div className="set-row">
                       <span className="grow">Files tracked</span>
                       <span className="faint tnum">{s.status?.file_count ?? "—"}</span>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen, act, waitFor } from "@testing-library/react";
+import { render, cleanup, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import type { NavigateEvent } from "@/lib/ipc";
 import type { Navigate } from "./App.types";
 import { App } from "./App";
@@ -38,6 +38,14 @@ vi.mock("@/lib/ipc", async () => {
   return { ...actual, isTauri: false, commands: {} };
 });
 
+// The probe itself is covered in `useUpdateCheck.test.ts`; what the shell owes
+// it is a banner that routes and dismisses.
+const updateCheck = vi.hoisted(() => ({
+  version: null as string | null,
+  dismiss: vi.fn(),
+}));
+vi.mock("@/lib/useUpdateCheck", () => ({ useUpdateCheck: () => updateCheck }));
+
 // One handler registry per test so a case can emit `navigate` like the panel does.
 const listeners = vi.hoisted(() => new Map<string, (event: unknown) => void>());
 vi.mock("@tauri-apps/api/event", () => ({
@@ -67,6 +75,8 @@ describe("App", () => {
     nav.current = null;
     listeners.clear();
     sessionStorage.clear();
+    updateCheck.version = null;
+    updateCheck.dismiss.mockClear();
   });
 
   afterEach(cleanup);
@@ -164,6 +174,34 @@ describe("App", () => {
     render(<App />);
     await emitNavigate({ route: "not-a-route", target: null });
     expect(screen.getByTestId("overview")).toBeInTheDocument();
+  });
+
+  it("says nothing about updates while the app is current", () => {
+    render(<App />);
+    expect(screen.queryByText(/is available/)).not.toBeInTheDocument();
+  });
+
+  it("announces an available update above the screen area", () => {
+    updateCheck.version = "0.1.1";
+    render(<App />);
+    expect(screen.getByText(/Prompt Janitor 0\.1\.1 is available/)).toBeInTheDocument();
+    // News, not an interruption: the screen underneath stays put.
+    expect(screen.getByTestId("overview")).toBeInTheDocument();
+  });
+
+  it("sends the banner's action to the Settings App tab", () => {
+    updateCheck.version = "0.1.1";
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+    expect(screen.getByTestId("settings")).toBeInTheDocument();
+    expect(propsOf("settings").initialTab).toBe("app");
+  });
+
+  it("hands the dismiss straight back to the hook that owns the session flag", () => {
+    updateCheck.version = "0.1.1";
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss update notice" }));
+    expect(updateCheck.dismiss).toHaveBeenCalledTimes(1);
   });
 
   it("stops listening for `navigate` once unmounted", async () => {

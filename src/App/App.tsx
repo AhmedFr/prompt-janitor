@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/Sidebar";
 import { Onboarding } from "@/components/Onboarding";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { Overview } from "@/screens/Overview";
 import { Setup } from "@/screens/Setup";
 import { Projects } from "@/screens/Projects";
@@ -14,6 +15,7 @@ import { Rules } from "@/screens/Rules";
 import { RulesNew } from "@/screens/RulesNew";
 import { Settings } from "@/screens/Settings";
 import { isTauri, type ArtifactKind, type NavigateEvent } from "@/lib/ipc";
+import { useUpdateCheck } from "@/lib/useUpdateCheck";
 // Deep import, not the screen barrel: this is the tab strip's own id list,
 // and the barrel would pull the whole Setup screen in behind it.
 import { KIND_TABS } from "@/screens/Setup/setup.columns";
@@ -38,6 +40,9 @@ export function App() {
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
+  // A quiet probe a few seconds after launch. News, never a modal — see
+  // `useUpdateCheck` for why the failure path says nothing at all.
+  const update = useUpdateCheck();
 
   // Stable across renders: screens hand `navigate` to `useCallback`s of their
   // own, and Setup's column cache keys on the identity of the context those
@@ -99,6 +104,13 @@ export function App() {
       </a>
       <Sidebar active={route} onNavigate={navigate} onReplay={() => setShowOnboarding(true)} />
       <main id="main-content" className="app-content" tabIndex={-1}>
+        {update.version && (
+          <UpdateBanner
+            version={update.version}
+            onOpen={() => navigate("settings", "app")}
+            onDismiss={update.dismiss}
+          />
+        )}
         {route === "overview" && <Overview navigate={navigate} />}
         {route === "setup" && <Setup navigate={navigate} initialTab={setupTab} />}
         {route === "projects" && <Projects navigate={navigate} />}

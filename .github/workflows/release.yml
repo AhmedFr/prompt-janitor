@@ -10,6 +10,16 @@ name: Release
 #   APPLE_SIGNING_IDENTITY        e.g. "Developer ID Application: Name (TEAMID)"
 #   APPLE_ID / APPLE_PASSWORD     Apple ID + app-specific password (notarization)
 #   APPLE_TEAM_ID                 the 10-character team id
+#
+# In-app updates are signed with the minisign keypair whose public half is
+# inlined in `tauri.conf.json` (plugins.updater.pubkey). The private half lives
+# only in these repo secrets — never in the tree:
+#   TAURI_SIGNING_PRIVATE_KEY           contents of the .key file
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its passphrase ("" if none)
+# `--config src-tauri/tauri.updater.conf.json` is what turns on
+# `createUpdaterArtifacts`, so a local `pnpm tauri build` without the key keeps
+# working. tauri-action uploads the resulting `latest.json` to the release
+# alongside the bundles (its `includeUpdaterJson` input defaults to true).
 
 on:
   push:
@@ -57,9 +67,11 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Prompt Janitor ${{ github.ref_name }}"
           releaseBody: "Download the .dmg below. See commit history for changes."
           releaseDraft: true
-          args: --target universal-apple-darwin
+          args: --target universal-apple-darwin --config src-tauri/tauri.updater.conf.json

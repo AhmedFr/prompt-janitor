@@ -1,0 +1,39 @@
+.app-tab__note {
+  font-size: 12px;
+  margin-bottom: 12px;
+  max-width: 560px;
+}
+
+.app-tab__found {
+  margin-bottom: 12px;
+}
+
+.app-tab__found-title {
+  font-weight: 500;
+}
+
+.app-tab__notes {
+  font-size: 12px;
+  margin-top: 4px;
+  max-width: 560px;
+  white-space: pre-wrap;
+}
+
+.app-tab__bar {
+  margin-bottom: 12px;
+}
+
+.app-tab__actions {
+  gap: 8px;
+  margin-top: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.app-tab__line {
+  font-size: 13px;
+}
+
+.app-tab__line--error {
+  color: var(--red);
+}
