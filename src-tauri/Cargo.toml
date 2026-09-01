@@ -1,6 +1,6 @@
 [package]
 name = "prompt-janitor"
-version = "0.1.0"
+version = "0.1.1"
 # Two binaries exist (app + license-tool); tell cargo/tauri which one is the app.
 default-run = "prompt-janitor"
 description = "Find, grade, and fix the AI prompt files across your projects."

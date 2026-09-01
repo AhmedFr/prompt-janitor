@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "updated": "2026-09-01",
   "readiness": {
     "percent": 83,
@@ -350,8 +350,8 @@
     {
       "name": "In-app updates + Settings danger zone",
       "tier": "infra",
-      "status": "pr",
-      "note": "#147 — updater keypair in repo secrets; first release tag lights it up; E2E blocked on Actions billing"
+      "status": "done",
+      "note": "Merged (#148); v0.1.1 is the first release carrying the updater; endpoint needs the repo public (or a hosted manifest) before other machines can update"
     },
     {
       "name": "Signed & notarized DMG",
@@ -424,6 +424,7 @@
     }
   ],
   "recent": [
+    "2026-09-01 — In-app updates + Settings danger zone merged (#148, CI green — Actions billing fixed); v0.1.1 tagged as the first release with signed updater artifacts",
     "2026-09-01 — Review fixes on #147: uninstall moves the bundle with the `trash` crate (NSFileManager) instead of `osascript`, closing an AppleScript-injection hole that a quote in the bundle path could open and dropping the Apple-events permission a hardened-runtime build would have needed; the order flipped so the bundle is trashed BEFORE any data is deleted (a failed trash step now leaves a working app with all its data); a Gatekeeper-translocated copy is detected and refused with instructions; the app-data wipe is guarded by a bundle-identifier check; uninstall takes two deliberate presses so macOS's default-button Return cannot do it alone; and the reset/uninstall prompts admit the licence key and AI settings go too",
     "2026-09-01 — In-app updates and a Settings danger zone (#147): the Tauri updater is wired end to end (signed artifacts from the release workflow, `latest.json` on GitHub Releases, a silent launch probe that surfaces a dismissible banner, and a Settings -> App tab with the real bundle version, release notes, a download bar and relaunch), plus `reset_app_data` / `uninstall_app` behind OS confirmations. Not exercised end to end — no release exists yet, so the owner verifies after the first v0.1.1 tag",
     "2026-08-25 — First installable build: `pnpm tauri build` produces Prompt Janitor.app + DMG (ad-hoc signed, aarch64) now that the icon set includes an .icns; installed to /Applications for owner testing. Signed/notarized universal DMG still waits on Apple Developer secrets + CI billing",
