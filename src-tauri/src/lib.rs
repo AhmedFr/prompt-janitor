@@ -6,6 +6,7 @@
 mod ai;
 mod ai_fix;
 mod ai_rules;
+mod app_data;
 mod apply;
 mod commands;
 pub mod engine;
@@ -50,6 +51,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        // In-app updates: `updater` fetches and installs the signed bundle,
+        // `process` relaunches into it once installed.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(builder.invoke_handler())
         .on_window_event(|window, event| {
             let app = window.app_handle();
@@ -68,10 +73,8 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");
             std::fs::create_dir_all(&dir).ok();
-            let db_path = dir.join("prompt-janitor.db");
-            let conn = store::open_and_migrate(&db_path).expect("initialize database");
-            query::seed_rules(&conn).ok();
-            query::seed_builtin_nl_rules(&conn).ok();
+            let db_path = dir.join(app_data::DB_FILE_NAME);
+            let conn = store::init_db(&db_path).expect("initialize database");
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),

@@ -44,6 +44,8 @@ ed25519-dalek = "2"
 base64 = "0.22"
 getrandom = "0.2"
 sha2 = "0.10"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 
 [dev-dependencies]
 tempfile = "3"
@@ -54,3 +56,10 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Uninstall moves the app bundle to the Trash. `trash` wraps NSFileManager's
+# `trashItemAtURL:`, which needs no Apple-events permission and cannot be made
+# to run a script by a path containing a quote — both of which ruled out the
+# `osascript`/Finder route.
+[target.'cfg(target_os = "macos")'.dependencies]
+trash = "5.2.6"

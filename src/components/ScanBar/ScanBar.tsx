@@ -18,7 +18,7 @@ import "./ScanBar.css";
  * Dumb on purpose: the caller owns {@link useScanProgress} and hands the
  * numbers down, so the bar has nothing to subscribe to and nothing to reset.
  */
-export function ScanBar({ progress, status }: ScanBarProps) {
+export function ScanBar({ progress, status, label = SCAN_BAR_LABEL }: ScanBarProps) {
   const percent = scanPercent(progress);
   // A scan with no counter yet is genuinely indeterminate: the bar draws a
   // stub so it reads as "running", but claiming 8% done would be a number we
@@ -31,7 +31,7 @@ export function ScanBar({ progress, status }: ScanBarProps) {
         <div
           className="bar scan-bar__track"
           role="progressbar"
-          aria-label={SCAN_BAR_LABEL}
+          aria-label={label}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={measured ? Math.round(percent) : undefined}

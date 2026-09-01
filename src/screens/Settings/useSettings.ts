@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri, type AppStatus, type AiConfig, type Entitlement } from "@/lib/ipc";
 
-/** Loads the persisted settings and exposes setters that persist immediately. */
+/**
+ * Loads the persisted settings and exposes setters that persist immediately.
+ *
+ * Refetches on `scan-done` like every other screen: the About panel's counts
+ * come straight from the database, and a scan — or a reset from the App tab —
+ * rewrites it underneath a Settings screen that happens to still be open.
+ */
 export function useSettings() {
   const [schedule, setScheduleState] = useState("6h");
   const [digest, setDigestState] = useState(true);
@@ -11,35 +18,39 @@ export function useSettings() {
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      if (!isTauri) {
-        setLoading(false);
-        return;
-      }
-      const [s, d, r, st, a, e] = await Promise.all([
-        commands.getSchedule(),
-        commands.getAlert("digest"),
-        commands.getAlert("regressions"),
-        commands.getAppStatus(),
-        commands.getAiConfig(),
-        commands.getEntitlement(),
-      ]);
-      if (!active) return;
-      if (s.status === "ok") setScheduleState(s.data);
-      if (d.status === "ok") setDigestState(d.data);
-      if (r.status === "ok") setRegressionsState(r.data);
-      if (st.status === "ok") setStatus(st.data);
-      if (a.status === "ok") setAi(a.data);
-      if (e.status === "ok") setEntitlement(e.data);
+  const load = useCallback(async () => {
+    if (!isTauri) {
       setLoading(false);
+      return;
     }
-    void load();
-    return () => {
-      active = false;
-    };
+    const [s, d, r, st, a, e] = await Promise.all([
+      commands.getSchedule(),
+      commands.getAlert("digest"),
+      commands.getAlert("regressions"),
+      commands.getAppStatus(),
+      commands.getAiConfig(),
+      commands.getEntitlement(),
+    ]);
+    if (s.status === "ok") setScheduleState(s.data);
+    if (d.status === "ok") setDigestState(d.data);
+    if (r.status === "ok") setRegressionsState(r.data);
+    if (st.status === "ok") setStatus(st.data);
+    if (a.status === "ok") setAi(a.data);
+    if (e.status === "ok") setEntitlement(e.data);
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    const unlisten = listen("scan-done", () => void load());
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [load]);
 
   const setSchedule = useCallback(async (v: string) => {
     setScheduleState(v);

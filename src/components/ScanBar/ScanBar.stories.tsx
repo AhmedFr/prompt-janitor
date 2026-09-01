@@ -26,3 +26,12 @@ export const Indeterminate: Story = {
 export const Finishing: Story = {
   args: { progress: { done: 120, total: 120 }, status: "Grading 120/120 files" },
 };
+
+/** Borrowed by Settings → App for an update download, with its own label. */
+export const UpdateDownload: Story = {
+  args: {
+    progress: { done: 4_100_000, total: 12_800_000 },
+    status: "Downloading 4.1 MB of 12.8 MB",
+    label: "Update download progress",
+  },
+};

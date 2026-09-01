@@ -1,0 +1,74 @@
+.app-tab__note {
+  font-size: 12px;
+  margin-bottom: 12px;
+  max-width: 560px;
+}
+
+.app-tab__found {
+  margin-bottom: 12px;
+}
+
+.app-tab__found-title {
+  font-weight: 500;
+}
+
+.app-tab__notes {
+  font-size: 12px;
+  margin-top: 4px;
+  max-width: 560px;
+  white-space: pre-wrap;
+}
+
+.app-tab__bar {
+  margin-bottom: 12px;
+}
+
+.app-tab__actions {
+  gap: 8px;
+  margin-top: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.app-tab__line {
+  font-size: 13px;
+}
+
+.app-tab__line--error {
+  color: var(--red);
+}
+
+.app-tab__danger-line {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 12px;
+  max-width: 560px;
+}
+
+.app-tab__danger-head {
+  margin-top: 22px;
+  color: var(--red);
+}
+
+/* Error-toned, not error-shouting: these are deliberate actions behind a
+   confirmation, so the colour is a warning, not an alarm. */
+.app-tab__danger-btn {
+  color: var(--red);
+  border-color: rgba(255, 59, 48, 0.35);
+}
+
+.app-tab__danger-btn:not(:disabled):hover {
+  background: rgba(255, 59, 48, 0.08);
+}
+
+/* Armed: the button has to look different from the one just pressed, or the
+   second press is indistinguishable from a click that did nothing. */
+.app-tab__danger-btn--armed {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.app-tab__danger-btn--armed:not(:disabled):hover {
+  background: #e0281e;
+}

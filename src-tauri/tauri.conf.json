@@ -27,6 +27,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQzMUU1MzE1MDY3MjM1QjYKUldTMk5YSUdGVk1lMCtsTU1GRitQZ0hUUCtJWVpEa1JNWVBPYit0UnVNbVFzN0w5QTlheU9FbzgK",
+      "endpoints": [
+        "https://github.com/AhmedFr/prompt-janitor/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
