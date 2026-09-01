@@ -32,19 +32,33 @@ const messageOf = (error: unknown): string => {
 };
 
 /**
+ * The updater's own words for "the endpoint served nothing I can parse",
+ * which is exactly what a 404 on `latest.json` produces. Matched in full
+ * rather than on "not found" or "404": the plugin also says "not found" when
+ * a manifest *does* exist but omits this platform, or when the downloaded
+ * archive holds no binary for it — real, reportable faults that must not be
+ * dressed up as "there is no release yet".
+ */
+const NOTHING_PUBLISHED = /could not fetch a valid release json/i;
+
+/** Reaching the endpoint failed outright, rather than the endpoint answering. */
+const NO_CONNECTION = /error sending request|network error|dns|timed? ?out|offline/i;
+
+/**
  * Turn an updater rejection into a line the user can act on.
  *
  * The case worth spelling out is the first one: with no release published, the
  * endpoint 404s and the plugin rejects with a manifest-parse failure. That is
  * the expected state of a freshly installed app, not a fault, and dressing it
  * up as a red error teaches users to distrust the button.
+ *
+ * Everything else is passed through verbatim. An error we have not learned to
+ * explain is more useful in the user's own words than reworded into a guess.
  */
 export function describeUpdateError(error: unknown): string {
   const message = messageOf(error);
   if (!message) return CHECK_FAILED;
-  if (/release json|404|not found/i.test(message)) return NO_RELEASES;
-  if (/error sending request|network|dns|timed? ?out|connect|offline/i.test(message)) {
-    return UNREACHABLE;
-  }
+  if (NOTHING_PUBLISHED.test(message)) return NO_RELEASES;
+  if (NO_CONNECTION.test(message)) return UNREACHABLE;
   return message;
 }

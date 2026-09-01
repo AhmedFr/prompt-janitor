@@ -31,11 +31,14 @@ describe("UpdateBanner", () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it("announces itself politely rather than stealing focus", () => {
+  it("announces the sentence, not the buttons, as the live region", () => {
     const { getByRole } = render(
       <UpdateBanner version="0.1.1" onOpen={() => {}} onDismiss={() => {}} />,
     );
-    expect(getByRole("status")).toBeInTheDocument();
+    const live = getByRole("status");
+    expect(live).toHaveTextContent("Prompt Janitor 0.1.1 is available");
+    // A live region wrapping the controls would re-announce them on change.
+    expect(live.querySelector("button")).toBeNull();
   });
 
   it("has no accessibility violations", async () => {

@@ -107,7 +107,13 @@ export function App() {
         {update.version && (
           <UpdateBanner
             version={update.version}
-            onOpen={() => navigate("settings", "app")}
+            onOpen={() => {
+              // Acting on the banner is the strongest possible acknowledgement
+              // of it: leaving the bar up over the tab it just opened would be
+              // the app repeating news the user is already reading.
+              navigate("settings", "app");
+              update.dismiss();
+            }}
             onDismiss={update.dismiss}
           />
         )}

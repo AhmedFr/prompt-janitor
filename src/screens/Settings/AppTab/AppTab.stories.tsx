@@ -15,6 +15,7 @@ const meta = {
     install: noop,
     danger: "",
     dangerResult: null,
+    uninstallArmed: false,
     reset: noop,
     uninstall: noop,
   },
@@ -77,3 +78,6 @@ export const ResetDone: Story = {
 export const DangerFailed: Story = {
   args: { dangerResult: { ok: false, message: "database is locked" } },
 };
+
+/** One press in: the second within five seconds is the one that acts. */
+export const UninstallArmed: Story = { args: { uninstallArmed: true } };

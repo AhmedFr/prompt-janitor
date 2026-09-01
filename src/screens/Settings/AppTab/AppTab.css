@@ -60,3 +60,15 @@
 .app-tab__danger-btn:not(:disabled):hover {
   background: rgba(255, 59, 48, 0.08);
 }
+
+/* Armed: the button has to look different from the one just pressed, or the
+   second press is indistinguishable from a click that did nothing. */
+.app-tab__danger-btn--armed {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.app-tab__danger-btn--armed:not(:disabled):hover {
+  background: #e0281e;
+}

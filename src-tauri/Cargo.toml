@@ -56,3 +56,10 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Uninstall moves the app bundle to the Trash. `trash` wraps NSFileManager's
+# `trashItemAtURL:`, which needs no Apple-events permission and cannot be made
+# to run a script by a path containing a quote — both of which ruled out the
+# `osascript`/Finder route.
+[target.'cfg(target_os = "macos")'.dependencies]
+trash = "5.2.6"

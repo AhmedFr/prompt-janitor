@@ -12,11 +12,16 @@ import "./UpdateBanner.css";
  */
 export function UpdateBanner({ version, onOpen, onDismiss }: UpdateBannerProps) {
   return (
-    <div className="update-banner" role="status">
+    <div className="update-banner">
       <span className="update-banner__icon">
         <Icon name="arrowDown" size={16} />
       </span>
-      <span className="update-banner__text">Prompt Janitor {version} is available</span>
+      {/* The live region is the sentence, not the bar: a `role="status"`
+          wrapping the buttons would re-announce them as controls appear or
+          change, and screen readers treat a live region's contents as text. */}
+      <span className="update-banner__text" role="status">
+        Prompt Janitor {version} is available
+      </span>
       <button className="update-banner__open" onClick={onOpen}>
         Open Settings
       </button>

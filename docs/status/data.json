@@ -371,11 +371,11 @@
     },
     {
       "name": "Vitest",
-      "result": "987/987 passing (81 files)"
+      "result": "999/999 passing (82 files)"
     },
     {
       "name": "cargo test",
-      "result": "318/318 passing"
+      "result": "321/321 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -424,6 +424,7 @@
     }
   ],
   "recent": [
+    "2026-09-01 — Review fixes on #147: uninstall moves the bundle with the `trash` crate (NSFileManager) instead of `osascript`, closing an AppleScript-injection hole that a quote in the bundle path could open and dropping the Apple-events permission a hardened-runtime build would have needed; the order flipped so the bundle is trashed BEFORE any data is deleted (a failed trash step now leaves a working app with all its data); a Gatekeeper-translocated copy is detected and refused with instructions; the app-data wipe is guarded by a bundle-identifier check; uninstall takes two deliberate presses so macOS's default-button Return cannot do it alone; and the reset/uninstall prompts admit the licence key and AI settings go too",
     "2026-09-01 — In-app updates and a Settings danger zone (#147): the Tauri updater is wired end to end (signed artifacts from the release workflow, `latest.json` on GitHub Releases, a silent launch probe that surfaces a dismissible banner, and a Settings -> App tab with the real bundle version, release notes, a download bar and relaunch), plus `reset_app_data` / `uninstall_app` behind OS confirmations. Not exercised end to end — no release exists yet, so the owner verifies after the first v0.1.1 tag",
     "2026-08-25 — First installable build: `pnpm tauri build` produces Prompt Janitor.app + DMG (ad-hoc signed, aarch64) now that the icon set includes an .icns; installed to /Applications for owner testing. Signed/notarized universal DMG still waits on Apple Developer secrets + CI billing",
     "2026-08-23 — Panel on-device fixes (#145): the tray icon is a generated macOS template image (black + alpha, authored on the 18 pt canvas tray-icon actually pins the NSImage to, pixel-snapped, `icons/tray/scripts/make_tray_icon.py`) instead of the full-colour app icon that rendered as a blue square; ScoreRing's letter and score line scale with the ring so the panel's 56 px ring stops overflowing, and the score moved onto the header's meta line; the popover window now measures its card and resizes to it (clamped 240–600) rather than standing at a dead-gapped 480, and the tray places it with that live size; fix rows are one 34 px line — grade badge, file, project, issue count — with hairline separators instead of a folder glyph plus a grade chip",

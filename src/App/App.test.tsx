@@ -197,6 +197,14 @@ describe("App", () => {
     expect(propsOf("settings").initialTab).toBe("app");
   });
 
+  /** Acting on the news is the strongest acknowledgement of it. */
+  it("dismisses the banner when its action is taken", () => {
+    updateCheck.version = "0.1.1";
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+    expect(updateCheck.dismiss).toHaveBeenCalledTimes(1);
+  });
+
   it("hands the dismiss straight back to the hook that owns the session flag", () => {
     updateCheck.version = "0.1.1";
     render(<App />);

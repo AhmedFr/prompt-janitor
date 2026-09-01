@@ -39,10 +39,19 @@ describe("describeUpdateError", () => {
     expect(message).toMatch(/No published releases yet/);
   });
 
-  it("also reads a bare 404 from the endpoint as 'no releases yet'", () => {
-    expect(describeUpdateError("Network Error: status code 404 Not Found")).toMatch(
-      /No published releases yet/,
-    );
+  /**
+   * A manifest that exists but omits this Mac's platform is a broken release,
+   * not an absent one. Claiming "no releases yet" would send the user away
+   * from a real, reportable problem.
+   */
+  it("passes a missing-platform failure through instead of calling it 'no releases'", () => {
+    const raw = "the platform `darwin-aarch64` was not found on the response `platforms` object";
+    expect(describeUpdateError(new Error(raw))).toBe(raw);
+  });
+
+  it("passes a missing-binary failure through too", () => {
+    const raw = "binary for the current platform was not found in the archive";
+    expect(describeUpdateError(new Error(raw))).toBe(raw);
   });
 
   it("says so plainly when the update server could not be reached", () => {

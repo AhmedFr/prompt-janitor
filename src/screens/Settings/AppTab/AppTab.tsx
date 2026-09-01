@@ -20,6 +20,7 @@ export function AppTabBody({
   install,
   danger,
   dangerResult,
+  uninstallArmed,
   reset,
   uninstall,
 }: AppTabBodyProps) {
@@ -97,14 +98,23 @@ export function AppTabBody({
           </Button>
           <Button
             size="sm"
-            className="app-tab__danger-btn"
+            className={"app-tab__danger-btn" + (uninstallArmed ? " app-tab__danger-btn--armed" : "")}
             onClick={() => void uninstall()}
             disabled={danger !== ""}
           >
             <Icon name="x" />{" "}
-            {danger === "uninstall" ? "Uninstalling…" : "Uninstall Prompt Janitor…"}
+            {danger === "uninstall"
+              ? "Uninstalling…"
+              : uninstallArmed
+                ? "Confirm uninstall"
+                : "Uninstall Prompt Janitor…"}
           </Button>
         </div>
+        {uninstallArmed && danger === "" && (
+          <p className="app-tab__danger-line" role="status">
+            Press again to remove Prompt Janitor. This will lapse in a few seconds.
+          </p>
+        )}
         {dangerResult && (
           <p
             className={"app-tab__danger-line" + (dangerResult.ok ? "" : " app-tab__line--error")}

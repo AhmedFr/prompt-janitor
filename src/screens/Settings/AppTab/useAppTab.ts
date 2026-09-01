@@ -5,7 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { commands, isTauri } from "@/lib/ipc";
 import { describeUpdateError } from "./AppTab.util";
-import { RESET_CONFIRM, UNINSTALL_CONFIRM } from "./AppTab.constants";
+import { RESET_CONFIRM, UNINSTALL_ARM_MS, UNINSTALL_CONFIRM } from "./AppTab.constants";
 import type { DangerBusy, DangerResult, UpdateStatus, UseAppTab } from "./AppTab.types";
 
 /**
@@ -20,10 +20,15 @@ export function useAppTab(): UseAppTab {
   const [update, setUpdate] = useState<UpdateStatus>({ kind: "idle" });
   const [danger, setDanger] = useState<DangerBusy>("");
   const [dangerResult, setDangerResult] = useState<DangerResult | null>(null);
+  const [uninstallArmed, setUninstallArmed] = useState(false);
   // The `Update` handle the check returned. It carries the download URL and
   // signature, so the install has to reuse the very object the check produced
   // rather than re-deriving one from the version string.
   const pending = useRef<Update | null>(null);
+  // A download in flight. State cannot guard this: two clicks landing in the
+  // same tick both read the pre-render value and both start a download.
+  const downloading = useRef(false);
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!isTauri) return;
@@ -32,7 +37,16 @@ export function useAppTab(): UseAppTab {
       .catch(() => setVersion(null));
   }, []);
 
+  // A timer that outlives the tab would call into an unmounted component.
+  useEffect(
+    () => () => {
+      if (armTimer.current) clearTimeout(armTimer.current);
+    },
+    [],
+  );
+
   const runCheck = useCallback(async () => {
+    if (!isTauri) return;
     setUpdate({ kind: "checking" });
     try {
       const found = await check();
@@ -50,7 +64,8 @@ export function useAppTab(): UseAppTab {
 
   const install = useCallback(async () => {
     const found = pending.current;
-    if (!found) return;
+    if (!found || downloading.current) return;
+    downloading.current = true;
     let downloaded = 0;
     let total = 0;
     setUpdate({ kind: "downloading", version: found.version, downloaded, total });
@@ -78,14 +93,23 @@ export function useAppTab(): UseAppTab {
       await relaunch();
     } catch (error) {
       setUpdate({ kind: "error", message: describeUpdateError(error) });
+    } finally {
+      // Not reached on the happy path — `relaunch` takes the process with it.
+      downloading.current = false;
     }
   }, []);
 
   /**
-   * Confirm, run, and report. Both destructive actions share this shape: the
-   * OS dialog is the guard (an in-page "are you sure" is one stray Enter away
-   * from being dismissed by muscle memory), and the outcome — success or
-   * failure — lands inline rather than in a second dialog.
+   * Confirm, run, and report.
+   *
+   * The OS dialog is a speed bump, not a lock: on macOS the confirm button is
+   * the alert's default, so Return answers it. It is worth raising because it
+   * is the one prompt the app cannot draw over or mis-render — but the real
+   * guard against an accidental uninstall is the two-press arming below, which
+   * runs before this is ever called.
+   *
+   * The outcome — success or failure — lands inline rather than in a second
+   * dialog.
    */
   const runDanger = useCallback(
     async (
@@ -95,7 +119,13 @@ export function useAppTab(): UseAppTab {
       okLabel: string,
       command: () => Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
     ) => {
-      const confirmed = await ask(prompt, { title, kind: "warning", okLabel, cancelLabel: "Cancel" });
+      if (!isTauri) return;
+      const confirmed = await ask(prompt, {
+        title,
+        kind: "warning",
+        okLabel,
+        cancelLabel: "Cancel",
+      });
       if (!confirmed) return;
       setDanger(key);
       setDangerResult(null);
@@ -120,17 +150,43 @@ export function useAppTab(): UseAppTab {
     [runDanger],
   );
 
-  const uninstall = useCallback(
-    () =>
-      runDanger(
-        "uninstall",
-        UNINSTALL_CONFIRM,
-        "Uninstall Prompt Janitor",
-        "Uninstall",
-        commands.uninstallApp,
-      ),
-    [runDanger],
-  );
+  /**
+   * First press arms; the second, within {@link UNINSTALL_ARM_MS}, goes ahead.
+   *
+   * Reset is recoverable in the sense that matters — the app keeps working, and
+   * a rescan rebuilds most of what was lost. Uninstall is not, so it costs two
+   * deliberate presses before the OS is even asked. The window lapses on its
+   * own so a half-finished thought does not stay loaded.
+   */
+  const uninstall = useCallback(async () => {
+    if (!isTauri) return;
+    if (!uninstallArmed) {
+      setUninstallArmed(true);
+      if (armTimer.current) clearTimeout(armTimer.current);
+      armTimer.current = setTimeout(() => setUninstallArmed(false), UNINSTALL_ARM_MS);
+      return;
+    }
+    if (armTimer.current) clearTimeout(armTimer.current);
+    armTimer.current = null;
+    setUninstallArmed(false);
+    await runDanger(
+      "uninstall",
+      UNINSTALL_CONFIRM,
+      "Uninstall Prompt Janitor",
+      "Uninstall",
+      commands.uninstallApp,
+    );
+  }, [runDanger, uninstallArmed]);
 
-  return { version, update, check: runCheck, install, danger, dangerResult, reset, uninstall };
+  return {
+    version,
+    update,
+    check: runCheck,
+    install,
+    danger,
+    dangerResult,
+    uninstallArmed,
+    reset,
+    uninstall,
+  };
 }

@@ -158,23 +158,29 @@ export const commands = {
 	/**  Quit the app for real (the tray is the only other way out). */
 	quit: () => __TAURI_INVOKE<void>("quit"),
 	/**
-	 *  Delete the local database, backups and settings, then come back up on a
-	 *  fresh one so the app keeps working.
+	 *  Delete the local database and its settings, then come back up on a fresh
+	 *  one so the app keeps working.
 	 * 
 	 *  The pooled connection is swapped for an in-memory database *before* the
-	 *  files go: on Windows an open handle blocks the delete outright, and on
-	 *  macOS the old connection would keep writing WAL frames to a file nobody is
-	 *  reading any more. The fresh database is opened through the same
-	 *  [`store::init_db`] a cold launch uses, so it is seeded identically.
+	 *  files are listed and deleted: on Windows an open handle blocks the delete
+	 *  outright, on macOS the old connection would keep writing WAL frames to a
+	 *  file nobody is reading any more, and closing it is also what checkpoints
+	 *  and removes `-wal`/`-shm` — so a list taken beforehand would over-count.
+	 *  The fresh database is opened through the same [`store::init_db`] a cold
+	 *  launch uses, so it is seeded identically.
 	 */
 	resetAppData: () => typedError<string, string>(__TAURI_INVOKE("reset_app_data")),
 	/**
-	 *  Remove every trace of the app: its data, then the bundle itself.
+	 *  Remove every trace of the app: the bundle first, then its data.
 	 * 
-	 *  A development build is left where it is — there is no bundle to trash, and
-	 *  the returned message says so rather than pretending the job is done. That
-	 *  is also the only path that returns to a still-running app; a real uninstall
-	 *  quits a moment after replying.
+	 *  Bundle first on purpose. Trashing can fail — a read-only volume, a
+	 *  translocated copy, a permissions refusal — and a user whose app is still
+	 *  installed should still have their database. Nothing destructive happens
+	 *  until the bundle is safely in the Trash.
+	 * 
+	 *  A development build has no bundle to trash. It still clears its data (that
+	 *  is the useful half in dev) and says what it did rather than pretending the
+	 *  job is done; it is also the only path that returns to a still-running app.
 	 */
 	uninstallApp: () => typedError<string, string>(__TAURI_INVOKE("uninstall_app")),
 };

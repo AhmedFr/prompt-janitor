@@ -40,9 +40,14 @@ export interface AppTabBodyProps {
   install: () => Promise<void>;
   danger: DangerBusy;
   dangerResult: DangerResult | null;
+  /**
+   * The uninstall button is one press in, waiting for the second. Drives the
+   * button's label; the arming itself lives in the hook.
+   */
+  uninstallArmed: boolean;
   /** Confirm, then wipe the local database and start a fresh one. */
   reset: () => Promise<void>;
-  /** Confirm, then remove the app data and move the bundle to the Trash. */
+  /** Arm on the first press; on the second, confirm and uninstall. */
   uninstall: () => Promise<void>;
 }
 
