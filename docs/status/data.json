@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "updated": "2026-08-23",
+  "updated": "2026-09-01",
   "readiness": {
     "percent": 83,
     "label": "Code complete — blocked on human actions to ship v1"
@@ -123,6 +123,11 @@
         "title": "Tag and publish the first release",
         "detail": "After the above: pnpm bump <version> if desired, git tag v0.1.0 && git push origin v0.1.0, wait for the Release workflow, check the draft release's DMG installs and launches, then publish the draft and verify the landing page download link resolves.",
         "kind": "external"
+      },
+      {
+        "title": "Verify in-app updates after tagging v0.1.1",
+        "detail": "The updater cannot be exercised end to end until a release exists. After `git tag v0.1.1 && git push --tags`: confirm the release workflow produced `latest.json` plus a `.app.tar.gz` and its `.sig`; publish the draft; then, from an installed 0.1.0 build, check that Settings -> App reports 0.1.1, that Install & relaunch downloads, verifies and restarts into the new version, and that the launch banner appears ~10s after opening the app. Before the tag exists the tab must read \"No published releases yet\" rather than an error.",
+        "kind": "testing"
       }
     ],
     "marketing": [
@@ -343,6 +348,12 @@
       "status": "shipped"
     },
     {
+      "name": "In-app updates + Settings danger zone",
+      "tier": "infra",
+      "status": "pr",
+      "note": "#147 — updater keypair in repo secrets; first release tag lights it up; E2E blocked on Actions billing"
+    },
+    {
       "name": "Signed & notarized DMG",
       "tier": "infra",
       "status": "blocked",
@@ -360,11 +371,11 @@
     },
     {
       "name": "Vitest",
-      "result": "934/934 passing (77 files)"
+      "result": "987/987 passing (81 files)"
     },
     {
       "name": "cargo test",
-      "result": "310/310 passing"
+      "result": "318/318 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -385,11 +396,6 @@
       "ref": "#45",
       "title": "Group prompts by project with auto-detected logos",
       "note": "Design-heavy; post-v1"
-    },
-    {
-      "ref": "—",
-      "title": "Auto-update via Tauri updater",
-      "note": "Needs updater keypair — see Decisions"
     },
     {
       "ref": "—",
@@ -418,6 +424,7 @@
     }
   ],
   "recent": [
+    "2026-09-01 — In-app updates and a Settings danger zone (#147): the Tauri updater is wired end to end (signed artifacts from the release workflow, `latest.json` on GitHub Releases, a silent launch probe that surfaces a dismissible banner, and a Settings -> App tab with the real bundle version, release notes, a download bar and relaunch), plus `reset_app_data` / `uninstall_app` behind OS confirmations. Not exercised end to end — no release exists yet, so the owner verifies after the first v0.1.1 tag",
     "2026-08-25 — First installable build: `pnpm tauri build` produces Prompt Janitor.app + DMG (ad-hoc signed, aarch64) now that the icon set includes an .icns; installed to /Applications for owner testing. Signed/notarized universal DMG still waits on Apple Developer secrets + CI billing",
     "2026-08-23 — Panel on-device fixes (#145): the tray icon is a generated macOS template image (black + alpha, authored on the 18 pt canvas tray-icon actually pins the NSImage to, pixel-snapped, `icons/tray/scripts/make_tray_icon.py`) instead of the full-colour app icon that rendered as a blue square; ScoreRing's letter and score line scale with the ring so the panel's 56 px ring stops overflowing, and the score moved onto the header's meta line; the popover window now measures its card and resizes to it (clamped 240–600) rather than standing at a dead-gapped 480, and the tray places it with that live size; fix rows are one 34 px line — grade badge, file, project, issue count — with hairline separators instead of a folder glyph plus a grade chip",
     "2026-08-23 — Menu-bar panel complete (#143 plumbing, #144 UI); #144 merged on local gates because GitHub Actions is blocked on account billing",

@@ -52,6 +52,8 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
             crate::commands::get_panel_snapshot,
             crate::commands::open_main,
             crate::commands::quit,
+            crate::app_data::reset_app_data,
+            crate::app_data::uninstall_app,
         ])
         // Event payloads appear in no command signature; register the type so the
         // frontend listener is typed from the same source as the commands.

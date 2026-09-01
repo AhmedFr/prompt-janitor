@@ -18,3 +18,19 @@ export const UNREACHABLE = "Couldn't reach the update server. Check your connect
 
 /** Last resort when the rejection carried no message at all. */
 export const CHECK_FAILED = "The update check failed.";
+
+/**
+ * The reset confirmation. Names what goes and, just as importantly, what
+ * happens next — a destructive prompt that does not say the app survives
+ * reads like it might not.
+ */
+export const RESET_CONFIRM =
+  "Delete the local database, backups and settings? The app keeps running with a fresh database.";
+
+/** The uninstall confirmation. */
+export const UNINSTALL_CONFIRM =
+  "Remove all app data and move Prompt Janitor to the Trash? The app will quit.";
+
+/** What the two destructive actions cannot take with them, said out loud. */
+export const DANGER_NOTE =
+  "Neither action touches your prompt files — Prompt Janitor only ever reads them where they live.";

@@ -1,2 +1,8 @@
 export { AppTab, AppTabBody } from "./AppTab";
-export type { AppTabBodyProps, UpdateStatus, UseAppTab } from "./AppTab.types";
+export type {
+  AppTabBodyProps,
+  DangerBusy,
+  DangerResult,
+  UpdateStatus,
+  UseAppTab,
+} from "./AppTab.types";

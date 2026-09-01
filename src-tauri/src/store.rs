@@ -297,6 +297,21 @@ pub fn open_and_migrate(path: &std::path::Path) -> rusqlite::Result<Connection> 
     Ok(conn)
 }
 
+/// Open, migrate and seed the database the app runs on.
+///
+/// One entry point on purpose: launch and "Reset app data" both go through it,
+/// so a database rebuilt after a reset is byte-for-byte the one a fresh
+/// install would have had — rule library and all.
+pub fn init_db(path: &std::path::Path) -> rusqlite::Result<Connection> {
+    let conn = open_and_migrate(path)?;
+    // Seeding is idempotent (INSERT OR IGNORE); a failure here means the rule
+    // library is incomplete, not that the database is unusable, so the app
+    // still comes up rather than refusing to start.
+    crate::query::seed_rules(&conn).ok();
+    crate::query::seed_builtin_nl_rules(&conn).ok();
+    Ok(conn)
+}
+
 /// In-memory, fully migrated connection for tests.
 #[cfg(test)]
 pub fn test_conn() -> Connection {

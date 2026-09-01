@@ -6,6 +6,7 @@
 mod ai;
 mod ai_fix;
 mod ai_rules;
+mod app_data;
 mod apply;
 mod commands;
 pub mod engine;
@@ -72,10 +73,8 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("resolve app data dir");
             std::fs::create_dir_all(&dir).ok();
-            let db_path = dir.join("prompt-janitor.db");
-            let conn = store::open_and_migrate(&db_path).expect("initialize database");
-            query::seed_rules(&conn).ok();
-            query::seed_builtin_nl_rules(&conn).ok();
+            let db_path = dir.join(app_data::DB_FILE_NAME);
+            let conn = store::init_db(&db_path).expect("initialize database");
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),

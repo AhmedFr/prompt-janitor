@@ -157,6 +157,26 @@ export const commands = {
 	openMain: (route: string, target: string | null) => __TAURI_INVOKE<void>("open_main", { route, target }),
 	/**  Quit the app for real (the tray is the only other way out). */
 	quit: () => __TAURI_INVOKE<void>("quit"),
+	/**
+	 *  Delete the local database, backups and settings, then come back up on a
+	 *  fresh one so the app keeps working.
+	 * 
+	 *  The pooled connection is swapped for an in-memory database *before* the
+	 *  files go: on Windows an open handle blocks the delete outright, and on
+	 *  macOS the old connection would keep writing WAL frames to a file nobody is
+	 *  reading any more. The fresh database is opened through the same
+	 *  [`store::init_db`] a cold launch uses, so it is seeded identically.
+	 */
+	resetAppData: () => typedError<string, string>(__TAURI_INVOKE("reset_app_data")),
+	/**
+	 *  Remove every trace of the app: its data, then the bundle itself.
+	 * 
+	 *  A development build is left where it is — there is no bundle to trash, and
+	 *  the returned message says so rather than pretending the job is done. That
+	 *  is also the only path that returns to a still-running app; a real uninstall
+	 *  quits a moment after replying.
+	 */
+	uninstallApp: () => typedError<string, string>(__TAURI_INVOKE("uninstall_app")),
 };
 
 /* Types */

@@ -17,6 +17,15 @@ export type UpdateStatus =
   | { kind: "restarting"; version: string }
   | { kind: "error"; message: string };
 
+/** Which destructive action is in flight, if any. */
+export type DangerBusy = "" | "reset" | "uninstall";
+
+/** The outcome of the last destructive action, shown inline under the buttons. */
+export interface DangerResult {
+  ok: boolean;
+  message: string;
+}
+
 /**
  * Presentational half of the tab — rendered from state `useAppTab` owns. Kept
  * separate so a story can hand it a fixed state with no updater behind it.
@@ -29,6 +38,12 @@ export interface AppTabBodyProps {
   check: () => Promise<void>;
   /** Download the offered update and relaunch into it. */
   install: () => Promise<void>;
+  danger: DangerBusy;
+  dangerResult: DangerResult | null;
+  /** Confirm, then wipe the local database and start a fresh one. */
+  reset: () => Promise<void>;
+  /** Confirm, then remove the app data and move the bundle to the Trash. */
+  uninstall: () => Promise<void>;
 }
 
 /** What `useAppTab` returns. */

@@ -62,6 +62,29 @@ cargo run --bin license-tool -- verify "PJ1.…"         # sanity-check against 
 Store the private key in a password manager and delete the file — `*.secret` is gitignored,
 and the key can never be recovered or rotated transparently for existing customers.
 
+## Updating & uninstalling
+
+Updates arrive in the app. Once a release is published, Prompt Janitor checks for a
+newer build shortly after launch and shows a line above the screen area; **Settings →
+App** has the same check on a button, with the release notes, a download bar, and
+"Install & relaunch". Downloads are verified against the signing key baked into the
+build before anything is installed. Until the first release is tagged there is nothing
+to serve, and the tab says so rather than reporting an error.
+
+To remove the app:
+
+- **From inside the app** — Settings → App → *Uninstall Prompt Janitor…* removes the
+  local data and moves the bundle to the Trash. *Reset app data…* next to it wipes the
+  database and backups but keeps the app, running on a fresh, empty database.
+- **By hand** — drag `Prompt Janitor.app` to the Trash and delete its data:
+
+  ```sh
+  rm -rf ~/Library/Application\ Support/com.promptjanitor.app
+  ```
+
+Neither route touches the prompt files it scanned: Prompt Janitor reads those where they
+live and only ever writes its findings into its own app-data directory.
+
 ## Development
 
 This project ships via GitHub milestones (one per phase), one issue per deliverable,

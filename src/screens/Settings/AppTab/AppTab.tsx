@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { ScanBar } from "@/components/ScanBar";
 import { useAppTab } from "./useAppTab";
 import { downloadStatus } from "./AppTab.util";
-import { DOWNLOAD_BAR_LABEL, UP_TO_DATE } from "./AppTab.constants";
+import { DANGER_NOTE, DOWNLOAD_BAR_LABEL, UP_TO_DATE } from "./AppTab.constants";
 import type { AppTabBodyProps } from "./AppTab.types";
 import "./AppTab.css";
 
@@ -13,8 +13,18 @@ export function AppTab() {
   return <AppTabBody {...useAppTab()} />;
 }
 
-export function AppTabBody({ version, update, check, install }: AppTabBodyProps) {
-  const busy = update.kind === "checking" || update.kind === "downloading" || update.kind === "restarting";
+export function AppTabBody({
+  version,
+  update,
+  check,
+  install,
+  danger,
+  dangerResult,
+  reset,
+  uninstall,
+}: AppTabBodyProps) {
+  const busy =
+    update.kind === "checking" || update.kind === "downloading" || update.kind === "restarting";
 
   return (
     <>
@@ -71,6 +81,38 @@ export function AppTabBody({ version, update, check, install }: AppTabBodyProps)
             </span>
           )}
         </div>
+      </Card>
+
+      <h2 className="set-sec app-tab__danger-head">Danger zone</h2>
+      <Card padded>
+        <p className="faint app-tab__note">{DANGER_NOTE}</p>
+        <div className="row app-tab__actions">
+          <Button
+            size="sm"
+            className="app-tab__danger-btn"
+            onClick={() => void reset()}
+            disabled={danger !== ""}
+          >
+            <Icon name="refresh" /> {danger === "reset" ? "Resetting…" : "Reset app data…"}
+          </Button>
+          <Button
+            size="sm"
+            className="app-tab__danger-btn"
+            onClick={() => void uninstall()}
+            disabled={danger !== ""}
+          >
+            <Icon name="x" />{" "}
+            {danger === "uninstall" ? "Uninstalling…" : "Uninstall Prompt Janitor…"}
+          </Button>
+        </div>
+        {dangerResult && (
+          <p
+            className={"app-tab__danger-line" + (dangerResult.ok ? "" : " app-tab__line--error")}
+            role={dangerResult.ok ? "status" : "alert"}
+          >
+            {dangerResult.message}
+          </p>
+        )}
       </Card>
     </>
   );
