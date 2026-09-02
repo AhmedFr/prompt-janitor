@@ -893,6 +893,33 @@ mod tests {
     }
 
     #[test]
+    fn a_store_that_cannot_be_read_reads_as_no_key_rather_than_failing() {
+        struct Locked;
+        impl SecretStore for Locked {
+            fn get(&self, _: &str) -> Result<Option<String>, String> {
+                Err("keychain locked".into())
+            }
+            fn set(&self, _: &str, _: &str) -> Result<(), String> {
+                Ok(())
+            }
+            fn delete(&self, _: &str) -> Result<(), String> {
+                Ok(())
+            }
+            fn persistent(&self) -> bool {
+                true
+            }
+        }
+        let conn = free_conn();
+        set_ai_config_with_conn(&conn, &Locked, "anthropic", "", "").unwrap();
+
+        let view = crate::ai::config_view(&conn, &Locked);
+
+        assert_eq!(view.provider, "anthropic");
+        assert!(!view.has_key);
+        assert_eq!(crate::ai::load_credentials(&conn, &Locked).key, "");
+    }
+
+    #[test]
     fn a_key_with_no_provider_selected_is_not_stored() {
         let conn = free_conn();
         let store = crate::secrets::MemoryStore::default();

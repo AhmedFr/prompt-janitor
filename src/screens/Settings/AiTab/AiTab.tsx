@@ -60,6 +60,9 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
       setModel(DEFAULT_MODELS[key] ?? "");
     }
     setProvider(key);
+    // Keys are stored per provider: "leave blank to keep" is only true for
+    // the provider whose key we know about, the saved one.
+    setHasKey(key === ai?.provider && !!ai?.has_key);
   };
 
   return (

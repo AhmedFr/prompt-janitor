@@ -49,6 +49,21 @@ describe("AiTab key storage", () => {
     expect(field.getAttribute("aria-describedby")).toContain(hint.id);
   });
 
+  it("stops claiming a stored key once the user switches to a provider that has none", () => {
+    const ai: AiConfig = { provider: "anthropic", model: DEFAULT_MODELS.anthropic, has_key: true };
+    const { getByRole, getByLabelText } = render(
+      <AiTab ai={ai} onSave={async () => {}} onTest={async () => ""} />,
+    );
+    fireEvent.click(getByRole("button", { name: "OpenRouter" }));
+    expect(getByLabelText("API key")).toHaveAttribute("placeholder", "Paste your API key");
+    // Switching back restores the truth for the saved provider.
+    fireEvent.click(getByRole("button", { name: "Anthropic" }));
+    expect(getByLabelText("API key")).toHaveAttribute(
+      "placeholder",
+      expect.stringMatching(/in your Keychain — leave blank to keep/),
+    );
+  });
+
   it("asks for a key when none is stored for the selected provider", () => {
     const ai: AiConfig = { provider: "openai", model: DEFAULT_MODELS.openai, has_key: false };
     const { getByLabelText } = render(

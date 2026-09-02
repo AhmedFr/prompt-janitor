@@ -83,7 +83,7 @@
     "blocking": [
       {
         "title": "Verify the Keychain move on a real Mac after #164",
-        "detail": "Launch the new build once with an existing AI key configured: Settings → AI should still show the key as stored and 'Test connection' should pass; Keychain Access (login keychain, search 'com.promptjanitor.app') should show an item named ai_key.<provider>; the SQLite settings table should no longer have an ai_key row (`sqlite3 ~/Library/Application\\ Support/com.promptjanitor.app/prompt-janitor.db \"select key from settings\"`). Then switch provider with the key field blank: Test connection must fail with 'No API key configured', not reuse the old key. Reset app data must remove the Keychain items. Expect a one-time macOS 'wants to access' prompt if a debug build reads an item the signed build wrote (or vice versa) — that is the Keychain tying items to code signatures, not a bug.",
+        "detail": "Launch the new build once with an existing AI key configured: Settings → AI should still show the key as stored and 'Test connection' should pass; in Keychain Access (login keychain) search com.promptjanitor.app — the Name and Where columns show the identifier, the Account column shows ai_key.<provider>; the SQLite settings table should no longer have an ai_key row (`sqlite3 ~/Library/Application\\ Support/com.promptjanitor.app/prompt-janitor.db \"select key from settings\"`), and `strings` on the .db and .db-wal files should not find the key. Then switch provider with the key field blank: the placeholder flips to 'Paste your API key' and Test connection must fail with 'No API key configured', not reuse the old key. Reset app data must remove the Keychain items. Keychain prompts: between two signed builds expect one 'wants to access' prompt; an unsigned dev binary changes identity on every rebuild, so click 'Always Allow' or expect a prompt per rebuild. Clicking 'Deny' shows as has_key false everywhere and a 'duplicate item' error on re-entry — that is the Keychain tying items to code signatures, not a bug.",
         "kind": "testing"
       },
       {
@@ -397,11 +397,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1019/1019 passing (85 files)"
+      "result": "1020/1020 passing (85 files)"
     },
     {
       "name": "cargo test",
-      "result": "336/336 passing (+1 ignored: real Keychain round trip, run by hand)"
+      "result": "341/341 passing (+1 ignored: real Keychain round trip, run by hand)"
     },
     {
       "name": "clippy -D warnings",

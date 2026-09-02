@@ -17,8 +17,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Keychain service name — the bundle identifier, so Keychain Access groups
-/// the entries under the app.
+/// Keychain service name — the bundle identifier from `tauri.conf.json`, so
+/// Keychain Access groups the entries under the app. Keep the two in step:
+/// a changed identifier here orphans every user's stored key.
 pub const SERVICE: &str = "com.promptjanitor.app";
 
 /// Legacy settings row the key used to live in. Only read by the migration.
@@ -36,29 +37,56 @@ pub trait SecretStore: Send + Sync {
     fn get(&self, name: &str) -> Result<Option<String>, String>;
     fn set(&self, name: &str, value: &str) -> Result<(), String>;
     fn delete(&self, name: &str) -> Result<(), String>;
+    /// Whether a value survives a restart. The migration deletes the only
+    /// other copy of the key, so it must refuse a store that forgets.
+    fn persistent(&self) -> bool;
 }
 
 /// Tauri managed state wrapping whichever store the platform provides.
 pub struct Secrets(pub Arc<dyn SecretStore>);
 
 /// In-memory store for tests and for platforms without a Keychain backend.
+/// Not persistent: it forgets everything at exit, and says so.
 #[derive(Default)]
-pub struct MemoryStore(Mutex<HashMap<String, String>>);
+pub struct MemoryStore {
+    items: Mutex<HashMap<String, String>>,
+    /// Tests that exercise the migration need a store that *claims* to keep
+    /// values; nothing outside tests should ever construct one.
+    claims_persistent: bool,
+}
+
+impl MemoryStore {
+    #[cfg(test)]
+    pub fn persistent_for_tests() -> Self {
+        Self {
+            items: Mutex::default(),
+            claims_persistent: true,
+        }
+    }
+}
 
 impl SecretStore for MemoryStore {
     fn get(&self, name: &str) -> Result<Option<String>, String> {
-        Ok(self.0.lock().map_err(|e| e.to_string())?.get(name).cloned())
+        Ok(self
+            .items
+            .lock()
+            .map_err(|e| e.to_string())?
+            .get(name)
+            .cloned())
     }
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
-        self.0
+        self.items
             .lock()
             .map_err(|e| e.to_string())?
             .insert(name.to_string(), value.to_string());
         Ok(())
     }
     fn delete(&self, name: &str) -> Result<(), String> {
-        self.0.lock().map_err(|e| e.to_string())?.remove(name);
+        self.items.lock().map_err(|e| e.to_string())?.remove(name);
         Ok(())
+    }
+    fn persistent(&self) -> bool {
+        self.claims_persistent
     }
 }
 
@@ -114,6 +142,9 @@ impl SecretStore for KeychainStore {
             Err(e) => Err(format!("Couldn't remove {name} from the Keychain: {e}")),
         }
     }
+    fn persistent(&self) -> bool {
+        true
+    }
 }
 
 /// The store this build uses: the login Keychain on macOS, memory elsewhere.
@@ -135,10 +166,11 @@ pub fn platform_store() -> Arc<dyn SecretStore> {
 }
 
 /// Move a legacy plaintext `ai_key` row into the store under the current
-/// provider, delete the row, and vacuum. Returns `Ok(true)` when a key was
-/// moved, `Ok(false)` when there was nothing to do. On a store failure the
-/// row is left in place (the key must not be lost) and the error returned,
-/// so the next launch retries.
+/// provider, delete the row, and scrub the database files. Returns
+/// `Ok(true)` when the row was removed, `Ok(false)` when there was nothing
+/// to do or the store is not one that survives a restart. On a store failure
+/// the row is left in place (the key must not be lost) and the error
+/// returned, so the next launch retries.
 pub fn migrate_legacy_ai_key(
     conn: &rusqlite::Connection,
     store: &dyn SecretStore,
@@ -147,30 +179,50 @@ pub fn migrate_legacy_ai_key(
     else {
         return Ok(false);
     };
+    if !store.persistent() {
+        eprintln!("Leaving the AI key in the database: no persistent secret store is available.");
+        return Ok(false);
+    }
     let provider = crate::query::get_setting(conn, "ai_provider")
         .map_err(|e| e.to_string())?
         .unwrap_or_default();
-    // A key with no provider selected cannot be used by anything; keeping it
-    // in plaintext "to be safe" would defeat the point of the move.
+    // A key whose provider is "none" or no longer registered cannot be used
+    // by anything; keeping it in plaintext "to be safe" would defeat the
+    // point of the move.
     if !key.is_empty() && crate::ai::provider::provider_ids().contains(&provider.as_str()) {
         store.set(&ai_key_name(&provider), &key)?;
     }
+    // `secure_delete` zeroes the row's bytes as they are freed. The row is
+    // gone at this point whatever happens below; the scrub is best effort.
+    conn.execute_batch("PRAGMA secure_delete = ON;")
+        .map_err(|e| e.to_string())?;
     crate::query::delete_setting(conn, LEGACY_SETTING).map_err(|e| e.to_string())?;
-    // Deleted rows stay readable in SQLite's free pages until the file is
-    // rewritten; this is the one time a full rewrite is worth it.
-    conn.execute_batch("VACUUM").map_err(|e| e.to_string())?;
+    // A deleted row stays readable in free pages until the file is rewritten,
+    // and in WAL mode its frames stay readable in `-wal` until that log is
+    // truncated, which a plain checkpoint does not do.
+    if let Err(e) = conn.execute_batch("VACUUM; PRAGMA wal_checkpoint(TRUNCATE);") {
+        eprintln!("The AI key moved to the Keychain but the database could not be scrubbed: {e}");
+    }
     Ok(true)
 }
 
 /// Delete every provider's key. Used by reset and uninstall, which wipe the
-/// database and would otherwise leave the secrets behind. Returns how many
-/// names were removed; the first failure aborts.
+/// database and would otherwise leave the secrets behind. Every name is
+/// attempted; the error, if any, names the ones that could not be removed.
 pub fn clear_ai_keys(store: &dyn SecretStore) -> Result<usize, String> {
     let ids = crate::ai::provider::provider_ids();
+    let mut failed = Vec::new();
     for id in &ids {
-        store.delete(&ai_key_name(id))?;
+        let name = ai_key_name(id);
+        if let Err(e) = store.delete(&name) {
+            failed.push(format!("{name}: {e}"));
+        }
     }
-    Ok(ids.len())
+    if failed.is_empty() {
+        Ok(ids.len())
+    } else {
+        Err(failed.join("; "))
+    }
 }
 
 #[cfg(test)]
@@ -213,7 +265,7 @@ mod tests {
     #[test]
     fn migration_moves_the_legacy_row_under_the_current_provider_and_removes_it() {
         let conn = conn();
-        let store = MemoryStore::default();
+        let store = MemoryStore::persistent_for_tests();
         set_setting(&conn, "ai_provider", "openai").unwrap();
         set_setting(&conn, LEGACY_SETTING, "sk-legacy").unwrap();
 
@@ -241,7 +293,7 @@ mod tests {
         // A key with "none" selected cannot be used by anything; keeping it
         // in plaintext to be safe would defeat the point of the move.
         let conn = conn();
-        let store = MemoryStore::default();
+        let store = MemoryStore::persistent_for_tests();
         set_setting(&conn, LEGACY_SETTING, "sk-orphan").unwrap();
 
         assert!(migrate_legacy_ai_key(&conn, &store).unwrap());
@@ -255,13 +307,93 @@ mod tests {
     struct FailingStore;
     impl SecretStore for FailingStore {
         fn get(&self, _: &str) -> Result<Option<String>, String> {
-            Ok(None)
+            Err("keychain locked".into())
         }
         fn set(&self, _: &str, _: &str) -> Result<(), String> {
             Err("keychain locked".into())
         }
-        fn delete(&self, _: &str) -> Result<(), String> {
-            Ok(())
+        fn delete(&self, name: &str) -> Result<(), String> {
+            Err(format!("cannot delete {name}"))
+        }
+        fn persistent(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn migration_refuses_to_move_a_key_into_a_store_that_forgets_on_restart() {
+        // The memory fallback exists so the app keeps working when the
+        // Keychain cannot be opened. Moving the only copy of the key into it
+        // and deleting the row would lose the key at the next launch.
+        let conn = conn();
+        let store = MemoryStore::default();
+        assert!(!store.persistent());
+        set_setting(&conn, "ai_provider", "anthropic").unwrap();
+        set_setting(&conn, LEGACY_SETTING, "sk-keep").unwrap();
+
+        assert!(!migrate_legacy_ai_key(&conn, &store).unwrap());
+
+        assert_eq!(
+            get_setting(&conn, LEGACY_SETTING).unwrap().as_deref(),
+            Some("sk-keep")
+        );
+        assert_eq!(store.get(&ai_key_name("anthropic")).unwrap(), None);
+    }
+
+    #[test]
+    fn migration_drops_a_key_whose_provider_is_not_registered() {
+        let conn = conn();
+        let store = MemoryStore::persistent_for_tests();
+        set_setting(&conn, "ai_provider", "a-provider-we-removed").unwrap();
+        set_setting(&conn, LEGACY_SETTING, "sk-orphan").unwrap();
+
+        assert!(migrate_legacy_ai_key(&conn, &store).unwrap());
+
+        assert_eq!(get_setting(&conn, LEGACY_SETTING).unwrap(), None);
+        assert_eq!(
+            store.get(&ai_key_name("a-provider-we-removed")).unwrap(),
+            None
+        );
+    }
+
+    /// The row's bytes must be gone from the file *and* the write-ahead log:
+    /// a checkpoint copies pages into the main file but leaves the frames in
+    /// `-wal` readable until it is truncated.
+    #[test]
+    fn migration_leaves_no_trace_of_the_key_in_the_database_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pj.db");
+        let conn = crate::store::init_db(&path).unwrap();
+        let store = MemoryStore::persistent_for_tests();
+        set_setting(&conn, "ai_provider", "anthropic").unwrap();
+        set_setting(&conn, LEGACY_SETTING, "sk-needle-7f3a9c").unwrap();
+
+        assert!(migrate_legacy_ai_key(&conn, &store).unwrap());
+
+        let needle = b"sk-needle-7f3a9c";
+        for suffix in ["", "-wal", "-shm"] {
+            let file = std::path::PathBuf::from(format!("{}{suffix}", path.display()));
+            if !file.exists() {
+                continue;
+            }
+            let bytes = std::fs::read(&file).unwrap();
+            assert!(
+                !bytes.windows(needle.len()).any(|w| w == needle),
+                "{} still contains the key",
+                file.display()
+            );
+        }
+        assert_eq!(
+            store.get(&ai_key_name("anthropic")).unwrap().as_deref(),
+            Some("sk-needle-7f3a9c")
+        );
+    }
+
+    #[test]
+    fn clearing_keeps_going_past_a_failure_and_names_what_it_could_not_remove() {
+        let err = clear_ai_keys(&FailingStore).unwrap_err();
+        for id in crate::ai::provider::provider_ids() {
+            assert!(err.contains(&ai_key_name(id)), "{err}");
         }
     }
 

@@ -192,7 +192,7 @@
             <strong>Verify the Keychain move on a real Mac after #164</strong>
             <span class="tag tag--testing">testing</span>
           </div>
-          <p>Launch the new build once with an existing AI key configured: Settings → AI should still show the key as stored and &#39;Test connection&#39; should pass; Keychain Access (login keychain, search &#39;com.promptjanitor.app&#39;) should show an item named ai_key.&lt;provider&gt;; the SQLite settings table should no longer have an ai_key row (`sqlite3 ~/Library/Application\ Support/com.promptjanitor.app/prompt-janitor.db &quot;select key from settings&quot;`). Then switch provider with the key field blank: Test connection must fail with &#39;No API key configured&#39;, not reuse the old key. Reset app data must remove the Keychain items. Expect a one-time macOS &#39;wants to access&#39; prompt if a debug build reads an item the signed build wrote (or vice versa) — that is the Keychain tying items to code signatures, not a bug.</p>
+          <p>Launch the new build once with an existing AI key configured: Settings → AI should still show the key as stored and &#39;Test connection&#39; should pass; in Keychain Access (login keychain) search com.promptjanitor.app — the Name and Where columns show the identifier, the Account column shows ai_key.&lt;provider&gt;; the SQLite settings table should no longer have an ai_key row (`sqlite3 ~/Library/Application\ Support/com.promptjanitor.app/prompt-janitor.db &quot;select key from settings&quot;`), and `strings` on the .db and .db-wal files should not find the key. Then switch provider with the key field blank: the placeholder flips to &#39;Paste your API key&#39; and Test connection must fail with &#39;No API key configured&#39;, not reuse the old key. Reset app data must remove the Keychain items. Keychain prompts: between two signed builds expect one &#39;wants to access&#39; prompt; an unsigned dev binary changes identity on every rebuild, so click &#39;Always Allow&#39; or expect a prompt per rebuild. Clicking &#39;Deny&#39; shows as has_key false everywhere and a &#39;duplicate item&#39; error on re-entry — that is the Keychain tying items to code signatures, not a bug.</p>
         </div>
       </li>
       <li class="action">
@@ -656,7 +656,7 @@
   <section aria-labelledby="hl">
     <h2 id="hl"><span>Repo health <span class="muted">— as of 2026-09-02</span></span><span class="index">§4</span></h2>
     <div class="badges">
-      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>1019/1019 passing (85 files)</b></span><span class="badge">cargo test <b>336/336 passing (+1 ignored: real Keychain round trip, run by hand)</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
+      <span class="badge">TypeScript <b>clean</b></span><span class="badge">ESLint <b>clean</b></span><span class="badge">Vitest <b>1020/1020 passing (85 files)</b></span><span class="badge">cargo test <b>341/341 passing (+1 ignored: real Keychain round trip, run by hand)</b></span><span class="badge">clippy -D warnings <b>clean</b></span><span class="badge">cargo fmt <b>clean</b></span>
     </div>
   </section>
 

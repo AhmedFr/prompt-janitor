@@ -27,9 +27,10 @@ pub const DB_FILE_NAME: &str = "prompt-janitor.db";
 /// happens next — a destructive prompt that does not say the app survives
 /// reads like it might not.
 ///
-/// The licence and AI keys live in the `settings` table, so they go with it.
-/// "Settings" alone does not convey that; a user who discovers it afterwards
-/// learns that this prompt understated what it was asking for.
+/// The licence key lives in the `settings` table and the AI keys in the
+/// Keychain; both go. "Settings" alone does not convey that; a user who
+/// discovers it afterwards learns that this prompt understated what it was
+/// asking for.
 pub const RESET_PROMPT: &str = "Delete the local database, backups and settings? The app keeps \
     running with a fresh database. You'll need to re-enter your licence key and AI settings \
     afterwards.";
