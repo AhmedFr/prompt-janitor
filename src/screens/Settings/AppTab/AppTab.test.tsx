@@ -120,7 +120,12 @@ describe("AppTabBody", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(UNREACHABLE);
   });
 
-  it("keeps both destructive actions out of reach while one is running", () => {
+  /**
+   * The command raises its native dialog and then does the work in one call,
+   * so the page cannot tell confirming from running. A "Resetting…" label
+   * over an open dialog would be a lie; the button just goes quiet.
+   */
+  it("keeps both destructive actions out of reach, labels unchanged, while one is running", () => {
     render(
       <AppTabBody
         version="0.1.0"
@@ -134,7 +139,7 @@ describe("AppTabBody", () => {
         uninstall={noop}
       />,
     );
-    expect(screen.getByRole("button", { name: /Resetting…/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Reset app data…/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ })).toBeDisabled();
   });
 

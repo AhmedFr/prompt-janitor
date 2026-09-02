@@ -83,7 +83,7 @@
     "blocking": [
       {
         "title": "Verify the CSP and ACL on a real Mac after #153 (PR #158)",
-        "detail": "The webview now runs under a Content-Security-Policy and every app command is gated per window, neither of which can be exercised headless. From a `pnpm tauri build` bundle: project logos render (they are `data:` URIs), the Analytics charts render (Recharts inline styles), Settings -> App -> Check for updates reaches GitHub, and Settings -> App -> Reset / Uninstall raise a native warning dialog whose Cancel reports \"Cancelled. Nothing was changed.\" inline. Then `pnpm dev`: the app loads with hot reload working under `devCsp`. Finally the tray panel: it opens, resizes to its card, Esc hides it, Scan now / Open app / Quit work — it had no capability at all before this PR, so this is the first time its window calls are actually allowed. A CSP violation shows in the webview console as \"Refused to …\".",
+        "detail": "The webview now runs under a Content-Security-Policy and every app command is gated per window, neither of which can be exercised headless — and neither is exercised by `pnpm dev` either: Tauri only injects the CSP into assets it serves itself, and in dev the page comes straight from Vite, so a green dev run proves nothing. Test a bundled build: `pnpm tauri build --debug` is the fast path (the release bundle works too). In it: project logos render (they are `data:` URIs), the Analytics charts render (Recharts inline styles), Settings -> App -> Check for updates reaches GitHub, and Settings -> App -> Reset / Uninstall raise a native warning sheet attached to the main window whose Cancel reports \"Cancelled. Nothing was changed.\" inline. Then the tray panel: it opens, resizes to its card, Esc hides it, Scan now / Open app / Quit work — it had no capability at all before this PR, so this is the first time its window calls are actually allowed. A CSP violation shows in the webview console (right-click -> Inspect in a debug bundle) as \"Refused to …\".",
         "kind": "testing"
       },
       {
@@ -382,7 +382,7 @@
     },
     {
       "name": "cargo test",
-      "result": "324/324 passing"
+      "result": "325/325 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -431,7 +431,7 @@
     }
   ],
   "recent": [
-    "2026-09-02 — #153 security hardening (audit H-1): the webview gets a strict CSP (self-only scripts, no eval, IPC origins only; a dev policy admits the Vite refresh preamble and HMR socket), build.rs registers all 46 app commands in a Tauri ACL manifest so capabilities now govern them per window (main gets its 42, the tray panel gets snapshot/scan/open-main/quit only, reset/uninstall are main-only, a misspelled permission fails the build), and reset/uninstall raise their confirmation natively in Rust so a script in the page cannot skip it; PR #158",
+    "2026-09-02 — #153 security hardening (audit H-1): the webview gets a strict CSP (self-only scripts, no eval, IPC origins only; a dev policy admits the Vite refresh preamble and HMR socket), build.rs registers all 46 app commands in a Tauri ACL manifest so capabilities now govern them per window (main gets 43 — everything but the three panel-only ones — the tray panel gets snapshot/scan/open-main/quit only, reset/uninstall are main-only, a misspelled permission fails the build), and reset/uninstall raise their confirmation natively in Rust so a script in the page cannot skip it; PR #158",
     "2026-09-01 — v0.1.1 released (run 3 green): universal DMG, signed updater artifacts, latest.json; draft published and the universal build installed on the owner Mac. In-app updates live end-to-end from the next tag — but the update endpoint 404s on other machines while the repo is private",
     "2026-09-01 — Release run 2 failed at codesign: empty Apple secrets were exported as empty env vars, which the bundler reads as \"signing requested\"; the workflow now exports Apple env only when the secrets are non-empty",
     "2026-09-01 — v0.1.1 release run failed bundling the vendor license-tool binary (universal builds only lipo the app binary); the tool moved to its own workspace crate (`cargo run -p license-tool`), bundle verified locally",

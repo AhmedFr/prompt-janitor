@@ -94,7 +94,7 @@ export function AppTabBody({
             onClick={() => void reset()}
             disabled={danger !== ""}
           >
-            <Icon name="refresh" /> {danger === "reset" ? "Resetting…" : "Reset app data…"}
+            <Icon name="refresh" /> Reset app data…
           </Button>
           <Button
             size="sm"
@@ -103,11 +103,7 @@ export function AppTabBody({
             disabled={danger !== ""}
           >
             <Icon name="x" />{" "}
-            {danger === "uninstall"
-              ? "Uninstalling…"
-              : uninstallArmed
-                ? "Confirm uninstall"
-                : "Uninstall Prompt Janitor…"}
+            {uninstallArmed ? "Confirm uninstall" : "Uninstall Prompt Janitor…"}
           </Button>
         </div>
         {uninstallArmed && danger === "" && (

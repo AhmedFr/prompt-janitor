@@ -67,6 +67,42 @@ pub fn ts_exporter() -> Typescript {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
+    /// `build.rs` registers `command_names::COMMANDS` with the ACL; the invoke
+    /// handler registers whatever `collect_commands!` lists. The two are
+    /// hand-maintained, and a command present in only one of them compiles,
+    /// passes every other test, and then fails at runtime as an ACL denial.
+    /// The builder exposes no accessor for its commands, so this reads them
+    /// back from the TypeScript it exports: every `__TAURI_INVOKE("name"` —
+    /// with an optional `<Type>` between the two for infallible commands.
+    #[test]
+    fn the_acl_command_list_matches_what_the_invoke_handler_registers() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bindings.ts");
+        super::ipc_builder()
+            .export(super::ts_exporter(), &path)
+            .expect("export bindings");
+        let ts = std::fs::read_to_string(&path).unwrap();
+
+        const CALL: &str = "__TAURI_INVOKE";
+        const OPEN: &str = "(\"";
+        let registered: BTreeSet<&str> = ts
+            .match_indices(CALL)
+            .map(|(at, _)| {
+                let rest = &ts[at + CALL.len()..];
+                let rest = &rest[rest.find(OPEN).expect("opening quote") + OPEN.len()..];
+                &rest[..rest.find('"').expect("closing quote")]
+            })
+            .collect();
+        let listed: BTreeSet<&str> = crate::command_names::COMMANDS.iter().copied().collect();
+
+        assert_eq!(
+            registered, listed,
+            "command_names::COMMANDS and collect_commands! in ipc.rs have drifted"
+        );
+    }
+
     /// Regenerates `src/lib/bindings.ts` headlessly (run via `cargo test`).
     /// Keeps the frontend types in lockstep with the Rust commands without
     /// needing to launch the GUI.

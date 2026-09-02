@@ -186,6 +186,13 @@ pub async fn reset_app_data(app: AppHandle, db: tauri::State<'_, AppDb>) -> Resu
 /// to draw. So the command is `async` and the wait moves to a blocking-pool
 /// thread; the plugin itself hops back to the main thread to present the
 /// alert. `false` is a declined dialog; `Err` is the pool thread going away.
+///
+/// The dialog is parented to the main window. Without a parent, `rfd` on
+/// macOS falls back to a detached system alert with a generic icon; with
+/// one it is the NSAlert sheet the old JavaScript `ask()` produced. Both
+/// commands are granted to the main window only, so that is the parent to
+/// look up. The builder is created inside the closure so the raw window
+/// handle it captures never crosses a thread.
 async fn confirm(
     app: &AppHandle,
     title: &'static str,
@@ -194,7 +201,7 @@ async fn confirm(
 ) -> Result<bool, String> {
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        handle
+        let mut dialog = handle
             .dialog()
             .message(prompt)
             .title(title)
@@ -202,8 +209,11 @@ async fn confirm(
             .buttons(MessageDialogButtons::OkCancelCustom(
                 ok_label.into(),
                 "Cancel".into(),
-            ))
-            .blocking_show()
+            ));
+        if let Some(main) = handle.get_webview_window(crate::window_policy::MAIN_LABEL) {
+            dialog = dialog.parent(&main);
+        }
+        dialog.blocking_show()
     })
     .await
     .map_err(|e| e.to_string())
