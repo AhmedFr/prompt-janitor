@@ -90,3 +90,13 @@ live and only ever writes its findings into its own app-data directory.
 This project ships via GitHub milestones (one per phase), one issue per deliverable,
 a branch + PR per issue, and CI gating merges to `main`. See the spec's
 "GitHub ship process" section for conventions.
+
+## License
+
+Copyright (C) 2026 Ahmed ABOUELLEIL.
+
+Prompt Janitor is released under the [GNU Affero General Public License v3.0](LICENSE)
+(`AGPL-3.0-only`). You may use, study, modify and redistribute it under that license;
+if you run a modified version as a network service, you must offer its source to the
+people who use it. Everything in this repository is covered: the app, the vendor
+license tool, the benchmark harness, the landing site and the fulfillment worker.

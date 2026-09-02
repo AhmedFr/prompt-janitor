@@ -1,6 +1,7 @@
 {
   "name": "pj-fulfillment",
   "private": true,
+  "license": "AGPL-3.0-only",
   "version": "0.1.0",
   "description": "Cloudflare Worker: Polar order.paid webhook -> PJ1 license key minting + email delivery.",
   "type": "module",

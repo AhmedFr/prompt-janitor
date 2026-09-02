@@ -15,7 +15,11 @@ export default defineConfig({
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
   },
-  envPrefix: ["VITE_", "TAURI_"],
+  // Only Tauri's own TAURI_ENV_* vars, never the bare TAURI_ prefix: the
+  // release build runs with TAURI_SIGNING_PRIVATE_KEY in its environment and
+  // a bare prefix would put it one `import.meta.env` reference away from the
+  // shipped bundle.
+  envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {
     target: "safari15",
     minify: process.env.TAURI_DEBUG ? false : "esbuild",
