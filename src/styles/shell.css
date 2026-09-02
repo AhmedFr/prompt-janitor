@@ -10,7 +10,12 @@
      automatic minimum size is its min-content height, so the single implicit
      row would otherwise size to the sidebar's full content — measured at 728px
      against a 480px window — and `overflow: hidden` would shear the bottom
-     off rather than let anything scroll. */
+     off rather than let anything scroll.
+
+     This template is load-bearing and assumes exactly one row: the shell is
+     a sidebar beside a content column, both full height. Adding a second row
+     here (a global banner, say) without giving it its own track would put the
+     shell back on implicit auto rows and bring the clipping straight back. */
   grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
@@ -209,6 +214,13 @@
   height: 100%;
 }
 
+/*
+ * The bar is one fixed-height row, so nothing in it may wrap: a second line is
+ * simply cut off by the 52px. `nowrap` is inherited, which is the point — it
+ * covers children this stylesheet never named, such as Overview's
+ * `Last scan · …` span, which otherwise wrapped to two lines (35px in a row
+ * that shows 17) as soon as the string grew.
+ */
 .screen__toolbar {
   height: 52px;
   flex: 0 0 52px;
@@ -217,15 +229,15 @@
   gap: 10px;
   padding: 0 18px;
   border-bottom: 0.5px solid var(--sep);
+  white-space: nowrap;
 }
 
 /*
- * The bar is one fixed-height row, so nothing in it may wrap — the second
- * line would be cut off by the 52px. Text is therefore what gives, and the
- * controls hold their size: a long project name (`acme-platform-api-gateway-
- * service-internal-tooling`) otherwise squeezed the back button from 28px to
- * 22px and a `Auto-fix 7` button from 77px to 53px, spilling its own label
- * past its pill because `.btn` is `white-space: nowrap`.
+ * `nowrap` stops the wrapping but not the shrinking, and it cannot: a control
+ * whose content is an icon has no text to floor its min-content size, so
+ * `.d-back` still collapsed from 28px to 21px next to a long project name
+ * (`acme-platform-api-gateway-service-internal-tooling`) — measured. Text
+ * items are the ones that give; the controls hold their size.
  */
 .screen__toolbar > .btn,
 .screen__toolbar > .seg,

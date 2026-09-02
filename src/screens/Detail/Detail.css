@@ -21,6 +21,17 @@
   .d-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /*
+   * Stacked, the source card comes first in the DOM and a long file is very
+   * tall — a 200-line prompt puts the grade and the issue list about 4800px
+   * below the fold, so the screen would open on the thing being judged rather
+   * than the judgement. The verdict goes first; the source it refers to reads
+   * underneath.
+   */
+  .d-scorecard {
+    order: -1;
+  }
 }
 
 .d-source {
