@@ -21,7 +21,7 @@ const meta = {
   component: HarnessTabBody,
   args: {
     harnesses: detected,
-    extraFolders: ["/Users/ahmed/code/scratch-prompts"],
+    extraFolders: ["/Users/dev/code/scratch-prompts"],
     scanning: false,
     scanProgress: { phase: null, progress: null, reset: () => {} },
     addFolder: noop,

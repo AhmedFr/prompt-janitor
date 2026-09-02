@@ -1,6 +1,7 @@
 {
   "name": "prompt-janitor-landing",
   "private": true,
+  "license": "AGPL-3.0-only",
   "version": "0.2.0",
   "description": "Marketing site for Prompt Janitor (Next.js on Vercel).",
   "scripts": {
