@@ -91,11 +91,16 @@ export function AiTab({ ai, onSave, onTest }: AiTabProps) {
                 className="input"
                 type="password"
                 value={apiKey}
-                placeholder={hasKey ? "•••••••• stored — leave blank to keep" : "Paste your API key"}
+                placeholder={hasKey ? "•••••••• in your Keychain — leave blank to keep" : "Paste your API key"}
                 onChange={(e) => setApiKey(e.target.value)}
-                aria-describedby={provider === "openrouter" ? "ai-openrouter-hint" : undefined}
+                aria-describedby={
+                  provider === "openrouter" ? "ai-key-hint ai-openrouter-hint" : "ai-key-hint"
+                }
               />
             </label>
+            <span id="ai-key-hint" className="faint" style={{ fontSize: 12, marginTop: 4, display: "block" }}>
+              Stored in your macOS Keychain, one entry per provider — never in the app database.
+            </span>
             {provider === "openrouter" && (
               <span
                 id="ai-openrouter-hint"

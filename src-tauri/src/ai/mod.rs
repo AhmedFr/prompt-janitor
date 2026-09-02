@@ -2,7 +2,9 @@
 //! OpenRouter), each registered as an [`provider::LlmProvider`] behind
 //! `provider.rs`; a local SLM (Ollama) can slot in behind [`complete`] later.
 //!
-//! The API key is stored in settings and never returned to the frontend.
+//! The API key lives in the platform secret store (the macOS Keychain, one
+//! entry per provider — see `crate::secrets`) and is never returned to the
+//! frontend; only `provider` and `model` are settings rows.
 
 mod anthropic;
 mod openai;
@@ -10,6 +12,7 @@ mod openrouter;
 pub mod provider;
 
 use crate::query::get_setting;
+use crate::secrets::{ai_key_name, SecretStore};
 
 /// Public view of the AI config (no secret key).
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
@@ -35,15 +38,29 @@ fn default_model(provider: &str) -> String {
         .to_string()
 }
 
-pub(crate) fn load_credentials(conn: &rusqlite::Connection) -> AiCredentials {
+/// The selected provider's credentials. The key is looked up under that
+/// provider's own name, so another provider's key can never be sent by
+/// mistake; a store error reads as "no key" (the caller reports that
+/// as "add a key in Settings"), and is printed so it is not silent.
+pub(crate) fn load_credentials(
+    conn: &rusqlite::Connection,
+    store: &dyn SecretStore,
+) -> AiCredentials {
     let provider = get_setting(conn, "ai_provider")
         .ok()
         .flatten()
         .unwrap_or_else(|| "none".to_string());
-    let key = get_setting(conn, "ai_key")
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    let key = if provider::provider_ids().contains(&provider.as_str()) {
+        store
+            .get(&ai_key_name(&provider))
+            .unwrap_or_else(|e| {
+                eprintln!("{e}");
+                None
+            })
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     let model = get_setting(conn, "ai_model")
         .ok()
         .flatten()
@@ -57,8 +74,8 @@ pub(crate) fn load_credentials(conn: &rusqlite::Connection) -> AiCredentials {
 }
 
 /// The config to show in Settings (no key).
-pub fn config_view(conn: &rusqlite::Connection) -> AiConfig {
-    let creds = load_credentials(conn);
+pub fn config_view(conn: &rusqlite::Connection, store: &dyn SecretStore) -> AiConfig {
+    let creds = load_credentials(conn, store);
     AiConfig {
         provider: creds.provider,
         model: creds.model,

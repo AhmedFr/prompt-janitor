@@ -32,3 +32,28 @@ describe("AiTab provider switch", () => {
     expect(getByLabelText("Model")).toHaveValue("my-custom-model");
   });
 });
+
+describe("AiTab key storage", () => {
+  afterEach(cleanup);
+
+  it("tells the user the key lives in the Keychain, per provider, and not in the database", () => {
+    const ai: AiConfig = { provider: "anthropic", model: DEFAULT_MODELS.anthropic, has_key: true };
+    const { getByLabelText, getByText } = render(
+      <AiTab ai={ai} onSave={async () => {}} onTest={async () => ""} />,
+    );
+    const hint = getByText(/macOS Keychain, one entry per provider/);
+    expect(hint).toHaveTextContent(/never in the app database/);
+    const field = getByLabelText("API key");
+    expect(field).toHaveAttribute("placeholder", expect.stringMatching(/in your Keychain — leave blank to keep/));
+    // The hint is announced with the field, not just placed near it.
+    expect(field.getAttribute("aria-describedby")).toContain(hint.id);
+  });
+
+  it("asks for a key when none is stored for the selected provider", () => {
+    const ai: AiConfig = { provider: "openai", model: DEFAULT_MODELS.openai, has_key: false };
+    const { getByLabelText } = render(
+      <AiTab ai={ai} onSave={async () => {}} onTest={async () => ""} />,
+    );
+    expect(getByLabelText("API key")).toHaveAttribute("placeholder", "Paste your API key");
+  });
+});

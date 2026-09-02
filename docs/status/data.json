@@ -82,6 +82,11 @@
   "actions": {
     "blocking": [
       {
+        "title": "Verify the Keychain move on a real Mac after #164",
+        "detail": "Launch the new build once with an existing AI key configured: Settings → AI should still show the key as stored and 'Test connection' should pass; Keychain Access (login keychain, search 'com.promptjanitor.app') should show an item named ai_key.<provider>; the SQLite settings table should no longer have an ai_key row (`sqlite3 ~/Library/Application\\ Support/com.promptjanitor.app/prompt-janitor.db \"select key from settings\"`). Then switch provider with the key field blank: Test connection must fail with 'No API key configured', not reuse the old key. Reset app data must remove the Keychain items. Expect a one-time macOS 'wants to access' prompt if a debug build reads an item the signed build wrote (or vice versa) — that is the Keychain tying items to code signatures, not a bug.",
+        "kind": "testing"
+      },
+      {
         "title": "Verify the CSP and ACL on a real Mac after #153 (PR #158)",
         "detail": "The webview now runs under a Content-Security-Policy and every app command is gated per window, neither of which can be exercised headless — and neither is exercised by `pnpm dev` either: Tauri only injects the CSP into assets it serves itself, and in dev the page comes straight from Vite, so a green dev run proves nothing. Test a bundled build: `pnpm tauri build --debug` is the fast path (the release bundle works too). In it: project logos render (they are `data:` URIs), the Analytics charts render (Recharts inline styles), Settings -> App -> Check for updates reaches GitHub, and Settings -> App -> Reset / Uninstall raise a native warning sheet attached to the main window whose Cancel reports \"Cancelled. Nothing was changed.\" inline. Then the tray panel: it opens, resizes to its card, Esc hides it, Scan now / Open app / Quit work — it had no capability at all before this PR, so this is the first time its window calls are actually allowed. A CSP violation shows in the webview console (right-click -> Inspect in a debug bundle) as \"Refused to …\".",
         "kind": "testing"
@@ -369,6 +374,12 @@
       "note": "Merged (#158); on-device CSP/ACL check is an owner action"
     },
     {
+      "name": "AI provider key in the macOS Keychain, per provider",
+      "tier": "infra",
+      "status": "pr",
+      "note": "PR #166 for #164 awaiting review; on-device check is an owner action"
+    },
+    {
       "name": "Signed & notarized DMG",
       "tier": "infra",
       "status": "blocked",
@@ -386,11 +397,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1017/1017 passing (85 files)"
+      "result": "1019/1019 passing (85 files)"
     },
     {
       "name": "cargo test",
-      "result": "325/325 passing"
+      "result": "336/336 passing (+1 ignored: real Keychain round trip, run by hand)"
     },
     {
       "name": "clippy -D warnings",
@@ -439,6 +450,7 @@
     }
   ],
   "recent": [
+    "2026-09-02 — #164 AI key moved to the macOS Keychain (audit M-2): one Keychain item per provider under com.promptjanitor.app, the old plaintext `ai_key` settings row is migrated on first launch and the database vacuumed, switching provider no longer carries the previous vendor's key, and reset/uninstall clear the entries. PR #166",
     "2026-09-02 — Phase 10 (pre-public security hardening) merged: #156 SHA-pinned actions + release environment + Dependabot, #157 AGPL-3.0 + scrub, #155 worker product gate, #158 CSP + app ACL + native confirm. Milestone closed 4/4. Deferred to later issues: Keychain key storage (M-2), server-side fix ids (M-1), the remaining Lows. Next: the owner's lock-down → flip-public checklist in Actions",
     "2026-09-02 — #153 security hardening (audit H-1): the webview gets a strict CSP (self-only scripts, no eval, IPC origins only; a dev policy admits the Vite refresh preamble and HMR socket), build.rs registers all 46 app commands in a Tauri ACL manifest so capabilities now govern them per window (main gets 43 — everything but the three panel-only ones — the tray panel gets snapshot/scan/open-main/quit only, reset/uninstall are main-only, a misspelled permission fails the build), and reset/uninstall raise their confirmation natively in Rust so a script in the page cannot skip it; PR #158",
     "2026-09-02 — #154 fulfillment product gate: the worker now mints a Pro key only for the Polar product named by POLAR_PRO_PRODUCT_ID (a missing value fails closed with a 500 so Polar retries); orders for any other product get a 202 and nothing else. Audit finding M-3. PR #155",

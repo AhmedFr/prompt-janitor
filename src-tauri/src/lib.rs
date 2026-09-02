@@ -29,6 +29,7 @@ pub mod rules;
 mod scan;
 pub mod scanner;
 mod scheduler;
+mod secrets;
 mod store;
 pub mod templates;
 mod tray;
@@ -78,6 +79,13 @@ pub fn run() {
             std::fs::create_dir_all(&dir).ok();
             let db_path = dir.join(app_data::DB_FILE_NAME);
             let conn = store::init_db(&db_path).expect("initialize database");
+            // The provider key moved from a settings row to the Keychain; a
+            // failed move keeps the row and is retried next launch.
+            let secrets = secrets::platform_store();
+            if let Err(e) = secrets::migrate_legacy_ai_key(&conn, secrets.as_ref()) {
+                eprintln!("Could not move the AI key into the Keychain: {e}");
+            }
+            app.manage(secrets::Secrets(secrets));
             app.manage(store::AppDb {
                 conn: Mutex::new(conn),
                 path: db_path.to_string_lossy().into_owned(),
