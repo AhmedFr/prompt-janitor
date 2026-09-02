@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
+use crate::secrets::{SecretStore, Secrets};
 use crate::store::{self, AppDb};
 
 /// File name of the SQLite database inside the app-data directory.
@@ -26,9 +27,10 @@ pub const DB_FILE_NAME: &str = "prompt-janitor.db";
 /// happens next — a destructive prompt that does not say the app survives
 /// reads like it might not.
 ///
-/// The licence and AI keys live in the `settings` table, so they go with it.
-/// "Settings" alone does not convey that; a user who discovers it afterwards
-/// learns that this prompt understated what it was asking for.
+/// The licence key lives in the `settings` table and the AI keys in the
+/// Keychain; both go. "Settings" alone does not convey that; a user who
+/// discovers it afterwards learns that this prompt understated what it was
+/// asking for.
 pub const RESET_PROMPT: &str = "Delete the local database, backups and settings? The app keeps \
     running with a fresh database. You'll need to re-enter your licence key and AI settings \
     afterwards.";
@@ -172,11 +174,15 @@ fn bundle_path_from_binary(binary: &Path) -> Option<PathBuf> {
 /// so the page cannot draw over it or answer it.
 #[tauri::command]
 #[specta::specta]
-pub async fn reset_app_data(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+pub async fn reset_app_data(
+    app: AppHandle,
+    db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
+) -> Result<String, String> {
     if !confirm(&app, "Reset app data", RESET_PROMPT, "Reset").await? {
         return Ok(CANCELLED.to_string());
     }
-    reset_app_data_inner(&app, &db)
+    reset_app_data_inner(&app, &db, secrets.0.as_ref())
 }
 
 /// Ask before a destructive action, on a thread that is allowed to block.
@@ -221,7 +227,11 @@ async fn confirm(
 
 /// The reset itself, once confirmed. Kept synchronous and apart from the
 /// dialog so the logic reads — and tests — without a prompt in the way.
-fn reset_app_data_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
+fn reset_app_data_inner(
+    app: &AppHandle,
+    db: &AppDb,
+    secrets: &dyn SecretStore,
+) -> Result<String, String> {
     let db_path = PathBuf::from(&db.path);
 
     let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
@@ -234,12 +244,20 @@ fn reset_app_data_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
     })?;
     drop(conn);
 
+    // The provider keys live in the Keychain, not the database, so a wiped
+    // database alone would leave them behind. Best effort: a locked Keychain
+    // must not turn a successful reset into a failure, but it is said.
+    let keys = match crate::secrets::clear_ai_keys(secrets) {
+        Ok(_) => String::new(),
+        Err(e) => format!(" The Keychain entries could not be removed ({e})."),
+    };
+
     // Every screen refetches on `scan-done`; without it they would keep
     // rendering rows that no longer exist.
     let _ = app.emit("scan-done", ());
 
     Ok(format!(
-        "Deleted {removed} local file{} and started a fresh database.",
+        "Deleted {removed} local file{} and started a fresh database.{keys}",
         if removed == 1 { "" } else { "s" }
     ))
 }
@@ -258,7 +276,11 @@ fn reset_app_data_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
 /// Confirmed natively first, for the same reason as [`reset_app_data`].
 #[tauri::command]
 #[specta::specta]
-pub async fn uninstall_app(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+pub async fn uninstall_app(
+    app: AppHandle,
+    db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
+) -> Result<String, String> {
     if !confirm(
         &app,
         "Uninstall Prompt Janitor",
@@ -269,11 +291,15 @@ pub async fn uninstall_app(app: AppHandle, db: tauri::State<'_, AppDb>) -> Resul
     {
         return Ok(CANCELLED.to_string());
     }
-    uninstall_app_inner(&app, &db)
+    uninstall_app_inner(&app, &db, secrets.0.as_ref())
 }
 
 /// The uninstall itself, once confirmed.
-fn uninstall_app_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
+fn uninstall_app_inner(
+    app: &AppHandle,
+    db: &AppDb,
+    secrets: &dyn SecretStore,
+) -> Result<String, String> {
     // Step 1 — the reversible, non-destructive half.
     #[cfg(target_os = "macos")]
     let quitting = {
@@ -304,8 +330,13 @@ fn uninstall_app_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
 
     // Step 2 — the destructive half, now that the app is on its way out.
     let removed = clear_app_data(app, db)?;
+    // Same as reset: the keys are not in the directory just removed.
+    let keys = match crate::secrets::clear_ai_keys(secrets) {
+        Ok(_) => String::new(),
+        Err(e) => format!(" The Keychain entries could not be removed ({e})."),
+    };
     let data = format!(
-        "Removed {removed} local file{}.",
+        "Removed {removed} local file{}.{keys}",
         if removed == 1 { "" } else { "s" }
     );
 

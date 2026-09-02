@@ -127,6 +127,12 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Resul
     Ok(())
 }
 
+/// Remove a setting; a missing key is not an error.
+pub fn delete_setting(conn: &Connection, key: &str) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM settings WHERE key = ?1", [key])?;
+    Ok(())
+}
+
 /// Folders the user added by hand, on top of what the harnesses report.
 /// Stored as a JSON array of strings; a missing or malformed value reads as
 /// empty. The single source of truth for that decoding — the scan, the

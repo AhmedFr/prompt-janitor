@@ -74,12 +74,17 @@ to serve, and the tab says so rather than reporting an error.
 To remove the app:
 
 - **From inside the app** — Settings → App → *Uninstall Prompt Janitor…* removes the
-  local data and moves the bundle to the Trash. *Reset app data…* next to it wipes the
-  database and backups but keeps the app, running on a fresh, empty database.
-- **By hand** — drag `Prompt Janitor.app` to the Trash and delete its data:
+  local data, the AI provider keys it kept in your Keychain, and moves the bundle to the
+  Trash. *Reset app data…* next to it wipes the database, backups and Keychain entries
+  but keeps the app, running on a fresh, empty database.
+- **By hand** — drag `Prompt Janitor.app` to the Trash, delete its data, and remove its
+  Keychain entries (one per AI provider you configured):
 
   ```sh
   rm -rf ~/Library/Application\ Support/com.promptjanitor.app
+  security delete-generic-password -s com.promptjanitor.app -a ai_key.anthropic
+  security delete-generic-password -s com.promptjanitor.app -a ai_key.openai
+  security delete-generic-password -s com.promptjanitor.app -a ai_key.openrouter
   ```
 
 Neither route touches the prompt files it scanned: Prompt Janitor reads those where they

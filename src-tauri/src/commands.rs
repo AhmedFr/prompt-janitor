@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::query::{self, Overview};
 use crate::scan::ScanSummary;
+use crate::secrets::{SecretStore, Secrets};
 use crate::store::AppDb;
 
 /// A small status payload proving the typed store ↔ frontend round-trip.
@@ -298,6 +299,7 @@ pub fn add_nl_rule(
 #[specta::specta]
 pub async fn evaluate_nl_rules(
     db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
     file_id: String,
 ) -> Result<crate::ai_rules::NlEvalResult, String> {
     let (creds, content, rules) = {
@@ -307,7 +309,11 @@ pub async fn evaluate_nl_rules(
             .ok_or_else(|| "File not found".to_string())?;
         let include_custom = entitlement_of(&conn).paid;
         let rules = query::enabled_nl_rules(&conn, include_custom).map_err(|e| e.to_string())?;
-        (crate::ai::load_credentials(&conn), detail.content, rules)
+        (
+            crate::ai::load_credentials(&conn, secrets.0.as_ref()),
+            detail.content,
+            rules,
+        )
     };
 
     if creds.provider == "none" || creds.key.is_empty() {
@@ -387,28 +393,36 @@ pub fn import_pack(db: tauri::State<'_, AppDb>, path: String) -> Result<u32, Str
 #[specta::specta]
 pub fn set_ai_config(
     db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
     provider: String,
     api_key: String,
     model: String,
 ) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    set_ai_config_with_conn(&conn, &provider, &api_key, &model)
+    set_ai_config_with_conn(&conn, secrets.0.as_ref(), &provider, &api_key, &model)
 }
 
-/// The body of [`set_ai_config`], taking a `&Connection` directly rather than
-/// a Tauri `State` so it can be exercised in tests.
+/// The body of [`set_ai_config`], taking a `&Connection` and a store directly
+/// rather than Tauri `State` so it can be exercised in tests.
+///
+/// The key goes to the secret store under the selected provider's own name
+/// and never to SQLite. A blank key keeps whatever that provider already has;
+/// it does not reach for another provider's key. A key with no provider
+/// selected has nothing to belong to and is dropped.
 fn set_ai_config_with_conn(
     conn: &rusqlite::Connection,
+    store: &dyn SecretStore,
     provider: &str,
     api_key: &str,
     model: &str,
 ) -> Result<(), String> {
-    if provider != "none" && !crate::ai::provider::provider_ids().contains(&provider) {
+    let known = crate::ai::provider::provider_ids().contains(&provider);
+    if provider != "none" && !known {
         return Err(format!("Unknown AI provider: {provider}"));
     }
     query::set_setting(conn, "ai_provider", provider).map_err(|e| e.to_string())?;
-    if !api_key.is_empty() {
-        query::set_setting(conn, "ai_key", api_key).map_err(|e| e.to_string())?;
+    if !api_key.is_empty() && known {
+        store.set(&crate::secrets::ai_key_name(provider), api_key)?;
     }
     query::set_setting(conn, "ai_model", model).map_err(|e| e.to_string())?;
     Ok(())
@@ -417,18 +431,24 @@ fn set_ai_config_with_conn(
 /// The current AI config (without the key).
 #[tauri::command]
 #[specta::specta]
-pub fn get_ai_config(db: tauri::State<'_, AppDb>) -> Result<crate::ai::AiConfig, String> {
+pub fn get_ai_config(
+    db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
+) -> Result<crate::ai::AiConfig, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    Ok(crate::ai::config_view(&conn))
+    Ok(crate::ai::config_view(&conn, secrets.0.as_ref()))
 }
 
 /// Verify the configured provider + key with a tiny request.
 #[tauri::command]
 #[specta::specta]
-pub async fn test_ai_connection(db: tauri::State<'_, AppDb>) -> Result<String, String> {
+pub async fn test_ai_connection(
+    db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
+) -> Result<String, String> {
     let creds = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
-        crate::ai::load_credentials(&conn)
+        crate::ai::load_credentials(&conn, secrets.0.as_ref())
     };
     crate::ai::complete(
         &creds,
@@ -500,6 +520,7 @@ pub fn clear_license(db: tauri::State<'_, AppDb>) -> Result<(), String> {
 #[specta::specta]
 pub async fn suggest_fix(
     db: tauri::State<'_, AppDb>,
+    secrets: tauri::State<'_, Secrets>,
     file_id: String,
     issue_index: u32,
 ) -> Result<crate::ai_fix::FixSuggestion, String> {
@@ -515,7 +536,7 @@ pub async fn suggest_fix(
             .ok_or_else(|| "Issue not found".to_string())?;
         (
             entitlement_of(&conn).paid,
-            crate::ai::load_credentials(&conn),
+            crate::ai::load_credentials(&conn, secrets.0.as_ref()),
             detail.content,
             issue,
         )
@@ -744,6 +765,7 @@ pub fn apply_template(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::secrets::SecretStore;
 
     /// A freshly migrated in-memory DB with no license key set — i.e. a free,
     /// unentitled user.
@@ -798,7 +820,8 @@ mod tests {
     #[test]
     fn set_ai_config_rejects_an_unknown_provider() {
         let conn = free_conn();
-        let result = set_ai_config_with_conn(&conn, "not-a-real-provider", "", "");
+        let store = crate::secrets::MemoryStore::default();
+        let result = set_ai_config_with_conn(&conn, &store, "not-a-real-provider", "", "");
         assert_eq!(
             result.unwrap_err(),
             "Unknown AI provider: not-a-real-provider"
@@ -808,10 +831,105 @@ mod tests {
     #[test]
     fn set_ai_config_allows_none_and_registered_providers() {
         let conn = free_conn();
-        assert!(set_ai_config_with_conn(&conn, "none", "", "").is_ok());
+        let store = crate::secrets::MemoryStore::default();
+        assert!(set_ai_config_with_conn(&conn, &store, "none", "", "").is_ok());
         for id in crate::ai::provider::provider_ids() {
-            assert!(set_ai_config_with_conn(&conn, id, "", "").is_ok());
+            assert!(set_ai_config_with_conn(&conn, &store, id, "", "").is_ok());
         }
+    }
+
+    #[test]
+    fn set_ai_config_keeps_the_key_out_of_sqlite_and_in_the_store_per_provider() {
+        let conn = free_conn();
+        let store = crate::secrets::MemoryStore::default();
+
+        set_ai_config_with_conn(&conn, &store, "anthropic", "sk-ant", "").unwrap();
+
+        assert_eq!(query::get_setting(&conn, "ai_key").unwrap(), None);
+        assert_eq!(
+            store
+                .get(&crate::secrets::ai_key_name("anthropic"))
+                .unwrap()
+                .as_deref(),
+            Some("sk-ant")
+        );
+        let creds = crate::ai::load_credentials(&conn, &store);
+        assert_eq!(creds.provider, "anthropic");
+        assert_eq!(creds.key, "sk-ant");
+        assert!(crate::ai::config_view(&conn, &store).has_key);
+    }
+
+    /// The old single `ai_key` row followed the user across providers: pick
+    /// OpenRouter with the field blank and the Anthropic secret went to
+    /// openrouter.ai as a bearer token. Keys are per provider now.
+    #[test]
+    fn switching_provider_never_reuses_another_providers_key() {
+        let conn = free_conn();
+        let store = crate::secrets::MemoryStore::default();
+        set_ai_config_with_conn(&conn, &store, "anthropic", "sk-ant", "").unwrap();
+
+        set_ai_config_with_conn(&conn, &store, "openrouter", "", "").unwrap();
+
+        let creds = crate::ai::load_credentials(&conn, &store);
+        assert_eq!(creds.provider, "openrouter");
+        assert_eq!(creds.key, "");
+        assert!(!crate::ai::config_view(&conn, &store).has_key);
+        // The Anthropic key is still there for when the user switches back.
+        set_ai_config_with_conn(&conn, &store, "anthropic", "", "").unwrap();
+        assert_eq!(crate::ai::load_credentials(&conn, &store).key, "sk-ant");
+    }
+
+    #[test]
+    fn a_blank_key_keeps_the_selected_providers_stored_key() {
+        let conn = free_conn();
+        let store = crate::secrets::MemoryStore::default();
+        set_ai_config_with_conn(&conn, &store, "openai", "sk-oa", "gpt-x").unwrap();
+
+        set_ai_config_with_conn(&conn, &store, "openai", "", "gpt-y").unwrap();
+
+        let creds = crate::ai::load_credentials(&conn, &store);
+        assert_eq!(creds.key, "sk-oa");
+        assert_eq!(creds.model, "gpt-y");
+    }
+
+    #[test]
+    fn a_store_that_cannot_be_read_reads_as_no_key_rather_than_failing() {
+        struct Locked;
+        impl SecretStore for Locked {
+            fn get(&self, _: &str) -> Result<Option<String>, String> {
+                Err("keychain locked".into())
+            }
+            fn set(&self, _: &str, _: &str) -> Result<(), String> {
+                Ok(())
+            }
+            fn delete(&self, _: &str) -> Result<(), String> {
+                Ok(())
+            }
+            fn persistent(&self) -> bool {
+                true
+            }
+        }
+        let conn = free_conn();
+        set_ai_config_with_conn(&conn, &Locked, "anthropic", "", "").unwrap();
+
+        let view = crate::ai::config_view(&conn, &Locked);
+
+        assert_eq!(view.provider, "anthropic");
+        assert!(!view.has_key);
+        assert_eq!(crate::ai::load_credentials(&conn, &Locked).key, "");
+    }
+
+    #[test]
+    fn a_key_with_no_provider_selected_is_not_stored() {
+        let conn = free_conn();
+        let store = crate::secrets::MemoryStore::default();
+
+        set_ai_config_with_conn(&conn, &store, "none", "sk-orphan", "").unwrap();
+
+        for id in crate::ai::provider::provider_ids() {
+            assert_eq!(store.get(&crate::secrets::ai_key_name(id)).unwrap(), None);
+        }
+        assert_eq!(query::get_setting(&conn, "ai_key").unwrap(), None);
     }
 
     #[test]
