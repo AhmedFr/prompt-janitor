@@ -6,8 +6,12 @@ import type { Env, PolarOrderData, PolarWebhookEvent } from "./types";
 /** Polar retries webhooks for a while; keep the idempotency marker well past that. */
 const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
-/** Only product at launch (see docs/superpowers/specs polar-fulfillment design, §2). */
-const DEFAULT_PLAN = "pro";
+/**
+ * The plan minted for the configured Pro product (the only product at launch;
+ * see docs/superpowers/specs polar-fulfillment design, §2). A second product
+ * needs its own entry here and its own product-id gate — never a fallthrough.
+ */
+const PRO_PLAN = "pro";
 
 function idempotencyKey(webhookId: string): string {
   return `webhook:${webhookId}`;
@@ -76,6 +80,35 @@ export default {
     const webhookId = headers["webhook-id"];
     const key = webhookId ? idempotencyKey(webhookId) : null;
 
+    // Product gate. Polar posts every product's orders to this endpoint, so
+    // "paid" alone is not "bought Pro": a $0 test SKU, the Field Guide sold
+    // on its own, or a 100 % discount code would otherwise mint a perpetual
+    // Pro key. Fail closed when the var is missing — a misconfigured deploy
+    // must not hand out licenses. That branch answers 5xx, like the bad
+    // signing-key branch below: Polar never retries a 2xx, so a 202 here
+    // would make every real purchase during the misconfigured window vanish
+    // silently, whereas a 5xx makes Polar retry, then auto-disable the
+    // endpoint and email the org — loud, and replayable once fixed. No
+    // idempotency marker is written for ignored events; there is nothing to
+    // dedupe.
+    const proProductId = env.POLAR_PRO_PRODUCT_ID?.trim() ?? "";
+    if (!proProductId) {
+      console.error("POLAR_PRO_PRODUCT_ID is not configured; refusing to mint", {
+        webhookId,
+        orderId: event.data?.id,
+      });
+      return new Response("license product not configured; nothing minted", { status: 500 });
+    }
+    const productId = typeof event.data?.product_id === "string" ? event.data.product_id : null;
+    if (productId !== proProductId) {
+      console.error("order.paid is not for the licensed product; ignored", {
+        webhookId,
+        orderId: event.data?.id,
+        productId,
+      });
+      return new Response("ignored: order is not for the licensed product", { status: 202 });
+    }
+
     const email = extractBuyerEmail(event.data);
     if (!email) {
       // No marker is written here on purpose: this event never entered the
@@ -114,7 +147,7 @@ export default {
     try {
       licenseKey = await mintLicenseKey(env.LICENSE_SIGNING_KEY, {
         email,
-        plan: DEFAULT_PLAN,
+        plan: PRO_PLAN,
       });
     } catch (err) {
       // Never log the key material itself — just enough to diagnose a bad

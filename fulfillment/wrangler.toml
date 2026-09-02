@@ -13,6 +13,12 @@ compatibility_date = "2026-07-06"
 binding = "FULFILLMENT_KV"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
+# Plain (non-secret) configuration. The Pro product's id from the Polar
+# dashboard: orders for any other product are acknowledged and ignored, and an
+# empty value fails closed (nothing is ever minted). See README.md "Deploy".
+[vars]
+POLAR_PRO_PRODUCT_ID = ""
+
 # Secrets (never committed — set with `wrangler secret put <NAME>`):
 #   POLAR_WEBHOOK_SECRET   Standard Webhooks secret from the Polar webhook endpoint config
 #   LICENSE_SIGNING_KEY    base64url(32-byte Ed25519 seed) — same format the vendor

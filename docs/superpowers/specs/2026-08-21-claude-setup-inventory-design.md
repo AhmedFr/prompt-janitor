@@ -62,7 +62,7 @@ defined by each detected harness. For Claude Code:
 
 A manual "extra folder" remains available in Settings as an escape hatch.
 
-Slug decoding: `-Users-ahmedabouelleil-code-02-personal-aprocy` → `/Users/ahmedabouelleil/code/02-personal/aprocy`.
+Slug decoding: `-Users-dev-code-aprocy` → `/Users/dev/code/aprocy`.
 Slugs are lossy — `-` may be a path separator, a literal dash, or a `.` (both
 `/` and `.` are encoded as `-`, so `~/.claude/worktrees/wt` becomes
 `--claude-worktrees-wt`). The slug directory is the project's identity, but

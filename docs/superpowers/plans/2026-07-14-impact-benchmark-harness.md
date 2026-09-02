@@ -164,7 +164,7 @@ Run once against any tiny repo so the parser is written against reality, not a g
 ```bash
 cd /tmp && mkdir -p cc-sample && cd cc-sample && git init -q
 claude -p "print hello to a file named hi.txt" --output-format stream-json --verbose \
-  > /Users/ahmedabouelleil/code/02-personal/prompt-janitor/benchmark/testdata/claude_stream_sample.jsonl
+  > /Users/dev/code/prompt-janitor/benchmark/testdata/claude_stream_sample.jsonl
 ```
 
 Open the file. Each line is a JSON object. Confirm the field paths used below match your Claude Code version: assistant tool calls appear as `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"..."}]}}`; the final line is `{"type":"result","num_turns":N,"duration_ms":M,"usage":{"input_tokens":..,"output_tokens":..}}`. If a path differs, adjust the field access in Step 3 — the sample test in Step 2 is what guards it.

@@ -2,6 +2,7 @@
 name = "benchmark"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-only"
 description = "Offline prompt-impact benchmark harness (not shipped in the app)."
 
 [dependencies]
