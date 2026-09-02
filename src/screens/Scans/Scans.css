@@ -5,9 +5,12 @@
   letter-spacing: -0.01em;
 }
 
+/* Three fixed columns put these at 137px in a 720px window — 105px inside the
+   padding, which a 30px `tokens saved` figure of five or six digits overruns.
+   Sized off the track they drop to two and stay legible. */
 .s-tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin-top: 18px;
 }

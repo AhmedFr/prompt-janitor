@@ -87,6 +87,11 @@
         "kind": "testing"
       },
       {
+        "title": "Confirm the window drags and the layouts hold on a real Mac (#165)",
+        "detail": "The three fixes for the owner's v0.1.1 report are verified by browser measurement and by tests over the capability files, but none of them can be exercised headless. In a bundled build (`pnpm tauri build --debug`): drag the window by the empty part of any screen's toolbar and by the strip above the sidebar's logo — that was permission-denied before, so it is the one thing that either works or does not. Then resize down to the 720x480 minimum: the sidebar's recents list should scroll with its footer still pinned and visible, the Detail screen should stack its scorecard under the source instead of squeezing the code to a 61px column, and no screen should scroll sideways. Check a project with a long name — the toolbar's buttons should keep their shape and the name should ellipsize.",
+        "kind": "testing"
+      },
+      {
         "title": "Set POLAR_PRO_PRODUCT_ID before deploying the fulfillment worker",
         "detail": "After #154 the worker refuses to mint unless wrangler.toml's [vars] POLAR_PRO_PRODUCT_ID equals the Pro product's id from the Polar dashboard (the value must live in the file — `wrangler deploy` overwrites dashboard vars — and sandbox and production orgs have different ids). Create the Pro product, paste its id, then `pnpm deploy` from fulfillment/. Verify in sandbox: an order for Pro mints and emails; an order for any other product produces a 202 and a 'not for the licensed product' log line; an empty value answers 500 and mints nothing."
       },
@@ -386,11 +391,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1017/1017 passing (85 files)"
+      "result": "1031/1031 passing (86 files)"
     },
     {
       "name": "cargo test",
-      "result": "325/325 passing"
+      "result": "331/331 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -439,6 +444,8 @@
     }
   ],
   "recent": [
+    "2026-09-02 — Real app icon: the flat blue placeholder replaced by a generated rounded-square gradient carrying the logo line-art (scripts/make_app_icon.py + pnpm tauri icon) (#165)",
+    "2026-09-02 — #165 on-device basics (items 2–4): the window can be dragged again — `core:window:default` is read-only and grants no `start-dragging`, so every `data-tauri-drag-region` had been denied silently since #143; a new `tests/capabilities.rs` pins that, the panel's hide/set-size, and that the panel still holds no updater/process/dialog/opener permission. The sidebar survives short windows: `.app-window`'s implicit grid row sized to content, so at the 480px minimum the sidebar laid out 728px tall and pushed the footer off-screen instead of scrolling its nav — the row is now capped and the nav is the part that gives. And layouts adapt: the Detail source column was 61px wide in a 720px window beside its fixed 340px rail, the Analytics tiles were *narrower* at a 900px window than at 720 because their breakpoint measured the viewport rather than the 232px-narrower content column, and long project names squeezed toolbar buttons out of shape. Measured before and after in a browser at 720/900/1200/2560. Branch fix/151-app-basics",
     "2026-09-02 — Phase 10 (pre-public security hardening) merged: #156 SHA-pinned actions + release environment + Dependabot, #157 AGPL-3.0 + scrub, #155 worker product gate, #158 CSP + app ACL + native confirm. Milestone closed 4/4. Deferred to later issues: Keychain key storage (M-2), server-side fix ids (M-1), the remaining Lows. Next: the owner's lock-down → flip-public checklist in Actions",
     "2026-09-02 — #153 security hardening (audit H-1): the webview gets a strict CSP (self-only scripts, no eval, IPC origins only; a dev policy admits the Vite refresh preamble and HMR socket), build.rs registers all 46 app commands in a Tauri ACL manifest so capabilities now govern them per window (main gets 43 — everything but the three panel-only ones — the tray panel gets snapshot/scan/open-main/quit only, reset/uninstall are main-only, a misspelled permission fails the build), and reset/uninstall raise their confirmation natively in Rust so a script in the page cannot skip it; PR #158",
     "2026-09-02 — #154 fulfillment product gate: the worker now mints a Pro key only for the Polar product named by POLAR_PRO_PRODUCT_ID (a missing value fails closed with a 500 so Polar retries); orders for any other product get a 202 and nothing else. Audit finding M-3. PR #155",
