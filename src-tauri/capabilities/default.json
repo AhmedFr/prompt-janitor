@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window: every screen, the updater, and the danger zone. The four panel-only commands are not granted here; the two destructive commands are granted here only.",
+  "description": "The main window: every screen, the updater, and the danger zone. The four panel-only commands are not granted here; the two destructive commands are granted here only. `core:window:default` is read-only and grants no `start-dragging`, so that one is added explicitly — without it every `data-tauri-drag-region` mousedown is denied and the window cannot be moved.",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
     "dialog:default",
     "notification:default",
     "opener:default",
