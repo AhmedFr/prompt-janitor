@@ -129,10 +129,10 @@ export class MemoryKV {
   }
 }
 
-/** A well-formed Polar `order.paid` payload fixture, deep-overridable. */
 /** The product id `makeEnv` configures as the Pro product. */
 export const TEST_PRO_PRODUCT_ID = "prod_test_pro";
 
+/** A well-formed Polar `order.paid` payload fixture, deep-overridable. */
 export function orderPaidEvent(overrides: {
   email?: string | null;
   type?: string;

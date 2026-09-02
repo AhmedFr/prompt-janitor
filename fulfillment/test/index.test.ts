@@ -104,45 +104,73 @@ describe("worker fetch handler", () => {
   it("202s without minting or emailing when the order is for a different product", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const kv = new MemoryKV();
 
     const request = signedRequest(orderPaidEvent({ productId: "prod_field_guide" }), { id: "msg_other_product" });
     const response = await worker.fetch(request, makeEnv(kv));
 
     expect(response.status).toBe(202);
-    expect(await response.text()).toMatch(/product/);
+    expect(await response.text()).toMatch(/not for the licensed product/);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(kv.has("webhook:msg_other_product")).toBe(false);
+    // The log line is the only trace of a wrong-product order; it must name
+    // the delivery and the product so the owner can find it in the dashboard.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ webhookId: "msg_other_product", productId: "prod_field_guide" }),
+    );
+    errorSpy.mockRestore();
   });
 
   it("202s without minting when the order carries no product_id at all", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const kv = new MemoryKV();
 
     const request = signedRequest(orderPaidEvent({ productId: null }), { id: "msg_no_product" });
     const response = await worker.fetch(request, makeEnv(kv));
 
     expect(response.status).toBe(202);
+    expect(await response.text()).toMatch(/not for the licensed product/);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(kv.has("webhook:msg_no_product")).toBe(false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ webhookId: "msg_no_product", productId: null }),
+    );
+    errorSpy.mockRestore();
   });
 
-  it("fails closed and mints nothing when POLAR_PRO_PRODUCT_ID is not configured", async () => {
+  /**
+   * A deploy with the placeholder still in wrangler.toml must not mint — and
+   * must not answer 2xx either, or Polar would consider every real purchase
+   * delivered and never retry. 5xx makes Polar retry and then disable the
+   * endpoint loudly, and the orders stay replayable once the var is set.
+   */
+  it.each([
+    ["unset", undefined],
+    ["empty", ""],
+    ["blank", "   "],
+  ])("fails closed with a 5xx and mints nothing when POLAR_PRO_PRODUCT_ID is %s", async (_label, value) => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const kv = new MemoryKV();
-    const env: Env = { ...makeEnv(kv), POLAR_PRO_PRODUCT_ID: "" };
+    const env: Env = { ...makeEnv(kv), POLAR_PRO_PRODUCT_ID: value };
 
     const request = signedRequest(orderPaidEvent(), { id: "msg_unconfigured" });
     const response = await worker.fetch(request, env);
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(500);
     expect(await response.text()).toMatch(/not configured/);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(kv.has("webhook:msg_unconfigured")).toBe(false);
-    expect(errorSpy).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/not configured/),
+      expect.objectContaining({ webhookId: "msg_unconfigured" }),
+    );
     errorSpy.mockRestore();
   });
 

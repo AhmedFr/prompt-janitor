@@ -120,8 +120,16 @@ and you must be logged in (`pnpm exec wrangler login`).
    the gate between "someone paid for something" and "someone bought Pro":
    every product in the org posts to the same webhook, and orders for any
    other product (a $0 test SKU, the Field Guide alone, a 100 % discount) are
-   acknowledged with a 202 and never minted. Leaving it empty fails closed —
-   the worker logs an error and mints nothing.
+   acknowledged with a 202 and never minted. Leaving it empty fails closed:
+   the worker logs an error, mints nothing, and answers 500 so Polar retries
+   and eventually disables the endpoint loudly instead of treating real
+   purchases as delivered — the orders stay replayable once the id is set.
+   Two things about the value: it is not a secret, and it *must* live in
+   the file, because `wrangler deploy` overwrites any `[vars]` value set in
+   the Cloudflare dashboard with what the file says. Polar's sandbox and
+   production orgs have different product ids, so run step 7 with the
+   sandbox id, then switch to the production id before the real deploy (or
+   add an `[env.sandbox.vars]` block).
 
 5. **Deploy:**
    ```

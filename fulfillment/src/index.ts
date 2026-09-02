@@ -84,15 +84,20 @@ export default {
     // "paid" alone is not "bought Pro": a $0 test SKU, the Field Guide sold
     // on its own, or a 100 % discount code would otherwise mint a perpetual
     // Pro key. Fail closed when the var is missing — a misconfigured deploy
-    // must not hand out licenses. No idempotency marker is written for
-    // ignored events; there is nothing to dedupe.
+    // must not hand out licenses. That branch answers 5xx, like the bad
+    // signing-key branch below: Polar never retries a 2xx, so a 202 here
+    // would make every real purchase during the misconfigured window vanish
+    // silently, whereas a 5xx makes Polar retry, then auto-disable the
+    // endpoint and email the org — loud, and replayable once fixed. No
+    // idempotency marker is written for ignored events; there is nothing to
+    // dedupe.
     const proProductId = env.POLAR_PRO_PRODUCT_ID?.trim() ?? "";
     if (!proProductId) {
       console.error("POLAR_PRO_PRODUCT_ID is not configured; refusing to mint", {
         webhookId,
         orderId: event.data?.id,
       });
-      return new Response("license product not configured; nothing minted", { status: 202 });
+      return new Response("license product not configured; nothing minted", { status: 500 });
     }
     const productId = typeof event.data?.product_id === "string" ? event.data.product_id : null;
     if (productId !== proProductId) {
