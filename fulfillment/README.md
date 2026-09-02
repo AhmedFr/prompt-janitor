@@ -9,6 +9,7 @@ Prompt Janitor Pro license key. Implements the design in
 Polar order.paid webhook (Standard Webhooks, HMAC-signed)
   -> verify signature (401 if bad)
   -> only process type === "order.paid" (202 everything else)
+  -> only process the configured Pro product (POLAR_PRO_PRODUCT_ID; 202 everything else)
   -> idempotency check on webhook-id (KV, 30 day TTL)
   -> mint PJ1.<payload>.<sig> Ed25519 license key (parity with the vendor CLI)
   -> email the key via Resend
@@ -114,21 +115,31 @@ and you must be logged in (`pnpm exec wrangler login`).
    - `RESEND_API_KEY` — a Resend API key allowed to send from the
      `FROM_ADDRESS` domain configured in `src/email.ts`.
 
-4. **Deploy:**
+4. **Set the Pro product id** in `wrangler.toml`'s `[vars]` block:
+   `POLAR_PRO_PRODUCT_ID = "<product id from the Polar dashboard>"`. This is
+   the gate between "someone paid for something" and "someone bought Pro":
+   every product in the org posts to the same webhook, and orders for any
+   other product (a $0 test SKU, the Field Guide alone, a 100 % discount) are
+   acknowledged with a 202 and never minted. Leaving it empty fails closed —
+   the worker logs an error and mints nothing.
+
+5. **Deploy:**
    ```
    pnpm deploy
    ```
    Note the worker URL Wrangler prints (`https://pj-fulfillment.<subdomain>.workers.dev`
    or your custom route/domain).
 
-5. **Register the Polar webhook:** in the Polar dashboard, add a webhook
+6. **Register the Polar webhook:** in the Polar dashboard, add a webhook
    endpoint pointing at the worker URL, subscribed to `order.paid` (you can
    subscribe to more events; everything except `order.paid` gets a 202 and
    is otherwise ignored). Polar shows the signing secret once here — that's
    the value for `POLAR_WEBHOOK_SECRET` in step 3.
 
-6. **Sandbox test:** use Polar's sandbox/test mode (or a $0/test product) to
-   fire a real `order.paid` webhook at the deployed worker. Confirm:
+7. **Sandbox test:** use Polar's sandbox/test mode to fire a real `order.paid`
+   webhook at the deployed worker. A sandbox order for the configured Pro
+   product mints; an order for any other product must produce a 202 and a
+   "not for the licensed product" log line and nothing else. Confirm:
    - the worker responds 202 within Polar's ~10s timeout,
    - the buyer's inbox gets the license-key email,
    - the key pastes into the app's Settings → License and verifies (this
@@ -136,7 +147,7 @@ and you must be logged in (`pnpm exec wrangler login`).
      `PUBKEY` in a build, per step 3's note).
    Then check `wrangler tail` / the Cloudflare dashboard logs for errors.
 
-7. **Failure behavior:** Polar retries a failing webhook endpoint and
+8. **Failure behavior:** Polar retries a failing webhook endpoint and
    auto-disables it after repeated consecutive failures (see Polar's docs
    for the current threshold), emailing the org. The dashboard can replay
    missed deliveries once the endpoint is fixed. Nothing on our side needs

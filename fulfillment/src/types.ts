@@ -7,6 +7,12 @@ export interface Env {
   LICENSE_SIGNING_KEY: string;
   /** Resend API key. */
   RESEND_API_KEY: string;
+  /**
+   * Polar product id of the Pro license (a plain `[vars]` entry in wrangler.toml).
+   * Every product in the org posts to the same webhook; only an order for this
+   * product mints a key. Empty or unset fails closed — nothing is minted.
+   */
+  POLAR_PRO_PRODUCT_ID: string;
 }
 
 /**

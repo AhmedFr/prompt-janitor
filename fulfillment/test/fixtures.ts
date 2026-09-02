@@ -130,16 +130,21 @@ export class MemoryKV {
 }
 
 /** A well-formed Polar `order.paid` payload fixture, deep-overridable. */
+/** The product id `makeEnv` configures as the Pro product. */
+export const TEST_PRO_PRODUCT_ID = "prod_test_pro";
+
 export function orderPaidEvent(overrides: {
   email?: string | null;
   type?: string;
   orderId?: string;
+  /** `null` omits the field entirely, as an unexpected payload shape would. */
+  productId?: string | null;
 } = {}): unknown {
   return {
     type: overrides.type ?? "order.paid",
     data: {
       id: overrides.orderId ?? "order_test_1",
-      product_id: "prod_test_pro",
+      ...(overrides.productId === null ? {} : { product_id: overrides.productId ?? TEST_PRO_PRODUCT_ID }),
       customer:
         overrides.email === null
           ? null

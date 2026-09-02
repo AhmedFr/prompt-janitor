@@ -1,6 +1,6 @@
 {
   "version": "0.1.1",
-  "updated": "2026-09-01",
+  "updated": "2026-09-02",
   "readiness": {
     "percent": 83,
     "label": "Code complete — blocked on human actions to ship v1"
@@ -81,6 +81,10 @@
   ],
   "actions": {
     "blocking": [
+      {
+        "title": "Set POLAR_PRO_PRODUCT_ID before deploying the fulfillment worker",
+        "detail": "After #154 the worker refuses to mint unless wrangler.toml's [vars] POLAR_PRO_PRODUCT_ID equals the Pro product's id from the Polar dashboard. Create the Pro product, paste its id, then `pnpm deploy` from fulfillment/. Verify in sandbox: an order for Pro mints and emails; an order for any other product produces a 202 and a 'not for the licensed product' log line."
+      },
       {
         "title": "Re-verify the menu-bar panel on a real Mac after the #145 fixes",
         "detail": "The first on-device pass found four visual defects (#145), all fixed: the tray icon is now a black-and-alpha template image, the score ring's type scales with its diameter, the popover window resizes to the height of its card, and the fix rows carry one grade badge instead of a glyph-plus-chip pair. Re-check on-device: the menu-bar icon is a legible glyph that tints for the light and dark bar and inverts when clicked; the panel window hugs its content with no dead gap in any state (no-scan, nothing-to-fix, three fixes, scanning, failure) and scrolls rather than overflowing when tall; the 56 px ring's letter sits inside its stroke and the score reads on the header's meta line. Then the original checklist: left-click opens under the icon, second click closes, outside click closes, far-left/right clamps inside the screen, multi-monitor with mixed scale factors opens on the right display, transparent corners, Esc hides, reopening refetches, a fix row / chip / Open app raises the main window, Scan now shows the bar and refreshes at the end, Quit exits. Checklist: .superpowers/sdd/2026-08-23-menu-bar-panel/task-2-report.md"
@@ -420,6 +424,7 @@
     }
   ],
   "recent": [
+    "2026-09-02 — #154 fulfillment product gate: the worker now mints a Pro key only for the Polar product named by POLAR_PRO_PRODUCT_ID (fails closed when unset); orders for any other product get a 202 and nothing else. Audit finding M-3. PR #155",
     "2026-09-01 — v0.1.1 released (run 3 green): universal DMG, signed updater artifacts, latest.json; draft published and the universal build installed on the owner Mac. In-app updates live end-to-end from the next tag — but the update endpoint 404s on other machines while the repo is private",
     "2026-09-01 — Release run 2 failed at codesign: empty Apple secrets were exported as empty env vars, which the bundler reads as \"signing requested\"; the workflow now exports Apple env only when the secrets are non-empty",
     "2026-09-01 — v0.1.1 release run failed bundling the vendor license-tool binary (universal builds only lipo the app binary); the tool moved to its own workspace crate (`cargo run -p license-tool`), bundle verified locally",

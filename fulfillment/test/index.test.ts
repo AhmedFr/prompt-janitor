@@ -2,7 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import type { Env } from "../src/types";
 import { publicKeyFromSeed, verifyLicenseKey } from "./fixtures";
-import { MemoryKV, TEST_SIGNING_SEED, TEST_SIGNING_SEED_B64URL, TEST_WEBHOOK_SECRET, orderPaidEvent, signWebhookBody } from "./fixtures";
+import {
+  MemoryKV,
+  TEST_PRO_PRODUCT_ID,
+  TEST_SIGNING_SEED,
+  TEST_SIGNING_SEED_B64URL,
+  TEST_WEBHOOK_SECRET,
+  orderPaidEvent,
+  signWebhookBody,
+} from "./fixtures";
 
 function makeEnv(kv = new MemoryKV()): Env {
   return {
@@ -10,6 +18,7 @@ function makeEnv(kv = new MemoryKV()): Env {
     POLAR_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
     LICENSE_SIGNING_KEY: TEST_SIGNING_SEED_B64URL,
     RESEND_API_KEY: "re_test_key",
+    POLAR_PRO_PRODUCT_ID: TEST_PRO_PRODUCT_ID,
   };
 }
 
@@ -85,6 +94,56 @@ describe("worker fetch handler", () => {
 
     // Idempotency was recorded.
     expect(kv.has("webhook:msg_order_42")).toBe(true);
+  });
+
+  /**
+   * Every product in the Polar org posts to the same webhook. Only the one
+   * configured as Pro may mint a key — a $0 test SKU, the Field Guide sold
+   * alone, or a future free tier must never produce a perpetual Pro license.
+   */
+  it("202s without minting or emailing when the order is for a different product", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const kv = new MemoryKV();
+
+    const request = signedRequest(orderPaidEvent({ productId: "prod_field_guide" }), { id: "msg_other_product" });
+    const response = await worker.fetch(request, makeEnv(kv));
+
+    expect(response.status).toBe(202);
+    expect(await response.text()).toMatch(/product/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(kv.has("webhook:msg_other_product")).toBe(false);
+  });
+
+  it("202s without minting when the order carries no product_id at all", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const kv = new MemoryKV();
+
+    const request = signedRequest(orderPaidEvent({ productId: null }), { id: "msg_no_product" });
+    const response = await worker.fetch(request, makeEnv(kv));
+
+    expect(response.status).toBe(202);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(kv.has("webhook:msg_no_product")).toBe(false);
+  });
+
+  it("fails closed and mints nothing when POLAR_PRO_PRODUCT_ID is not configured", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const kv = new MemoryKV();
+    const env: Env = { ...makeEnv(kv), POLAR_PRO_PRODUCT_ID: "" };
+
+    const request = signedRequest(orderPaidEvent(), { id: "msg_unconfigured" });
+    const response = await worker.fetch(request, env);
+
+    expect(response.status).toBe(202);
+    expect(await response.text()).toMatch(/not configured/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(kv.has("webhook:msg_unconfigured")).toBe(false);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it("does not re-process (or re-email) an already-seen webhook-id", async () => {
