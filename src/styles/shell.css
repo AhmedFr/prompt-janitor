@@ -219,6 +219,29 @@
   border-bottom: 0.5px solid var(--sep);
 }
 
+/*
+ * The bar is one fixed-height row, so nothing in it may wrap — the second
+ * line would be cut off by the 52px. Text is therefore what gives, and the
+ * controls hold their size: a long project name (`acme-platform-api-gateway-
+ * service-internal-tooling`) otherwise squeezed the back button from 28px to
+ * 22px and a `Auto-fix 7` button from 77px to 53px, spilling its own label
+ * past its pill because `.btn` is `white-space: nowrap`.
+ */
+.screen__toolbar > .btn,
+.screen__toolbar > .seg,
+.screen__toolbar > .d-back {
+  flex: 0 0 auto;
+}
+
+/* The two variable-length strings in the bar; they ellipsize instead. */
+.screen__title,
+.screen__toolbar > .path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .screen__title {
   margin: 0;
   font-family: var(--font-display);

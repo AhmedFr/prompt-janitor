@@ -4,9 +4,11 @@
   gap: 16px;
 }
 
+/* Sized off the track, not a viewport breakpoint — the grid sits in a column
+   232px narrower than the window. See `.an-tiles` in `Analytics.css`. */
 .usage-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -46,10 +48,4 @@
   gap: 2px;
   line-height: 1.5;
   overflow-wrap: anywhere;
-}
-
-@media (max-width: 860px) {
-  .usage-row {
-    grid-template-columns: 1fr;
-  }
 }

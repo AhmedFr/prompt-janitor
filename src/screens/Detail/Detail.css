@@ -1,8 +1,26 @@
+/*
+ * The scorecard is a fixed 340px rail, so the source column is whatever is
+ * left — and in a 720px window that was 61px: the file this screen exists to
+ * show, four characters wide. `minmax(0, 1fr)` keeps a long unbroken line
+ * from blowing the track out; the stack below keeps the column readable.
+ *
+ * The breakpoint is on the window because that is the box a media query can
+ * see, but the number is derived from the content column: the sidebar takes
+ * 232px and `.page-wide` another 52px of padding, so a 1000px window leaves
+ * ~716px here — 340px of rail, 20px of gap and ~356px of source, which is
+ * about the least this is worth reading in. Narrower than that, stack.
+ */
 .d-grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 20px;
   align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .d-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .d-source {

@@ -1,6 +1,14 @@
+/*
+ * `auto-fit` rather than a fixed count with a viewport breakpoint. The grid
+ * sits in a column 232px narrower than the window, so a `max-width: 860px`
+ * media query measured the wrong box: at a 900px window it did not fire and
+ * the four tiles were laid out at 145px each — *narrower* than the 205px they
+ * got at a 720px window, where it did. Sizing off the track instead means the
+ * count only ever falls as the space does: 4 wide, 3 mid, 2 at the minimum.
+ */
 .an-tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 
@@ -46,9 +54,11 @@
   height: 200px;
 }
 
+/* 280px is the narrowest a `.an-chart` stays readable at; below two of them
+   the row drops to one column on its own. */
 .an-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   margin-top: 18px;
   align-items: start;
@@ -84,14 +94,4 @@
   height: 100%;
   border-radius: 200px;
   background: var(--blue);
-}
-
-@media (max-width: 860px) {
-  .an-tiles {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .an-row {
-    grid-template-columns: 1fr;
-  }
 }
