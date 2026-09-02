@@ -74,6 +74,11 @@ export const ResetDone: Story = {
   args: { dangerResult: { ok: true, message: "Deleted 3 local files and started a fresh database." } },
 };
 
+/** The native dialog was declined: an `ok` reply that says nothing changed. */
+export const DangerCancelled: Story = {
+  args: { dangerResult: { ok: true, message: "Cancelled. Nothing was changed." } },
+};
+
 /** A destructive action that failed says so where it was triggered. */
 export const DangerFailed: Story = {
   args: { dangerResult: { ok: false, message: "database is locked" } },

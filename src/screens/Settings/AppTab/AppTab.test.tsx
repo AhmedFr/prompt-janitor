@@ -2,14 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, act, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { AppTab, AppTabBody } from "./AppTab";
-import {
-  NO_RELEASES,
-  RESET_CONFIRM,
-  UNINSTALL_ARM_MS,
-  UNINSTALL_CONFIRM,
-  UNREACHABLE,
-  UP_TO_DATE,
-} from "./AppTab.constants";
+import { NO_RELEASES, UNINSTALL_ARM_MS, UNREACHABLE, UP_TO_DATE } from "./AppTab.constants";
 
 const getVersion = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/app", () => ({ getVersion }));
@@ -19,9 +12,6 @@ vi.mock("@tauri-apps/plugin-updater", () => ({ check }));
 
 const relaunch = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-process", () => ({ relaunch }));
-
-const ask = vi.hoisted(() => vi.fn());
-vi.mock("@tauri-apps/plugin-dialog", () => ({ ask }));
 
 const resetAppData = vi.hoisted(() => vi.fn());
 const uninstallApp = vi.hoisted(() => vi.fn());
@@ -39,6 +29,9 @@ vi.mock("@/lib/ipc", async () => {
 
 const noop = async () => {};
 
+/** What the command answers when its native dialog is declined. */
+const CANCELLED = "Cancelled. Nothing was changed.";
+
 /** The half of the body's props this suite is not exercising. */
 const quiet = {
   danger: "" as const,
@@ -53,7 +46,6 @@ beforeEach(() => {
   getVersion.mockReset().mockResolvedValue("0.1.0");
   check.mockReset();
   relaunch.mockReset().mockResolvedValue(undefined);
-  ask.mockReset();
   resetAppData.mockReset().mockResolvedValue({ status: "ok", data: "Deleted 2 local files." });
   uninstallApp.mockReset().mockResolvedValue({ status: "ok", data: "Removed 2 local files." });
 });
@@ -229,61 +221,52 @@ describe("AppTab", () => {
     expect(downloadAndInstall).toHaveBeenCalledTimes(1);
   });
 
-  it("does nothing when the reset confirmation is declined", async () => {
+  /**
+   * The confirmation is the command's own first step, in Rust, so a script in
+   * the page cannot skip it by invoking the command directly. The click
+   * therefore goes straight to the command; the dialog is its business.
+   */
+  it("hands a reset straight to the command, which owns the confirmation", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(false);
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
-    expect(resetAppData).not.toHaveBeenCalled();
+    await waitFor(() => expect(resetAppData).toHaveBeenCalledTimes(1));
   });
 
-  it("spells out what a reset deletes and what survives it", async () => {
+  it("resets and reports what went", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(false);
-    render(<AppTab />);
-    fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
-    await waitFor(() => expect(ask).toHaveBeenCalledWith(RESET_CONFIRM, expect.anything()));
-  });
-
-  it("resets and reports what went once confirmed", async () => {
-    check.mockResolvedValue(null);
-    ask.mockResolvedValue(true);
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
     expect(await screen.findByText("Deleted 2 local files.")).toBeInTheDocument();
     expect(resetAppData).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a declined reset inline as a calm status, not an error", async () => {
+    check.mockResolvedValue(null);
+    resetAppData.mockResolvedValue({ status: "ok", data: CANCELLED });
+    render(<AppTab />);
+    fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
+    expect(await screen.findByRole("status")).toHaveTextContent(CANCELLED);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows a failed reset inline rather than swallowing it", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(true);
     resetAppData.mockResolvedValue({ status: "error", error: "database is locked" });
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("database is locked");
   });
 
-  it("says a reset costs the licence key and AI settings too", async () => {
-    check.mockResolvedValue(null);
-    ask.mockResolvedValue(false);
-    render(<AppTab />);
-    fireEvent.click(screen.getByRole("button", { name: /Reset app data…/ }));
-    await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
-    expect(ask.mock.calls[0][0]).toMatch(/re-enter your licence key and AI settings/);
-  });
-
   /**
-   * The OS alert's confirm button is the macOS default, so Return answers it.
-   * A single press must not be able to reach that alert at all.
+   * The native alert's confirm button is the macOS default, so Return answers
+   * it. A single press must not be able to reach that alert at all.
    */
   it("arms rather than uninstalling on the first press", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(true);
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ }));
     expect(await screen.findByRole("button", { name: /Confirm uninstall/ })).toBeInTheDocument();
-    expect(ask).not.toHaveBeenCalled();
     expect(uninstallApp).not.toHaveBeenCalled();
   });
 
@@ -304,33 +287,26 @@ describe("AppTab", () => {
     }
   });
 
-  it("does nothing when the uninstall confirmation is declined", async () => {
+  it("hands the uninstall to the command on the second press", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(false);
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Confirm uninstall/ }));
-    await waitFor(() => expect(ask).toHaveBeenCalledWith(UNINSTALL_CONFIRM, expect.anything()));
-    expect(uninstallApp).not.toHaveBeenCalled();
+    await waitFor(() => expect(uninstallApp).toHaveBeenCalledTimes(1));
   });
 
-  it("raises the OS dialog as a warning, not a plain question", async () => {
+  it("shows a declined uninstall inline and leaves the button disarmed", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(false);
+    uninstallApp.mockResolvedValue({ status: "ok", data: CANCELLED });
     render(<AppTab />);
     fireEvent.click(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Confirm uninstall/ }));
-    await waitFor(() =>
-      expect(ask).toHaveBeenCalledWith(
-        UNINSTALL_CONFIRM,
-        expect.objectContaining({ kind: "warning" }),
-      ),
-    );
+    expect(await screen.findByRole("status")).toHaveTextContent(CANCELLED);
+    expect(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ })).toBeInTheDocument();
   });
 
-  it("uninstalls on the second press once confirmed, and reports what happened", async () => {
+  it("uninstalls on the second press, and reports what happened", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(true);
     uninstallApp.mockResolvedValue({
       status: "ok",
       data: "Removed 2 local files. This is a development build, so there is no app bundle to move to the Trash.",
@@ -344,7 +320,6 @@ describe("AppTab", () => {
 
   it("surfaces a refused trash step, which leaves the data untouched", async () => {
     check.mockResolvedValue(null);
-    ask.mockResolvedValue(true);
     uninstallApp.mockResolvedValue({
       status: "error",
       error:
@@ -385,7 +360,6 @@ describe("AppTab", () => {
     fireEvent.click(screen.getByRole("button", { name: /Uninstall Prompt Janitor…/ }));
     await waitFor(() => expect(getVersion).not.toHaveBeenCalled());
     expect(check).not.toHaveBeenCalled();
-    expect(ask).not.toHaveBeenCalled();
     expect(resetAppData).not.toHaveBeenCalled();
     expect(uninstallApp).not.toHaveBeenCalled();
   });

@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "panel",
+  "description": "The menu-bar popover: read its snapshot, start a scan, raise the main window, quit. It sizes itself to its card and hides on Esc; it gets no dialog, opener, updater or process access and cannot reset or uninstall the app.",
+  "windows": ["panel"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-set-size",
+    "allow-get-panel-snapshot",
+    "allow-scan-now",
+    "allow-open-main",
+    "allow-quit"
+  ]
+}
