@@ -168,6 +168,11 @@ export const commands = {
 	 *  and removes `-wal`/`-shm` — so a list taken beforehand would over-count.
 	 *  The fresh database is opened through the same [`store::init_db`] a cold
 	 *  launch uses, so it is seeded identically.
+	 * 
+	 *  The confirmation is the command's own first step rather than the
+	 *  webview's: a script that reached the page could otherwise skip a
+	 *  JavaScript prompt by invoking the command directly. The dialog is native,
+	 *  so the page cannot draw over it or answer it.
 	 */
 	resetAppData: () => typedError<string, string>(__TAURI_INVOKE("reset_app_data")),
 	/**
@@ -181,6 +186,8 @@ export const commands = {
 	 *  A development build has no bundle to trash. It still clears its data (that
 	 *  is the useful half in dev) and says what it did rather than pretending the
 	 *  job is done; it is also the only path that returns to a still-running app.
+	 * 
+	 *  Confirmed natively first, for the same reason as [`reset_app_data`].
 	 */
 	uninstallApp: () => typedError<string, string>(__TAURI_INVOKE("uninstall_app")),
 };

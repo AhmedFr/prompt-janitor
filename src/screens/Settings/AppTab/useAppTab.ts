@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { commands, isTauri } from "@/lib/ipc";
 import { describeUpdateError } from "./AppTab.util";
-import { RESET_CONFIRM, UNINSTALL_ARM_MS, UNINSTALL_CONFIRM } from "./AppTab.constants";
+import { UNINSTALL_ARM_MS } from "./AppTab.constants";
 import type { DangerBusy, DangerResult, UpdateStatus, UseAppTab } from "./AppTab.types";
 
 /**
@@ -100,33 +99,25 @@ export function useAppTab(): UseAppTab {
   }, []);
 
   /**
-   * Confirm, run, and report.
+   * Run, and report.
    *
-   * The OS dialog is a speed bump, not a lock: on macOS the confirm button is
-   * the alert's default, so Return answers it. It is worth raising because it
-   * is the one prompt the app cannot draw over or mis-render — but the real
-   * guard against an accidental uninstall is the two-press arming below, which
-   * runs before this is ever called.
+   * The confirmation is not here: it is the command's own first step, in
+   * Rust, where a native warning dialog is raised before anything happens. A
+   * prompt on this side would be a courtesy only — a script that reached the
+   * page could skip it by invoking the command directly — so the page does
+   * not get to be the one that asks. A declined dialog comes back as an `ok`
+   * reply that says nothing changed, and is rendered inline like any other.
    *
-   * The outcome — success or failure — lands inline rather than in a second
-   * dialog.
+   * The native alert's confirm button is the macOS default, so Return
+   * answers it; the real guard against an accidental uninstall is the
+   * two-press arming below, which runs before this is ever called.
    */
   const runDanger = useCallback(
     async (
       key: Exclude<DangerBusy, "">,
-      prompt: string,
-      title: string,
-      okLabel: string,
       command: () => Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
     ) => {
       if (!isTauri) return;
-      const confirmed = await ask(prompt, {
-        title,
-        kind: "warning",
-        okLabel,
-        cancelLabel: "Cancel",
-      });
-      if (!confirmed) return;
       setDanger(key);
       setDangerResult(null);
       try {
@@ -145,18 +136,16 @@ export function useAppTab(): UseAppTab {
     [],
   );
 
-  const reset = useCallback(
-    () => runDanger("reset", RESET_CONFIRM, "Reset app data", "Reset", commands.resetAppData),
-    [runDanger],
-  );
+  const reset = useCallback(() => runDanger("reset", commands.resetAppData), [runDanger]);
 
   /**
    * First press arms; the second, within {@link UNINSTALL_ARM_MS}, goes ahead.
    *
    * Reset is recoverable in the sense that matters — the app keeps working, and
    * a rescan rebuilds most of what was lost. Uninstall is not, so it costs two
-   * deliberate presses before the OS is even asked. The window lapses on its
-   * own so a half-finished thought does not stay loaded.
+   * deliberate presses before the command — and its native dialog — is even
+   * reached. The window lapses on its own so a half-finished thought does not
+   * stay loaded.
    */
   const uninstall = useCallback(async () => {
     if (!isTauri) return;
@@ -169,13 +158,7 @@ export function useAppTab(): UseAppTab {
     if (armTimer.current) clearTimeout(armTimer.current);
     armTimer.current = null;
     setUninstallArmed(false);
-    await runDanger(
-      "uninstall",
-      UNINSTALL_CONFIRM,
-      "Uninstall Prompt Janitor",
-      "Uninstall",
-      commands.uninstallApp,
-    );
+    await runDanger("uninstall", commands.uninstallApp);
   }, [runDanger, uninstallArmed]);
 
   return {

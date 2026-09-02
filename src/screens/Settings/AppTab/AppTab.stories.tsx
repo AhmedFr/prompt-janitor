@@ -66,12 +66,20 @@ export const NoReleasesYet: Story = {
   args: { update: { kind: "error", message: NO_RELEASES } },
 };
 
-/** A reset in flight — both destructive buttons are out of reach. */
+/**
+ * A reset in flight — the native dialog may still be open, so the labels stay
+ * as they were; both destructive buttons are simply out of reach.
+ */
 export const Resetting: Story = { args: { danger: "reset" } };
 
 /** What a finished reset reports. */
 export const ResetDone: Story = {
   args: { dangerResult: { ok: true, message: "Deleted 3 local files and started a fresh database." } },
+};
+
+/** The native dialog was declined: an `ok` reply that says nothing changed. */
+export const DangerCancelled: Story = {
+  args: { dangerResult: { ok: true, message: "Cancelled. Nothing was changed." } },
 };
 
 /** A destructive action that failed says so where it was triggered. */

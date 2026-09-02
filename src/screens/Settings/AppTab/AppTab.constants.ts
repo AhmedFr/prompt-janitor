@@ -20,30 +20,14 @@ export const UNREACHABLE = "Couldn't reach the update server. Check your connect
 export const CHECK_FAILED = "The update check failed.";
 
 /**
- * The reset confirmation. Names what goes and, just as importantly, what
- * happens next — a destructive prompt that does not say the app survives
- * reads like it might not.
- *
- * The licence and AI keys live in the `settings` table, so they go with it.
- * "Settings" alone does not convey that; a user who discovers it afterwards
- * learns that this prompt understated what it was asking for.
- */
-export const RESET_CONFIRM =
-  "Delete the local database, backups and settings? The app keeps running with a fresh database. " +
-  "You'll need to re-enter your licence key and AI settings afterwards.";
-
-/** The uninstall confirmation. */
-export const UNINSTALL_CONFIRM =
-  "Remove all app data and move Prompt Janitor to the Trash? The app will quit. " +
-  "Your licence key and AI settings go with it — you'll need to re-enter them if you reinstall.";
-
-/**
  * How long the "Confirm uninstall" state stays armed.
  *
- * On macOS the confirm button is the alert's default, so Return alone answers
- * it — one stray keypress on a focused button would otherwise be the whole
- * journey from "browsing Settings" to "app in the Trash". Two deliberate
- * clicks are required before the OS dialog is ever raised.
+ * The reset and uninstall confirmations themselves are raised natively by the
+ * Rust commands (`src-tauri/src/app_data.rs`), where a script in the page
+ * cannot skip them. On macOS the confirm button is that alert's default, so
+ * Return alone answers it — one stray keypress on a focused button would
+ * otherwise be the whole journey from "browsing Settings" to "app in the
+ * Trash". Two deliberate clicks are required before the dialog is ever raised.
  */
 export const UNINSTALL_ARM_MS = 5_000;
 

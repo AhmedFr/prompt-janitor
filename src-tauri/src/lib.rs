@@ -8,6 +8,9 @@ mod ai_fix;
 mod ai_rules;
 mod app_data;
 mod apply;
+// Only the ACL-sync test reads this in the crate; build.rs `include!`s the file.
+#[cfg(test)]
+mod command_names;
 mod commands;
 pub mod engine;
 pub mod harness;

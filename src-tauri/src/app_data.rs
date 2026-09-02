@@ -15,11 +15,32 @@
 use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::store::{self, AppDb};
 
 /// File name of the SQLite database inside the app-data directory.
 pub const DB_FILE_NAME: &str = "prompt-janitor.db";
+
+/// The reset confirmation. Names what goes and, just as importantly, what
+/// happens next — a destructive prompt that does not say the app survives
+/// reads like it might not.
+///
+/// The licence and AI keys live in the `settings` table, so they go with it.
+/// "Settings" alone does not convey that; a user who discovers it afterwards
+/// learns that this prompt understated what it was asking for.
+pub const RESET_PROMPT: &str = "Delete the local database, backups and settings? The app keeps \
+    running with a fresh database. You'll need to re-enter your licence key and AI settings \
+    afterwards.";
+
+/// The uninstall confirmation.
+pub const UNINSTALL_PROMPT: &str = "Remove all app data and move Prompt Janitor to the Trash? \
+    The app will quit. Your licence key and AI settings go with it — you'll need to re-enter \
+    them if you reinstall.";
+
+/// What a declined dialog reports. It is an `Ok`, not an error: the user
+/// chose it, and the tab renders it inline like any other outcome.
+pub const CANCELLED: &str = "Cancelled. Nothing was changed.";
 
 /// How long the uninstall waits before quitting, so the IPC reply reaches the
 /// window that asked. Long enough for a local round trip, short enough that
@@ -144,9 +165,63 @@ fn bundle_path_from_binary(binary: &Path) -> Option<PathBuf> {
 /// and removes `-wal`/`-shm` — so a list taken beforehand would over-count.
 /// The fresh database is opened through the same [`store::init_db`] a cold
 /// launch uses, so it is seeded identically.
+///
+/// The confirmation is the command's own first step rather than the
+/// webview's: a script that reached the page could otherwise skip a
+/// JavaScript prompt by invoking the command directly. The dialog is native,
+/// so the page cannot draw over it or answer it.
 #[tauri::command]
 #[specta::specta]
-pub fn reset_app_data(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+pub async fn reset_app_data(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+    if !confirm(&app, "Reset app data", RESET_PROMPT, "Reset").await? {
+        return Ok(CANCELLED.to_string());
+    }
+    reset_app_data_inner(&app, &db)
+}
+
+/// Ask before a destructive action, on a thread that is allowed to block.
+///
+/// Tauri runs synchronous commands on the main thread, and `blocking_show`
+/// must not run there — it would wait on a dialog the main thread is the one
+/// to draw. So the command is `async` and the wait moves to a blocking-pool
+/// thread; the plugin itself hops back to the main thread to present the
+/// alert. `false` is a declined dialog; `Err` is the pool thread going away.
+///
+/// The dialog is parented to the main window. Without a parent, `rfd` on
+/// macOS falls back to a detached system alert with a generic icon; with
+/// one it is the NSAlert sheet the old JavaScript `ask()` produced. Both
+/// commands are granted to the main window only, so that is the parent to
+/// look up. The builder is created inside the closure so the raw window
+/// handle it captures never crosses a thread.
+async fn confirm(
+    app: &AppHandle,
+    title: &'static str,
+    prompt: &'static str,
+    ok_label: &'static str,
+) -> Result<bool, String> {
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = handle
+            .dialog()
+            .message(prompt)
+            .title(title)
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                ok_label.into(),
+                "Cancel".into(),
+            ));
+        if let Some(main) = handle.get_webview_window(crate::window_policy::MAIN_LABEL) {
+            dialog = dialog.parent(&main);
+        }
+        dialog.blocking_show()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// The reset itself, once confirmed. Kept synchronous and apart from the
+/// dialog so the logic reads — and tests — without a prompt in the way.
+fn reset_app_data_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
     let db_path = PathBuf::from(&db.path);
 
     let mut conn = db.conn.lock().map_err(|e| e.to_string())?;
@@ -179,9 +254,26 @@ pub fn reset_app_data(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<Str
 /// A development build has no bundle to trash. It still clears its data (that
 /// is the useful half in dev) and says what it did rather than pretending the
 /// job is done; it is also the only path that returns to a still-running app.
+///
+/// Confirmed natively first, for the same reason as [`reset_app_data`].
 #[tauri::command]
 #[specta::specta]
-pub fn uninstall_app(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+pub async fn uninstall_app(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<String, String> {
+    if !confirm(
+        &app,
+        "Uninstall Prompt Janitor",
+        UNINSTALL_PROMPT,
+        "Uninstall",
+    )
+    .await?
+    {
+        return Ok(CANCELLED.to_string());
+    }
+    uninstall_app_inner(&app, &db)
+}
+
+/// The uninstall itself, once confirmed.
+fn uninstall_app_inner(app: &AppHandle, db: &AppDb) -> Result<String, String> {
     // Step 1 — the reversible, non-destructive half.
     #[cfg(target_os = "macos")]
     let quitting = {
@@ -211,7 +303,7 @@ pub fn uninstall_app(app: AppHandle, db: tauri::State<'_, AppDb>) -> Result<Stri
     let quitting = false;
 
     // Step 2 — the destructive half, now that the app is on its way out.
-    let removed = clear_app_data(&app, &db)?;
+    let removed = clear_app_data(app, db)?;
     let data = format!(
         "Removed {removed} local file{}.",
         if removed == 1 { "" } else { "s" }
@@ -403,6 +495,31 @@ mod tests {
             )),
             BundleLocation::Translocated
         );
+    }
+
+    /// The prompts used to live in the webview, where a script in the page
+    /// could skip them by invoking the command directly. Now that they are
+    /// the command's own first step, the wording is pinned here: a reset
+    /// costs the licence key and AI settings, and the prompt has to say so.
+    #[test]
+    fn the_reset_prompt_says_what_a_reset_costs() {
+        assert!(RESET_PROMPT.contains("fresh database"));
+        assert!(RESET_PROMPT.contains("licence key and AI settings"));
+    }
+
+    #[test]
+    fn the_uninstall_prompt_says_the_app_goes_to_the_trash_and_quits() {
+        assert!(UNINSTALL_PROMPT.contains("Trash"));
+        assert!(UNINSTALL_PROMPT.contains("quit"));
+        assert!(UNINSTALL_PROMPT.contains("licence key and AI settings"));
+    }
+
+    /// A declined dialog is a success from the command's point of view — the
+    /// reply is rendered inline like any other outcome, so it has to read as
+    /// "nothing happened", not as an error.
+    #[test]
+    fn a_cancelled_action_reports_that_nothing_changed() {
+        assert!(CANCELLED.contains("Nothing was changed"));
     }
 
     #[test]
