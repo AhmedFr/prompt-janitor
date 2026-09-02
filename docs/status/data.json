@@ -82,8 +82,8 @@
   "actions": {
     "blocking": [
       {
-        "title": "Lock the GitHub account and repo before flipping it public (audit I-4, M-4)",
-        "detail": "Settings only, no code: (1) two-factor auth on the account; (2) Settings → Environments → `release`: add yourself as a required reviewer so a tag push waits for approval before the updater key is used; (3) Rules → tag protection for `v*` so only you can create release tags; (4) branch protection on `main` (require PR + green CI); (5) Actions → General: 'Require approval for all outside collaborators' and default workflow permissions 'Read repository contents'. #151 already makes release.yml reference the environment, so step 2 is what turns it into a gate."
+        "title": "Lock the GitHub account and repo around the flip to public (audit I-4, M-4)",
+        "detail": "Settings only, no code — but the order matters because branch/tag rules and environment reviewers are Pro-plan features while a repo is private and free once it is public. Now, while private: (1) two-factor auth on the account; (2) Actions → General: 'Require approval for all outside collaborators' and default workflow permissions 'Read repository contents'; (3) Settings → Environments → create `release` so the next tag push does not create it implicitly. Then flip public. Immediately after: (4) `release` environment → add yourself as required reviewer — until this is done `environment: release` in release.yml is a no-op and a tag push still builds and signs unattended, exactly as before; (5) Rules → tag ruleset for `v*` so only you can create release tags; (6) branch protection on `main` (require PR + green CI). The next `v*` tag is the first live run of the pinned tauri-action and the environment gate."
       },
       {
         "title": "Re-verify the menu-bar panel on a real Mac after the #145 fixes",

@@ -27,8 +27,13 @@ describe("GitHub Actions are pinned to commit SHAs", () => {
     });
   }
 
-  it("ci.yml runs with a read-only token", () => {
-    expect(ciYml).toMatch(/^permissions:\n\s+contents:\s*read\s*$/m);
+  it("ci.yml runs with a read-only token and grants nothing else", () => {
+    // The whole top-level block, not just one line: `contents: read` next to
+    // an `id-token: write` would still be a token worth stealing.
+    const block = ciYml.match(/^permissions:\n((?:[ \t]+\S.*\n)+)/m);
+    expect(block, "ci.yml should declare a top-level permissions block").not.toBeNull();
+    const grants = block![1].trim().split("\n").map((line) => line.trim());
+    expect(grants).toEqual(["contents: read"]);
   });
 
   it("release.yml builds inside a protected environment", () => {
