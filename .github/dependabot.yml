@@ -1,0 +1,11 @@
+# Keeps the SHA-pinned actions in ci.yml / release.yml current: Dependabot
+# bumps the commit SHA and the trailing "# vX.Y.Z" comment together. It does
+# not touch dtolnay/rust-toolchain (pinned to a branch tip, no tag) — refresh
+# that one by hand now and then with `gh api repos/dtolnay/rust-toolchain/branches/stable`.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [area:ci, type:ci]
