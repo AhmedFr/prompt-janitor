@@ -1,6 +1,6 @@
 [package]
 name = "prompt-janitor"
-version = "0.1.1"
+version = "0.1.2"
 description = "Find, grade, and fix the AI prompt files across your projects."
 authors = ["Ahmed ABOUELLEIL"]
 edition = "2021"
