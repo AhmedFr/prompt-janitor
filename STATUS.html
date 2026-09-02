@@ -229,10 +229,10 @@
         <span class="action__num">5</span>
         <div class="action__body">
           <div class="action__head">
-            <strong>Decide: public repo or external hosting for downloads</strong>
+            <strong>Flip the repo to public once the Phase 10 PRs land (decision made: public, AGPL-3.0)</strong>
             <span class="tag tag--vision">vision call</span>
           </div>
-          <p>The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.</p>
+          <p>Decided 2026-09-02: the repo goes public under AGPL-3.0 (#152 adds the LICENSE) so GitHub release assets, the updater endpoint and the landing site work without external hosting. Order: merge #155–#158, do the account/repo lock-down item above, run `gitleaks git .` once for a second opinion on history, then Settings → Danger zone → Change visibility → Public.</p>
         </div>
       </li>
       <li class="action">

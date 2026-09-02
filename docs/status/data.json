@@ -101,8 +101,8 @@
         "kind": "testing"
       },
       {
-        "title": "Decide: public repo or external hosting for downloads",
-        "detail": "The repo is private. GitHub release assets and the Pages landing site are only public if the repo is public (or you host the DMG/landing elsewhere). This gates everything marketing-related.",
+        "title": "Flip the repo to public once the Phase 10 PRs land (decision made: public, AGPL-3.0)",
+        "detail": "Decided 2026-09-02: the repo goes public under AGPL-3.0 (#152 adds the LICENSE) so GitHub release assets, the updater endpoint and the landing site work without external hosting. Order: merge #155–#158, do the account/repo lock-down item above, run `gitleaks git .` once for a second opinion on history, then Settings → Danger zone → Change visibility → Public.",
         "kind": "vision"
       },
       {
