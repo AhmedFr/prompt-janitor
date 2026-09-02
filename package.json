@@ -19,7 +19,10 @@
     "bump": "node scripts/bump-version.mjs",
     "status": "node scripts/generate-status.mjs",
     "storybook": "storybook dev -p 6006 --no-open",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "check": "scripts/check.sh",
+    "check:fast": "scripts/check.sh --fast",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

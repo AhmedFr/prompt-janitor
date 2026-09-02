@@ -1,12 +1,16 @@
 name: CI
 
+# Runs on pushes to `main` only. PRs are gated locally: `pnpm check` runs the
+# same suite (scripts/check.sh) and `pnpm install` wires it into a pre-push
+# hook. The Rust job needs a macOS runner, which GitHub bills at 10x, so this
+# must not run per PR. `workflow_dispatch` is there for a manual run.
 on:
   push:
     branches: [main]
-  pull_request:
+    paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
 
-# Fork PRs run this workflow with no secrets; keep the token read-only so a
-# compromised step cannot push, tag, or comment either.
+# Keep the token read-only so a compromised step cannot push, tag, or comment.
 permissions:
   contents: read
 

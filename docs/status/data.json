@@ -444,6 +444,7 @@
     }
   ],
   "recent": [
+    "2026-09-03 — GitHub Actions CI deactivated (manual dispatch only; the Rust job's macOS runner bills at 10x and the monthly quota was 90% spent). `pnpm check` (scripts/check.sh) is the only merge gate and `pnpm install` installs its fast variant as a pre-push hook; release.yml untouched. Shipping skill + CLAUDE.md updated to match; #167",
     "2026-09-02 — v0.1.2 published (release gate approved — the new `release` environment from #163 requires a reviewer on every tag); update manifest publicly fetchable, so the installed 0.1.1 app can now discover it in-app",
     "2026-09-02 — v0.1.2 tagged: app-basics fixes (icon, dragging, responsive layouts, sidebar). First release the installed 0.1.1 app can discover in-app — the live updater test",
     "2026-09-02 — Real app icon: the flat blue placeholder replaced by a generated rounded-square gradient carrying the logo line-art (scripts/make_app_icon.py + pnpm tauri icon) (#165)",
