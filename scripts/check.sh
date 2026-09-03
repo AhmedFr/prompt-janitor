@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Local merge gate. CI only runs on `main` (the Rust job needs a macOS runner,
-# billed at 10x), so this is what every branch must pass before push or merge.
+# THE merge gate. GitHub Actions CI is deactivated (manual dispatch only), so
+# this is what every branch must pass before push or merge.
 #
-#   pnpm check         full suite, identical to the `main` workflow
+#   pnpm check         full suite (what CI used to run)
 #   pnpm check:fast    skips the Storybook, landing and fulfillment builds
 #                      (the pre-push hook)
 #

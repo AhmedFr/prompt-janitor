@@ -23,7 +23,7 @@ ordered as a step-by-step ship checklist.
 
 - Ship process: one issue per deliverable, branch + PR per issue, milestones = phases.
 - Version bumps: `pnpm bump <semver>` (syncs package.json, tauri.conf.json, Cargo.toml, Cargo.lock).
-- Gates: `pnpm check` (lint, tests, build, `cargo fmt`, `clippy --all-targets -- -D warnings`, `cargo test`, fulfillment, landing) must pass before a PR opens. CI runs it on `main` only — never on PRs — because the Rust job needs a 10x-billed macOS runner; `pnpm install` installs `pnpm check:fast` as a pre-push hook.
+- Gates: `pnpm check` (lint, tests, build, `cargo fmt`, `clippy --all-targets -- -D warnings`, `cargo test`, fulfillment, landing) must pass before a PR opens. GitHub Actions CI is deactivated (manual dispatch only; the Rust job needs a 10x-billed macOS runner and the free quota ran out), so this local run is the only gate; `pnpm install` installs `pnpm check:fast` as a pre-push hook.
 - License vendor flow: see README "Minting license keys".
 - Harness modules: screens, IPC commands and rules import `crate::harness::model` only — never `crate::harness::claude_code::*`.
 - Status dashboard: every PR updates `docs/status/data.json` + `pnpm status`.
