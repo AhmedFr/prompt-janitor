@@ -7,7 +7,7 @@ description: Use when making ANY change to the prompt-janitor repo that will rea
 
 ## Overview
 
-Every change reaches `main` the same way: **issue → branch → TDD → PR → review → green CI → squash-merge → status update**. The repo is private with no branch protection; the process is enforced by discipline, not by GitHub. **Violating the letter of this process is violating its spirit.**
+Every change reaches `main` the same way: **issue → branch → TDD → local gates → PR → review → squash-merge → status update**. The repo is private with no branch protection; the process is enforced by discipline, not by GitHub. **Violating the letter of this process is violating its spirit.**
 
 ## The ship checklist
 
@@ -16,13 +16,11 @@ Create a todo per line. Do them in order.
 1. **Issue** — `gh issue create` with area + type labels (`area:frontend|backend|engine|ai|design|ci`, `type:feat|chore|test|ci`), the current phase milestone, and acceptance criteria. One issue per deliverable. Existing issue → reuse it.
 2. **Branch** — from a fresh `main`: `git switch main && git pull && git switch -c <type>/<issue#>-<slug>`. Never commit to `main`. Never build on an unrelated branch. Stash or leave unrelated WIP where it is; never sweep it into your commit.
 3. **TDD** — REQUIRED SUB-SKILL: `superpowers:test-driven-development`. Failing test first, for every unit in the matrix below.
-4. **Local gates** — all must pass before the PR opens:
-   `pnpm lint && pnpm typecheck && pnpm test && pnpm storybook:build` ·
-   `cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`.
+4. **Local gates** — `pnpm check` must pass before the PR opens (frontend lint/test/build/storybook, `cargo fmt/clippy/test` in `src-tauri`, fulfillment typecheck/test, landing build). This IS the merge gate: GitHub Actions CI is deactivated (manual `workflow_dispatch` only, since 2026-09-03 — the Rust job needs a macOS runner billed at 10x and the free quota ran out), so nothing runs on PRs or on `main`. Run the full `pnpm check` (not just `:fast`) on the final commit before asking for merge. `pnpm install` wires `pnpm check:fast` into a pre-push hook; `SKIP_CHECKS=1 git push` bypasses it — only for emergencies.
 5. **Status** — every PR updates `docs/status/data.json` (at minimum a dated `recent` line naming the issue/PR; plus readiness, features, actions, health, test counts when they moved), then `pnpm status`, and commits both in the PR. No PR ships without it.
 6. **PR** — `gh pr create` against `main`; body: what/why, test evidence (pasted command output), `Closes #<issue>`, screenshots for UI. Conventional-commit title (`feat(scope): …`).
 7. **Review** — REQUIRED SUB-SKILL: `superpowers:requesting-code-review` before asking the owner. Fix findings; REQUIRED SUB-SKILL: `superpowers:receiving-code-review`. The owner is the merge reviewer; you are never the one who approves.
-8. **Merge** — only after green CI and owner approval: `gh pr merge --squash --delete-branch`. Then `git switch main && git pull`.
+8. **Merge** — only after `pnpm check` passed on the final commit and owner approval: `gh pr merge --squash --delete-branch`. Then `git switch main && git pull`.
 
 ## Testing matrix (per unit you add or change)
 
@@ -56,7 +54,7 @@ Create a todo per line. Do them in order.
 ## Red flags — STOP
 
 - `git push origin main` or a commit while on `main`
-- `gh pr merge` without owner approval or with red CI
+- `gh pr merge` without owner approval or without a passing `pnpm check` on the final commit
 - A `.tsx` component folder with no `.test.tsx` or `.stories.tsx`
 - Code written before its failing test
 - A PR body with no pasted test output

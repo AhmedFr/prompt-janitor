@@ -1,12 +1,15 @@
 name: CI
 
+# DEACTIVATED (2026-09-03): manual `workflow_dispatch` only, nothing runs
+# automatically. All checks are done locally — `pnpm check` (scripts/check.sh)
+# is the merge gate and `pnpm install` wires it into a pre-push hook. The Rust
+# job needs a macOS runner (billed at 10x) and the free quota was exhausted.
+# To re-enable, add `push: { branches: [main] }` back to `on:`.
+# release.yml (tag-triggered) is unaffected.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
-# Fork PRs run this workflow with no secrets; keep the token read-only so a
-# compromised step cannot push, tag, or comment either.
+# Keep the token read-only so a compromised step cannot push, tag, or comment.
 permissions:
   contents: read
 
