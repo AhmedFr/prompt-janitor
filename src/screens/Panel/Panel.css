@@ -61,13 +61,14 @@ html.panel-window #root {
 }
 
 .panel__failure {
-  padding: 16px;
+  padding: 14px;
 }
 
 .panel__failure-title {
   font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   margin: 0 0 6px;
 }
 
@@ -80,7 +81,7 @@ html.panel-window #root {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
+  padding: 14px;
 }
 
 .panel__skeleton {

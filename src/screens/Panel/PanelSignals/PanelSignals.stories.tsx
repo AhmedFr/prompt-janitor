@@ -8,7 +8,7 @@ const meta = {
   args: { neverUsedSkills: 3, mcpErroring: 1, sessionsToday: 12, onOpen: () => {} },
   decorators: [
     (Story) => (
-      <div style={{ width: 360, background: "var(--card)" }}>
+      <div style={{ width: 352, background: "var(--card)" }}>
         <Story />
       </div>
     ),

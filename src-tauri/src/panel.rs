@@ -179,6 +179,10 @@ pub fn create(app: &App) -> tauri::Result<()> {
         // Against the desktop, not the app shell: a transparent popover can only
         // be judged by what shows through it.
         crate::window_policy::hide_main(app.handle());
+        // A full-screen app owns a Space of its own, and a window parked on the
+        // desktop Space is simply not on screen there — the screenshot comes
+        // back showing whatever is in front instead of the panel.
+        let _ = window.set_visible_on_all_workspaces(true);
         let _ = window.set_position(LogicalPosition::new(DEBUG_POSITION.0, DEBUG_POSITION.1));
         let _ = window.show();
         let _ = window.set_focus();

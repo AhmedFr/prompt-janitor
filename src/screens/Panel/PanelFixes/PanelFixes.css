@@ -1,19 +1,25 @@
+/* The section is inset 8 px and each row 6 px more, so the row's hover pill can
+   sit wider than the text it highlights — the macOS menu/popover pattern —
+   while the text still lands on the card's 14 px gutter. */
 .panel-fixes {
-  padding: 2px 16px 10px;
+  padding: 0 8px 8px;
   min-height: 0;
 }
 
 /* Smaller than the app's section label: the panel is a popover, and a full
-   12 px eyebrow over a 34 px row competes with the row it introduces. */
+   12 px eyebrow over a 38 px row competes with the row it introduces. */
 .panel-fixes__title {
   font-size: 11px;
-  color: var(--text-2);
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.06em;
+  padding: 0 6px;
   margin: 0 0 2px;
 }
 
 .panel-fixes__empty {
   font-size: 12px;
+  padding: 2px 6px 4px;
   margin: 0;
 }
 
@@ -24,25 +30,39 @@
 }
 
 /* A hairline between rows, never above the first or below the last: the
-   section already has edges, and a rule against them reads as a stray line. */
+   section already has edges, and a rule against them reads as a stray line.
+   Inset to the text rather than run edge to edge — the separator's job is to
+   divide the names, and a line under the grade badges cuts the column in two.
+   It lives on the `li` because the row itself is a grid: a pseudo-element on
+   `.panel-fix` would become a fifth column. */
 .panel-fixes__list li + li {
-  border-top: 1px solid var(--sep);
+  position: relative;
+}
+
+.panel-fixes__list li + li::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 40px;
+  right: 6px;
+  height: 0.5px;
+  background: var(--sep);
 }
 
 .panel-fix {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  min-height: 34px;
-  padding: 4px 6px;
+  min-height: 38px;
+  padding: 0 6px;
   border: 0;
-  border-radius: var(--r-ctrl);
+  border-radius: 10px;
   background: transparent;
   color: inherit;
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .panel-fix:hover {
@@ -64,14 +84,14 @@
 /* The project trails the file name rather than sitting in its own column: it
    is context for the name, and it is the half worth truncating first. */
 .panel-fix__project {
-  font-size: 11px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .panel-fix__issues {
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   justify-self: end;
 }
