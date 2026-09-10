@@ -10,6 +10,12 @@ export const FILTER_PLACEHOLDER = "Filter…";
 export const CLEAR_LABEL = "Clear";
 export const NO_MATCH_LABEL = "No matches";
 
+/** A group with nothing in it at all — where "No matches" would blame a query there isn't one of. */
+export const NO_OPTIONS_LABEL = "No options";
+
+/** Gap kept between the popover's edge and the window's before it flips sides. */
+export const VIEWPORT_MARGIN = 8;
+
 /** Separates the group's name from its selection on the trigger: "Scope · 2". */
 export const VALUE_SEPARATOR = " · ";
 

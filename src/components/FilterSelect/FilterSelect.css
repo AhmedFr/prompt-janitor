@@ -77,6 +77,14 @@
   top: calc(100% + 5px);
   left: 0;
   z-index: 20;
+}
+
+/* The rightmost group in a toolbar has no room to open leftwards; the flip is
+   measured in the component, since how much room there is depends on a window
+   the user can drag down to 720px. */
+.fs__popover[data-align="right"] {
+  left: auto;
+  right: 0;
   min-width: 100%;
   /* Wide enough for a project name, capped so a long path can't push the
      popover off the window. */

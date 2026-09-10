@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { Icon } from "@/components/Icon";
 import type { FilterSelectProps } from "./FilterSelect.types";
 import { useFilterSelect } from "./useFilterSelect";
@@ -6,9 +6,11 @@ import {
   CLEAR_LABEL,
   FILTER_PLACEHOLDER,
   NO_MATCH_LABEL,
+  NO_OPTIONS_LABEL,
   SEARCH_THRESHOLD,
   SELECTED_SUFFIX,
   VALUE_SEPARATOR,
+  VIEWPORT_MARGIN,
 } from "./FilterSelect.constants";
 import "./FilterSelect.css";
 
@@ -22,10 +24,21 @@ import "./FilterSelect.css";
  * project and one per plugin — where this spends the same width whether the
  * group has three options or thirty, and only the group the user is actually
  * filtering by ever unfolds.
+ *
+ * **Which element is the combobox depends on whether the popover has a filter
+ * box**, because `aria-activedescendant` is only honoured on the element that
+ * actually has DOM focus — and is only a valid attribute on a combobox, never
+ * on a plain button. A short group is the ARIA "select-only combobox": the
+ * trigger is the combobox and keeps focus throughout. A long one moves focus
+ * into the filter box, which becomes the combobox owning the list, and the
+ * trigger drops back to a disclosure button.
  */
 export function FilterSelect({ label, options, selected, multi, onToggle, onClear }: FilterSelectProps) {
   const uid = useId();
   const [query, setQuery] = useState("");
+  const [alignRight, setAlignRight] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // Only ids the options still offer count as a selection: a remembered filter
   // whose option has gone (a rescanned-away project) must not make the trigger
@@ -45,11 +58,21 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
 
   const visibleIds = useMemo(() => visible.map((option) => option.id), [visible]);
 
-  const { open, active, setActive, rootRef, triggerRef, toggleOpen, close, onKeyDown } = useFilterSelect({
-    visibleIds,
-    multi,
-    onToggle,
-  });
+  const { open, active, setActive, rootRef, triggerRef, toggleOpen, close, dismiss, onKeyDown } =
+    useFilterSelect({ visibleIds, multi, onToggle });
+
+  const listId = `${uid}list`;
+  const optionId = (index: number) => `${uid}opt${index}`;
+  const activeId = open && active >= 0 && active < visible.length ? optionId(active) : undefined;
+
+  // One place decides where focus goes when the popover opens, so the answer
+  // can't drift between the two shapes. It has to be explicit: WebKit — the
+  // engine Tauri ships on macOS — does not focus a `<button>` on click, so a
+  // pointer-opened popover would otherwise ignore every key that follows.
+  useEffect(() => {
+    if (!open) return;
+    (searchable ? searchRef.current : triggerRef.current)?.focus();
+  }, [open, searchable, triggerRef]);
 
   // A query the user has left behind is not a filter they would expect to come
   // back to — reopening a group should show all of it.
@@ -57,9 +80,38 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
     if (!open) setQuery("");
   }, [open]);
 
-  const listId = `${uid}list`;
-  const optionId = (index: number) => `${uid}opt${index}`;
-  const activeId = open && active >= 0 && active < visible.length ? optionId(active) : undefined;
+  // The rightmost group in a toolbar has no room to open leftwards. Measured
+  // rather than guessed: how much room there is depends on the window, which
+  // is resizable down to 720px.
+  useLayoutEffect(() => {
+    if (!open) {
+      setAlignRight(false);
+      return;
+    }
+    const rect = popoverRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // `window.innerWidth` rather than `documentElement.clientWidth`: the
+    // webview paints overlay scrollbars, so the two agree, and only the
+    // former is populated under jsdom for the test to stage.
+    setAlignRight(rect.right > window.innerWidth - VIEWPORT_MARGIN);
+  }, [open]);
+
+  // Keeps the walked-to option on screen: the list scrolls past nine rows, and
+  // an active row below the fold leaves a keyboard user navigating blind.
+  // Guarded because jsdom has no `scrollIntoView`.
+  useEffect(() => {
+    if (!activeId) return;
+    const el = document.getElementById(activeId);
+    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "nearest" });
+  }, [activeId]);
+
+  // The popover's controls are ordinary tab stops, so what ends the session is
+  // focus leaving the whole control — not Tab itself. See `useFilterSelect`.
+  const onBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && rootRef.current?.contains(next)) return;
+    dismiss();
+  };
 
   // The name is spelled out where the visible text is abbreviated: "Scope · 2"
   // reads as "Scope, 2 selected", and the count never runs into the label.
@@ -76,16 +128,20 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
   };
 
   return (
-    <div className="fs" ref={rootRef} onKeyDown={onKeyDown}>
+    <div className="fs" ref={rootRef} onKeyDown={onKeyDown} onBlur={onBlur}>
       <button
         type="button"
         ref={triggerRef}
         className="fs__trigger"
         data-active={chosen.length > 0}
+        // Only when this element is the one holding focus and the pointer —
+        // otherwise the filter box below is the combobox and this is a plain
+        // disclosure button.
+        role={searchable ? undefined : "combobox"}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        aria-activedescendant={activeId}
+        aria-activedescendant={searchable ? undefined : activeId}
         aria-label={spokenValue ? `${label}, ${spokenValue}` : label}
         onClick={toggleOpen}
       >
@@ -95,16 +151,20 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
       </button>
 
       {open && (
-        <div className="fs__popover">
+        <div className="fs__popover" ref={popoverRef} data-align={alignRight ? "right" : "left"}>
           {searchable && (
             <input
-              type="search"
+              type="text"
+              ref={searchRef}
               className="fs__search"
-              autoFocus
+              role="combobox"
+              aria-expanded="true"
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={activeId}
               value={query}
               placeholder={FILTER_PLACEHOLDER}
               aria-label={`${FILTER_PLACEHOLDER} ${label}`}
-              aria-controls={listId}
               onChange={(event) => {
                 setQuery(event.target.value);
                 // The list under the cursor is a different list now; keeping
@@ -149,7 +209,13 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
             })}
           </ul>
 
-          {visible.length === 0 && <p className="fs__empty">{NO_MATCH_LABEL}</p>}
+          {/* Announced, not just drawn: the list shrinking under a query the
+              user is typing is the whole feedback the filter box gives. */}
+          {visible.length === 0 && (
+            <p className="fs__empty" role="status">
+              {options.length === 0 ? NO_OPTIONS_LABEL : NO_MATCH_LABEL}
+            </p>
+          )}
 
           {chosen.length > 0 && (
             <button

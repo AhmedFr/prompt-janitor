@@ -35,8 +35,12 @@ function setup(overrides: Partial<FilterSelectProps> = {}) {
   return { ...render(<FilterSelect {...props} />), onToggle, onClear, props };
 }
 
-/** The trigger, whatever its current accessible name. */
-const trigger = () => screen.getByRole("button", { name: /^Scope/ });
+/**
+ * The trigger, whatever its current accessible name — and whatever its role,
+ * which depends on whether the group is big enough to grow a filter box.
+ */
+// The open listbox carries the group name too, hence the selector.
+const trigger = () => screen.getByLabelText(/^Scope/, { selector: ".fs__trigger" });
 
 function open() {
   fireEvent.click(trigger());
@@ -55,6 +59,29 @@ describe("FilterSelect: trigger", () => {
     expect(trigger()).toHaveAccessibleName("Scope");
     expect(trigger()).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("is itself the combobox while it is the thing holding focus", () => {
+    // `aria-activedescendant` is only valid on a combobox — never on a plain
+    // button — and is only honoured on the element with DOM focus. A short
+    // group keeps focus on the trigger, so the trigger is the combobox.
+    setup();
+    expect(trigger()).toHaveAttribute("role", "combobox");
+    expect(trigger()).toHaveAttribute("aria-haspopup", "listbox");
+  });
+
+  it("hands the combobox role to the filter box when there is one", () => {
+    // A long group moves focus into the filter box, so that is what owns the
+    // list; the trigger drops back to a plain disclosure button.
+    setup({ options: MANY });
+    expect(trigger().tagName).toBe("BUTTON");
+    expect(trigger()).not.toHaveAttribute("role");
+
+    open();
+    const box = screen.getByPlaceholderText(FILTER_PLACEHOLDER);
+    expect(box).toHaveAttribute("role", "combobox");
+    expect(box).toHaveAttribute("aria-controls", screen.getByRole("listbox").id);
+    expect(trigger()).not.toHaveAttribute("aria-activedescendant");
   });
 
   it("names its one selection rather than counting it", () => {
@@ -229,17 +256,49 @@ describe("FilterSelect: keyboard", () => {
     expect(trigger()).toHaveFocus();
   });
 
-  it("closes on Tab without swallowing the tab", () => {
+  it("takes focus itself when opened by pointer", () => {
+    // WebKit — the engine Tauri ships on macOS — does not focus a <button> on
+    // click, so without this every key pressed after a pointer-open would go
+    // to the document and the popover would ignore the keyboard entirely.
     setup();
-    open();
-    fireEvent.keyDown(trigger(), { key: "Tab" });
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    fireEvent.click(trigger());
+    expect(trigger()).toHaveFocus();
   });
 
   it("moves the caret into the option search when there is one", () => {
     setup({ options: MANY });
     open();
     expect(screen.getByPlaceholderText(FILTER_PLACEHOLDER)).toHaveFocus();
+  });
+
+  it("leaves Home and End to the caret inside the filter box", () => {
+    setup({ options: MANY });
+    open();
+    const box = screen.getByPlaceholderText(FILTER_PLACEHOLDER);
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    const first = screen.getAllByRole("option")[0].id;
+
+    fireEvent.keyDown(box, { key: "End" });
+
+    // A query the user cannot edit from the front is worse than a shortcut
+    // they lose, so End moved the caret and not the active option.
+    expect(box).toHaveAttribute("aria-activedescendant", first);
+  });
+
+  it("keeps the walked-to option in view", () => {
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    // jsdom has no scrollIntoView at all; the list scrolls past nine rows and
+    // an active row below the fold leaves a keyboard user navigating blind.
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      setup({ options: MANY });
+      open();
+      fireEvent.keyDown(screen.getByPlaceholderText(FILTER_PLACEHOLDER), { key: "ArrowDown" });
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("drives the list from the search box", () => {
@@ -275,6 +334,75 @@ describe("FilterSelect: dismissal", () => {
     fireEvent.click(trigger());
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
+
+  it("closes when focus leaves it entirely", () => {
+    render(<button type="button">Elsewhere</button>);
+    setup();
+    open();
+    fireEvent.blur(trigger(), { relatedTarget: screen.getByRole("button", { name: "Elsewhere" }) });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("stays open while focus moves to its own Clear button", () => {
+    // Tab is not swallowed, so Clear is an ordinary tab stop — a Clear no
+    // keyboard user could reach would fail WCAG 2.1.1.
+    setup({ selected: ["orca"] });
+    open();
+    const clear = screen.getByRole("button", { name: CLEAR_LABEL });
+    fireEvent.blur(trigger(), { relatedTarget: clear });
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
+
+  it("lets Enter operate the Clear button rather than swallowing it", () => {
+    const { onClear } = setup({ selected: ["orca"] });
+    open();
+    const clear = screen.getByRole("button", { name: CLEAR_LABEL });
+    // The root's key handler must not preventDefault here: that would suppress
+    // the click a real browser synthesises from Enter on a focused button.
+    const event = fireEvent.keyDown(clear, { key: "Enter", cancelable: true });
+    expect(event).toBe(true); // not prevented
+    expect(onClear).not.toHaveBeenCalled(); // jsdom synthesises no click
+  });
+});
+
+describe("FilterSelect: placement", () => {
+  /** jsdom measures nothing, so the overflow has to be staged. */
+  function stageWidth(right: number) {
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      if ((this as Element).classList?.contains("fs__popover")) {
+        return { right, left: right - 280, top: 0, bottom: 0, width: 280, height: 200, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+      }
+      return original.call(this);
+    };
+    return () => {
+      Element.prototype.getBoundingClientRect = original;
+    };
+  }
+
+  it("opens leftwards when there is room", () => {
+    const restore = stageWidth(300);
+    try {
+      setup();
+      open();
+      expect(document.querySelector(".fs__popover")).toHaveAttribute("data-align", "left");
+    } finally {
+      restore();
+    }
+  });
+
+  it("flips to the trigger's right edge when it would run off the window", () => {
+    // The rightmost group in a toolbar has no room to open leftwards, and the
+    // window is resizable down to 720px.
+    const restore = stageWidth(window.innerWidth + 40);
+    try {
+      setup();
+      open();
+      expect(document.querySelector(".fs__popover")).toHaveAttribute("data-align", "right");
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("FilterSelect: accessibility", () => {
@@ -286,6 +414,26 @@ describe("FilterSelect: accessibility", () => {
   it("has no axe violations open", async () => {
     const { container } = setup({ selected: ["orca"], options: MANY });
     open();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no axe violations with an option active", async () => {
+    // The state the other two never reach: `aria-activedescendant` is only in
+    // the DOM once something is active, and it is invalid on a plain button —
+    // so an audit taken before the first ArrowDown proves nothing about it.
+    const { container } = setup({ selected: ["orca"] });
+    open();
+    fireEvent.keyDown(trigger(), { key: "ArrowDown" });
+    expect(trigger()).toHaveAttribute("aria-activedescendant");
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no axe violations with an option active in a searchable group", async () => {
+    const { container } = setup({ options: MANY });
+    open();
+    const box = screen.getByPlaceholderText(FILTER_PLACEHOLDER);
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(box).toHaveAttribute("aria-activedescendant");
     expect(await axe(container)).toHaveNoViolations();
   });
 });

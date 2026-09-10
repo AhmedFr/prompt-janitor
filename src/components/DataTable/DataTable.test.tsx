@@ -6,6 +6,12 @@ import { DataTable } from "./DataTable";
 import { ActionsCell } from "./cells";
 import { ROW_HEIGHT, SEARCH_DEBOUNCE_MS } from "./DataTable.constants";
 import type { DataTableProps, PillGroup } from "./DataTable.types";
+import {
+  filterOption as optionFor,
+  filterTrigger as groupTrigger,
+  openFilterGroup as openGroup,
+  pickFilter as pick,
+} from "@/test/filters";
 
 // Passes straight through to the real virtualiser, only counting `measure()`
 // so the density re-measure can be asserted from outside the component.
@@ -128,35 +134,6 @@ function setup(overrides: Partial<DataTableProps<Row>> = {}) {
   return { ...render(<DataTable {...props} />), props };
 }
 
-/**
- * A pill group's trigger, whatever selection its accessible name now carries.
- * Scoped to the toolbar: a column of the same name carries a sort button, and
- * "Score" would otherwise match both.
- */
-const groupTrigger = (label: string) =>
-  within(document.querySelector(".dt__toolbar") as HTMLElement).getByRole("button", {
-    name: new RegExp(`^${label}`),
-  });
-
-/** Opens a group's popover and hands back its listbox. */
-function openGroup(label: string) {
-  fireEvent.click(groupTrigger(label));
-  return screen.getByRole("listbox", { name: label });
-}
-
-/** An option row inside whichever popover is open. */
-const optionFor = (label: string) => screen.getByRole("option", { name: new RegExp(`^${label},`) });
-
-/**
- * Picks an option and closes the popover behind it. Closed explicitly rather
- * than by clicking elsewhere: `fireEvent.click` fires no `mousedown`, so the
- * dismissal a real pointer would cause never happens in jsdom.
- */
-function pick(group: string, option: string) {
-  openGroup(group);
-  fireEvent.click(optionFor(option));
-  if (screen.queryByRole("listbox", { name: group })) fireEvent.click(groupTrigger(group));
-}
 
 /** The first-column text of every body row, in render order. */
 function rowNames(): string[] {

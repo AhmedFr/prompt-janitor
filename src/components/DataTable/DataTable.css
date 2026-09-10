@@ -101,15 +101,6 @@
   outline-offset: 1px;
 }
 
-/* White on rgba(255,255,255,…) over the chip never clears AA; the active count
-   sits on a darkened patch of --blue-press (composited #004fb7, 7.49:1 against
-   white) and inherits the chip's own white instead — the same pairing
-   `Setup.css` documents. */
-.dt__pill--on .dt__pill-count {
-  background: rgba(0, 0, 0, 0.18);
-  color: inherit;
-}
-
 /* ---------- table ---------- */
 
 .dt__scroll {
