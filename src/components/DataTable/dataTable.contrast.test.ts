@@ -15,9 +15,13 @@ import { AA_CONTRAST, contrastRatio } from "@/lib/contrast";
  *   1.4.11, short of AA for the label inside it.
  * - Pressed chip's count: white on `rgba(0, 0, 0, 0.18)` over `--blue-press`,
  *   which composites to #004fb7.
- * - Sort glyph: `--text-2` (#6e6e73) on the sticky header's `--group`
- *   (#f5f5f7). `--text-3` (#9a9aa0) was the original at 2.57:1, under even
- *   the 3:1 non-text floor a control's only affordance has to clear.
+ * - Sort glyph: `--text-2` (#6e6e73) on the header, which is now the card's
+ *   own white rather than a `--group` band. `--text-3` (#9a9aa0) was the
+ *   original at 2.57:1 on `--group`, under even the 3:1 non-text floor a
+ *   control's only affordance has to clear.
+ * - Active sort glyph: `--blue` on that same white. It is an icon, not text,
+ *   so the 3:1 floor is the one that applies — and it is the reason the
+ *   header *label* beside it stays `--text-2` rather than turning blue too.
  * - Pill group label: `--text-2` on the toolbar's white ground.
  */
 const BLUE = "#0a84ff";
@@ -45,11 +49,22 @@ describe("DataTable contrast", () => {
   });
 
   it("keeps the sort glyph above the non-text floor on the sticky header", () => {
-    expect(contrastRatio(TEXT_2, GROUP)).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
+    expect(contrastRatio(TEXT_2, WHITE)).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
   });
 
-  it("is why the sort glyph is not --text-3", () => {
+  it("keeps the active sort glyph above it too", () => {
+    expect(contrastRatio(BLUE, WHITE)).toBeGreaterThanOrEqual(NON_TEXT_CONTRAST);
+  });
+
+  it("is why the sort glyph is not --text-3, on the old --group header or the white one", () => {
     expect(contrastRatio(TEXT_3, GROUP)).toBeLessThan(NON_TEXT_CONTRAST);
+    expect(contrastRatio(TEXT_3, WHITE)).toBeLessThan(NON_TEXT_CONTRAST);
+  });
+
+  it("keeps the header label itself at full AA, not just the non-text floor", () => {
+    // The label is text; the caret beside it is not. Only one of the two may
+    // sit at 3:1.
+    expect(contrastRatio(TEXT_2, WHITE)).toBeGreaterThanOrEqual(AA_CONTRAST);
   });
 
   it("keeps the pill group label readable on the toolbar", () => {

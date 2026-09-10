@@ -11,6 +11,7 @@ import { flexRender, type Header, type Row as TanstackRow } from "@tanstack/reac
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { DataTableProps } from "./DataTable.types";
 import { useDataTable } from "./useDataTable";
+import { sizedMinWidth } from "./dataTable.util";
 import { DataTableSearch } from "./DataTableSearch";
 import {
   CLEAR_FILTERS_LABEL,
@@ -134,7 +135,19 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   const padBottom =
     isVirtual && items.length > 0 ? virtualizer.getTotalSize() - items[items.length - 1].end : 0;
   const visibleRows = isVirtual ? items.map((item) => modelRows[item.index]) : modelRows;
-  const columnCount = table.getAllLeafColumns().length;
+  // Visible, not all: a hidden column still has a column def, and counting it
+  // would emit a stray `<col>` and overshoot every `colSpan` in the body.
+  const leafColumns = table.getVisibleLeafColumns();
+  const columnCount = leafColumns.length;
+
+  // One declared width is enough to switch the table to fixed layout — see
+  // `ColumnMeta.width`. A table where no column asks for anything keeps the
+  // browser's own content-driven layout, unchanged.
+  const columnWidths = leafColumns.map((column) => column.columnDef.meta?.width);
+  const isSized = columnWidths.some((width) => width !== undefined);
+  // Past this the table stops shrinking and `.dt__scroll` scrolls instead —
+  // rather than squeezing the unsized Name column down to nothing.
+  const minWidth = isSized ? sizedMinWidth(columnWidths) : undefined;
 
   // With nothing scanned yet there is nothing to search or slice, so the
   // filter controls would only be furniture. `toolbarRight` stays — the way
@@ -226,13 +239,23 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 
       <div className="dt__scroll" ref={scrollRef}>
         <table
-          className="dt__table"
+          className={cx("dt__table", isSized && "dt__table--sized")}
+          style={minWidth ? { minWidth } : undefined}
           aria-label={ariaLabel}
           aria-busy={loading || undefined}
           // Only meaningful while rows are missing from the DOM; a full table
           // already tells assistive tech how many rows there are.
           aria-rowcount={isVirtual ? modelRows.length + 1 : undefined}
         >
+          {isSized && (
+            <colgroup>
+              {leafColumns.map((column) => {
+                const width = column.columnDef.meta?.width;
+                return <col key={column.id} style={width ? { width } : undefined} />;
+              })}
+            </colgroup>
+          )}
+
           <thead className="dt__head">
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id} aria-rowindex={isVirtual ? 1 : undefined}>
@@ -273,7 +296,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
             {loading &&
               Array.from({ length: SKELETON_ROWS }, (_, index) => (
                 <tr key={`skeleton-${index}`} className="dt__skeleton-row" aria-hidden="true">
-                  {table.getAllLeafColumns().map((column) => (
+                  {leafColumns.map((column) => (
                     <td key={column.id} className="dt__cell">
                       <span className="dt__skeleton" />
                     </td>

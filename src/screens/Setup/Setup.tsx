@@ -69,7 +69,7 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page setup-page">
+        <div className="page page--table setup-page">
           {busy && (
             <ScanBar
               progress={scan.progress}

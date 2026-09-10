@@ -3,7 +3,17 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Layer, UsageStat } from "@/lib/ipc";
 import { DataTable } from "./DataTable";
 import type { DataTableProps, PillGroup } from "./DataTable.types";
-import { ActionsCell, GradeCell, PathCell, PercentCell, ScopeCell, TokensCell, UsageCell } from "./cells";
+import {
+  ActionsCell,
+  CountCell,
+  GradeCell,
+  LastUsedCell,
+  PathCell,
+  PercentCell,
+  ScopeCell,
+  TokensCell,
+  lastUsedAt,
+} from "./cells";
 
 interface Artifact {
   id: string;
@@ -17,8 +27,6 @@ interface Artifact {
   errorRate: number | null;
   tokens: number | null;
 }
-
-const NOW = new Date("2026-08-20T12:00:00.000Z");
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
   total: 24,
@@ -95,10 +103,25 @@ const COLUMNS: ColumnDef<Artifact, any>[] = [
   },
   { id: "path", header: "Path", accessorKey: "path", cell: (c) => <PathCell path={c.getValue()} /> },
   {
-    id: "usage",
-    header: "Usage",
-    accessorFn: (r) => r.usage?.total ?? 0,
-    cell: (c) => <UsageCell usage={c.row.original.usage} now={NOW} />,
+    id: "uses",
+    header: "Uses",
+    accessorFn: (r) => r.usage?.total ?? -1,
+    meta: { align: "right" },
+    cell: (c) => <CountCell value={c.row.original.usage?.total} />,
+  },
+  {
+    id: "sessions",
+    header: "Sessions",
+    accessorFn: (r) => r.usage?.sessions ?? -1,
+    meta: { align: "right" },
+    cell: (c) => <CountCell value={c.row.original.usage?.sessions} />,
+  },
+  {
+    id: "lastUsed",
+    header: "Last used",
+    accessorFn: (r) => lastUsedAt(r.usage?.last_used) ?? -1,
+    meta: { align: "right" },
+    cell: (c) => <LastUsedCell lastUsed={c.row.original.usage?.last_used} />,
   },
   {
     id: "errors",

@@ -135,6 +135,18 @@ declare module "@tanstack/react-table" {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData extends RowData, TValue> {
     align?: "left" | "right";
+    /**
+     * A CSS length pinned on this column through the table's `<colgroup>`.
+     *
+     * Declaring one on *any* column switches the whole table to
+     * `table-layout: fixed`, which is what lets a wide table fit its
+     * container: the sized columns take exactly what they asked for and the
+     * columns that declare nothing share the remainder. Size the short,
+     * predictable columns (counts, rates, an actions button) and leave the
+     * name column alone — it is the one that should absorb the slack, and the
+     * one whose cells ellipsize when there isn't any.
+     */
+    width?: string;
   }
 }
 

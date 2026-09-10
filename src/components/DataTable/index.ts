@@ -20,7 +20,9 @@ export {
 } from "./DataTable.constants";
 export {
   GradeCell,
-  UsageCell,
+  NameCell,
+  CountCell,
+  LastUsedCell,
   PercentCell,
   TokensCell,
   ScopeCell,
@@ -28,8 +30,11 @@ export {
   ActionsCell,
   truncateMiddle,
   formatPercent,
+  formatCount,
   formatTokens,
+  lastUsedAt,
   EMPTY_MARK,
+  NEVER_MARK,
 } from "./cells";
 
 export type {
@@ -42,7 +47,9 @@ export type {
 export type { UseDataTable } from "./useDataTable";
 export type {
   GradeCellProps,
-  UsageCellProps,
+  NameCellProps,
+  CountCellProps,
+  LastUsedCellProps,
   PercentCellProps,
   TokensCellProps,
   ScopeCellProps,

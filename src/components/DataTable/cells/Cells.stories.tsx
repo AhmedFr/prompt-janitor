@@ -1,20 +1,24 @@
 import type { ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import type { UsageStat } from "@/lib/ipc";
-import { ActionsCell, GradeCell, PathCell, PercentCell, ScopeCell, TokensCell, UsageCell } from "./index";
+import {
+  ActionsCell,
+  CountCell,
+  GradeCell,
+  LastUsedCell,
+  NameCell,
+  PathCell,
+  PercentCell,
+  ScopeCell,
+  TokensCell,
+} from "./index";
 
+/**
+ * `LastUsedCell` reads relative ages off the wall clock, so the story dates are
+ * offsets from a fixed base rather than from `Date.now()` — otherwise every
+ * snapshot of this story differs from the last by however long ago it was taken.
+ */
 const NOW = new Date("2026-08-20T12:00:00.000Z");
-
-const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
-  total: 24,
-  sessions: 9,
-  last_used: "2026-08-19T12:00:00.000Z",
-  error_rate: 0,
-  avg_turn_tokens: 900,
-  count_30d: 12,
-  count_prev_30d: 6,
-  ...o,
-});
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -48,12 +52,29 @@ export const AllCells: Story = {
             <GradeCell grade={null} />
           </span>
         </Row>
-        <Row label="UsageCell">
-          <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
-            <UsageCell usage={usage()} now={NOW} />
-            <UsageCell usage={null} now={NOW} />
-            <UsageCell usage={usage({ error_rate: 0.4 })} now={NOW} />
-            <UsageCell usage={usage({ last_used: "2026-04-02T12:00:00.000Z" })} now={NOW} />
+        <Row label="NameCell">
+          {/* In a 240px column, which is what a nine-column table leaves it. */}
+          <span style={{ display: "block", width: 240 }}>
+            <NameCell
+              name="running-a-feature-workflow"
+              description="Ship a change through issue, branch, TDD, local gates, PR, review and squash-merge"
+            />
+          </span>
+          <span style={{ display: "block", width: 240 }}>
+            <NameCell name="deploy" description={null} />
+          </span>
+        </Row>
+        <Row label="CountCell">
+          <CountCell value={12345} /> · <CountCell value={9} /> · <CountCell value={0} /> ·{" "}
+          <CountCell value={null} />
+        </Row>
+        <Row label="LastUsedCell">
+          <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
+            <LastUsedCell lastUsed={hoursAgo(0.2)} />
+            <LastUsedCell lastUsed={hoursAgo(5)} />
+            <LastUsedCell lastUsed={hoursAgo(24 * 3)} />
+            <LastUsedCell lastUsed={hoursAgo(24 * 140)} />
+            <LastUsedCell lastUsed={null} />
           </span>
         </Row>
         <Row label="PercentCell">

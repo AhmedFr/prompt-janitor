@@ -1,3 +1,4 @@
+import { FLEX_COLUMN_MIN } from "./DataTable.constants";
 import type { DataTableProps, PillGroup, TableState } from "./DataTable.types";
 
 /** The `keys` shape a table's `search` config carries, with the optional wrapper stripped. */
@@ -123,4 +124,29 @@ export function facetedPillCounts<Row>(
     out[group.id] = pillCounts(applyFilters(rows, others, search, groups), group);
   }
   return out;
+}
+
+/**
+ * The `min-width` a fixed-layout table must not shrink past, from its
+ * columns' declared widths: every pixel width as given, plus
+ * {@link FLEX_COLUMN_MIN} for each column that declared none.
+ *
+ * Without it, fixed layout gives an undeclared column whatever the sized ones
+ * leave — which is 0px once the window is narrow enough, and a Name column
+ * rendered at nothing is worse than one that scrolls. Returns `undefined`
+ * when any declared width isn't a plain pixel length: there is no honest
+ * floor to add up out of `%` or `ch`, and a wrong one is worse than none.
+ */
+export function sizedMinWidth(widths: (string | undefined)[]): string | undefined {
+  let total = 0;
+  for (const width of widths) {
+    if (width === undefined) {
+      total += FLEX_COLUMN_MIN;
+      continue;
+    }
+    const px = /^(\d+(?:\.\d+)?)px$/.exec(width);
+    if (!px) return undefined;
+    total += Number(px[1]);
+  }
+  return `${total}px`;
 }

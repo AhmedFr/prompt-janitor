@@ -24,11 +24,18 @@
 
 /* ---------- toolbar ---------- */
 
+/*
+ * One band, not a stack of strips: the search box and every chip group wrap
+ * within a single row, so the controls read as one toolbar sitting above the
+ * table. `column-gap` is wider than `row-gap` on purpose — it separates the
+ * groups; the rows it wraps onto belong to the same band and shouldn't drift
+ * apart.
+ */
 .dt__toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 12px;
 }
 
 .dt__toolbar-right {
@@ -37,11 +44,13 @@
   gap: 8px;
 }
 
+/* Left padding matches --dt-row-pad-x, so the search icon starts on the same
+   vertical as the first column's text directly below it. */
 .dt__search {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 9px;
+  padding: 0 var(--dt-row-pad-x);
   height: 28px;
   border-radius: var(--r-ctrl);
   border: 0.5px solid var(--sep-strong);
@@ -61,7 +70,9 @@
   font: inherit;
   font-size: 12px;
   color: var(--text);
-  width: 200px;
+  /* ~260px overall with the icon and gutters — wide enough for a real query,
+     narrow enough that the chips stay on the same line beside it. */
+  width: 210px;
   min-width: 0;
 }
 
@@ -69,7 +80,7 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 /* The visible boundary between one group of chips and the next — and the
@@ -77,8 +88,10 @@
    --text-2 on the toolbar's white ground is 5.07:1 (see
    dataTable.contrast.test.ts). */
 .dt__pill-group-label {
+  align-self: center;
+  margin-right: 2px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-2);
@@ -152,19 +165,38 @@
   color: var(--text);
 }
 
+/*
+ * Any column declaring a `meta.width` puts the table on fixed layout (see
+ * `ColumnMeta.width`): the sized columns take exactly what they asked for,
+ * whatever is left goes to the columns that asked for nothing, and a wide
+ * table stops widening past its container. `.dt__scroll`'s overflow is then
+ * the last resort it was always meant to be, not the normal reading mode.
+ */
+.dt__table--sized {
+  table-layout: fixed;
+}
+
+/*
+ * A label, not a band. The grey header stripe read as a piece of furniture
+ * competing with the rows; on the card's own white with a hairline under it,
+ * the eye goes to the data and the header is just what the columns are
+ * called. Small, uppercase, tracked, `--text-2` — 5.07:1 on white, measured
+ * in `dataTable.contrast.test.ts`.
+ */
 .dt__head th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--group);
+  /* Opaque, not transparent: rows scroll underneath it. */
+  background: var(--card);
   border-bottom: 0.5px solid var(--sep-strong);
   text-align: left;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-2);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 7px var(--dt-row-pad-x);
+  letter-spacing: 0.06em;
+  padding: 8px var(--dt-row-pad-x);
   white-space: nowrap;
 }
 
@@ -182,20 +214,44 @@
   cursor: pointer;
 }
 
-/* Unsorted columns keep a quiet glyph rather than none: an indicator that only
-   appears once you have already clicked doesn't tell you the column is
-   sortable in the first place. --text-2 rather than --text-3 because the glyph
-   *is* the affordance — 4.66:1 on the sticky header's --group ground, where
-   --text-3 managed 2.57:1 and missed even the 3:1 non-text floor. Measured in
-   dataTable.contrast.test.ts. */
+/* A caret on every column at once is nine arrows shouting at a reader looking
+   for one number. Only the column actually sorted keeps a visible one; the
+   rest reveal theirs on hover or keyboard focus, which is when the question
+   "can I sort this?" is being asked. `opacity`, not `display`, so the header
+   never changes width as a sort moves between columns.
+
+   --text-2 rather than --text-3 because the glyph *is* the affordance —
+   5.07:1 on the header's white ground, where --text-3 managed 2.98:1 and
+   missed even the 3:1 non-text floor. Measured in dataTable.contrast.test.ts. */
 .dt__sort-glyph {
   font-size: 9px;
   color: var(--text-2);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.dt__sort:hover .dt__sort-glyph,
+.dt__sort:focus-visible .dt__sort-glyph,
+.dt__sort-glyph[data-sort="ascending"],
+.dt__sort-glyph[data-sort="descending"] {
+  opacity: 1;
 }
 
 .dt__sort-glyph[data-sort="ascending"],
 .dt__sort-glyph[data-sort="descending"] {
   color: var(--blue);
+}
+
+/* The sorted column's own name comes forward with its caret. */
+.dt__th[aria-sort="ascending"],
+.dt__th[aria-sort="descending"] {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt__sort-glyph {
+    transition: none;
+  }
 }
 
 .dt__cell {
@@ -217,6 +273,13 @@
   height: var(--dt-row-h);
 }
 
+/* Every row, not just the openable ones: the tint is what tells you which
+   line your eye is on as it crosses nine columns. Clickable rows say so with
+   the cursor instead. */
+.dt__row:hover {
+  background: var(--group);
+}
+
 .dt__row--clickable {
   cursor: pointer;
 }
@@ -225,10 +288,6 @@
    where you landed, not where focus is. */
 .dt__row--highlight {
   background: var(--blue-tint);
-}
-
-.dt__row--clickable:hover {
-  background: var(--group);
 }
 
 .dt__row--clickable:focus-visible {

@@ -850,4 +850,56 @@ describe("DataTable", () => {
 
     expect(rowNames()).toEqual(["Alpha", "Charlie"]);
   });
+  describe("sort caret", () => {
+    const glyphOf = (name: RegExp) =>
+      screen.getByRole("columnheader", { name }).querySelector(".dt__sort-glyph") as HTMLElement;
+
+    it("marks the sorted column's caret with its direction and leaves the rest unsorted", () => {
+      setup({ defaultSort: { id: "name", desc: true } });
+      // The quiet columns keep their caret in the DOM — CSS reveals it on
+      // hover — so the header can never change width when a sort lands.
+      expect(glyphOf(/Name/)).toHaveAttribute("data-sort", "descending");
+      expect(glyphOf(/Score/)).toHaveAttribute("data-sort", "none");
+    });
+
+    it("moves the direction to whichever column was clicked last", () => {
+      setup({ defaultSort: { id: "name", desc: true } });
+      fireEvent.click(screen.getByRole("button", { name: "Score" }));
+      expect(glyphOf(/Score/)).toHaveAttribute("data-sort", "ascending");
+      expect(glyphOf(/Name/)).toHaveAttribute("data-sort", "none");
+    });
+
+    it("gives an unsortable column no caret at all", () => {
+      setup();
+      expect(glyphOf(/Kind/)).toBeNull();
+    });
+  });
+
+  describe("column sizing", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SIZED: ColumnDef<Row, any>[] = [
+      { id: "name", header: "Name", accessorKey: "name" },
+      { id: "kind", header: "Kind", accessorKey: "kind", meta: { width: "120px" } },
+      { id: "score", header: "Score", accessorKey: "score", meta: { align: "right", width: "80px" } },
+    ];
+
+    it("leaves a table whose columns declare no width on the browser's own layout", () => {
+      setup();
+      const table = screen.getByRole("table");
+      expect(table.querySelector("colgroup")).toBeNull();
+      expect(table).not.toHaveClass("dt__table--sized");
+    });
+
+    it("pins declared widths through a colgroup so the flexible column takes the slack", () => {
+      setup({ columns: SIZED });
+      const cols = [...screen.getByRole("table").querySelectorAll("colgroup col")];
+      expect(cols).toHaveLength(3);
+      // The name column declares none: fixed layout hands it whatever is left,
+      // which is what makes a nine-column table fit without scrolling.
+      expect(cols[0].getAttribute("style")).toBeNull();
+      expect(cols[1]).toHaveStyle({ width: "120px" });
+      expect(cols[2]).toHaveStyle({ width: "80px" });
+      expect(screen.getByRole("table")).toHaveClass("dt__table--sized");
+    });
+  });
 });

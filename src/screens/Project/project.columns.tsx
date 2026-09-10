@@ -6,8 +6,11 @@ import { KIND_ORDER } from "@/screens/Setup/Setup.constants";
 import {
   actionsColumn,
   avgTokensColumn,
+  COLUMN_WIDTH,
   errorRateColumn,
+  lastUsedColumn,
   nameColumn,
+  sessionsColumn,
   sizeColumn,
   usesColumn,
   type ActionsKind,
@@ -102,6 +105,7 @@ function kindColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "kind",
     header: "Kind",
+    meta: { width: COLUMN_WIDTH.kind },
     accessorFn: (r) => kindRank(r.kind),
     cell: (c) => (
       <span className="project-kind" data-kind={c.row.original.kind}>
@@ -131,10 +135,13 @@ const cache = new WeakMap<ColumnsCtx, ColumnDef<ArtifactView, unknown>[]>();
 export function projectSetupColumns(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown>[] {
   let defs = cache.get(ctx);
   if (!defs) {
+    const invocable = (row: ArtifactView) => INVOCABLE_KINDS.has(row.kind);
     defs = [
       kindColumn(),
       nameColumn(),
-      usesColumn((row) => INVOCABLE_KINDS.has(row.kind)),
+      usesColumn(invocable),
+      sessionsColumn(invocable),
+      lastUsedColumn(invocable),
       errorRateColumn(),
       avgTokensColumn(),
       sizeColumn(),

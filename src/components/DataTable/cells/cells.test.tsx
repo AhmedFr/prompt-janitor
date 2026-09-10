@@ -1,28 +1,34 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import type { UsageStat } from "@/lib/ipc";
 import {
   ActionsCell,
+  CountCell,
   GradeCell,
+  LastUsedCell,
+  NameCell,
   PathCell,
   PercentCell,
   ScopeCell,
   TokensCell,
-  UsageCell,
 } from "./index";
-import { truncateMiddle } from "./cells.util";
+import { lastUsedAt, truncateMiddle } from "./cells.util";
 
-const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
-  total: 9,
-  sessions: 4,
-  last_used: "2026-08-19T10:00:00.000Z",
-  error_rate: 0,
-  avg_turn_tokens: null,
-  count_30d: 2,
-  count_prev_30d: 1,
-  ...o,
-});
+/** `relativeTime` reads the wall clock, so every relative assertion pins it. */
+const NOW = new Date("2026-08-19T15:00:00.000Z");
+
+/**
+ * Only the relative-age assertions freeze the clock. Fake timers would stall
+ * axe's own async work, so the accessibility sweep at the bottom of this file
+ * has to run on the real one.
+ */
+function withFrozenClock() {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => vi.useRealTimers());
+}
 
 afterEach(cleanup);
 
@@ -38,15 +44,74 @@ describe("GradeCell", () => {
   });
 });
 
-describe("UsageCell", () => {
-  it("renders the label formatUsage produced", () => {
-    render(<UsageCell usage={usage()} now={new Date("2026-08-19T15:00:00.000Z")} />);
-    expect(screen.getByText("used 9× · 4 sessions · last 5h ago")).toBeInTheDocument();
+describe("NameCell", () => {
+  it("renders the name with its description muted beside it", () => {
+    render(<NameCell name="superpowers" description="v6.3.0 · claude-plugins-official" />);
+    expect(screen.getByText("superpowers")).toBeInTheDocument();
+    expect(screen.getByText("v6.3.0 · claude-plugins-official")).toHaveClass("muted");
   });
 
-  it("carries the usage tone so never-used rows read differently", () => {
-    render(<UsageCell usage={null} />);
-    expect(screen.getByText("never used")).toHaveAttribute("data-tone", "never");
+  it("renders nothing beside the name when there is no description", () => {
+    const { container } = render(<NameCell name="deploy" description={null} />);
+    expect(container.querySelector(".dt-name__desc")).toBeNull();
+  });
+
+  it("keeps the full text in a title, because both halves are clamped to one line", () => {
+    const description = "a description far too long to survive one compact table row";
+    render(<NameCell name="running-a-feature-workflow" description={description} />);
+    expect(screen.getByTitle("running-a-feature-workflow")).toBeInTheDocument();
+    expect(screen.getByTitle(description)).toBeInTheDocument();
+  });
+});
+
+describe("CountCell", () => {
+  it("groups thousands so a long count stays scannable", () => {
+    render(<CountCell value={12345} />);
+    expect(screen.getByText("12,345")).toBeInTheDocument();
+  });
+
+  it("renders a real zero rather than an em dash", () => {
+    render(<CountCell value={0} />);
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+
+  it("renders an em dash when the count is unknown", () => {
+    render(<CountCell value={null} />);
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+});
+
+describe("lastUsedAt", () => {
+  it("parses an RFC3339 timestamp to epoch milliseconds", () => {
+    expect(lastUsedAt("2026-08-19T10:00:00.000Z")).toBe(Date.parse("2026-08-19T10:00:00.000Z"));
+  });
+
+  it("reads a missing or unparseable timestamp as never used", () => {
+    expect(lastUsedAt(null)).toBeNull();
+    expect(lastUsedAt(undefined)).toBeNull();
+    expect(lastUsedAt("not a date")).toBeNull();
+  });
+});
+
+describe("LastUsedCell", () => {
+  withFrozenClock();
+
+  it("renders a short relative age", () => {
+    render(<LastUsedCell lastUsed="2026-08-19T10:00:00.000Z" />);
+    expect(screen.getByText("5h")).toBeInTheDocument();
+  });
+
+  it("counts days once the age passes a day", () => {
+    render(<LastUsedCell lastUsed="2026-08-16T15:00:00.000Z" />);
+    expect(screen.getByText("3d")).toBeInTheDocument();
+  });
+
+  it("says never — not an em dash — for an artifact nothing ever invoked", () => {
+    // The em dash means "unknown" in every other cell; "was never called" is
+    // a fact about the artifact, not a gap in the data.
+    render(<LastUsedCell lastUsed={null} />);
+    expect(screen.getByText("never")).toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 });
 
@@ -164,7 +229,8 @@ describe("cells accessibility", () => {
     const { container } = render(
       <div>
         <GradeCell grade="A" />
-        <UsageCell usage={usage()} now={new Date("2026-08-19T15:00:00.000Z")} />
+        <CountCell value={9} />
+        <LastUsedCell lastUsed="2026-08-19T10:00:00.000Z" />
         <PercentCell value={0.5} />
         <TokensCell value={2400} />
         <ScopeCell layer="global" />

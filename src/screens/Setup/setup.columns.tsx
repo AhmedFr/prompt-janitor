@@ -3,12 +3,15 @@ import type { ArtifactKind, ArtifactView } from "@/lib/ipc";
 import type { GradeLetter } from "@/components/Grade";
 import {
   ActionsCell,
+  CountCell,
   EMPTY_MARK,
   GradeCell,
+  LastUsedCell,
+  lastUsedAt,
+  NameCell,
   PercentCell,
   ScopeCell,
   TokensCell,
-  UsageCell,
 } from "@/components/DataTable";
 import { openExternal } from "@/lib/open-external";
 import { projectNameFor } from "./setup.util";
@@ -56,6 +59,29 @@ export interface ColumnsCtx {
 
 const SIZE_UNITS = ["B", "KB", "MB"] as const;
 
+/**
+ * What each short column asks for, in CSS pixels — wide enough for its
+ * uppercase header plus a sort caret, and no wider.
+ *
+ * Every column here declares one and `name` declares none, which is the whole
+ * mechanism (see `ColumnMeta.width`): the table goes to fixed layout, these
+ * take what they asked for, and Name absorbs the rest instead of the table
+ * widening past the page and scrolling sideways — the defect that clipped
+ * "running-a-feature-workflow" down to "rkflow" on the owner's screen.
+ */
+export const COLUMN_WIDTH = {
+  kind: "100px",
+  scope: "104px",
+  grade: "78px",
+  uses: "68px",
+  sessions: "88px",
+  lastUsed: "96px",
+  errorRate: "82px",
+  avgTokens: "100px",
+  size: "80px",
+  actions: "76px",
+} as const;
+
 /** Human file size from a byte count — whole bytes under 1 KB, one decimal place above it. */
 export function formatSize(bytes: number): string {
   let value = bytes;
@@ -72,18 +98,11 @@ export function nameColumn(): ColumnDef<ArtifactView, unknown> {
     id: "name",
     header: "Name",
     accessorKey: "name",
-    // Description muted alongside the name — hooks bake "event: cmd" into
-    // `name` already and carry no description, so this degrades to plain
-    // text for them. Inline rather than a named component: this module's
-    // exports are column/pill *definitions*, not components, and a stray
-    // capitalized helper here trips Fast Refresh's one-component-per-file
-    // check for no benefit — nothing renders this file directly.
-    cell: (c) => (
-      <span>
-        {c.row.original.name}
-        {c.row.original.description && <span className="muted"> · {c.row.original.description}</span>}
-      </span>
-    ),
+    // Description muted alongside the name, both clamped to one line by
+    // `NameCell` — hooks bake "event: cmd" into `name` already and carry no
+    // description, so this degrades to plain text for them. The one column
+    // that declares no width: it takes whatever the sized columns leave.
+    cell: (c) => <NameCell name={c.row.original.name} description={c.row.original.description} />,
   };
 }
 
@@ -101,6 +120,7 @@ function scopeColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
   return {
     id: "scope",
     header: "Scope",
+    meta: { width: COLUMN_WIDTH.scope },
     // Returns the rendered label itself (not the raw `layer` value) so a
     // header-sort click orders rows exactly the way `ScopeCell` displays
     // them — "Global" before "Plugin" before a project name, not "global"
@@ -120,6 +140,7 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "grade",
     header: "Grade",
+    meta: { width: COLUMN_WIDTH.grade },
     // TanStack's default sort comparator isn't transitive over null/
     // undefined mixed with strings, so ungraded rows scatter mid-table
     // instead of grouping at the end. "Z" sorts after every real grade
@@ -133,14 +154,34 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
 }
 
 /**
- * `applies` narrows which rows the column makes a claim about. Every Setup
+ * Whether a usage column should stay silent about this row.
+ *
+ * `applies` narrows which rows a usage column makes a claim about. Every Setup
  * table holds one kind, so it is only ever invocable rows there and the
  * default (always) is right. A table that mixes kinds — the project page's
- * single combined inventory — needs the guard: `UsageCell` renders "never
- * used" for a null rollup, which reads as a finding about a rule file rather
- * than as the fact that rule files are loaded, never called. Guarded-out rows
- * fall back to the same em dash `PercentCell`/`TokensCell` already use, and
- * still sort under the never-used sentinel.
+ * single combined inventory — needs the guard: `LastUsedCell` renders "never"
+ * for a null rollup, which reads as a finding about a rule file rather than as
+ * the fact that rule files are loaded, never called. Guarded-out rows fall
+ * back to the same em dash `PercentCell`/`TokensCell` already use.
+ *
+ * It governs the sort key as much as the cell, and has to: a stale
+ * `usage_stats` row against a rule file would otherwise rank first under
+ * "Uses desc" while its cell showed "—", leaving the table ordered by a
+ * number it refuses to display. Guarded-out rows take the same `-1` sentinel
+ * as never-used ones.
+ */
+function silent(row: ArtifactView, applies?: (row: ArtifactView) => boolean): boolean {
+  return applies !== undefined && !applies(row);
+}
+
+/** The em dash a guarded-out row shows in place of a claim it can't make. */
+const noClaim = <span className="muted">{EMPTY_MARK}</span>;
+
+/**
+ * Three plain columns rather than one pill: a single "used 9× · 4 sessions ·
+ * last 3d ago" chip can only be sorted one way, and the whole reason to have
+ * the numbers in a table is to rank by any of them. Right-aligned so the
+ * digits line up down the column.
  */
 export function usesColumn(
   applies?: (row: ArtifactView) => boolean,
@@ -148,13 +189,54 @@ export function usesColumn(
   return {
     id: "uses",
     header: "Uses",
-    // Never-used sorts to the bottom of a "Uses desc" default sort.
-    accessorFn: (r) => r.usage?.total ?? -1,
+    // Never-used sorts to the bottom of a "Uses desc" default sort — and so
+    // does a guarded-out row, whatever rollup it carries: a column that
+    // refuses to show a number must not rank the table by it either.
+    accessorFn: (r) => (silent(r, applies) ? -1 : r.usage?.total ?? -1),
+    meta: { align: "right", width: COLUMN_WIDTH.uses },
     cell: (c) =>
-      applies && !applies(c.row.original) ? (
-        <span className="muted">{EMPTY_MARK}</span>
+      silent(c.row.original, applies) ? noClaim : <CountCell value={c.row.original.usage?.total} />,
+  };
+}
+
+/** How many distinct sessions reached for the artifact — breadth, where Uses is volume. */
+export function sessionsColumn(
+  applies?: (row: ArtifactView) => boolean,
+): ColumnDef<ArtifactView, unknown> {
+  return {
+    id: "sessions",
+    header: "Sessions",
+    accessorFn: (r) => (silent(r, applies) ? -1 : r.usage?.sessions ?? -1),
+    meta: { align: "right", width: COLUMN_WIDTH.sessions },
+    cell: (c) =>
+      silent(c.row.original, applies) ? (
+        noClaim
       ) : (
-        <UsageCell usage={c.row.original.usage} />
+        <CountCell value={c.row.original.usage?.sessions} />
+      ),
+  };
+}
+
+/**
+ * Sorted by the timestamp behind the label, never by the label: "3d" and "40d"
+ * compare the wrong way round as text. Rows with no last-used instant — never
+ * invoked, or invoked with no recorded time — take the same `-1` sentinel the
+ * other usage columns use, so they trail a descending sort instead of leading
+ * it.
+ */
+export function lastUsedColumn(
+  applies?: (row: ArtifactView) => boolean,
+): ColumnDef<ArtifactView, unknown> {
+  return {
+    id: "lastUsed",
+    header: "Last used",
+    accessorFn: (r) => (silent(r, applies) ? -1 : lastUsedAt(r.usage?.last_used) ?? -1),
+    meta: { align: "right", width: COLUMN_WIDTH.lastUsed },
+    cell: (c) =>
+      silent(c.row.original, applies) ? (
+        noClaim
+      ) : (
+        <LastUsedCell lastUsed={c.row.original.usage?.last_used} />
       ),
   };
 }
@@ -164,7 +246,7 @@ export function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
     id: "errorRate",
     header: "Error %",
     accessorFn: (r) => r.usage?.error_rate ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.errorRate },
     cell: (c) => <PercentCell value={c.row.original.usage?.error_rate} />,
   };
 }
@@ -174,7 +256,7 @@ export function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
     id: "avgTokens",
     header: "Avg tokens",
     accessorFn: (r) => r.usage?.avg_turn_tokens ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.avgTokens },
     cell: (c) => <TokensCell value={c.row.original.usage?.avg_turn_tokens} />,
   };
 }
@@ -184,7 +266,7 @@ export function sizeColumn(): ColumnDef<ArtifactView, unknown> {
     id: "size",
     header: "Size",
     accessorKey: "bytes",
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.size },
     cell: (c) => <span className="dt-num">{formatSize(c.getValue() as number)}</span>,
   };
 }
@@ -198,7 +280,7 @@ function bundledColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
     // Kept for sorting — TanStack memoises this per row and re-derives it
     // only when the row (or the column defs) change.
     accessorFn: countFor,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.uses },
     // Reads straight from `ctx` rather than trusting the memoised
     // `getValue()`: `ctx.pluginBundleCounts` can be swapped for a fresher
     // map (a rescan) without the column defs themselves changing identity,
@@ -223,7 +305,7 @@ export function actionsColumn(
     id: "actions",
     header: "Actions",
     enableSorting: false,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.actions },
     cell: (c) => {
       const row = c.row.original;
       const resolved = typeof kind === "function" ? kind(row) : kind;
@@ -256,6 +338,8 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
         nameColumn(),
         scopeColumn(ctx),
         usesColumn(),
+        sessionsColumn(),
+        lastUsedColumn(),
         errorRateColumn(),
         avgTokensColumn(),
         sizeColumn(),
@@ -264,7 +348,15 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
     case "hook":
       return [nameColumn(), scopeColumn(ctx)];
     case "mcp_server":
-      return [nameColumn(), scopeColumn(ctx), usesColumn(), errorRateColumn(), avgTokensColumn()];
+      return [
+        nameColumn(),
+        scopeColumn(ctx),
+        usesColumn(),
+        sessionsColumn(),
+        lastUsedColumn(),
+        errorRateColumn(),
+        avgTokensColumn(),
+      ];
     case "plugin":
       return [nameColumn(), bundledColumn(ctx), actionsColumn("folder", ctx)];
     case "settings":

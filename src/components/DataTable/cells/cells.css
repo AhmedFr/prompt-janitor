@@ -1,9 +1,54 @@
 /* Shared table-cell primitives. One stylesheet for all seven cells: they are
    variations on the same dense row rhythm, not independent components. */
 
+/* `nowrap`: "12.0 KB" broken across two lines is both unreadable and the one
+   thing that can push a compact row past its pinned height. */
 .dt-num {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: var(--text);
+}
+
+/* ---------- name + description, on one line ---------- */
+
+/*
+ * A table is read by scanning down a column, and a description that wraps
+ * turns every third row into a paragraph. Both halves stay on one line and
+ * ellipsize; `title` carries the full text (see `NameCell`).
+ */
+.dt-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+/*
+ * Keeps its natural width for as long as the column allows, and only then
+ * ellipsizes — never past `min-width`. Shrinking it proportionally with the
+ * description is what rendered "rkflow" where the row said
+ * "running-a-feature-workflow": the name is the row's identity, and it is the
+ * last thing that should give.
+ */
+.dt-name__label {
+  flex: 0 1 auto;
+  min-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * `flex-basis: 0` is the whole trick: the description has no width of its own
+ * to defend, so it grows into whatever the name leaves and gives all of it
+ * back first. Context, not identity.
+ */
+.dt-name__desc {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dt-scope {

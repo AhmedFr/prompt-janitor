@@ -1,8 +1,3 @@
-/* Tables need the width; the old card layout capped the page at 1000px. */
-.setup-page {
-  max-width: 1180px;
-}
-
 .setup-harnesses {
   display: flex;
   flex-wrap: wrap;
