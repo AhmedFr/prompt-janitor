@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { filterTrigger, pickFilter } from "@/test/filters";
 import type { FileRow } from "@/lib/ipc";
 import { Prompts } from "./Prompts";
 
@@ -151,7 +152,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^AGENTS\.md, \d+$/ }));
+    pickFilter("Kind", "AGENTS.md");
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
   });
@@ -160,7 +161,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^F, \d+$/ }));
+    pickFilter("Grade", "F");
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
   });
@@ -169,7 +170,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /^web, \d+$/ }));
+    pickFilter("Project", "web");
 
     await waitFor(() =>
       expect(rowIds()).toEqual(["/code/web/CLAUDE.md", "/code/web/docs/CLAUDE.md"]),
@@ -180,7 +181,7 @@ describe("Prompts", () => {
     await renderScreen();
     await waitFor(() => expect(rowIds()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /Has issues/ }));
+    pickFilter("Status", "Has issues");
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
   });
@@ -194,10 +195,7 @@ describe("Prompts", () => {
     await renderScreen({ target: "/code/api" });
 
     await waitFor(() => expect(rowIds()).toEqual(["/code/api/AGENTS.md"]));
-    expect(screen.getByRole("button", { name: /^api, \d+$/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(filterTrigger("Project")).toHaveAccessibleName("Project, api");
   });
 
   it("leaves the deep-linked project selected on the next unqualified visit", async () => {

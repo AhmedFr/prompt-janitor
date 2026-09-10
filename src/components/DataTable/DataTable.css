@@ -25,7 +25,7 @@
 /* ---------- toolbar ---------- */
 
 /*
- * One band, not a stack of strips: the search box and every chip group wrap
+ * One band, not a stack of strips: the search box and every filter select wrap
  * within a single row, so the controls read as one toolbar sitting above the
  * table. `column-gap` is wider than `row-gap` on purpose — it separates the
  * groups; the rows it wraps onto belong to the same band and shouldn't drift
@@ -76,66 +76,29 @@
   min-width: 0;
 }
 
-.dt__pills {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-}
-
-/* The visible boundary between one group of chips and the next — and the
-   accessible name of the group, via aria-labelledby, so it is written once.
-   --text-2 on the toolbar's white ground is 5.07:1 (see
-   dataTable.contrast.test.ts). */
-.dt__pill-group-label {
-  align-self: center;
-  margin-right: 2px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-
-.dt__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* The toolbar's reset. A link rather than a button: it is the least of the
+   controls in the band, and giving it a border would make it compete with the
+   filter triggers it undoes. --blue-press on white is 6.30:1. */
+.dt__clear-all {
+  padding: 0 4px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-size: 12px;
-  padding: 4px 10px;
-  border-radius: var(--r-pill);
-  border: 0.5px solid var(--sep-strong);
-  background: var(--card);
-  color: var(--text-2);
+  color: var(--blue-press);
   cursor: pointer;
 }
 
-/* --blue-press, not --blue: white on --blue is 3.65:1 — fine for the chip's
-   shape, short of AA for the label inside it; on --blue-press it is 5.62:1.
-   The pressed chip is text first. Measured in dataTable.contrast.test.ts. */
-.dt__pill--on {
-  background: var(--blue-press);
-  color: #fff;
-  border-color: transparent;
+.dt__clear-all:hover {
+  text-decoration: underline;
 }
 
-.dt__pill:focus-visible,
+.dt__clear-all:focus-visible,
 .dt__sort:focus-visible,
 .dt__clear:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 1px;
-}
-
-.dt__pill-count {
-  min-width: 1.4em;
-  text-align: center;
-  padding: 0 5px;
-  border-radius: var(--r-pill);
-  background: var(--group);
-  color: var(--text-2);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* White on rgba(255,255,255,…) over the chip never clears AA; the active count

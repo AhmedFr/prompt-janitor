@@ -128,6 +128,36 @@ function setup(overrides: Partial<DataTableProps<Row>> = {}) {
   return { ...render(<DataTable {...props} />), props };
 }
 
+/**
+ * A pill group's trigger, whatever selection its accessible name now carries.
+ * Scoped to the toolbar: a column of the same name carries a sort button, and
+ * "Score" would otherwise match both.
+ */
+const groupTrigger = (label: string) =>
+  within(document.querySelector(".dt__toolbar") as HTMLElement).getByRole("button", {
+    name: new RegExp(`^${label}`),
+  });
+
+/** Opens a group's popover and hands back its listbox. */
+function openGroup(label: string) {
+  fireEvent.click(groupTrigger(label));
+  return screen.getByRole("listbox", { name: label });
+}
+
+/** An option row inside whichever popover is open. */
+const optionFor = (label: string) => screen.getByRole("option", { name: new RegExp(`^${label},`) });
+
+/**
+ * Picks an option and closes the popover behind it. Closed explicitly rather
+ * than by clicking elsewhere: `fireEvent.click` fires no `mousedown`, so the
+ * dismissal a real pointer would cause never happens in jsdom.
+ */
+function pick(group: string, option: string) {
+  openGroup(group);
+  fireEvent.click(optionFor(option));
+  if (screen.queryByRole("listbox", { name: group })) fireEvent.click(groupTrigger(group));
+}
+
 /** The first-column text of every body row, in render order. */
 function rowNames(): string[] {
   const body = screen.getAllByRole("rowgroup")[1];
@@ -228,21 +258,27 @@ describe("DataTable", () => {
     await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
   });
 
-  it("renders each pill group as toggle buttons carrying their match counts", () => {
+  it("folds each pill group into one filter select, options and counts inside", () => {
+    // A chip row spends width in proportion to how many options a group has;
+    // one trigger spends the same width whatever the group holds.
     setup({ pills: PILLS });
-    const group = screen.getByRole("group", { name: "Kind" });
-    const rules = within(group).getByRole("button", { name: /Rules/ });
-    expect(rules).toHaveAttribute("aria-pressed", "false");
-    expect(rules).toHaveTextContent("2");
-    expect(within(group).getByRole("button", { name: /Prompts/ })).toHaveTextContent("1");
+    expect(groupTrigger("Kind")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+
+    const list = openGroup("Kind");
+    expect(within(list).getAllByRole("option").map((el) => el.textContent)).toEqual([
+      "Rules2",
+      "Prompts1",
+    ]);
   });
 
-  it("names a pill by its label and its count, not by the two run together", () => {
+  it("names an option by its label and its count, not by the two run together", () => {
     // Same defect as the tab badges: the count concatenated into the name,
-    // so the Rules pill announced as "Rules2".
+    // so the Rules option announced as "Rules2".
     setup({ pills: PILLS });
-    expect(screen.getByRole("button", { name: "Rules, 2" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Prompts, 1" })).toBeInTheDocument();
+    openGroup("Kind");
+    expect(screen.getByRole("option", { name: "Rules, 2" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Prompts, 1" })).toBeInTheDocument();
   });
 
   it("prefers a precomputed pill count over recounting the rows", () => {
@@ -255,23 +291,70 @@ describe("DataTable", () => {
         },
       ],
     });
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("42");
+    openGroup("Kind");
+    expect(screen.getByRole("option", { name: "Rules, 42" })).toBeInTheDocument();
   });
 
-  it("filters to the selected pills and marks them pressed", () => {
+  it("filters to the selected options and says so on the trigger", () => {
     setup({ pills: PILLS });
-    const rules = screen.getByRole("button", { name: /Rules/ });
+    openGroup("Kind");
 
-    fireEvent.click(rules);
-    expect(rules).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(optionFor("Rules"));
+    expect(optionFor("Rules")).toHaveAttribute("aria-selected", "true");
     expect(rowNames()).toEqual(["Alpha", "Charlie"]);
+    // One selection is named; past one there is no room, so it is counted.
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, Rules");
 
-    fireEvent.click(screen.getByRole("button", { name: /Prompts/ }));
+    fireEvent.click(optionFor("Prompts"));
     expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, 2 selected");
 
-    fireEvent.click(rules);
-    expect(rules).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(optionFor("Rules"));
+    expect(optionFor("Rules")).toHaveAttribute("aria-selected", "false");
     expect(rowNames()).toEqual(["Bravo"]);
+  });
+
+  it("keeps a multi group open across picks and closes a single-select one", () => {
+    setup({ pills: TWO_GROUPS });
+
+    openGroup("Kind"); // multi
+    fireEvent.click(optionFor("Rules"));
+    expect(screen.getByRole("listbox", { name: "Kind" })).toBeInTheDocument();
+    fireEvent.click(groupTrigger("Kind"));
+
+    openGroup("Score"); // single-select
+    fireEvent.click(optionFor("High"));
+    expect(screen.queryByRole("listbox", { name: "Score" })).not.toBeInTheDocument();
+  });
+
+  it("clears one group from its own popover without touching another", () => {
+    setup({ pills: TWO_GROUPS });
+    pick("Kind", "Rules");
+    pick("Score", "High");
+    expect(rowNames()).toEqual(["Alpha"]);
+
+    openGroup("Kind");
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind");
+    expect(groupTrigger("Score")).toHaveAccessibleName("Score, High");
+    expect(rowNames()).toEqual(["Alpha"]);
+  });
+
+  it("offers Clear all only while something is filtered, and drops search and pills together", async () => {
+    setup({ pills: PILLS, search: SEARCH });
+    expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
+
+    pick("Kind", "Rules");
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "alp" } });
+    await waitFor(() => expect(rowNames()).toEqual(["Alpha"]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind");
+    expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
   });
 
   it("makes rows focusable and named when onRowClick is set", () => {
@@ -384,7 +467,7 @@ describe("DataTable", () => {
 
     expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]);
     expect(screen.queryByText(/No rows match/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "false");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind");
     expect(screen.queryByText(/of 3 rows/)).not.toBeInTheDocument();
   });
 
@@ -396,7 +479,7 @@ describe("DataTable", () => {
     setup({ pills: PILLS, stateKey: "part-stale" });
 
     expect(rowNames()).toEqual(["Alpha", "Charlie"]);
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "true");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, Rules");
   });
 
   it("offers a clear-filters escape hatch when filters match nothing", async () => {
@@ -416,7 +499,7 @@ describe("DataTable", () => {
 
     fireEvent.click(within(header()).getByRole("button"));
     fireEvent.click(within(header()).getByRole("button"));
-    fireEvent.click(screen.getByRole("button", { name: /Rules/ }));
+    pick("Kind", "Rules");
     expect(header()).toHaveAttribute("aria-sort", "descending");
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zzz" } });
@@ -425,7 +508,7 @@ describe("DataTable", () => {
 
     // Search and pills are gone; the sort is the user's reading order, not a filter.
     expect(screen.getByRole("searchbox")).toHaveValue("");
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "false");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind");
     expect(header()).toHaveAttribute("aria-sort", "descending");
     expect(rowNames()).toEqual(["Charlie", "Bravo", "Alpha"]);
   });
@@ -434,7 +517,7 @@ describe("DataTable", () => {
     setup({ pills: PILLS });
     expect(screen.queryByText(/of 3 rows/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Prompts/ }));
+    pick("Kind", "Prompts");
     expect(screen.getByText("1 of 3 rows")).toBeInTheDocument();
   });
 
@@ -442,7 +525,7 @@ describe("DataTable", () => {
     const { unmount } = setup({ search: { placeholder: "Search", keys: ["name"] }, pills: PILLS });
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "a" } });
-    fireEvent.click(screen.getByRole("button", { name: /Rules/ }));
+    pick("Kind", "Rules");
     fireEvent.click(within(screen.getByRole("columnheader", { name: /Name/ })).getByRole("button"));
     await waitFor(() => expect(window.sessionStorage.getItem("pj.table.test")).toContain('"a"'));
 
@@ -450,7 +533,7 @@ describe("DataTable", () => {
     setup({ search: { placeholder: "Search", keys: ["name"] }, pills: PILLS });
 
     expect(screen.getByRole("searchbox")).toHaveValue("a");
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "true");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, Rules");
     expect(screen.getByRole("columnheader", { name: /Name/ })).toHaveAttribute("aria-sort", "ascending");
   });
 
@@ -553,53 +636,57 @@ describe("DataTable", () => {
     const { container } = setup({ columns: [...COLUMNS, ACTIONS_COLUMN], onRowClick: vi.fn() });
     expect(await axe(container)).toHaveNoViolations();
   });
-  it("hands a group's count off to the chip that owns it", () => {
+  it("hands a group's count off to the option that owns it", () => {
     setup({ pills: TWO_GROUPS });
-    const score = screen.getByRole("group", { name: "Score" });
-    expect(within(score).getByRole("button", { name: /Low/ })).toHaveTextContent("2");
-    expect(within(score).getByRole("button", { name: /High/ })).toHaveTextContent("1");
+    const score = openGroup("Score");
+    expect(within(score).getByRole("option", { name: "Low, 2" })).toBeInTheDocument();
+    expect(within(score).getByRole("option", { name: "High, 1" })).toBeInTheDocument();
   });
 
-  it("counts chips over the searched slice, not the whole table", async () => {
+  it("counts options over the searched slice, not the whole table", async () => {
     setup({ pills: PILLS, search: SEARCH });
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "alp" } });
     await waitFor(() => expect(rowNames()).toEqual(["Alpha"]));
 
-    // Alpha is the only match and it is a rule: a "Prompts 1" chip here would
-    // promise a row the search has already excluded.
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("0");
+    // Alpha is the only match and it is a rule: a "Prompts 1" option here
+    // would promise a row the search has already excluded.
+    openGroup("Kind");
+    expect(optionFor("Rules")).toHaveAccessibleName("Rules, 1");
+    expect(optionFor("Prompts")).toHaveAccessibleName("Prompts, 0");
   });
 
-  it("counts chips within the other groups' selections", () => {
+  it("counts options within the other groups' selections", () => {
     setup({ pills: TWO_GROUPS });
 
-    fireEvent.click(screen.getByRole("button", { name: /High/ }));
+    pick("Score", "High");
 
     // Only Alpha scores >= 3, and it is a rule.
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("0");
+    openGroup("Kind");
+    expect(optionFor("Rules")).toHaveAccessibleName("Rules, 1");
+    expect(optionFor("Prompts")).toHaveAccessibleName("Prompts, 0");
   });
 
-  it("keeps a group's own chips counted as if nothing in it were selected", () => {
+  it("keeps a group's own options counted as if nothing in it were selected", () => {
     setup({ pills: TWO_GROUPS });
 
-    fireEvent.click(screen.getByRole("button", { name: /Rules/ }));
+    pick("Kind", "Rules");
 
     // Picking Rules must not zero Prompts — that count is the way back out.
-    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveTextContent("2");
+    openGroup("Kind");
+    expect(optionFor("Prompts")).toHaveAccessibleName("Prompts, 1");
+    expect(optionFor("Rules")).toHaveAccessibleName("Rules, 2");
+    fireEvent.click(groupTrigger("Kind"));
+
     // The other group is faceted by the rule selection: Bravo (score 1) is gone.
-    expect(screen.getByRole("button", { name: /Low/ })).toHaveTextContent("1");
+    openGroup("Score");
+    expect(optionFor("Low")).toHaveAccessibleName("Low, 1");
   });
 
-  it("labels each pill group visibly, not only for assistive tech", () => {
+  it("names each group on its own trigger, in the order they were given", () => {
     const { container } = setup({ pills: TWO_GROUPS });
-    const labels = [...container.querySelectorAll(".dt__pill-group-label")].map((el) => el.textContent);
-    expect(labels).toEqual(["Kind", "Score"]);
-    // The visible label is what names the group, so the name is spelled once.
-    expect(screen.getByRole("group", { name: "Score" })).toBeInTheDocument();
+    const triggers = [...container.querySelectorAll(".fs__trigger")].map((el) => el.textContent);
+    expect(triggers).toEqual(["Kind", "Score"]);
   });
 
   it("does not carry a half-typed search onto the next table key", async () => {
@@ -690,7 +777,8 @@ describe("DataTable", () => {
     pills.push(TWO_GROUPS[1]);
     rerender(<DataTable {...props} />);
 
-    expect(screen.getByRole("button", { name: /High/ })).toHaveTextContent("1");
+    openGroup("Score");
+    expect(optionFor("High")).toHaveAccessibleName("High, 1");
   });
 
   it("re-reads a mutated search config when its key count changes", async () => {
@@ -803,7 +891,7 @@ describe("DataTable", () => {
     setup({ pills: PILLS, initialPills: { kind: ["prompt"] } });
 
     await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
-    expect(screen.getByRole("button", { name: /Prompts/ })).toHaveAttribute("aria-pressed", "true");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, Prompts");
   });
 
   it("lets an initial pill selection beat the remembered one", async () => {
@@ -817,7 +905,7 @@ describe("DataTable", () => {
     setup({ pills: PILLS, stateKey: "deep-link", initialPills: { kind: ["prompt"] } });
 
     await waitFor(() => expect(rowNames()).toEqual(["Bravo"]));
-    expect(screen.getByRole("button", { name: /Rules/ })).toHaveAttribute("aria-pressed", "false");
+    expect(groupTrigger("Kind")).toHaveAccessibleName("Kind, Prompts");
   });
 
   it("re-applies when a new initial selection arrives", async () => {
