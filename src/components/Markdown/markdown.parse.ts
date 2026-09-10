@@ -147,20 +147,57 @@ const MARKERS: { open: string; close: string; kind: "strong" | "em" | "code" }[]
   { open: "_", close: "_", kind: "em" },
 ];
 
-/** `[label](href)`, with no nested brackets or parentheses in either half. */
-const LINK = /^\[([^\]]*)\]\(([^)\s]*)\)/;
+/**
+ * `[label](href)`, with no nested brackets or parentheses in either half.
+ *
+ * Both halves are length-bounded, and that bound is load-bearing rather than
+ * decorative. Unbounded, `[^\]]*` scans to the end of the block looking for a
+ * `]` that is not there, backtracks the whole way, and does it again at every
+ * `[` — quadratic. A 200k run of `[` took 19 s in a real measurement, which
+ * at this module's 1 MiB read cap extrapolates to minutes of frozen webview
+ * with no way out. Bounding the class caps the work per position instead:
+ * the same input measures 271 ms.
+ *
+ * The limits are far past any real label or href, and a link that exceeds
+ * them degrades to literal text rather than to a wrong parse.
+ */
+const LINK = /^\[([^\]]{0,512})\]\(([^)\s]{0,2048})\)/;
+
+/** The only schemes a rendered link may carry. */
+const SAFE_SCHEMES = ["http", "https", "mailto"];
 
 /**
- * Only schemes that are safe to hand to an anchor. Everything else — most
- * pointedly `javascript:` — is refused and the link renders as the literal
- * text the file contained, so a skill file can't turn a click into script
- * execution. Relative and anchor hrefs are allowed: they can only ever
- * address the app's own document.
+ * Whether an href is safe to put in an anchor.
+ *
+ * Refusing `javascript:` means refusing every spelling of it the *browser*
+ * accepts, not every spelling that looks obvious in source. Two gaps make
+ * that harder than it reads:
+ *
+ * - The URL parser strips leading C0 controls and spaces before it looks for
+ *   a scheme, and it strips tabs and newlines from anywhere in the string.
+ *   `String.prototype.trim` removes whitespace but leaves `\u0000`-`\u0008`
+ *   and `\u000e`-`\u001f` in place — so a raw-string check reads
+ *   `"\u0001javascript:…"` as having no scheme at all, calls it relative, and
+ *   waves through an href the browser resolves to `javascript:`. Every
+ *   control character is stripped here first, for exactly that reason.
+ * - A protocol-relative `//host/path` has no scheme either, but it is not
+ *   relative in the sense that matters: it navigates off to another origin.
+ *
+ * Anything that survives with no scheme is genuinely same-document — `#anchor`
+ * or `./file.md` — and can only ever address the app's own page.
+ *
+ * This is defence in depth, not the only defence: the shipped CSP has no
+ * `unsafe-inline`, so a `javascript:` URL would not run in a release build.
+ * The dev CSP does allow it, and a control that only works because a second
+ * control is present is not doing its job.
  */
 export function safeHref(href: string): boolean {
-  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(href.trim());
+  // eslint-disable-next-line no-control-regex -- stripping controls is the point
+  const clean = href.replace(/[\u0000-\u0020\u007f]/g, "");
+  if (clean.startsWith("//")) return false;
+  const scheme = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(clean);
   if (!scheme) return true;
-  return ["http", "https", "mailto"].includes(scheme[1].toLowerCase());
+  return SAFE_SCHEMES.includes(scheme[1].toLowerCase());
 }
 
 /**

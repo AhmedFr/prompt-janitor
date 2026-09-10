@@ -39,23 +39,48 @@ import "./SkillPanel.css";
 export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = "read" }: SkillPanelViewProps) {
   const [mode, setMode] = useState<PanelMode>(initialMode);
   const [draft, setDraft] = useState(source.content ?? "");
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  // What a confirmed discard should do: leave the editor, or close the panel
+  // outright. Null means nothing is being confirmed. Holding the *intent*
+  // rather than a boolean is what lets Cancel and Close share one dialog
+  // without either of them doing the other's job.
+  const [pendingDiscard, setPendingDiscard] = useState<"stop-editing" | "close" | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Whatever had focus when the panel opened — the table row, in the app.
+  const opener = useRef<HTMLElement | null>(null);
 
   const dirty = mode === "edit" && source.content !== null && draft !== source.content;
 
   // Focus moves into the panel on open so Escape and Tab land here rather than
-  // in the table behind it.
+  // in the table behind it, and goes back where it came from on close —
+  // otherwise it lands on `<body>` and the keyboard user loses their place in
+  // a table they may have scrolled a long way down.
   useEffect(() => {
+    opener.current = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
+    return () => opener.current?.focus();
   }, []);
+
+  /** Leaves the editor, keeping the panel open. */
+  const stopEditing = () => {
+    setMode("read");
+    setPendingDiscard(null);
+  };
 
   const requestClose = () => {
     if (dirty) {
-      setConfirmingDiscard(true);
+      setPendingDiscard("close");
       return;
     }
     onClose();
+  };
+
+  /** Cancel means "stop editing", not "stop looking at this skill". */
+  const requestStopEditing = () => {
+    if (dirty) {
+      setPendingDiscard("stop-editing");
+      return;
+    }
+    stopEditing();
   };
 
   const startEditing = () => {
@@ -64,9 +89,9 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
   };
 
   const handleSave = async () => {
-    const bytes = await source.save(draft);
-    if (bytes === null) return; // `source.error` now says why; stay in the editor.
-    onSaved?.(bytes);
+    const saved = await source.save(draft);
+    if (saved === null) return; // `source.error` now says why; stay in the editor.
+    onSaved?.();
     setMode("read");
   };
 
@@ -87,7 +112,13 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
           if (e.key === "Escape") {
             e.stopPropagation();
             requestClose();
+            return;
           }
+          // `aria-modal` claims the rest of the page is inert, so Tab has to
+          // behave that way too. Without this, Tab walks into the table behind
+          // the scrim — which cannot be clicked, and from which Escape (bound
+          // here) no longer reaches this handler.
+          if (e.key === "Tab") trapTab(e, panelRef.current);
         }}
       >
         <header className="sp__hd">
@@ -99,7 +130,10 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
           <div className="sp__id">
             <h2 className="sp__title">{skill.name}</h2>
           </div>
-          <button className="sp__close" onClick={onClose} aria-label="Close">
+          {/* `requestClose`, not `onClose`: this is the most obvious way out
+              of the panel, so it is the one that must not discard a draft
+              silently. */}
+          <button className="sp__close" onClick={requestClose} aria-label="Close">
             <Icon name="x" size={15} />
           </button>
         </header>
@@ -109,8 +143,15 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
             <span className="path" title={source.path}>
               {source.path}
             </span>
-            <Button size="sm" aria-label="Reveal in Finder" onClick={() => void openExternal(source.path!)}>
-              <Icon name="folder" /> Reveal
+            {/* "Open", not "Reveal": this is the opener plugin, the same
+                call the table's own action makes, and it opens the file in
+                the default app rather than selecting it in Finder. */}
+            <Button
+              size="sm"
+              aria-label={`Open ${skill.name} on disk`}
+              onClick={() => void openExternal(source.path!)}
+            >
+              <Icon name="folder" /> Open
             </Button>
           </div>
         )}
@@ -146,7 +187,7 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
             <>
               {dirty && <span className="sp__dirty">{DIRTY_LABEL}</span>}
               <span className="toolbar-spacer" />
-              <Button size="sm" disabled={source.saving} onClick={() => setMode("read")}>
+              <Button size="sm" disabled={source.saving} onClick={requestStopEditing}>
                 Cancel
               </Button>
               <Button variant="primary" size="sm" disabled={source.saving} onClick={() => void handleSave()}>
@@ -156,12 +197,34 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
           )}
         </footer>
 
-        {confirmingDiscard && (
-          <DiscardConfirm onKeep={() => setConfirmingDiscard(false)} onDiscard={onClose} />
+        {pendingDiscard && (
+          <DiscardConfirm
+            onKeep={() => setPendingDiscard(null)}
+            onDiscard={pendingDiscard === "close" ? onClose : stopEditing}
+          />
         )}
       </div>
     </div>
   );
+}
+
+/** Everything inside the panel that can hold focus, in document order. */
+const FOCUSABLE = 'button:not([disabled]), textarea, a[href], [tabindex]:not([tabindex="-1"])';
+
+/** Wraps Tab and Shift+Tab around the panel's own focusable elements. */
+function trapTab(e: React.KeyboardEvent, panel: HTMLElement | null) {
+  const stops = panel ? [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)] : [];
+  if (stops.length === 0) return;
+
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  const active = document.activeElement;
+  // The panel itself holds focus until the user Tabs off it, so an unknown
+  // active element means "at the start" rather than "somewhere in the middle".
+  if (e.shiftKey ? active === first || !stops.includes(active as HTMLElement) : active === last) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  }
 }
 
 /** The file's header as a key/value strip, then its body rendered as markdown. */

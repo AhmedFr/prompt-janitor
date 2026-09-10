@@ -1,8 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Markdown } from "./index";
 
+const openExternal = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/open-external", () => ({ openExternal }));
+
+beforeEach(() => openExternal.mockReset());
 afterEach(cleanup);
 
 describe("Markdown", () => {
@@ -39,6 +43,20 @@ describe("Markdown", () => {
   it("renders a link with its href", () => {
     render(<Markdown source="[docs](https://x.dev)" />);
     expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://x.dev");
+  });
+
+  /**
+   * Every other external link in the app goes through the opener plugin. A
+   * bare `target="_blank"` inside a WKWebView either does nothing or navigates
+   * the app's own webview off the app with no way back.
+   */
+  it("opens a link in the real browser rather than navigating the webview", () => {
+    render(<Markdown source="[docs](https://x.dev)" />);
+    const click = fireEvent.click(screen.getByRole("link", { name: "docs" }));
+
+    expect(openExternal).toHaveBeenCalledWith("https://x.dev");
+    // The default is prevented, so the webview never follows the href itself.
+    expect(click).toBe(false);
   });
 
   it("renders embedded HTML as visible text, never as markup", () => {

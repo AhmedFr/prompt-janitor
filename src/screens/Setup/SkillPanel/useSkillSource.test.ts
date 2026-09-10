@@ -22,7 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("useSkillSource", () => {
   it("reads the artifact's file on mount", async () => {
-    getArtifactSource.mockResolvedValue(ok({ path: "/s/SKILL.md", content: "# a", bytes: 3 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/s/SKILL.md", content: "# a", bytes: 3, modified: "111" }));
 
     const { result } = renderHook(() => useSkillSource(7));
 
@@ -44,13 +44,13 @@ describe("useSkillSource", () => {
   });
 
   it("re-reads when it is pointed at a different artifact", async () => {
-    getArtifactSource.mockResolvedValue(ok({ path: "/a", content: "a", bytes: 1 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/a", content: "a", bytes: 1, modified: "111" }));
     const { result, rerender } = renderHook(({ id }) => useSkillSource(id), {
       initialProps: { id: 1 },
     });
     await waitFor(() => expect(result.current.content).toBe("a"));
 
-    getArtifactSource.mockResolvedValue(ok({ path: "/b", content: "b", bytes: 1 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/b", content: "b", bytes: 1, modified: "222" }));
     rerender({ id: 2 });
 
     await waitFor(() => expect(result.current.content).toBe("b"));
@@ -69,19 +69,19 @@ describe("useSkillSource", () => {
       initialProps: { id: 1 },
     });
 
-    getArtifactSource.mockResolvedValueOnce(ok({ path: "/b", content: "second", bytes: 6 }));
+    getArtifactSource.mockResolvedValueOnce(ok({ path: "/b", content: "second", bytes: 6, modified: "222" }));
     rerender({ id: 2 });
     await waitFor(() => expect(result.current.content).toBe("second"));
 
     await act(async () => {
-      settleFirst(ok({ path: "/a", content: "first", bytes: 5 }));
+      settleFirst(ok({ path: "/a", content: "first", bytes: 5, modified: "111" }));
     });
 
     expect(result.current.content).toBe("second");
   });
 
   it("saves the edited text and adopts it as the on-disk content", async () => {
-    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValue(ok({ bytes: 3 }));
     const { result } = renderHook(() => useSkillSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
@@ -91,7 +91,9 @@ describe("useSkillSource", () => {
       landed = await result.current.save("new");
     });
 
-    expect(saveArtifactSource).toHaveBeenCalledWith(7, "new");
+    // The stamp from the read travels back, so Rust can refuse a save over a
+    // file something else has changed in the meantime.
+    expect(saveArtifactSource).toHaveBeenCalledWith(7, "new", "111");
     // The byte count comes back from Rust rather than being measured here:
     // `content.length` counts UTF-16 units, and the Size column means bytes.
     expect(landed).toBe(3);
@@ -100,7 +102,7 @@ describe("useSkillSource", () => {
   });
 
   it("reports a failed save and leaves the on-disk content untouched", async () => {
-    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValue(err("That file is no longer on disk."));
     const { result } = renderHook(() => useSkillSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
@@ -116,7 +118,7 @@ describe("useSkillSource", () => {
   });
 
   it("clears a previous error once a save succeeds", async () => {
-    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3 }));
+    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValueOnce(err("boom"));
     saveArtifactSource.mockResolvedValueOnce(ok({ bytes: 3 }));
     const { result } = renderHook(() => useSkillSource(7));
@@ -131,5 +133,42 @@ describe("useSkillSource", () => {
       await result.current.save("new");
     });
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe("useSkillSource — a file that moved underneath the panel", () => {
+  it("re-reads after a rejected save, so the next attempt carries the new stamp", async () => {
+    getArtifactSource.mockResolvedValueOnce(
+      ok({ path: "/s", content: "old", bytes: 3, modified: "111" }),
+    );
+    saveArtifactSource.mockResolvedValueOnce(err("That file changed on disk since you opened it."));
+    const { result } = renderHook(() => useSkillSource(7));
+    await waitFor(() => expect(result.current.content).toBe("old"));
+
+    getArtifactSource.mockResolvedValueOnce(
+      ok({ path: "/s", content: "theirs", bytes: 6, modified: "222" }),
+    );
+    await act(async () => {
+      await result.current.save("mine");
+    });
+
+    // The panel now holds what is actually on disk, and says why.
+    await waitFor(() => expect(result.current.content).toBe("theirs"));
+    expect(result.current.error).toContain("changed on disk");
+  });
+
+  it("does not re-read after an ordinary save failure", async () => {
+    getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
+    saveArtifactSource.mockResolvedValue(err("That file is no longer on disk."));
+    const { result } = renderHook(() => useSkillSource(7));
+    await waitFor(() => expect(result.current.content).toBe("old"));
+    const reads = getArtifactSource.mock.calls.length;
+
+    await act(async () => {
+      await result.current.save("mine");
+    });
+
+    expect(getArtifactSource.mock.calls.length).toBe(reads);
+    expect(result.current.content).toBe("old");
   });
 });

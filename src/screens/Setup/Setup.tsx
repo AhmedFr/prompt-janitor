@@ -167,10 +167,20 @@ function Inventory({
   const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
   const tables = useSetupTables(data, openDetail);
   const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
-  // The skill whose panel is open, or null. Held here rather than in
-  // `KindTable` so it survives that component's prop changes, and so the
-  // drawer renders over the whole inventory rather than inside a tab panel.
-  const [openSkill, setOpenSkill] = useState<ArtifactView | null>(null);
+  // The *id* of the skill whose panel is open, not the row itself. Held here
+  // rather than in `KindTable` so it survives that component's prop changes,
+  // and so the drawer renders over the whole inventory rather than inside a
+  // tab panel.
+  //
+  // An id rather than a snapshot because the row is re-derived below: saving
+  // an edited `name:` changes what the skill is called, and a header pinned to
+  // the row as it was at click time would keep announcing the old name until
+  // the panel was closed and reopened.
+  const [openSkillId, setOpenSkillId] = useState<number | null>(null);
+  const openSkill = useMemo(
+    () => (openSkillId === null ? null : tables.rowsFor("skill").find((r) => r.id === openSkillId)),
+    [openSkillId, tables],
+  );
 
   // A deep link names the tab it means; the remembered one only decides where
   // an unqualified visit lands. `useTabState` reads storage first, so without
@@ -211,18 +221,26 @@ function Inventory({
           // it against `KIND_TABS` keeps the kind typed without a cast.
           const tab = KIND_TABS.find((candidate) => candidate.id === id) ?? KIND_TABS[0];
           return (
-            <KindTable tab={tab} tables={tables} search={search} onOpenSkill={setOpenSkill} />
+            <KindTable
+              tab={tab}
+              tables={tables}
+              search={search}
+              onOpenSkill={(row) => setOpenSkillId(row.id)}
+            />
           );
         }}
       </Tabs>
 
+      {/* A rescan can remove the skill outright, in which case `openSkill`
+          resolves to nothing and the panel goes with it — better than a
+          drawer describing a file that is no longer there. */}
       {openSkill && (
         <SkillPanel
           // Keyed on the artifact so switching rows remounts the panel rather
           // than leaving the previous skill's draft in the editor.
           key={openSkill.id}
           skill={openSkill}
-          onClose={() => setOpenSkill(null)}
+          onClose={() => setOpenSkillId(null)}
           // The save already updated `artifacts.bytes`; refetching is what
           // carries that into the Size column without waiting for a rescan.
           onSaved={() => void onRefetch()}

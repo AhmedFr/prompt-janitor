@@ -135,8 +135,14 @@ export const commands = {
 	 *  that is the security boundary and not just an interface choice.
 	 */
 	getArtifactSource: (artifactId: number) => typedError<ArtifactSource, string>(__TAURI_INVOKE("get_artifact_source", { artifactId })),
-	/**  Save the skill panel's edits back to the artifact's file on disk. */
-	saveArtifactSource: (artifactId: number, content: string) => typedError<ArtifactSaved, string>(__TAURI_INVOKE("save_artifact_source", { artifactId, content })),
+	/**
+	 *  Save the skill panel's edits back to the artifact's file on disk.
+	 * 
+	 *  `expected_modified` is the stamp the panel was handed by
+	 *  [`get_artifact_source`]; passing it refuses a save over a file something
+	 *  else has changed since. `None` overwrites deliberately.
+	 */
+	saveArtifactSource: (artifactId: number, content: string, expectedModified: string | null) => typedError<ArtifactSaved, string>(__TAURI_INVOKE("save_artifact_source", { artifactId, content, expectedModified })),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**
@@ -276,6 +282,14 @@ export type ArtifactSource = {
 	content: string,
 	/**  Size of `content` in bytes — what the Size column shows. */
 	bytes: number,
+	/**
+	 *  The file's modification time when it was read, as an opaque stamp.
+	 * 
+	 *  Handed back on save so a write can tell "the file I was shown" from
+	 *  "the file as it is now". Opaque on purpose: nothing but equality is
+	 *  ever asked of it, so its format is free to change.
+	 */
+	modified: string,
 };
 
 /**

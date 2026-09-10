@@ -254,7 +254,7 @@ beforeEach(() => {
   scanNow.mockResolvedValue({ status: "error", error: "no" });
   getArtifactSource.mockResolvedValue({
     status: "ok",
-    data: { path: "/s/SKILL.md", content: "# From disk\n", bytes: 12 },
+    data: { path: "/s/SKILL.md", content: "# From disk\n", bytes: 12, modified: "111" },
   });
   saveArtifactSource.mockResolvedValue({ status: "ok", data: { bytes: 20 } });
   open.mockResolvedValue(null);
@@ -535,8 +535,48 @@ describe("Setup", () => {
       });
       fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
 
-      await waitFor(() => expect(saveArtifactSource).toHaveBeenCalledWith(2, "# Edited"));
+      await waitFor(() => expect(saveArtifactSource).toHaveBeenCalledWith(2, "# Edited", "111"));
       await waitFor(() => expect(getSetup.mock.calls.length).toBeGreaterThan(before));
+    });
+
+    /**
+     * Editing a skill's `name:` frontmatter changes what the row is called.
+     * The panel header has to follow the refreshed inventory rather than the
+     * snapshot it was opened with, or it keeps announcing the old name until
+     * the user closes and reopens it.
+     */
+    it("follows the refreshed row after a save, rather than the row it opened with", async () => {
+      const panel = await openAdapt();
+      await within(panel).findByRole("heading", { name: "From disk" });
+
+      // The rescan-shaped refetch that follows a save returns a renamed skill.
+      const renamed = {
+        ...populated,
+        global: populated.global.map((a) => (a.id === 2 ? { ...a, name: "adapts" } : a)),
+      };
+      getSetup.mockResolvedValue({ status: "ok", data: renamed });
+
+      fireEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+      fireEvent.change(within(panel).getByRole("textbox", { name: /markdown/i }), {
+        target: { value: "# Edited" },
+      });
+      fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("dialog")).toHaveAccessibleName(/adapts/),
+      );
+    });
+
+    it("closes itself if the skill is gone from the inventory after a rescan", async () => {
+      await openAdapt();
+
+      getSetup.mockResolvedValue({
+        status: "ok",
+        data: { ...populated, global: populated.global.filter((a) => a.id !== 2) },
+      });
+      await emit("scan-done");
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });
 
     it("stays shut when a row on a tab with no panel is clicked", async () => {

@@ -852,15 +852,20 @@ pub fn get_artifact_source(
 }
 
 /// Save the skill panel's edits back to the artifact's file on disk.
+///
+/// `expected_modified` is the stamp the panel was handed by
+/// [`get_artifact_source`]; passing it refuses a save over a file something
+/// else has changed since. `None` overwrites deliberately.
 #[tauri::command]
 #[specta::specta]
 pub fn save_artifact_source(
     db: tauri::State<'_, AppDb>,
     artifact_id: i32,
     content: String,
+    expected_modified: Option<String>,
 ) -> Result<crate::artifact_source::ArtifactSaved, String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    crate::artifact_source::write_source(&conn, artifact_id, &content)
+    crate::artifact_source::write_source(&conn, artifact_id, &content, expected_modified.as_deref())
 }
 
 /// The rule files `harness` loads inside `project_path`, in load order.

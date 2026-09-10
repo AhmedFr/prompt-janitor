@@ -54,6 +54,7 @@ const skill: ArtifactView = {
 const source = (over: Partial<SkillSource> = {}): SkillSource => ({
   content: SOURCE,
   path: skill.path,
+  modified: "1757462400000000000",
   loading: false,
   saving: false,
   error: null,

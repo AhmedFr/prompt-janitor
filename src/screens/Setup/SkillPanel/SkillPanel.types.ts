@@ -17,6 +17,12 @@ export interface SkillSource {
   content: string | null;
   /** Absolute path, for the header. */
   path: string | null;
+  /**
+   * The file's modification stamp as of this read, or `null` before one
+   * lands. Sent back on save so a write over a file that changed underneath
+   * the panel is refused rather than silently winning.
+   */
+  modified: string | null;
   /** The read is in flight. */
   loading: boolean;
   /** The save is in flight. */
@@ -36,10 +42,14 @@ export interface SkillPanelProps {
   /** Closes the panel. The caller restores focus to the row. */
   onClose: () => void;
   /**
-   * Told the artifact's new byte count after a successful save, so the Size
-   * column can update without waiting for a rescan.
+   * Called after a save lands, so the caller can refresh whatever the write
+   * invalidated — the Size column, most obviously.
+   *
+   * Deliberately carries no byte count. `save` returns one, but the screen
+   * refetches the whole inventory rather than patching a single cell: one
+   * source of truth beats two, and the query is local.
    */
-  onSaved?: (bytes: number) => void;
+  onSaved?: () => void;
 }
 
 export interface SkillPanelViewProps extends SkillPanelProps {
