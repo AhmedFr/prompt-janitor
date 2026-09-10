@@ -24,6 +24,34 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ---- the menu-bar panel window is transparent ----
+   `main.tsx` puts `panel-window` on the root element of the popover window
+   only; the main window keeps its background. All three layers have to be
+   cleared, not just `body`: the canvas takes its colour from `html` and falls
+   through to `body`, and `#root` sits over both — one opaque layer anywhere in
+   that stack paints the square white rectangle the card's rounded corners were
+   sitting inside.
+
+   These rules live here rather than in `Panel.css` on purpose. `base.css` is
+   imported by `main.tsx` itself, so it is always in the bundle and its position
+   in the cascade does not depend on which component happened to import a
+   stylesheet first. */
+html.panel-window,
+html.panel-window body,
+html.panel-window #root {
+  background: transparent;
+}
+
+/* The popover document never scrolls — `.panel__body` does. On a Mac set to
+   "Show scroll bars: Always" a scrollable document paints legacy scrollbars,
+   and a legacy scrollbar over a transparent page is a solid dark bar down the
+   right edge and along the bottom: the "dark band under the card". Taking the
+   scroll away takes the bars with it, on every scroll-bar setting. */
+html.panel-window,
+html.panel-window body {
+  overflow: hidden;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
