@@ -850,6 +850,31 @@ describe("DataTable", () => {
 
     expect(rowNames()).toEqual(["Alpha", "Charlie"]);
   });
+  describe("sort caret", () => {
+    const glyphOf = (name: RegExp) =>
+      screen.getByRole("columnheader", { name }).querySelector(".dt__sort-glyph") as HTMLElement;
+
+    it("marks the sorted column's caret with its direction and leaves the rest unsorted", () => {
+      setup({ defaultSort: { id: "name", desc: true } });
+      // The quiet columns keep their caret in the DOM — CSS reveals it on
+      // hover — so the header can never change width when a sort lands.
+      expect(glyphOf(/Name/)).toHaveAttribute("data-sort", "descending");
+      expect(glyphOf(/Score/)).toHaveAttribute("data-sort", "none");
+    });
+
+    it("moves the direction to whichever column was clicked last", () => {
+      setup({ defaultSort: { id: "name", desc: true } });
+      fireEvent.click(screen.getByRole("button", { name: "Score" }));
+      expect(glyphOf(/Score/)).toHaveAttribute("data-sort", "ascending");
+      expect(glyphOf(/Name/)).toHaveAttribute("data-sort", "none");
+    });
+
+    it("gives an unsortable column no caret at all", () => {
+      setup();
+      expect(glyphOf(/Kind/)).toBeNull();
+    });
+  });
+
   describe("column sizing", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SIZED: ColumnDef<Row, any>[] = [
