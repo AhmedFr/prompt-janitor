@@ -23,17 +23,16 @@ export function PanelFooter({ scanning, scan, onScan, onOpenApp, onQuit }: Panel
           />
         </div>
       )}
+      {/* Default size, not `sm`: these are the popover's only controls and a
+          12 px pill under a 13 px card reads as a secondary toolbar. The three
+          of them measure ~278 px inside a 324 px row, so they still fit. */}
       <div className="panel-footer__actions">
-        <Button size="sm" variant="primary" disabled={scanning} onClick={onScan}>
+        <Button variant="primary" disabled={scanning} onClick={onScan}>
           <Icon name="refresh" /> {scanning ? SCANNING : SCAN_NOW}
         </Button>
         <span className="toolbar-spacer" />
-        <Button size="sm" onClick={onOpenApp}>
-          {OPEN_APP}
-        </Button>
-        <Button size="sm" onClick={onQuit}>
-          {QUIT}
-        </Button>
+        <Button onClick={onOpenApp}>{OPEN_APP}</Button>
+        <Button onClick={onQuit}>{QUIT}</Button>
       </div>
     </footer>
   );

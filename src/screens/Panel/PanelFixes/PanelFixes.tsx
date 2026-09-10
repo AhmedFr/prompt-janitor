@@ -12,7 +12,7 @@ import "./PanelFixes.css";
  *
  * One grade badge per row and nothing else: the row used to carry a folder
  * glyph on the left as well, which is two marks for the one fact that matters
- * on a 360 px row. The file leads, its project trails it in the muted colour,
+ * on a 352 px row. The file leads, its project trails it in the muted colour,
  * and the issue count sits against the right edge where the eye can compare
  * three rows down a column.
  */

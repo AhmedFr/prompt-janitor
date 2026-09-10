@@ -32,7 +32,7 @@ describe("PanelFixes", () => {
 
   /**
    * The row used to carry a folder glyph on the left *and* a grade chip on the
-   * right — two marks for one fact, on a 360 px row.
+   * right — two marks for one fact, on a 352 px row.
    */
   it("marks each row with one grade badge and no project glyph", () => {
     render(<PanelFixes fixes={fixes} onOpen={() => {}} />);

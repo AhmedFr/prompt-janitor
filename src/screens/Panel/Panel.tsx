@@ -19,7 +19,7 @@ import "./Panel.css";
 
 /**
  * The menu-bar popover: the whole "is my setup good enough?" answer in one
- * 360 px-wide card, without opening the app.
+ * 352 px-wide card, without opening the app.
  *
  * Layout only — {@link usePanel} owns the snapshot and the scan,
  * {@link usePanelSize} keeps the window the height of the card, and every row

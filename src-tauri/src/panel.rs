@@ -9,12 +9,19 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use tauri::utils::config::Color;
 use tauri::{App, AppHandle, LogicalPosition, Manager, Monitor, WebviewUrl, WebviewWindowBuilder};
+
+/// Fully transparent RGBA — the window's background under the card.
+const TRANSPARENT: Color = Color(0, 0, 0, 0);
 
 /// Window label of the panel.
 pub const PANEL_LABEL: &str = "panel";
-/// Panel size in logical pixels.
-pub const PANEL_SIZE: (f64, f64) = (360.0, 480.0);
+/// Panel window size in logical pixels — the card plus the transparent inset
+/// its shadow needs. Keep the width in step with `PANEL_WIDTH` in
+/// `src/screens/Panel/Panel.constants.ts`, which is what the window is resized
+/// to once the card has been measured.
+pub const PANEL_SIZE: (f64, f64) = (376.0, 480.0);
 /// Distance between the tray icon's edge and the panel.
 pub const PANEL_GAP: f64 = 6.0;
 /// Minimum distance between the panel and the edge of the work area.
@@ -23,6 +30,34 @@ pub const PANEL_MARGIN: f64 = 8.0;
 /// The page the panel renders. `main.tsx` branches on the query string, which
 /// keeps window detection out of Storybook and the component tests.
 const PANEL_URL: &str = "index.html?window=panel";
+
+/// Set `PJ_PANEL_DEBUG=1` to park the panel on screen at launch.
+///
+/// A transparent, shadowless popover can only be judged against a real desktop,
+/// and the panel normally exists for as long as a click: it opens under the tray
+/// icon and hides itself the moment focus moves — including to a screenshot
+/// tool. With this set the panel opens at {@link DEBUG_POSITION} during
+/// `create` and ignores the blur-hide, so it can be photographed and compared.
+/// Not `cfg(debug_assertions)`: the visual regression this guards against is a
+/// property of the *release* bundle, which is the one worth checking.
+const DEBUG_ENV: &str = "PJ_PANEL_DEBUG";
+
+/// Where the debug hook parks the panel — clear of the menu bar, inside the
+/// top-left of any display.
+const DEBUG_POSITION: (f64, f64) = (200.0, 100.0);
+
+/// Whether a value of `PJ_PANEL_DEBUG` arms the hook. Exactly `1` and nothing
+/// else: an unset, empty or `0` variable is the normal path, and treating any
+/// non-empty value as true would arm the hook for `PJ_PANEL_DEBUG=0`.
+fn pins_panel(value: Option<&str>) -> bool {
+    value == Some("1")
+}
+
+/// Whether the debug hook is armed. Read fresh each time: the value is a
+/// launch-time constant in practice and the calls are not on a hot path.
+fn debug_pinned() -> bool {
+    pins_panel(std::env::var(DEBUG_ENV).ok().as_deref())
+}
 
 /// A rectangle in logical pixels, top-left origin.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -112,17 +147,46 @@ pub fn create(app: &App) -> tauri::Result<()> {
     if app.get_webview_window(PANEL_LABEL).is_some() {
         return Ok(());
     }
-    WebviewWindowBuilder::new(app, PANEL_LABEL, WebviewUrl::App(PANEL_URL.into()))
+    let window = WebviewWindowBuilder::new(app, PANEL_LABEL, WebviewUrl::App(PANEL_URL.into()))
         .title("Prompt Janitor")
         .inner_size(PANEL_SIZE.0, PANEL_SIZE.1)
         .decorations(false)
         .transparent(true)
+        // Transparency has two halves and `transparent(true)` only guarantees
+        // the first: it makes the NSWindow non-opaque and asks wry to stop the
+        // WKWebView drawing its background. The page still composites onto
+        // whatever colour the webview was *created* with, and that default is
+        // opaque white — the exact rectangle the card's rounded corners were
+        // sitting inside. A zero-alpha background colour is what makes the
+        // clear window actually read as clear.
+        .background_color(TRANSPARENT)
+        // No system shadow. Photographed side by side, the shadow macOS draws
+        // for this window is a hard grey frame with square corners hugging the
+        // right and bottom edges, not a popover's soft halo: the shape is
+        // cached from the window, and the window is a transparent rectangle
+        // that then *resizes* after load (`usePanelSize` fits it to the card).
+        // The card casts its own shadow in CSS, inside the transparent inset,
+        // so the popover keeps its depth and the artifact cannot recur.
+        .shadow(false)
         .always_on_top(true)
         .resizable(false)
         .skip_taskbar(true)
         .visible(false)
         .focused(false)
         .build()?;
+
+    if debug_pinned() {
+        // Against the desktop, not the app shell: a transparent popover can only
+        // be judged by what shows through it.
+        crate::window_policy::hide_main(app.handle());
+        // A full-screen app owns a Space of its own, and a window parked on the
+        // desktop Space is simply not on screen there — the screenshot comes
+        // back showing whatever is in front instead of the panel.
+        let _ = window.set_visible_on_all_workspaces(true);
+        let _ = window.set_position(LogicalPosition::new(DEBUG_POSITION.0, DEBUG_POSITION.1));
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
     Ok(())
 }
 
@@ -177,6 +241,11 @@ pub fn clear_blur_stamp() {
 /// The `WindowEvent::Focused(false)` handler: hide, and record when, so the
 /// tray click that caused the blur can tell it closed an open panel.
 pub fn hide_on_blur(app: &AppHandle) {
+    // A parked panel is being looked at, not used; a screenshot tool taking
+    // focus must not make it vanish.
+    if debug_pinned() {
+        return;
+    }
     hide(app);
     if let Ok(mut stamp) = LAST_BLUR_HIDE.lock() {
         *stamp = Some(Instant::now());
@@ -287,7 +356,8 @@ mod tests {
         w: 1440.0,
         h: 875.0,
     };
-    const SIZE: (f64, f64) = (360.0, 480.0);
+    // The shipped size, so the arithmetic below breaks loudly if it changes.
+    const SIZE: (f64, f64) = PANEL_SIZE;
 
     fn icon_at(x: f64) -> Rect {
         Rect {
@@ -300,10 +370,10 @@ mod tests {
 
     #[test]
     fn centres_under_the_icon() {
-        // centre 712 − 180 = 532; bottom 24 + gap 6 = 30
+        // centre 712 − 188 = 524; bottom 24 + gap 6 = 30
         assert_eq!(
             position_under(icon_at(700.0), WORK_AREA, SIZE),
-            (532.0, 30.0)
+            (524.0, 30.0)
         );
     }
 
@@ -315,10 +385,10 @@ mod tests {
 
     #[test]
     fn clamps_to_the_right_margin() {
-        // centre 1422 − 180 = 1242, pushed back to 1440 − 360 − 8
+        // centre 1422 − 188 = 1234, pushed back to 1440 − 376 − 8
         assert_eq!(
             position_under(icon_at(1410.0), WORK_AREA, SIZE),
-            (1072.0, 30.0)
+            (1056.0, 30.0)
         );
     }
 
@@ -332,7 +402,7 @@ mod tests {
             w: 24.0,
             h: 24.0,
         };
-        assert_eq!(position_under(icon, WORK_AREA, SIZE), (532.0, 374.0));
+        assert_eq!(position_under(icon, WORK_AREA, SIZE), (524.0, 374.0));
     }
 
     #[test]
@@ -344,7 +414,46 @@ mod tests {
             h: 300.0,
             ..WORK_AREA
         };
-        assert_eq!(position_under(icon_at(700.0), short, SIZE), (532.0, 33.0));
+        assert_eq!(position_under(icon_at(700.0), short, SIZE), (524.0, 33.0));
+    }
+
+    /// The panel's width lives in three languages: this file sizes the
+    /// window, `Panel.constants.ts` resizes it to the card, `Panel.css` draws
+    /// the card inside the transparent inset. Nothing but this test fails
+    /// when they drift — and drift is exactly the "opens at one width, jumps
+    /// on first measure" bug this popover has already shipped once.
+    #[test]
+    fn width_is_pinned_across_rust_ts_and_css() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ts = std::fs::read_to_string(root.join("src/screens/Panel/Panel.constants.ts"))
+            .expect("Panel.constants.ts");
+        let css =
+            std::fs::read_to_string(root.join("src/screens/Panel/Panel.css")).expect("Panel.css");
+
+        let grab = |hay: &str, pat: &str| -> f64 {
+            let at = hay.find(pat).unwrap_or_else(|| panic!("`{pat}` not found"));
+            hay[at + pat.len()..]
+                .trim_start_matches([' ', '='])
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .unwrap_or_else(|_| panic!("no number after `{pat}`"))
+        };
+
+        let ts_width = grab(&ts, "PANEL_WIDTH");
+        let ts_inset = grab(&ts, "PANEL_CARD_INSET");
+        let ts_max = grab(&ts, "PANEL_MAX_HEIGHT");
+        assert_eq!(ts_width, PANEL_SIZE.0, "TS PANEL_WIDTH vs Rust PANEL_SIZE");
+
+        let card = css.split(".panel {").nth(1).expect(".panel block");
+        let card = &card[..card.find('}').expect(".panel block end")];
+        assert_eq!(grab(card, "width:"), ts_width - ts_inset, "CSS card width");
+        assert_eq!(
+            grab(card, "max-height:"),
+            ts_max - ts_inset,
+            "CSS card max-height"
+        );
     }
 
     #[test]
@@ -355,6 +464,15 @@ mod tests {
             ..WORK_AREA
         };
         assert_eq!(position_under(icon_at(150.0), narrow, SIZE), (8.0, 30.0));
+    }
+
+    #[test]
+    fn only_an_exact_one_arms_the_debug_hook() {
+        assert!(pins_panel(Some("1")));
+        assert!(!pins_panel(None));
+        assert!(!pins_panel(Some("0")));
+        assert!(!pins_panel(Some("")));
+        assert!(!pins_panel(Some("true")));
     }
 
     #[test]

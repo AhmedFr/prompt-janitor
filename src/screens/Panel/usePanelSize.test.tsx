@@ -72,7 +72,7 @@ describe("usePanelSize", () => {
     cardHeight = 412;
     render(<Card />);
     expect(setSize).toHaveBeenCalledTimes(1);
-    expect(setSize.mock.calls[0][0]).toMatchObject({ width: 360, height: 420 });
+    expect(setSize.mock.calls[0][0]).toMatchObject({ width: 376, height: 436 });
   });
 
   it("follows the card when its content changes height", () => {
@@ -81,7 +81,7 @@ describe("usePanelSize", () => {
     cardHeight = 300;
     act(() => observers.notify.forEach((notify) => notify()));
     expect(setSize).toHaveBeenCalledTimes(2);
-    expect(setSize.mock.calls[1][0]).toMatchObject({ width: 360, height: 308 });
+    expect(setSize.mock.calls[1][0]).toMatchObject({ width: 376, height: 324 });
   });
 
   /** A resize call per repaint would fight the window server for no reason. */

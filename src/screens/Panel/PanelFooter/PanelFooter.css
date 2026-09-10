@@ -1,6 +1,8 @@
+/* A hairline, and the card's 14 px gutter, so the primary button's left edge
+   lines up with the verdict and the rows above it. */
 .panel-footer {
-  border-top: 1px solid var(--sep);
-  padding: 10px 16px;
+  border-top: 0.5px solid var(--sep);
+  padding: 10px 14px;
 }
 
 .panel-footer__scan {
@@ -10,5 +12,5 @@
 .panel-footer__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }

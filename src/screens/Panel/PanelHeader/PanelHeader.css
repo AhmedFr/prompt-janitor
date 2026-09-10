@@ -1,23 +1,30 @@
+/* 14 px is the popover's gutter — every section in the card lines its text up
+   with this, so the ring, the section labels, the rows and the footer buttons
+   all sit on one left edge. */
 .panel-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 16px 8px;
+  padding: 14px 14px 10px;
 }
 
 .panel-header--empty {
   display: block;
+  padding: 16px 14px 14px;
 }
 
 .panel-header__text {
   min-width: 0;
 }
 
+/* Semibold rather than bold: at popover scale a 700 weight over a 12 px
+   supporting line reads as shouting, and macOS titles this size are 600. */
 .panel-header__verdict {
   font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
   margin: 0;
 }
 
@@ -25,7 +32,8 @@
 .panel-header__meta,
 .panel-header__hint {
   font-size: 12px;
-  margin: 2px 0 0;
+  line-height: 1.35;
+  margin: 1px 0 0;
 }
 
 .panel-header__delta {

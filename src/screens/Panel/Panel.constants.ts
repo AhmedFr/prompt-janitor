@@ -30,15 +30,21 @@ export const SCAN_HARNESS = "agent";
 /** No scan has ever finished — "Scanned never" reads like a bug. */
 export const NEVER_SCANNED = "Never scanned";
 
-/** Panel window width in logical pixels — the card plus its inset. */
-export const PANEL_WIDTH = 360;
+/**
+ * Panel window width in logical pixels — the 352 px card plus 12 px of
+ * transparent inset on each side. Mirrored by `PANEL_SIZE` in
+ * `src-tauri/src/panel.rs`, which is the size the window is *built* at.
+ */
+export const PANEL_WIDTH = 376;
 
 /**
  * The card's margin, top and bottom together. The window is sized to the card
  * plus this: the transparent gap is what makes the rounded corners read as a
- * popover rather than as a rectangle with clipped edges.
+ * popover rather than as a rectangle with clipped edges, and — since the
+ * window carries no system shadow — it is also the only room the card's own
+ * shadow has to fall in. 12 px a side is what that shadow needs.
  */
-export const PANEL_CARD_INSET = 8;
+export const PANEL_CARD_INSET = 24;
 
 /** Shortest the popover gets. Below this a near-empty card reads as a glitch. */
 export const PANEL_MIN_HEIGHT = 240;

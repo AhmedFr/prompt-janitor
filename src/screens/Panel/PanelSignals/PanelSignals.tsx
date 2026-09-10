@@ -9,7 +9,7 @@ import "./PanelSignals.css";
  * a count with nowhere to go is trivia.
  *
  * A problem chip disappears at zero rather than reading "0 never-used skills":
- * the panel is 360 px wide, and a chip that reports the absence of a problem
+ * the panel card is 352 px wide, and a chip that reports the absence of a problem
  * spends that width on nothing. When both problems are gone the panel says so
  * once, in a line that is not a button because there is nowhere to go.
  */

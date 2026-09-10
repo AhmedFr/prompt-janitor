@@ -18,7 +18,7 @@ const isPanel = isPanelWindow();
 
 // The panel window is transparent so the card's corners show the desktop
 // through them; the main window must keep its background. A class on the root
-// element is what lets one stylesheet say both (see `Panel.css`).
+// element is what lets one stylesheet say both (see `base.css`).
 if (isPanel) document.documentElement.classList.add("panel-window");
 
 ReactDOM.createRoot(root).render(

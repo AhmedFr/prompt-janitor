@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { PanelSnapshot } from "@/lib/ipc";
 import { Panel } from "./Panel";
+import { PANEL_WIDTH } from "./Panel.constants";
 
 const populated: PanelSnapshot = {
   has_data: true,
@@ -49,7 +50,8 @@ const noScan: PanelSnapshot = {
 };
 
 /**
- * The menu-bar popover at the width the panel window actually is (360). The
+ * The menu-bar popover at the width the panel window actually is (376 —
+ * `PANEL_WIDTH`, the 352 px card plus its transparent inset). The
  * height is the card's own: in the app `usePanelSize` resizes the window to
  * match, so every story is as tall as its content. Storybook feeds the card a
  * fixture through the `data` prop — in the app it comes from `usePanel`, which
@@ -62,7 +64,7 @@ const meta = {
   parameters: { layout: "centered" },
   decorators: [
     (Story) => (
-      <div style={{ width: 360, position: "relative" }}>
+      <div style={{ width: PANEL_WIDTH, position: "relative" }}>
         <Story />
       </div>
     ),

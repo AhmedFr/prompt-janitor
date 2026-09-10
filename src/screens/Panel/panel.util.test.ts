@@ -98,9 +98,9 @@ describe("metaLine", () => {
 });
 
 describe("panelHeight", () => {
-  /** The window has to clear the card's 4 px margin on both edges. */
+  /** The window has to clear the card's 12 px margin on both edges. */
   it("adds the card's inset to the measured content", () => {
-    expect(panelHeight(412)).toBe(420);
+    expect(panelHeight(412)).toBe(436);
   });
 
   /** A one-line card floating under the menu bar reads as a glitch, not a popover. */
@@ -115,6 +115,6 @@ describe("panelHeight", () => {
 
   /** A fractional layout height would resize the window on every repaint. */
   it("rounds a sub-pixel measurement", () => {
-    expect(panelHeight(411.4)).toBe(419);
+    expect(panelHeight(411.4)).toBe(435);
   });
 });
