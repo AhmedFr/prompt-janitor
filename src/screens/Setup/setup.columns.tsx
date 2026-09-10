@@ -162,8 +162,13 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
  * single combined inventory — needs the guard: `LastUsedCell` renders "never"
  * for a null rollup, which reads as a finding about a rule file rather than as
  * the fact that rule files are loaded, never called. Guarded-out rows fall
- * back to the same em dash `PercentCell`/`TokensCell` already use, and still
- * sort under the never-used sentinel.
+ * back to the same em dash `PercentCell`/`TokensCell` already use.
+ *
+ * It governs the sort key as much as the cell, and has to: a stale
+ * `usage_stats` row against a rule file would otherwise rank first under
+ * "Uses desc" while its cell showed "—", leaving the table ordered by a
+ * number it refuses to display. Guarded-out rows take the same `-1` sentinel
+ * as never-used ones.
  */
 function silent(row: ArtifactView, applies?: (row: ArtifactView) => boolean): boolean {
   return applies !== undefined && !applies(row);
@@ -184,8 +189,10 @@ export function usesColumn(
   return {
     id: "uses",
     header: "Uses",
-    // Never-used sorts to the bottom of a "Uses desc" default sort.
-    accessorFn: (r) => r.usage?.total ?? -1,
+    // Never-used sorts to the bottom of a "Uses desc" default sort — and so
+    // does a guarded-out row, whatever rollup it carries: a column that
+    // refuses to show a number must not rank the table by it either.
+    accessorFn: (r) => (silent(r, applies) ? -1 : r.usage?.total ?? -1),
     meta: { align: "right", width: COLUMN_WIDTH.uses },
     cell: (c) =>
       silent(c.row.original, applies) ? noClaim : <CountCell value={c.row.original.usage?.total} />,
@@ -199,7 +206,7 @@ export function sessionsColumn(
   return {
     id: "sessions",
     header: "Sessions",
-    accessorFn: (r) => r.usage?.sessions ?? -1,
+    accessorFn: (r) => (silent(r, applies) ? -1 : r.usage?.sessions ?? -1),
     meta: { align: "right", width: COLUMN_WIDTH.sessions },
     cell: (c) =>
       silent(c.row.original, applies) ? (
@@ -223,7 +230,7 @@ export function lastUsedColumn(
   return {
     id: "lastUsed",
     header: "Last used",
-    accessorFn: (r) => lastUsedAt(r.usage?.last_used) ?? -1,
+    accessorFn: (r) => (silent(r, applies) ? -1 : lastUsedAt(r.usage?.last_used) ?? -1),
     meta: { align: "right", width: COLUMN_WIDTH.lastUsed },
     cell: (c) =>
       silent(c.row.original, applies) ? (

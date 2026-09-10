@@ -135,7 +135,9 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   const padBottom =
     isVirtual && items.length > 0 ? virtualizer.getTotalSize() - items[items.length - 1].end : 0;
   const visibleRows = isVirtual ? items.map((item) => modelRows[item.index]) : modelRows;
-  const leafColumns = table.getAllLeafColumns();
+  // Visible, not all: a hidden column still has a column def, and counting it
+  // would emit a stray `<col>` and overshoot every `colSpan` in the body.
+  const leafColumns = table.getVisibleLeafColumns();
   const columnCount = leafColumns.length;
 
   // One declared width is enough to switch the table to fixed layout — see

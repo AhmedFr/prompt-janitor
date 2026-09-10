@@ -12,8 +12,13 @@ import {
   TokensCell,
 } from "./index";
 
-/** Relative ages are read off the wall clock, so the story dates are offsets from it. */
-const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+/**
+ * `LastUsedCell` reads relative ages off the wall clock, so the story dates are
+ * offsets from a fixed base rather than from `Date.now()` — otherwise every
+ * snapshot of this story differs from the last by however long ago it was taken.
+ */
+const NOW = new Date("2026-08-20T12:00:00.000Z");
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (

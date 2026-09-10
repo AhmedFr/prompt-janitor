@@ -28,7 +28,7 @@ interface Artifact {
   tokens: number | null;
 }
 
-const usage =(o: Partial<UsageStat> = {}): UsageStat => ({
+const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
   total: 24,
   sessions: 9,
   last_used: "2026-08-19T12:00:00.000Z",

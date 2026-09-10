@@ -89,6 +89,14 @@ function headers(): string[] {
     .map((th) => th.textContent?.replace(/[▲▼↕]/g, "").trim() ?? "");
 }
 
+/** The Name cell of every body row, in render order — Name is the second column here. */
+function nameCells(): string[] {
+  return within(screen.getByRole("table"))
+    .getAllByRole("row")
+    .slice(1)
+    .map((tr) => tr.querySelectorAll("td")[1]?.textContent ?? "");
+}
+
 /** The first cell of every body row, in render order. */
 function firstCells(): string[] {
   return within(screen.getByRole("table"))
@@ -196,6 +204,25 @@ describe("projectSetupColumns", () => {
     expect(cells[3]).toBe("4");
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("800")).toBeInTheDocument();
+  });
+
+  it("sorts a guarded-out row under the never-used sentinel, whatever rollup it carries", () => {
+    // A stale `usage_stats` row against a rule file would otherwise sort to
+    // the top of "Uses desc" while its cell renders "—": the table would be
+    // ranked by a number it refuses to show.
+    for (const id of ["uses", "sessions", "lastUsed"]) {
+      cleanup();
+      mount(
+        projectSetupColumns(ctx()),
+        [
+          artifact({ id: 1, kind: "rule", name: "CLAUDE.md", usage: usage({ total: 999, sessions: 99 }) }),
+          artifact({ id: 2, kind: "skill", name: "pdf-extract", usage: usage({ total: 3, sessions: 1 }) }),
+        ],
+        rowId,
+        { defaultSort: { id, desc: true } },
+      );
+      expect(nameCells(), `sorted by ${id}`).toEqual(["pdf-extract", "CLAUDE.md"]);
+    }
   });
 
   it("makes no usage claim about a kind nothing invokes", () => {
