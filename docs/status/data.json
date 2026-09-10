@@ -82,6 +82,11 @@
   "actions": {
     "blocking": [
       {
+        "title": "Look at the menu-bar panel once more on your Mac (#171)",
+        "detail": "The popover was rebuilt and photographed on this machine: transparent corners over the wallpaper, no dark band, a soft shadow inside a 12 px inset, and a macOS-popover pass on type and spacing. What a screenshot cannot check is the live behaviour — click the tray icon and confirm the panel still lands under it (the window is 376 px wide now, not 360), that it hides on blur and on Esc, and that a tall panel scrolls inside the card rather than the window. If anything looks off, `PJ_PANEL_DEBUG=1 '/Applications/Prompt Janitor.app/Contents/MacOS/prompt-janitor'` parks the panel at (200, 100) on every Space and keeps it open when it loses focus, so you can screenshot it.",
+        "kind": "testing"
+      },
+      {
         "title": "Verify the CSP and ACL on a real Mac after #153 (PR #158)",
         "detail": "The webview now runs under a Content-Security-Policy and every app command is gated per window, neither of which can be exercised headless — and neither is exercised by `pnpm dev` either: Tauri only injects the CSP into assets it serves itself, and in dev the page comes straight from Vite, so a green dev run proves nothing. Test a bundled build: `pnpm tauri build --debug` is the fast path (the release bundle works too). In it: project logos render (they are `data:` URIs), the Analytics charts render (Recharts inline styles), Settings -> App -> Check for updates reaches GitHub, and Settings -> App -> Reset / Uninstall raise a native warning sheet attached to the main window whose Cancel reports \"Cancelled. Nothing was changed.\" inline. Then the tray panel: it opens, resizes to its card, Esc hides it, Scan now / Open app / Quit work — it had no capability at all before this PR, so this is the first time its window calls are actually allowed. A CSP violation shows in the webview console (right-click -> Inspect in a debug bundle) as \"Refused to …\".",
         "kind": "testing"
@@ -328,12 +333,6 @@
       "note": "Merged (#138)"
     },
     {
-      "name": "Table standard — full width, one-line rows, split usage columns",
-      "tier": "free",
-      "status": "pr",
-      "note": "PR for #172: Uses/Sessions/Last used as three sortable columns; table pages fluid; fixed column widths so the nine-column Setup table stops scrolling sideways; calm header and one toolbar band"
-    },
-    {
       "name": "Analytics usage as ranked lists with window",
       "tier": "free",
       "status": "done",
@@ -397,11 +396,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1055/1055 passing (86 files)"
+      "result": "1031/1031 passing (86 files)"
     },
     {
       "name": "cargo test",
-      "result": "331/331 passing"
+      "result": "333/333 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -450,8 +449,8 @@
     }
   ],
   "recent": [
-    "2026-09-10 — Review fix on #172/#173: the usage columns' `applies` guard now covers the sort key as well as the cell — a stale rollup on a rule row was ranking the project's mixed table by a number the cell refused to show; plus the colgroup and body `colSpan` count visible leaf columns",
-    "2026-09-10 — Tables to standard (#172): the usage pill split into sortable Uses / Sessions / Last used columns; the table pages dropped their prose width cap; a `<colgroup>` pins the short columns so Name absorbs the slack and the nine-column Setup table fits without scrolling sideways (measured 1440/1200px, browser); calm white header with a caret only on the sorted column, and search + chips in one toolbar band",
+    "2026-09-10 — Panel visuals fixed and verified on-device by photograph: runtime windows need an explicit transparent background_color, the dark band was legacy scroll bars, the native shadow drew a cached square frame — CSS shadow + 12px inset instead; macOS popover taste pass (#171)",
+    "2026-09-10 — Menu-bar panel visuals fixed on-device (#171): the popover painted an opaque white rectangle because a transparent window built at runtime never gets a webview background colour (a config-declared one does), and the \"dark band\" under the card was legacy scroll bars on a scrollable transparent document, not a stale shadow. Verified by photographing the running app — `PJ_PANEL_DEBUG=1` parks the panel on the desktop for exactly that. Native window shadow off (macOS draws it as a square-cornered frame for this window), card shadow in CSS inside a 12 px inset, plus a macOS-popover pass on type and spacing",
     "2026-09-03 — GitHub Actions CI deactivated (manual dispatch only; the Rust job's macOS runner bills at 10x and the monthly quota was 90% spent). `pnpm check` (scripts/check.sh) is the only merge gate and `pnpm install` installs its fast variant as a pre-push hook; release.yml untouched. Shipping skill + CLAUDE.md updated to match; #167",
     "2026-09-02 — v0.1.2 published (release gate approved — the new `release` environment from #163 requires a reviewer on every tag); update manifest publicly fetchable, so the installed 0.1.1 app can now discover it in-app",
     "2026-09-02 — v0.1.2 tagged: app-basics fixes (icon, dragging, responsive layouts, sidebar). First release the installed 0.1.1 app can discover in-app — the live updater test",
