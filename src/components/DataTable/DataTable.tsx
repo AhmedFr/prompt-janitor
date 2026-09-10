@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useId,
   useRef,
   type CSSProperties,
   type KeyboardEvent,
@@ -13,7 +12,9 @@ import type { DataTableProps } from "./DataTable.types";
 import { useDataTable } from "./useDataTable";
 import { sizedMinWidth } from "./dataTable.util";
 import { DataTableSearch } from "./DataTableSearch";
+import { FilterSelect } from "@/components/FilterSelect";
 import {
+  CLEAR_ALL_LABEL,
   CLEAR_FILTERS_LABEL,
   NO_MATCH_TITLE,
   ROW_HEIGHT,
@@ -46,10 +47,16 @@ function fromRowItself(event: SyntheticEvent<HTMLTableRowElement>): boolean {
 const SORT_GLYPH = { ascending: "▲", descending: "▼", none: "↕" } as const;
 
 /**
- * The one table in the app: search, pills, tri-state sort, sticky header,
+ * The one table in the app: search, filter selects, tri-state sort, sticky header,
  * optional virtualisation. Screens supply column defs and pill predicates and
  * nothing else, so every list in Prompt Janitor behaves identically — the
  * filter you set on one screen works the same way on the next.
+ *
+ * Each `PillGroup` renders as one `FilterSelect` rather than as a row of
+ * chips. A chip row costs width in proportion to how many options a group
+ * holds — Setup's Scope group has one per project plus one per plugin — and
+ * three such rows pushed the first row of data off the first screenful. A
+ * trigger costs the same width whatever the group holds.
  *
  * Height is capped by `--dt-max-h` (70vh by default) on the root, so a table
  * scrolls inside the page instead of pushing the page around it.
@@ -79,6 +86,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     setSearch,
     toggleSort,
     togglePill,
+    clearPillGroup,
     clearFilters,
     counts,
     filteredCount,
@@ -87,7 +95,6 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   } = useDataTable(props);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const uid = useId();
   const modelRows = loading ? [] : table.getRowModel().rows;
   const isVirtual = virtualize && modelRows.length > VIRTUAL_THRESHOLD;
 
@@ -196,42 +203,33 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 
           {showFilters &&
             pills?.map((group) => (
-              <div
-                className="dt__pills"
-                role="group"
-                aria-labelledby={`${uid}-pills-${group.id}`}
+              <FilterSelect
                 key={group.id}
-              >
-                {/* The group's name is spelled once, visibly: a "Rules 2" chip
-                    two chips away from "Global 4" is only readable when the
-                    boundary between the two groups is on screen. */}
-                <span className="dt__pill-group-label" id={`${uid}-pills-${group.id}`}>
-                  {group.label}
-                </span>
-                {group.options.map((option) => {
-                  const on = (state.pills[group.id] ?? []).includes(option.id);
-                  const count = option.count ?? counts[group.id]?.[option.id] ?? 0;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={cx("dt__pill", on && "dt__pill--on")}
-                      // Same defect as the tab badges: the count sits inside
-                      // the button, so without this the pill announces as
-                      // "Rules2" rather than "Rules, 2".
-                      aria-label={`${option.label}, ${count}`}
-                      aria-pressed={on}
-                      onClick={() => togglePill(group.id, option.id, !!group.multi)}
-                    >
-                      {option.label}
-                      <span className="dt__pill-count" aria-hidden="true">
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                label={group.label}
+                multi={!!group.multi}
+                selected={state.pills[group.id] ?? []}
+                options={group.options.map((option) => ({
+                  id: option.id,
+                  label: option.label,
+                  // A group that precomputed its own counts (see
+                  // `PillOption.count`) keeps them; everything else takes the
+                  // faceted pass's.
+                  count: option.count ?? counts[group.id]?.[option.id] ?? 0,
+                }))}
+                onToggle={(optionId) => togglePill(group.id, optionId, !!group.multi)}
+                onClear={() => clearPillGroup(group.id)}
+              />
             ))}
+
+          {/* The only thing in the toolbar that says the table is showing a
+              slice — the triggers each speak for their own group, and none of
+              them speaks for the search box. Absent when there is nothing to
+              clear, so an unfiltered toolbar carries no dead control. */}
+          {showFilters && isFiltered && (
+            <button type="button" className="dt__clear-all" onClick={clearFilters}>
+              {CLEAR_ALL_LABEL}
+            </button>
+          )}
 
           {toolbarRight && <div className="dt__toolbar-right">{toolbarRight}</div>}
         </div>

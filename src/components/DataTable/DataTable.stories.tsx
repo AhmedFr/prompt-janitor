@@ -201,7 +201,8 @@ export const Regular: Story = { args: { ...base, stateKey: "sb-regular" } };
 /** The density every in-page tab uses: more rows above the fold, same rhythm. */
 export const Compact: Story = { args: { ...base, stateKey: "sb-compact", density: "compact" } };
 
-export const WithPills: Story = {
+/** Each group folds into one `FilterSelect`, however many options it holds. */
+export const WithFilters: Story = {
   args: {
     ...base,
     stateKey: "sb-pills",

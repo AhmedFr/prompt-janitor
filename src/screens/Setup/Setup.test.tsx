@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { filterOption, filterTrigger, openFilterGroup, pickFilter } from "@/test/filters";
 import { Setup } from "./Setup";
 import type { ArtifactView, SetupView, UsageStat } from "@/lib/ipc";
 
@@ -306,12 +307,11 @@ describe("Setup", () => {
     );
   });
 
-  it("narrows a tab to one project with the Scope pills", async () => {
+  it("narrows a tab to one project with the Scope filter", async () => {
     await renderSetup();
     openTab(/^Skills/);
 
-    const scope = screen.getByRole("group", { name: "Scope" });
-    fireEvent.click(within(scope).getByRole("button", { name: /^web/ }));
+    pickFilter("Scope", "web");
 
     expect(rowNames()).toEqual(["deploy"]);
   });
@@ -320,7 +320,7 @@ describe("Setup", () => {
     await renderSetup();
     openTab(/^Skills/);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
+    pickFilter("Status", "Never used");
 
     expect(rowNames()).toEqual(["sunset", "brainstorming", "brainstorming"]);
   });
@@ -366,12 +366,11 @@ describe("Setup", () => {
     await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
   });
 
-  it("narrows a tab to one plugin with the Scope pills", async () => {
+  it("narrows a tab to one plugin with the Scope filter", async () => {
     await renderSetup();
     openTab(/^Skills/);
 
-    const scope = screen.getByRole("group", { name: "Scope" });
-    fireEvent.click(within(scope).getByRole("button", { name: /^posthog/ }));
+    pickFilter("Scope", "posthog");
 
     expect(rowNames()).toEqual(["brainstorming"]);
     expect(within(rowFor("brainstorming")).getByText("posthog")).toBeInTheDocument();
@@ -410,7 +409,7 @@ describe("Setup", () => {
   it("keeps each tab's filters to itself, even between tabs with the same pill groups", async () => {
     await renderSetup();
     openTab(/^Skills/);
-    fireEvent.click(screen.getByRole("button", { name: /^Never used/ }));
+    pickFilter("Status", "Never used");
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "sunset" } });
     await waitFor(() => expect(rowNames()).toEqual(["sunset"]));
 
@@ -421,10 +420,7 @@ describe("Setup", () => {
 
     expect(rowNames()).toEqual(["code-reviewer"]);
     expect(screen.getByRole("searchbox")).toHaveValue("");
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(filterTrigger("Status")).toHaveAccessibleName("Status");
     // Nothing was typed or pressed on this tab, so it has nothing to remember.
     expect(window.sessionStorage.getItem("pj.table.setup.agent")).toBeNull();
 
@@ -432,16 +428,15 @@ describe("Setup", () => {
 
     expect(rowNames()).toEqual(["sunset"]);
     expect(screen.getByRole("searchbox")).toHaveValue("sunset");
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(filterTrigger("Status")).toHaveAccessibleName("Status, Never used");
   });
 
   it("rebuilds the tabs, rows and pill counts from the inventory a scan produced", async () => {
     await renderSetup();
     openTab(/^Skills/);
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used3");
+    openFilterGroup("Status");
+    expect(filterOption("Never used")).toHaveAccessibleName("Never used, 3");
+    fireEvent.click(filterTrigger("Status"));
 
     // The rescan finds one more, never-used skill. Every derived value here
     // is cached on the identity of what it was built from — the row arrays,
@@ -466,7 +461,8 @@ describe("Setup", () => {
       expect(screen.getByRole("tab", { name: "Skills, 6" })).toHaveTextContent("Skills6"),
     );
     expect(rowNames()).toContain("zzz-new");
-    expect(screen.getByRole("button", { name: /^Never used/ })).toHaveTextContent("Never used4");
+    openFilterGroup("Status");
+    expect(filterOption("Never used")).toHaveAccessibleName("Never used, 4");
   });
 
   it("offers a folder picker when no harness was detected", async () => {

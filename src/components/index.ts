@@ -22,6 +22,7 @@ export {
   PathCell,
   ActionsCell,
 } from "./DataTable";
+export { FilterSelect } from "./FilterSelect";
 export { Tabs, useTabState } from "./Tabs";
 export { RankedList, rankRows } from "./RankedList";
 export { ScanBar } from "./ScanBar";
@@ -38,6 +39,7 @@ export type { CardProps } from "./Card";
 export type { UsageBadgeProps } from "./UsageBadge";
 export type { ArtifactCardProps } from "./ArtifactCard";
 export type { DataTableProps, DataTableSearch, PillGroup, PillOption, TableState, RowAction } from "./DataTable";
+export type { FilterSelectOption, FilterSelectProps } from "./FilterSelect";
 export type { TabItem, TabsProps } from "./Tabs";
 export type {
   RankedRow,

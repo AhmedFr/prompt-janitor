@@ -11,6 +11,13 @@ export const VIRTUAL_OVERSCAN = 10;
 export const NO_MATCH_TITLE = "No rows match — clear filters";
 export const CLEAR_FILTERS_LABEL = "Clear filters";
 
+/**
+ * The toolbar's own reset, distinct from the empty state's `CLEAR_FILTERS_LABEL`:
+ * "all" is what makes it read as wider than the group whose popover the user
+ * just closed, which has a `Clear` of its own.
+ */
+export const CLEAR_ALL_LABEL = "Clear all";
+
 /** How long typing settles before the table re-filters. */
 export const SEARCH_DEBOUNCE_MS = 150;
 

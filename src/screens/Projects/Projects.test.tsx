@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { pickFilter } from "@/test/filters";
 import type { ProjectRow } from "@/lib/ipc";
 import { Projects } from "./Projects";
 
@@ -89,7 +90,7 @@ describe("Projects", () => {
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /Has issues/ }));
+    pickFilter("Status", "Has issues");
 
     await waitFor(() => expect(rowNames()).not.toContain("web-app"));
     expect(rowNames()).toEqual(expect.arrayContaining(["scripts", "gone"]));
@@ -99,8 +100,8 @@ describe("Projects", () => {
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
-    // The chip's accessible name is its letter followed by the faceted count.
-    fireEvent.click(screen.getByRole("button", { name: /^A, \d+$/ }));
+    // The option's accessible name is its letter followed by the faceted count.
+    pickFilter("Grade", "A");
 
     await waitFor(() => expect(rowNames()).toEqual(["web-app"]));
   });
@@ -109,7 +110,7 @@ describe("Projects", () => {
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
-    fireEvent.click(screen.getByRole("button", { name: /Missing folder/ }));
+    pickFilter("Status", "Missing folder");
 
     await waitFor(() => expect(rowNames()).toEqual(["gone"]));
   });

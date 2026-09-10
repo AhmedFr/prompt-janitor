@@ -21,6 +21,8 @@ export interface UseDataTable<Row> {
   /** Cycles a column asc → desc → unsorted. */
   toggleSort: (columnId: string) => void;
   togglePill: (groupId: string, optionId: string, multi: boolean) => void;
+  /** Turns every option in one group off, leaving the other groups and the search alone. */
+  clearPillGroup: (groupId: string) => void;
   clearFilters: () => void;
   /** Match counts per pill group id, then per option id (faceted — see `facetedPillCounts`). */
   counts: Record<string, Record<string, number>>;
@@ -137,6 +139,11 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     [patch, selectedPills],
   );
 
+  const clearPillGroup = useCallback(
+    (groupId: string) => patch({ pills: { ...selectedPills, [groupId]: [] } }),
+    [patch, selectedPills],
+  );
+
   // Clears the *filters*, not the view: the sort is the order the user chose to
   // read in, and throwing it away on "no rows match" loses their place too.
   const clearFilters = useCallback(() => patch({ search: "", pills: {} }), [patch]);
@@ -176,6 +183,7 @@ export function useDataTable<Row>(props: DataTableProps<Row>): UseDataTable<Row>
     setSearch,
     toggleSort,
     togglePill,
+    clearPillGroup,
     clearFilters,
     counts,
     filteredCount: filtered.length,

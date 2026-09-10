@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { pickFilter } from "@/test/filters";
 import type { RuleInfo } from "@/lib/ipc";
 import { Rules } from "./Rules";
 import { HIGHLIGHT_KEY, STATUS_MSG_MS, TAB_STATE_KEY } from "./Rules.constants";
@@ -339,7 +340,7 @@ describe("Rules", () => {
     await renderScreen();
     await rowsSettle(2);
 
-    fireEvent.click(within(screen.getByRole("group", { name: "Severity" })).getByRole("button", { name: /Critical/ }));
+    pickFilter("Severity", "Critical");
 
     await rowsSettle(1);
     expect(rowTitles()[0]).toContain("No Slack references");
@@ -349,7 +350,7 @@ describe("Rules", () => {
     await renderScreen();
     await rowsSettle(2);
 
-    fireEvent.click(within(screen.getByRole("group", { name: "Enabled" })).getByRole("button", { name: /Off/ }));
+    pickFilter("Enabled", "Off");
 
     await rowsSettle(1);
     expect(rowTitles()[0]).toContain("Be terse");
@@ -359,7 +360,7 @@ describe("Rules", () => {
     await renderScreen();
     await rowsSettle(2);
 
-    fireEvent.click(within(screen.getByRole("group", { name: "Hits" })).getByRole("button", { name: /Has hits/ }));
+    pickFilter("Hits", "Has hits");
 
     await rowsSettle(1);
     expect(rowTitles()[0]).toContain("No Slack references");

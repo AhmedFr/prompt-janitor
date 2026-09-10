@@ -396,7 +396,7 @@
     },
     {
       "name": "Vitest",
-      "result": "1031/1031 passing (86 files)"
+      "result": "1106/1106 passing (88 files)"
     },
     {
       "name": "cargo test",
@@ -449,6 +449,7 @@
     }
   ],
   "recent": [
+    "2026-09-10 — Table filters folded into one multi-select per group (#176, PR #178): a chip row cost width in proportion to a group's option count — Setup's Scope group has one per project plus one per plugin — so three groups pushed the first data row off the first screenful. New `FilterSelect` (listbox popover, faceted counts, keyboard, per-group Clear, filter box past 8 options) plus a `Clear all` in the toolbar. `PillGroup` and the `pills` prop are unchanged, so no screen was touched. Review round: the trigger is now a real ARIA combobox (aria-activedescendant is invalid on a button, and has to sit on whichever element holds focus — the filter box when there is one), focus is taken explicitly on open because WebKit does not focus a button on click, the active option scrolls into view, Tab reaches the popover's Clear, and the popover flips when it would run off the window.",
     "2026-09-10 — v0.1.3 tagged: table standard (#173) + panel visual fixes (#174)",
     "2026-09-10 — Panel visuals fixed and verified on-device by photograph: runtime windows need an explicit transparent background_color, the dark band was legacy scroll bars, the native shadow drew a cached square frame — CSS shadow + 12px inset instead; macOS popover taste pass (#171)",
     "2026-09-10 — Menu-bar panel visuals fixed on-device (#171): the popover painted an opaque white rectangle because a transparent window built at runtime never gets a webview background colour (a config-declared one does), and the \"dark band\" under the card was legacy scroll bars on a scrollable transparent document, not a stale shadow. Verified by photographing the running app — `PJ_PANEL_DEBUG=1` parks the panel on the desktop for exactly that. Native window shadow off (macOS draws it as a square-cornered frame for this window), card shadow in CSS inside a 12 px inset, plus a macOS-popover pass on type and spacing",
