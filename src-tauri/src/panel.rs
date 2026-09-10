@@ -356,7 +356,8 @@ mod tests {
         w: 1440.0,
         h: 875.0,
     };
-    const SIZE: (f64, f64) = (360.0, 480.0);
+    // The shipped size, so the arithmetic below breaks loudly if it changes.
+    const SIZE: (f64, f64) = PANEL_SIZE;
 
     fn icon_at(x: f64) -> Rect {
         Rect {
@@ -369,10 +370,10 @@ mod tests {
 
     #[test]
     fn centres_under_the_icon() {
-        // centre 712 − 180 = 532; bottom 24 + gap 6 = 30
+        // centre 712 − 188 = 524; bottom 24 + gap 6 = 30
         assert_eq!(
             position_under(icon_at(700.0), WORK_AREA, SIZE),
-            (532.0, 30.0)
+            (524.0, 30.0)
         );
     }
 
@@ -384,10 +385,10 @@ mod tests {
 
     #[test]
     fn clamps_to_the_right_margin() {
-        // centre 1422 − 180 = 1242, pushed back to 1440 − 360 − 8
+        // centre 1422 − 188 = 1234, pushed back to 1440 − 376 − 8
         assert_eq!(
             position_under(icon_at(1410.0), WORK_AREA, SIZE),
-            (1072.0, 30.0)
+            (1056.0, 30.0)
         );
     }
 
@@ -401,7 +402,7 @@ mod tests {
             w: 24.0,
             h: 24.0,
         };
-        assert_eq!(position_under(icon, WORK_AREA, SIZE), (532.0, 374.0));
+        assert_eq!(position_under(icon, WORK_AREA, SIZE), (524.0, 374.0));
     }
 
     #[test]
@@ -413,7 +414,46 @@ mod tests {
             h: 300.0,
             ..WORK_AREA
         };
-        assert_eq!(position_under(icon_at(700.0), short, SIZE), (532.0, 33.0));
+        assert_eq!(position_under(icon_at(700.0), short, SIZE), (524.0, 33.0));
+    }
+
+    /// The panel's width lives in three languages: this file sizes the
+    /// window, `Panel.constants.ts` resizes it to the card, `Panel.css` draws
+    /// the card inside the transparent inset. Nothing but this test fails
+    /// when they drift — and drift is exactly the "opens at one width, jumps
+    /// on first measure" bug this popover has already shipped once.
+    #[test]
+    fn width_is_pinned_across_rust_ts_and_css() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let ts = std::fs::read_to_string(root.join("src/screens/Panel/Panel.constants.ts"))
+            .expect("Panel.constants.ts");
+        let css =
+            std::fs::read_to_string(root.join("src/screens/Panel/Panel.css")).expect("Panel.css");
+
+        let grab = |hay: &str, pat: &str| -> f64 {
+            let at = hay.find(pat).unwrap_or_else(|| panic!("`{pat}` not found"));
+            hay[at + pat.len()..]
+                .trim_start_matches([' ', '='])
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<String>()
+                .parse()
+                .unwrap_or_else(|_| panic!("no number after `{pat}`"))
+        };
+
+        let ts_width = grab(&ts, "PANEL_WIDTH");
+        let ts_inset = grab(&ts, "PANEL_CARD_INSET");
+        let ts_max = grab(&ts, "PANEL_MAX_HEIGHT");
+        assert_eq!(ts_width, PANEL_SIZE.0, "TS PANEL_WIDTH vs Rust PANEL_SIZE");
+
+        let card = css.split(".panel {").nth(1).expect(".panel block");
+        let card = &card[..card.find('}').expect(".panel block end")];
+        assert_eq!(grab(card, "width:"), ts_width - ts_inset, "CSS card width");
+        assert_eq!(
+            grab(card, "max-height:"),
+            ts_max - ts_inset,
+            "CSS card max-height"
+        );
     }
 
     #[test]
