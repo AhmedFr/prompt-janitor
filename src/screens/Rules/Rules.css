@@ -1,8 +1,3 @@
-/* Six columns plus a chip row need the width; the default page caps at 920px. */
-.rules-page {
-  max-width: 1100px;
-}
-
 /*
  * The Enabled column's switch. `base.css` styles a `<button class="switch">`
  * — this is the same shape as an `<input type="checkbox" role="switch">`,

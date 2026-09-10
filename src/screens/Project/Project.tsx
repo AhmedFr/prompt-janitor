@@ -123,7 +123,7 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page project-page">
+        <div className="page page--table project-page">
           {busy && (
             <ScanBar
               progress={scan.progress}

@@ -1,4 +1,5 @@
 export { GradeCell } from "./GradeCell";
+export { NameCell } from "./NameCell";
 export { CountCell } from "./CountCell";
 export { LastUsedCell } from "./LastUsedCell";
 export { PercentCell } from "./PercentCell";
@@ -19,6 +20,7 @@ export {
 } from "./cells.util";
 export type {
   GradeCellProps,
+  NameCellProps,
   CountCellProps,
   LastUsedCellProps,
   PercentCellProps,

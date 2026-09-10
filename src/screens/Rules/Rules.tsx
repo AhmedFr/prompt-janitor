@@ -153,7 +153,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page rules-page">
+        <div className="page page--table rules-page">
           {unavailable ? (
             <NoDesktopApp />
           ) : failed ? (

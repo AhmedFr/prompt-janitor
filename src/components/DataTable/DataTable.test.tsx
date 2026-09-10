@@ -850,4 +850,31 @@ describe("DataTable", () => {
 
     expect(rowNames()).toEqual(["Alpha", "Charlie"]);
   });
+  describe("column sizing", () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SIZED: ColumnDef<Row, any>[] = [
+      { id: "name", header: "Name", accessorKey: "name" },
+      { id: "kind", header: "Kind", accessorKey: "kind", meta: { width: "120px" } },
+      { id: "score", header: "Score", accessorKey: "score", meta: { align: "right", width: "80px" } },
+    ];
+
+    it("leaves a table whose columns declare no width on the browser's own layout", () => {
+      setup();
+      const table = screen.getByRole("table");
+      expect(table.querySelector("colgroup")).toBeNull();
+      expect(table).not.toHaveClass("dt__table--sized");
+    });
+
+    it("pins declared widths through a colgroup so the flexible column takes the slack", () => {
+      setup({ columns: SIZED });
+      const cols = [...screen.getByRole("table").querySelectorAll("colgroup col")];
+      expect(cols).toHaveLength(3);
+      // The name column declares none: fixed layout hands it whatever is left,
+      // which is what makes a nine-column table fit without scrolling.
+      expect(cols[0].getAttribute("style")).toBeNull();
+      expect(cols[1]).toHaveStyle({ width: "120px" });
+      expect(cols[2]).toHaveStyle({ width: "80px" });
+      expect(screen.getByRole("table")).toHaveClass("dt__table--sized");
+    });
+  });
 });

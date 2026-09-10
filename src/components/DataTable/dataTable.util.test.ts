@@ -7,7 +7,9 @@ import {
   matchesSearch,
   pillCounts,
   prunePills,
+  sizedMinWidth,
 } from "./dataTable.util";
+import { FLEX_COLUMN_MIN } from "./DataTable.constants";
 
 interface Row {
   name: string;
@@ -252,5 +254,23 @@ describe("prunePills", () => {
   it("passes an already-clean selection through unchanged, and handles no groups", () => {
     expect(prunePills({}, groups)).toEqual({});
     expect(prunePills({ kind: ["rule"] }, [])).toEqual({});
+  });
+});
+
+describe("sizedMinWidth", () => {
+  it("adds the declared widths to a floor for each column that declared none", () => {
+    // 104 + 68 + the Name column's own floor.
+    expect(sizedMinWidth([undefined, "104px", "68px"])).toBe(`${172 + FLEX_COLUMN_MIN}px`);
+  });
+
+  it("is just the sum when every column declares a width", () => {
+    expect(sizedMinWidth(["50px", "50.5px"])).toBe("100.5px");
+  });
+
+  it("declines to guess a floor when a width is not a plain pixel length", () => {
+    // No honest total to add up out of a percentage, and a wrong floor would
+    // make the table scroll at a width it actually fits.
+    expect(sizedMinWidth([undefined, "40%"])).toBeUndefined();
+    expect(sizedMinWidth([undefined, "12ch"])).toBeUndefined();
   });
 });

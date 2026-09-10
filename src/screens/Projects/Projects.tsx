@@ -66,7 +66,7 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page projects-page">
+        <div className="page page--table projects-page">
           {failed ? (
             <UnreadableProjects onRetry={() => void state.refetch()} />
           ) : (

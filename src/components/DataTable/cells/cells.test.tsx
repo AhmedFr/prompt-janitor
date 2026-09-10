@@ -6,6 +6,7 @@ import {
   CountCell,
   GradeCell,
   LastUsedCell,
+  NameCell,
   PathCell,
   PercentCell,
   ScopeCell,
@@ -40,6 +41,26 @@ describe("GradeCell", () => {
   it("renders the neutral ungraded chip for a null grade", () => {
     render(<GradeCell grade={null} />);
     expect(screen.getByLabelText("Ungraded")).toBeInTheDocument();
+  });
+});
+
+describe("NameCell", () => {
+  it("renders the name with its description muted beside it", () => {
+    render(<NameCell name="superpowers" description="v6.3.0 · claude-plugins-official" />);
+    expect(screen.getByText("superpowers")).toBeInTheDocument();
+    expect(screen.getByText("v6.3.0 · claude-plugins-official")).toHaveClass("muted");
+  });
+
+  it("renders nothing beside the name when there is no description", () => {
+    const { container } = render(<NameCell name="deploy" description={null} />);
+    expect(container.querySelector(".dt-name__desc")).toBeNull();
+  });
+
+  it("keeps the full text in a title, because both halves are clamped to one line", () => {
+    const description = "a description far too long to survive one compact table row";
+    render(<NameCell name="running-a-feature-workflow" description={description} />);
+    expect(screen.getByTitle("running-a-feature-workflow")).toBeInTheDocument();
+    expect(screen.getByTitle(description)).toBeInTheDocument();
   });
 });
 

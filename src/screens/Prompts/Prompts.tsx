@@ -116,7 +116,7 @@ export function Prompts({ navigate, target, data: override }: PromptsProps) {
       </header>
 
       <div className="scroll-area">
-        <div className="page prompts-page">
+        <div className="page page--table prompts-page">
           {failed ? (
             <UnreadablePrompts onRetry={() => void state.refetch()} />
           ) : (

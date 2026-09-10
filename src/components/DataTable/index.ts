@@ -20,6 +20,7 @@ export {
 } from "./DataTable.constants";
 export {
   GradeCell,
+  NameCell,
   CountCell,
   LastUsedCell,
   PercentCell,
@@ -46,6 +47,7 @@ export type {
 export type { UseDataTable } from "./useDataTable";
 export type {
   GradeCellProps,
+  NameCellProps,
   CountCellProps,
   LastUsedCellProps,
   PercentCellProps,

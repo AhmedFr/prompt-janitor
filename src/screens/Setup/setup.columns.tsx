@@ -8,6 +8,7 @@ import {
   GradeCell,
   LastUsedCell,
   lastUsedAt,
+  NameCell,
   PercentCell,
   ScopeCell,
   TokensCell,
@@ -58,6 +59,29 @@ export interface ColumnsCtx {
 
 const SIZE_UNITS = ["B", "KB", "MB"] as const;
 
+/**
+ * What each short column asks for, in CSS pixels — wide enough for its
+ * uppercase header plus a sort caret, and no wider.
+ *
+ * Every column here declares one and `name` declares none, which is the whole
+ * mechanism (see `ColumnMeta.width`): the table goes to fixed layout, these
+ * take what they asked for, and Name absorbs the rest instead of the table
+ * widening past the page and scrolling sideways — the defect that clipped
+ * "running-a-feature-workflow" down to "rkflow" on the owner's screen.
+ */
+export const COLUMN_WIDTH = {
+  kind: "100px",
+  scope: "104px",
+  grade: "78px",
+  uses: "68px",
+  sessions: "88px",
+  lastUsed: "96px",
+  errorRate: "82px",
+  avgTokens: "100px",
+  size: "80px",
+  actions: "76px",
+} as const;
+
 /** Human file size from a byte count — whole bytes under 1 KB, one decimal place above it. */
 export function formatSize(bytes: number): string {
   let value = bytes;
@@ -74,18 +98,11 @@ export function nameColumn(): ColumnDef<ArtifactView, unknown> {
     id: "name",
     header: "Name",
     accessorKey: "name",
-    // Description muted alongside the name — hooks bake "event: cmd" into
-    // `name` already and carry no description, so this degrades to plain
-    // text for them. Inline rather than a named component: this module's
-    // exports are column/pill *definitions*, not components, and a stray
-    // capitalized helper here trips Fast Refresh's one-component-per-file
-    // check for no benefit — nothing renders this file directly.
-    cell: (c) => (
-      <span>
-        {c.row.original.name}
-        {c.row.original.description && <span className="muted"> · {c.row.original.description}</span>}
-      </span>
-    ),
+    // Description muted alongside the name, both clamped to one line by
+    // `NameCell` — hooks bake "event: cmd" into `name` already and carry no
+    // description, so this degrades to plain text for them. The one column
+    // that declares no width: it takes whatever the sized columns leave.
+    cell: (c) => <NameCell name={c.row.original.name} description={c.row.original.description} />,
   };
 }
 
@@ -103,6 +120,7 @@ function scopeColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
   return {
     id: "scope",
     header: "Scope",
+    meta: { width: COLUMN_WIDTH.scope },
     // Returns the rendered label itself (not the raw `layer` value) so a
     // header-sort click orders rows exactly the way `ScopeCell` displays
     // them — "Global" before "Plugin" before a project name, not "global"
@@ -122,6 +140,7 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "grade",
     header: "Grade",
+    meta: { width: COLUMN_WIDTH.grade },
     // TanStack's default sort comparator isn't transitive over null/
     // undefined mixed with strings, so ungraded rows scatter mid-table
     // instead of grouping at the end. "Z" sorts after every real grade
@@ -167,7 +186,7 @@ export function usesColumn(
     header: "Uses",
     // Never-used sorts to the bottom of a "Uses desc" default sort.
     accessorFn: (r) => r.usage?.total ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.uses },
     cell: (c) =>
       silent(c.row.original, applies) ? noClaim : <CountCell value={c.row.original.usage?.total} />,
   };
@@ -181,7 +200,7 @@ export function sessionsColumn(
     id: "sessions",
     header: "Sessions",
     accessorFn: (r) => r.usage?.sessions ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.sessions },
     cell: (c) =>
       silent(c.row.original, applies) ? (
         noClaim
@@ -205,7 +224,7 @@ export function lastUsedColumn(
     id: "lastUsed",
     header: "Last used",
     accessorFn: (r) => lastUsedAt(r.usage?.last_used) ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.lastUsed },
     cell: (c) =>
       silent(c.row.original, applies) ? (
         noClaim
@@ -220,7 +239,7 @@ export function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
     id: "errorRate",
     header: "Error %",
     accessorFn: (r) => r.usage?.error_rate ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.errorRate },
     cell: (c) => <PercentCell value={c.row.original.usage?.error_rate} />,
   };
 }
@@ -230,7 +249,7 @@ export function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
     id: "avgTokens",
     header: "Avg tokens",
     accessorFn: (r) => r.usage?.avg_turn_tokens ?? -1,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.avgTokens },
     cell: (c) => <TokensCell value={c.row.original.usage?.avg_turn_tokens} />,
   };
 }
@@ -240,7 +259,7 @@ export function sizeColumn(): ColumnDef<ArtifactView, unknown> {
     id: "size",
     header: "Size",
     accessorKey: "bytes",
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.size },
     cell: (c) => <span className="dt-num">{formatSize(c.getValue() as number)}</span>,
   };
 }
@@ -254,7 +273,7 @@ function bundledColumn(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown> {
     // Kept for sorting — TanStack memoises this per row and re-derives it
     // only when the row (or the column defs) change.
     accessorFn: countFor,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.uses },
     // Reads straight from `ctx` rather than trusting the memoised
     // `getValue()`: `ctx.pluginBundleCounts` can be swapped for a fresher
     // map (a rescan) without the column defs themselves changing identity,
@@ -279,7 +298,7 @@ export function actionsColumn(
     id: "actions",
     header: "Actions",
     enableSorting: false,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.actions },
     cell: (c) => {
       const row = c.row.original;
       const resolved = typeof kind === "function" ? kind(row) : kind;

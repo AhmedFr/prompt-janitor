@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { ActionsCell, type PillGroup, type RowAction } from "@/components/DataTable";
+import { ActionsCell, NameCell, type PillGroup, type RowAction } from "@/components/DataTable";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SOURCES, SourceBadge } from "@/components/SourceBadge";
 import type { RuleInfo, Severity, Source } from "@/lib/ipc";
@@ -20,6 +20,19 @@ export interface RuleColumnsCtx {
   /** Put a rule's pattern (or NL instruction) on the clipboard. */
   onCopy: (pattern: string) => void;
 }
+
+/**
+ * What each short column asks for (see `ColumnMeta.width`). Title declares
+ * none, so it absorbs the slack and its description ellipsizes rather than
+ * wrapping the row onto a second line.
+ */
+const COLUMN_WIDTH = {
+  enabled: "96px",
+  source: "112px",
+  severity: "116px",
+  hits: "76px",
+  actions: "88px",
+} as const;
 
 /** Severity as the dots read it, worst first. */
 const SEVERITY_LABELS: Record<Severity, string> = { hi: "Critical", mid: "Warning", lo: "Nit" };
@@ -69,6 +82,7 @@ function enabledColumn(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown> {
   return {
     id: "enabled",
     header: "Enabled",
+    meta: { width: COLUMN_WIDTH.enabled },
     accessorFn: (r) => (r.enabled ? 1 : 0),
     cell: (c) => {
       const rule = c.row.original;
@@ -102,12 +116,7 @@ function titleColumn(): ColumnDef<RuleInfo, unknown> {
     id: "title",
     header: "Title",
     accessorKey: "title",
-    cell: (c) => (
-      <span>
-        {c.row.original.title}
-        {c.row.original.description && <span className="muted"> · {c.row.original.description}</span>}
-      </span>
-    ),
+    cell: (c) => <NameCell name={c.row.original.title} description={c.row.original.description} />,
   };
 }
 
@@ -115,6 +124,7 @@ function sourceColumn(): ColumnDef<RuleInfo, unknown> {
   return {
     id: "source",
     header: "Source",
+    meta: { width: COLUMN_WIDTH.source },
     // Sorts by the badge's own wording, so a header click orders the rows the
     // way the column reads rather than by the raw enum value.
     accessorFn: (r) => SOURCES[r.source].label,
@@ -126,6 +136,7 @@ function severityColumn(): ColumnDef<RuleInfo, unknown> {
   return {
     id: "severity",
     header: "Severity",
+    meta: { width: COLUMN_WIDTH.severity },
     accessorFn: (r) => severityRank(r.severity),
     cell: (c) => (
       <span className="rules-severity">
@@ -141,7 +152,7 @@ function hitsColumn(): ColumnDef<RuleInfo, unknown> {
     id: "hits",
     header: "Hits",
     accessorKey: "hit_count",
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.hits },
     cell: (c) => <span className="dt-num">{c.row.original.hit_count}</span>,
   };
 }
@@ -163,7 +174,7 @@ function actionsColumn(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown> {
     id: "actions",
     header: "Actions",
     enableSorting: false,
-    meta: { align: "right" },
+    meta: { align: "right", width: COLUMN_WIDTH.actions },
     cell: (c) => {
       const rule = c.row.original;
       const actions: RowAction[] = [];

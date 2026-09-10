@@ -6,6 +6,7 @@ import { KIND_ORDER } from "@/screens/Setup/Setup.constants";
 import {
   actionsColumn,
   avgTokensColumn,
+  COLUMN_WIDTH,
   errorRateColumn,
   lastUsedColumn,
   nameColumn,
@@ -104,6 +105,7 @@ function kindColumn(): ColumnDef<ArtifactView, unknown> {
   return {
     id: "kind",
     header: "Kind",
+    meta: { width: COLUMN_WIDTH.kind },
     accessorFn: (r) => kindRank(r.kind),
     cell: (c) => (
       <span className="project-kind" data-kind={c.row.original.kind}>

@@ -152,6 +152,17 @@
   color: var(--text);
 }
 
+/*
+ * Any column declaring a `meta.width` puts the table on fixed layout (see
+ * `ColumnMeta.width`): the sized columns take exactly what they asked for,
+ * whatever is left goes to the columns that asked for nothing, and a wide
+ * table stops widening past its container. `.dt__scroll`'s overflow is then
+ * the last resort it was always meant to be, not the normal reading mode.
+ */
+.dt__table--sized {
+  table-layout: fixed;
+}
+
 .dt__head th {
   position: sticky;
   top: 0;

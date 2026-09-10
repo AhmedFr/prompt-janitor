@@ -13,6 +13,7 @@ export {
   DataTable,
   useTableState,
   GradeCell,
+  NameCell,
   CountCell,
   LastUsedCell,
   PercentCell,

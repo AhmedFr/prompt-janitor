@@ -119,9 +119,21 @@ button {
   flex: 1;
   overflow-y: auto;
 }
+/* Prose and cards: a measure, so a sentence never runs the width of a 27" display. */
 .page {
   padding: 22px 26px 40px;
   max-width: 920px;
+}
+/*
+ * A table page. A table is not prose — it is a grid whose columns each want
+ * room, and capping it at a measure is what forced the Setup screen to scroll
+ * sideways and clip its own Name column. Fluid, with a tighter gutter than
+ * `.page` so the first column starts near the window edge, the way the
+ * reference tables read.
+ */
+.page--table {
+  padding: 22px 20px 40px;
+  max-width: none;
 }
 .page-wide {
   padding: 22px 26px 40px;

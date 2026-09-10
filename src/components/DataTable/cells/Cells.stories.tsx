@@ -5,6 +5,7 @@ import {
   CountCell,
   GradeCell,
   LastUsedCell,
+  NameCell,
   PathCell,
   PercentCell,
   ScopeCell,
@@ -44,6 +45,18 @@ export const AllCells: Story = {
             <GradeCell grade="C" />
             <GradeCell grade="F" />
             <GradeCell grade={null} />
+          </span>
+        </Row>
+        <Row label="NameCell">
+          {/* In a 240px column, which is what a nine-column table leaves it. */}
+          <span style={{ display: "block", width: 240 }}>
+            <NameCell
+              name="running-a-feature-workflow"
+              description="Ship a change through issue, branch, TDD, local gates, PR, review and squash-merge"
+            />
+          </span>
+          <span style={{ display: "block", width: 240 }}>
+            <NameCell name="deploy" description={null} />
           </span>
         </Row>
         <Row label="CountCell">

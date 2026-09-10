@@ -7,6 +7,13 @@ export interface GradeCellProps {
   grade: GradeLetter | null | undefined;
 }
 
+export interface NameCellProps {
+  /** The row's own name — the one thing that must stay legible when the column narrows. */
+  name: string;
+  /** Muted context beside it; `null`/empty renders nothing at all. */
+  description?: string | null;
+}
+
 export interface CountCellProps {
   /** Whole count; `null` renders "—" rather than a misleading zero. */
   value: number | null | undefined;
