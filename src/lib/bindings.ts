@@ -128,6 +128,15 @@ export const commands = {
 	 *  project with its own artifacts.
 	 */
 	getSetup: () => typedError<SetupView, string>(__TAURI_INVOKE("get_setup")),
+	/**
+	 *  One skill's markdown, for the Setup screen's skill panel.
+	 * 
+	 *  Keyed on the artifact id rather than a path — see `artifact_source` for why
+	 *  that is the security boundary and not just an interface choice.
+	 */
+	getArtifactSource: (artifactId: number) => typedError<ArtifactSource, string>(__TAURI_INVOKE("get_artifact_source", { artifactId })),
+	/**  Save the skill panel's edits back to the artifact's file on disk. */
+	saveArtifactSource: (artifactId: number, content: string) => typedError<ArtifactSaved, string>(__TAURI_INVOKE("save_artifact_source", { artifactId, content })),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**
@@ -254,6 +263,20 @@ export type ApplyTemplateResult = {
 };
 
 export type ArtifactKind = "rule" | "skill" | "agent" | "command" | "hook" | "mcp_server" | "plugin" | "settings";
+
+/**  What a successful save reports back, so the table can update without a rescan. */
+export type ArtifactSaved = {
+	bytes: number,
+};
+
+/**  One artifact's file, as the panel reads it. */
+export type ArtifactSource = {
+	/**  Absolute path on disk, shown in the panel header. */
+	path: string,
+	content: string,
+	/**  Size of `content` in bytes — what the Size column shows. */
+	bytes: number,
+};
 
 /**
  *  An inventoried artifact, with its grade (when the file grader saw it) and

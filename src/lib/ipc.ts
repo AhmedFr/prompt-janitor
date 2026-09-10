@@ -32,6 +32,8 @@ export type {
   CommonIssue,
   SetupView,
   ArtifactView,
+  ArtifactSource,
+  ArtifactSaved,
   ProjectSetup,
   HarnessInfo,
   UsageStat,

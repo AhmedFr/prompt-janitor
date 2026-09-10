@@ -8,11 +8,15 @@ import type { NameCellProps } from "./cells.types";
  * and the whole string lives in `title` instead. The name gets its own floor
  * (`min-width` in `cells.css`) so a squeezed column can never reduce it to a
  * stub like "rkflow".
+ *
+ * `description` is optional, and Setup's tables leave it out entirely — see
+ * `nameColumn` in `setup.columns.tsx`. Those pass `title` instead, so the
+ * description they no longer draw is still one hover away.
  */
-export function NameCell({ name, description }: NameCellProps) {
+export function NameCell({ name, description, title }: NameCellProps) {
   return (
     <span className="dt-name">
-      <span className="dt-name__label" title={name}>
+      <span className="dt-name__label" title={title ?? name}>
         {name}
       </span>
       {description && (

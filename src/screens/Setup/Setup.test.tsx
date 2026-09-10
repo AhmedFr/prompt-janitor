@@ -26,13 +26,22 @@ const getSetup = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
+const getArtifactSource = vi.hoisted(() => vi.fn());
+const saveArtifactSource = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
     ...actual,
     isTauri: true,
-    commands: { getSetup, getExtraScanFolders, setExtraScanFolders, scanNow },
+    commands: {
+      getSetup,
+      getExtraScanFolders,
+      setExtraScanFolders,
+      scanNow,
+      getArtifactSource,
+      saveArtifactSource,
+    },
   };
 });
 
@@ -243,6 +252,11 @@ beforeEach(() => {
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "error", error: "no" });
+  getArtifactSource.mockResolvedValue({
+    status: "ok",
+    data: { path: "/s/SKILL.md", content: "# From disk\n", bytes: 12 },
+  });
+  saveArtifactSource.mockResolvedValue({ status: "ok", data: { bytes: 20 } });
   open.mockResolvedValue(null);
 });
 
@@ -482,6 +496,58 @@ describe("Setup", () => {
 
     expect(await screen.findByText(/setup could not be read/i)).toBeInTheDocument();
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
+  describe("the skill panel", () => {
+    /** Open the Skills tab and click the `adapt` row. */
+    const openAdapt = async () => {
+      await renderSetup();
+      await screen.findByRole("tablist", { name: /setup/i });
+      openTab(/^Skills/);
+      fireEvent.click(rowFor("adapt"));
+      return await screen.findByRole("dialog");
+    };
+
+    it("opens when a skill row is clicked, showing that skill's file", async () => {
+      const panel = await openAdapt();
+
+      expect(panel).toHaveAccessibleName(/adapt/);
+      // Keyed on the row's artifact id, which is what the command takes.
+      await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(2));
+      expect(await within(panel).findByRole("heading", { name: "From disk" })).toBeInTheDocument();
+    });
+
+    it("closes again, and stops asking for the file", async () => {
+      const panel = await openAdapt();
+      fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    });
+
+    it("refreshes the inventory after a save, so Size stops showing the old count", async () => {
+      const panel = await openAdapt();
+      await within(panel).findByRole("heading", { name: "From disk" });
+      const before = getSetup.mock.calls.length;
+
+      fireEvent.click(within(panel).getByRole("button", { name: "Edit" }));
+      fireEvent.change(within(panel).getByRole("textbox", { name: /markdown/i }), {
+        target: { value: "# Edited" },
+      });
+      fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(saveArtifactSource).toHaveBeenCalledWith(2, "# Edited"));
+      await waitFor(() => expect(getSetup.mock.calls.length).toBeGreaterThan(before));
+    });
+
+    it("stays shut when a row on a tab with no panel is clicked", async () => {
+      await renderSetup();
+      await screen.findByRole("tablist", { name: /setup/i });
+      openTab(/^Plugins/);
+      fireEvent.click(rowFor("superpowers"));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(getArtifactSource).not.toHaveBeenCalled();
+    });
   });
 
   it("has no accessibility violations", async () => {

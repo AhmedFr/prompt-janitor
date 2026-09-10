@@ -837,6 +837,32 @@ pub fn get_setup(db: tauri::State<'_, AppDb>) -> Result<crate::harness_query::Se
     crate::harness_query::setup_view(&conn).map_err(|e| e.to_string())
 }
 
+/// One skill's markdown, for the Setup screen's skill panel.
+///
+/// Keyed on the artifact id rather than a path — see `artifact_source` for why
+/// that is the security boundary and not just an interface choice.
+#[tauri::command]
+#[specta::specta]
+pub fn get_artifact_source(
+    db: tauri::State<'_, AppDb>,
+    artifact_id: i32,
+) -> Result<crate::artifact_source::ArtifactSource, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::artifact_source::read_source(&conn, artifact_id)
+}
+
+/// Save the skill panel's edits back to the artifact's file on disk.
+#[tauri::command]
+#[specta::specta]
+pub fn save_artifact_source(
+    db: tauri::State<'_, AppDb>,
+    artifact_id: i32,
+    content: String,
+) -> Result<crate::artifact_source::ArtifactSaved, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::artifact_source::write_source(&conn, artifact_id, &content)
+}
+
 /// The rule files `harness` loads inside `project_path`, in load order.
 #[tauri::command]
 #[specta::specta]

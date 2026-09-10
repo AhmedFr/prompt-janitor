@@ -199,12 +199,26 @@ describe("columnsFor", () => {
     expect(screen.getByText("SessionStart: echo hi")).toBeInTheDocument();
   });
 
-  it("renders the description muted alongside the name when present", () => {
+  it("renders the name alone — a Setup name cell carries no description", () => {
     mount("plugin", [
       artifact({ kind: "plugin", name: "superpowers", description: "v6.3.0 · claude-plugins-official" }),
     ]);
     expect(screen.getByText("superpowers")).toBeInTheDocument();
-    expect(screen.getByText(/v6\.3\.0 · claude-plugins-official/)).toHaveClass("muted");
+    expect(screen.queryByText(/v6\.3\.0 · claude-plugins-official/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * The description leaves the cell but must not leave the row: hovering the
+   * name is what is left of it on the tabs that have no panel to open.
+   */
+  it("keeps the description reachable as the name's tooltip", () => {
+    mount("skill", [artifact({ kind: "skill", name: "adapt", description: "Adapts designs" })]);
+    expect(screen.getByText("adapt")).toHaveAttribute("title", "adapt — Adapts designs");
+  });
+
+  it("titles the name with just the name when the row has no description", () => {
+    mount("skill", [artifact({ kind: "skill", name: "adapt", description: null })]);
+    expect(screen.getByText("adapt")).toHaveAttribute("title", "adapt");
   });
 
   it("resolves the Scope cell's project name from ctx.projectNames by path prefix", () => {

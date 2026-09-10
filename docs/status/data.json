@@ -396,11 +396,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1106/1106 passing (88 files)"
+      "result": "1132/1132 passing (91 files)"
     },
     {
       "name": "cargo test",
-      "result": "333/333 passing"
+      "result": "344/344 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -449,6 +449,7 @@
     }
   ],
   "recent": [
+    "2026-09-10 — Setup → Skills reads and edits a skill in place (#175): the Name column carries the name alone across every Setup tab (the description moves to the tooltip, the search keys and the panel), and clicking a skill opens a drawer with its frontmatter as a key/value strip and its body rendered by a dependency-free markdown renderer. Two new IPC commands key on the artifact id rather than a path, so the set of files the webview can address is exactly the set the scan found; saves refresh `artifacts.bytes` but deliberately leave `hash` stale so the next scan re-grades the file",
     "2026-09-10 — Table filters folded into one multi-select per group (#176, PR #178): a chip row cost width in proportion to a group's option count — Setup's Scope group has one per project plus one per plugin — so three groups pushed the first data row off the first screenful. New `FilterSelect` (listbox popover, faceted counts, keyboard, per-group Clear, filter box past 8 options) plus a `Clear all` in the toolbar. `PillGroup` and the `pills` prop are unchanged, so no screen was touched. Review round: the trigger is now a real ARIA combobox (aria-activedescendant is invalid on a button, and has to sit on whichever element holds focus — the filter box when there is one), focus is taken explicitly on open because WebKit does not focus a button on click, the active option scrolls into view, Tab reaches the popover's Clear, and the popover flips when it would run off the window.",
     "2026-09-10 — v0.1.3 tagged: table standard (#173) + panel visual fixes (#174)",
     "2026-09-10 — Panel visuals fixed and verified on-device by photograph: runtime windows need an explicit transparent background_color, the dark band was legacy scroll bars, the native shadow drew a cached square frame — CSS shadow + 12px inset instead; macOS popover taste pass (#171)",
