@@ -8,6 +8,8 @@ import {
   defaultSortFor,
   formatSize,
   KIND_TABS,
+  lastUsedColumn,
+  sessionsColumn,
   usesColumn,
   type ColumnsCtx,
 } from "./setup.columns";
@@ -104,36 +106,43 @@ describe("KIND_TABS", () => {
 });
 
 describe("columnsFor", () => {
-  it("gives skills the name/scope/uses/errorRate/avgTokens/size/actions columns, in that order", () => {
+  it("gives skills the name/scope/usage/errorRate/avgTokens/size/actions columns, in that order", () => {
     const ids = columnsFor("skill", ctx()).map((c) => c.id);
-    expect(ids).toEqual(["name", "scope", "uses", "errorRate", "avgTokens", "size", "actions"]);
+    expect(ids).toEqual([
+      "name",
+      "scope",
+      "uses",
+      "sessions",
+      "lastUsed",
+      "errorRate",
+      "avgTokens",
+      "size",
+      "actions",
+    ]);
   });
 
   it("gives agents and commands the same shape as skills", () => {
-    expect(columnsFor("agent", ctx()).map((c) => c.id)).toEqual([
+    const shape = [
       "name",
       "scope",
       "uses",
+      "sessions",
+      "lastUsed",
       "errorRate",
       "avgTokens",
       "size",
       "actions",
-    ]);
-    expect(columnsFor("command", ctx()).map((c) => c.id)).toEqual([
-      "name",
-      "scope",
-      "uses",
-      "errorRate",
-      "avgTokens",
-      "size",
-      "actions",
-    ]);
+    ];
+    expect(columnsFor("agent", ctx()).map((c) => c.id)).toEqual(shape);
+    expect(columnsFor("command", ctx()).map((c) => c.id)).toEqual(shape);
   });
 
   it("gives rules a grade column and no usage columns", () => {
     const ids = columnsFor("rule", ctx()).map((c) => c.id);
     expect(ids).toContain("grade");
     expect(ids).not.toContain("uses");
+    expect(ids).not.toContain("sessions");
+    expect(ids).not.toContain("lastUsed");
     expect(ids).not.toContain("errorRate");
     expect(ids).not.toContain("avgTokens");
     expect(ids).toEqual(["name", "scope", "grade", "size", "actions"]);
@@ -148,9 +157,23 @@ describe("columnsFor", () => {
       "name",
       "scope",
       "uses",
+      "sessions",
+      "lastUsed",
       "errorRate",
       "avgTokens",
     ]);
+  });
+
+  it("splits usage into three sortable columns rather than one pill", () => {
+    const headers = columnsFor("skill", ctx())
+      .map((c) => c.header)
+      .filter((h): h is string => typeof h === "string");
+    expect(headers).toContain("Uses");
+    expect(headers).toContain("Sessions");
+    expect(headers).toContain("Last used");
+    // The pill's combined sentence is gone; nothing renders it any more.
+    mount("skill", [artifact({ kind: "skill", usage: usage({ total: 9, sessions: 4 }) })]);
+    expect(screen.queryByText(/used 9× · 4 sessions/)).not.toBeInTheDocument();
   });
 
   it("gives plugins name, bundled count (as the `uses` column) and actions — no scope, grade or size", () => {
@@ -240,9 +263,23 @@ describe("columnsFor", () => {
     expect(screen.getByLabelText("Grade B")).toBeInTheDocument();
   });
 
-  it("renders usage for skill rows via UsageCell", () => {
-    mount("skill", [artifact({ kind: "skill", usage: usage({ total: 9, sessions: 4 }) })]);
-    expect(screen.getByText(/used 9× · 4 sessions/)).toBeInTheDocument();
+  it("renders a skill row's uses, sessions and last-used age in their own cells", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-19T15:00:00.000Z"));
+    try {
+      mount("skill", [artifact({ kind: "skill", usage: usage({ total: 9, sessions: 4 }) })]);
+      const cells = [...screen.getAllByRole("row")[1].querySelectorAll("td")].map((td) => td.textContent);
+      // name, scope, uses, sessions, last used, …
+      expect(cells.slice(2, 5)).toEqual(["9", "4", "5h"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renders an em dash for uses and sessions, and 'never', for a never-used row", () => {
+    mount("skill", [artifact({ kind: "skill", usage: null })]);
+    const cells = [...screen.getAllByRole("row")[1].querySelectorAll("td")].map((td) => td.textContent);
+    expect(cells.slice(2, 5)).toEqual(["—", "—", "never"]);
   });
 
   it("formats the size column from bytes", () => {
@@ -327,6 +364,37 @@ describe("columnsFor", () => {
       defaultSortFor("skill"),
     );
     expect(rowNames()).toEqual(["high", "low", "never"]);
+  });
+
+  it("sorts by sessions descending via the sessions column, never-used trailing", () => {
+    mount(
+      "skill",
+      [
+        artifact({ id: 1, kind: "skill", name: "few", usage: usage({ sessions: 2 }) }),
+        artifact({ id: 2, kind: "skill", name: "many", usage: usage({ sessions: 30 }) }),
+        artifact({ id: 3, kind: "skill", name: "never", usage: null }),
+      ],
+      ctx(),
+      { id: "sessions", desc: true },
+    );
+    expect(rowNames()).toEqual(["many", "few", "never"]);
+  });
+
+  it("sorts by the underlying timestamp, not the rendered age, with never-used last on desc", () => {
+    mount(
+      "skill",
+      [
+        // "3d" and "40d" would sort the wrong way round as text.
+        artifact({ id: 1, kind: "skill", name: "old", usage: usage({ last_used: "2026-07-10T12:00:00.000Z" }) }),
+        artifact({ id: 2, kind: "skill", name: "recent", usage: usage({ last_used: "2026-08-18T12:00:00.000Z" }) }),
+        artifact({ id: 3, kind: "skill", name: "never", usage: null }),
+        artifact({ id: 4, kind: "skill", name: "unknown", usage: usage({ last_used: null }) }),
+      ],
+      ctx(),
+      { id: "lastUsed", desc: true },
+    );
+    expect(rowNames().slice(0, 2)).toEqual(["recent", "old"]);
+    expect(rowNames().slice(2).sort()).toEqual(["never", "unknown"]);
   });
 
   it("sorts by error rate descending via the errorRate column, never-used trailing", () => {
@@ -436,25 +504,32 @@ describe("shared column builders", () => {
     );
   }
 
-  it("says never used for an artifact that could have been invoked and wasn't", () => {
-    mountColumns([usesColumn()], [artifact({ kind: "skill", usage: null })]);
-    expect(screen.getByText("never used")).toBeInTheDocument();
+  it("says never for an artifact that could have been invoked and wasn't", () => {
+    mountColumns([lastUsedColumn()], [artifact({ kind: "skill", usage: null })]);
+    expect(screen.getByText("never")).toBeInTheDocument();
   });
 
   it("makes no usage claim about a kind nothing can invoke", () => {
-    // A rule file is loaded, never called: "never used" would read as a
-    // finding about the rule rather than a fact about the column.
-    mountColumns([usesColumn((r) => r.kind !== "rule")], [artifact({ kind: "rule", usage: null })]);
-    expect(screen.queryByText("never used")).not.toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // A rule file is loaded, never called: "never" would read as a finding
+    // about the rule rather than a fact about the column, so the guarded
+    // columns fall back to the em dash every unknown value uses.
+    const guard = (r: ArtifactView) => r.kind !== "rule";
+    mountColumns(
+      [usesColumn(guard), sessionsColumn(guard), lastUsedColumn(guard)],
+      [artifact({ kind: "rule", usage: null })],
+    );
+    expect(screen.queryByText("never")).not.toBeInTheDocument();
+    expect(screen.getAllByText("—")).toHaveLength(3);
   });
 
   it("still reports usage for an invocable row under the same guard", () => {
+    const guard = (r: ArtifactView) => r.kind !== "rule";
     mountColumns(
-      [usesColumn((r) => r.kind !== "rule")],
+      [usesColumn(guard), sessionsColumn(guard)],
       [artifact({ kind: "skill", usage: usage({ total: 9, sessions: 4 }) })],
     );
-    expect(screen.getByText(/used 9×/)).toBeInTheDocument();
+    expect(screen.getByText("9")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
   });
 
   it("resolves the action per row when handed a resolver instead of one kind", () => {

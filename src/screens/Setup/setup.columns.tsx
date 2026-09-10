@@ -3,12 +3,14 @@ import type { ArtifactKind, ArtifactView } from "@/lib/ipc";
 import type { GradeLetter } from "@/components/Grade";
 import {
   ActionsCell,
+  CountCell,
   EMPTY_MARK,
   GradeCell,
+  LastUsedCell,
+  lastUsedAt,
   PercentCell,
   ScopeCell,
   TokensCell,
-  UsageCell,
 } from "@/components/DataTable";
 import { openExternal } from "@/lib/open-external";
 import { projectNameFor } from "./setup.util";
@@ -133,14 +135,29 @@ function gradeColumn(): ColumnDef<ArtifactView, unknown> {
 }
 
 /**
- * `applies` narrows which rows the column makes a claim about. Every Setup
+ * Whether a usage column should stay silent about this row.
+ *
+ * `applies` narrows which rows a usage column makes a claim about. Every Setup
  * table holds one kind, so it is only ever invocable rows there and the
  * default (always) is right. A table that mixes kinds — the project page's
- * single combined inventory — needs the guard: `UsageCell` renders "never
- * used" for a null rollup, which reads as a finding about a rule file rather
- * than as the fact that rule files are loaded, never called. Guarded-out rows
- * fall back to the same em dash `PercentCell`/`TokensCell` already use, and
- * still sort under the never-used sentinel.
+ * single combined inventory — needs the guard: `LastUsedCell` renders "never"
+ * for a null rollup, which reads as a finding about a rule file rather than as
+ * the fact that rule files are loaded, never called. Guarded-out rows fall
+ * back to the same em dash `PercentCell`/`TokensCell` already use, and still
+ * sort under the never-used sentinel.
+ */
+function silent(row: ArtifactView, applies?: (row: ArtifactView) => boolean): boolean {
+  return applies !== undefined && !applies(row);
+}
+
+/** The em dash a guarded-out row shows in place of a claim it can't make. */
+const noClaim = <span className="muted">{EMPTY_MARK}</span>;
+
+/**
+ * Three plain columns rather than one pill: a single "used 9× · 4 sessions ·
+ * last 3d ago" chip can only be sorted one way, and the whole reason to have
+ * the numbers in a table is to rank by any of them. Right-aligned so the
+ * digits line up down the column.
  */
 export function usesColumn(
   applies?: (row: ArtifactView) => boolean,
@@ -150,11 +167,50 @@ export function usesColumn(
     header: "Uses",
     // Never-used sorts to the bottom of a "Uses desc" default sort.
     accessorFn: (r) => r.usage?.total ?? -1,
+    meta: { align: "right" },
     cell: (c) =>
-      applies && !applies(c.row.original) ? (
-        <span className="muted">{EMPTY_MARK}</span>
+      silent(c.row.original, applies) ? noClaim : <CountCell value={c.row.original.usage?.total} />,
+  };
+}
+
+/** How many distinct sessions reached for the artifact — breadth, where Uses is volume. */
+export function sessionsColumn(
+  applies?: (row: ArtifactView) => boolean,
+): ColumnDef<ArtifactView, unknown> {
+  return {
+    id: "sessions",
+    header: "Sessions",
+    accessorFn: (r) => r.usage?.sessions ?? -1,
+    meta: { align: "right" },
+    cell: (c) =>
+      silent(c.row.original, applies) ? (
+        noClaim
       ) : (
-        <UsageCell usage={c.row.original.usage} />
+        <CountCell value={c.row.original.usage?.sessions} />
+      ),
+  };
+}
+
+/**
+ * Sorted by the timestamp behind the label, never by the label: "3d" and "40d"
+ * compare the wrong way round as text. Rows with no last-used instant — never
+ * invoked, or invoked with no recorded time — take the same `-1` sentinel the
+ * other usage columns use, so they trail a descending sort instead of leading
+ * it.
+ */
+export function lastUsedColumn(
+  applies?: (row: ArtifactView) => boolean,
+): ColumnDef<ArtifactView, unknown> {
+  return {
+    id: "lastUsed",
+    header: "Last used",
+    accessorFn: (r) => lastUsedAt(r.usage?.last_used) ?? -1,
+    meta: { align: "right" },
+    cell: (c) =>
+      silent(c.row.original, applies) ? (
+        noClaim
+      ) : (
+        <LastUsedCell lastUsed={c.row.original.usage?.last_used} />
       ),
   };
 }
@@ -256,6 +312,8 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
         nameColumn(),
         scopeColumn(ctx),
         usesColumn(),
+        sessionsColumn(),
+        lastUsedColumn(),
         errorRateColumn(),
         avgTokensColumn(),
         sizeColumn(),
@@ -264,7 +322,15 @@ function buildColumns(kind: ArtifactKind, ctx: ColumnsCtx): ColumnDef<ArtifactVi
     case "hook":
       return [nameColumn(), scopeColumn(ctx)];
     case "mcp_server":
-      return [nameColumn(), scopeColumn(ctx), usesColumn(), errorRateColumn(), avgTokensColumn()];
+      return [
+        nameColumn(),
+        scopeColumn(ctx),
+        usesColumn(),
+        sessionsColumn(),
+        lastUsedColumn(),
+        errorRateColumn(),
+        avgTokensColumn(),
+      ];
     case "plugin":
       return [nameColumn(), bundledColumn(ctx), actionsColumn("folder", ctx)];
     case "settings":

@@ -7,7 +7,9 @@ import {
   actionsColumn,
   avgTokensColumn,
   errorRateColumn,
+  lastUsedColumn,
   nameColumn,
+  sessionsColumn,
   sizeColumn,
   usesColumn,
   type ActionsKind,
@@ -131,10 +133,13 @@ const cache = new WeakMap<ColumnsCtx, ColumnDef<ArtifactView, unknown>[]>();
 export function projectSetupColumns(ctx: ColumnsCtx): ColumnDef<ArtifactView, unknown>[] {
   let defs = cache.get(ctx);
   if (!defs) {
+    const invocable = (row: ArtifactView) => INVOCABLE_KINDS.has(row.kind);
     defs = [
       kindColumn(),
       nameColumn(),
-      usesColumn((row) => INVOCABLE_KINDS.has(row.kind)),
+      usesColumn(invocable),
+      sessionsColumn(invocable),
+      lastUsedColumn(invocable),
       errorRateColumn(),
       avgTokensColumn(),
       sizeColumn(),

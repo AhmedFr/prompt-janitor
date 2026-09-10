@@ -148,7 +148,17 @@ describe("projectSetupColumns", () => {
 
   it("replaces Scope with Kind — every row is in this one project", () => {
     mount(projectSetupColumns(ctx()), [artifact()], rowId);
-    expect(headers()).toEqual(["Kind", "Name", "Uses", "Error %", "Avg tokens", "Size", "Actions"]);
+    expect(headers()).toEqual([
+      "Kind",
+      "Name",
+      "Uses",
+      "Sessions",
+      "Last used",
+      "Error %",
+      "Avg tokens",
+      "Size",
+      "Actions",
+    ]);
     expect(screen.queryByRole("columnheader", { name: /Scope/ })).not.toBeInTheDocument();
   });
 
@@ -180,14 +190,17 @@ describe("projectSetupColumns", () => {
 
   it("reports usage for the kinds an agent can invoke", () => {
     mount(projectSetupColumns(ctx()), [artifact({ kind: "skill", usage: usage() })], rowId);
-    expect(screen.getByText(/used 9×/)).toBeInTheDocument();
+    const cells = [...screen.getAllByRole("row")[1].querySelectorAll("td")].map((td) => td.textContent);
+    // kind, name, uses, sessions, last used, error %, avg tokens, …
+    expect(cells[2]).toBe("9");
+    expect(cells[3]).toBe("4");
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("800")).toBeInTheDocument();
   });
 
   it("makes no usage claim about a kind nothing invokes", () => {
     mount(projectSetupColumns(ctx()), [artifact({ kind: "rule", name: "CLAUDE.md" })], rowId);
-    expect(screen.queryByText("never used")).not.toBeInTheDocument();
+    expect(screen.queryByText("never")).not.toBeInTheDocument();
   });
 
   it("opens a rule row's graded file, and a plugin row's folder", () => {

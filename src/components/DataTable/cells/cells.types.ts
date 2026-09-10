@@ -1,17 +1,23 @@
 import type { GradeLetter } from "@/components/Grade";
 import type { IconName } from "@/components/Icon";
-import type { Layer, UsageStat } from "@/lib/ipc";
+import type { Layer } from "@/lib/ipc";
 
 export interface GradeCellProps {
   /** Letter grade for the row's artifact; `null` renders the neutral ungraded chip. */
   grade: GradeLetter | null | undefined;
 }
 
-export interface UsageCellProps {
-  /** Usage rollup for the row; `null` means the artifact was never invoked. */
-  usage: UsageStat | null;
-  /** Reference instant for relative-time formatting. Defaults to `new Date()`. */
-  now?: Date;
+export interface CountCellProps {
+  /** Whole count; `null` renders "—" rather than a misleading zero. */
+  value: number | null | undefined;
+}
+
+export interface LastUsedCellProps {
+  /**
+   * `UsageStat.last_used` — a UTC RFC3339 timestamp. `null` (or no usage
+   * rollup at all) means the artifact was never invoked.
+   */
+  lastUsed: string | null | undefined;
 }
 
 export interface PercentCellProps {
