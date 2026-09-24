@@ -1,8 +1,10 @@
+/* 600, matching `NameCell` in every other table: the name is the row's identity. */
 .projects-name {
   display: inline-flex;
   align-items: center;
   gap: 9px;
   min-width: 0;
+  font-weight: 600;
 }
 
 .projects-chip {

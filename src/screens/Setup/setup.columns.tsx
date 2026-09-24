@@ -15,6 +15,7 @@ import {
 } from "@/components/DataTable";
 import { openExternal } from "@/lib/open-external";
 import { projectNameFor } from "./setup.util";
+import { ERROR_RATE_BANDS } from "./Setup.constants";
 
 /**
  * The tabs the Setup screen renders, in display order. `settings` comes last:
@@ -277,7 +278,7 @@ export function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
     header: "Error %",
     accessorFn: (r) => r.usage?.error_rate ?? -1,
     meta: { align: "right", width: COLUMN_WIDTH.errorRate },
-    cell: (c) => <PercentCell value={c.row.original.usage?.error_rate} />,
+    cell: (c) => <PercentCell value={c.row.original.usage?.error_rate} thresholds={ERROR_RATE_BANDS} />,
   };
 }
 

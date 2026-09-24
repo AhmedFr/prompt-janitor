@@ -1,8 +1,9 @@
 import "./cells.css";
 import type { TokensCellProps } from "./cells.types";
-import { formatTokens } from "./cells.util";
+import { EMPTY_MARK, formatTokens } from "./cells.util";
 
-/** Right-aligned token count with thousands separators; "—" when unknown. */
+/** Right-aligned token count with thousands separators; a muted "—" when unknown. */
 export function TokensCell({ value }: TokensCellProps) {
-  return <span className="dt-num">{formatTokens(value)}</span>;
+  const text = formatTokens(value);
+  return <span className={text === EMPTY_MARK ? "dt-num muted" : "dt-num"}>{text}</span>;
 }

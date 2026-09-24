@@ -18,9 +18,10 @@
   line-height: 1.25;
 }
 
+/* 600, matching `NameCell` in every other table: the name is the row's identity. */
 .prompts-name__file {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* The way out of this table into the project the row belongs to. */

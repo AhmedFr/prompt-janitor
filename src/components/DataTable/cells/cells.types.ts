@@ -33,9 +33,30 @@ export interface LastUsedCellProps {
   lastUsed: string | null | undefined;
 }
 
+/**
+ * Where a rate stops being fine and starts being a problem, both as 0–1
+ * fractions with `watch < bad`. Owned by the screen, not the cell: what
+ * counts as a bad error rate is a product decision the table does not make.
+ */
+export interface RateThresholds {
+  /** At or above this, the rate is worth a look (amber). */
+  watch: number;
+  /** At or above this, the rate is a finding (red, with an icon). */
+  bad: number;
+}
+
+/** A rate's band against its {@link RateThresholds}; `unknown` when there is no value. */
+export type RateTone = "good" | "watch" | "bad" | "unknown";
+
 export interface PercentCellProps {
   /** Fraction in the 0–1 range (as Rust hands rates over); `null` renders "—". */
   value: number | null | undefined;
+  /**
+   * Tones the value green / amber / red against these lines. Omitted, the
+   * percentage stays neutral — not every percentage is a rate with a
+   * right answer.
+   */
+  thresholds?: RateThresholds;
 }
 
 export interface TokensCellProps {

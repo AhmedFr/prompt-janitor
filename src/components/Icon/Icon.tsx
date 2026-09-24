@@ -137,6 +137,13 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M4 16.4l8 4.1 8-4.1" strokeOpacity=".55" />
     </>
   ),
+  alert: (
+    <>
+      <path d="M12 4.5l8.5 14.5h-17z" />
+      <line x1="12" y1="10" x2="12" y2="13.5" />
+      <circle cx="12" cy="16.3" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, ...rest }: IconProps) {

@@ -1,3 +1,5 @@
+import type { RateThresholds, RateTone } from "./cells.types";
+
 /** How much of a long path's head survives {@link truncateMiddle}. */
 export const PATH_HEAD = 24;
 /** How much of a long path's tail survives — the filename end is the useful half. */
@@ -28,6 +30,20 @@ export function truncateMiddle(path: string): string {
 export function formatPercent(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return EMPTY_MARK;
   return `${Math.round(value * 100)}%`;
+}
+
+/**
+ * Which band a 0–1 rate falls in: `good` under `watch`, `watch` from `watch`
+ * up to just under `bad`, `bad` at `bad` and above. Both lines are inclusive
+ * on their lower edge, so a rate sitting exactly on a threshold reads as the
+ * worse band — the same `>=` Setup's "Errors" filter uses. Unknown stays
+ * unknown rather than defaulting to good.
+ */
+export function rateTone(value: number | null | undefined, thresholds: RateThresholds): RateTone {
+  if (value == null || !Number.isFinite(value)) return "unknown";
+  if (value >= thresholds.bad) return "bad";
+  if (value >= thresholds.watch) return "watch";
+  return "good";
 }
 
 /** Groups thousands so a six-digit count is readable at a glance; unknown stays unknown. */
