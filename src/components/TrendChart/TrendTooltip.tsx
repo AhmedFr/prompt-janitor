@@ -12,6 +12,7 @@ export function TrendTooltip({ active, payload, xKey, dataKey, valueDetail }: Tr
   if (!active || !row) return null;
 
   const value = Number(row[dataKey]);
+  if (!Number.isFinite(value)) return null;
   const x = row[xKey];
   return (
     <div className="trend-tip">

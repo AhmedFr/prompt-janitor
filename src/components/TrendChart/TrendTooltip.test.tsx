@@ -19,6 +19,13 @@ describe("TrendTooltip", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("renders nothing for a row that lacks the plotted value, rather than NaN", () => {
+    const { container } = render(
+      <TrendTooltip active payload={payloadFor({ t: SEP_18_NOON })} xKey="t" dataKey="score" />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("leads with the value and dates it underneath", () => {
     const { getByText } = render(
       <TrendTooltip active payload={payloadFor({ t: SEP_18_NOON, score: 72 })} xKey="t" dataKey="score" />,
