@@ -1,5 +1,5 @@
 {
-  "version": "0.1.4",
+  "version": "0.1.5",
   "updated": "2026-09-24",
   "readiness": {
     "percent": 83,
@@ -464,6 +464,7 @@
     }
   ],
   "recent": [
+    "2026-09-24 — v0.1.5 tagged: the detail sheet actually reads files in a real build (ACL fix #192/#194) and becomes a file viewer — content first, Rendered/Source with highlighting, find, copy/reveal/open (#193/#195)",
     "2026-09-24 — Fix #192: every detail sheet (and the #177 skill panel) failed in a real build with \"Command get_artifact_source not allowed by ACL\" — the command was registered but granted by no capability file. Granted get/save_artifact_source to the main window, plus a Rust test that fails whenever any registered command is granted to no window.",
     "2026-09-24 — Detail sheet becomes a file viewer (#193): a wide reader where the file is the page — one meta line (kind · scope · uses · toned error % · last used) with the full facts behind Details, Rendered / Source for markdown, a numbered and highlighted Source view (lowlight + five highlight.js grammars; frontmatter coloured as YAML), find in file (⌘F, n of m, Enter / ⇧Enter, CSS Custom Highlight API over static ranges), Copy, and Reveal in Finder / Open in editor through a new `open_artifact` command keyed on the artifact id. Skills edit in place from the viewer. The old Open button never worked (it fed a file path to `openUrl`).",
     "2026-09-24 — v0.1.4 published from a local build to spare the Actions quota: universal DMG + signed updater archive (signature verified against the app's pubkey) + hand-written latest.json; the tag-triggered Release run was cancelled before it started. `releases/latest/download/latest.json` now serves 0.1.4.",
