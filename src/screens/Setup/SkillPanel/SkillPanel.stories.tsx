@@ -61,6 +61,7 @@ const source = (over: Partial<ArtifactSourceState> = {}): ArtifactSourceState =>
   saving: false,
   error: null,
   save: async () => 4096,
+  reload: () => {},
   ...over,
 });
 

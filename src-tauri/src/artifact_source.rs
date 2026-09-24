@@ -47,6 +47,17 @@ pub struct ArtifactSource {
     pub modified: String,
 }
 
+/// What the sheet asks the system to do with an artifact's file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenAction {
+    /// Select it in a Finder window.
+    Reveal,
+    /// Open it in the app macOS associates with its type — the user's editor
+    /// for `.md` and `.json` on a developer's machine.
+    Open,
+}
+
 /// What a successful save reports back, so the table can update without a rescan.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct ArtifactSaved {
@@ -180,15 +191,7 @@ pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource
         });
     }
 
-    // Only a directory row is ever redirected, and only to a file inside it,
-    // so the set of readable paths stays within what the scan found.
-    let path = crate::harness::by_id(&row.harness)
-        .map(|h| {
-            h.source_file(kind, &row.path)
-                .to_string_lossy()
-                .into_owned()
-        })
-        .unwrap_or(row.path);
+    let path = own_file(&row, kind);
     let (content, meta) = read_capped(&path, MAX_BYTES)?;
     Ok(ArtifactSource {
         format: format_of(&path),
@@ -198,6 +201,60 @@ pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource
         path,
         modified: stamp_of(&meta),
     })
+}
+
+/// The file a row of its own is read from.
+///
+/// Only a directory row is ever redirected, and only to a file inside it, so
+/// the set of readable paths stays within what the scan found.
+fn own_file(row: &Row, kind: ArtifactKind) -> String {
+    crate::harness::by_id(&row.harness)
+        .map(|h| {
+            h.source_file(kind, &row.path)
+                .to_string_lossy()
+                .into_owned()
+        })
+        .unwrap_or_else(|| row.path.clone())
+}
+
+/// The file the sheet's "Reveal in Finder" and "Open in editor" act on.
+///
+/// Keyed on the artifact id for the same reason the read is: the webview names
+/// a row, never a path, so what can be opened is exactly what the scan found.
+/// A config-derived row opens the whole file it lives in, since its excerpt has
+/// no file of its own.
+pub fn file_to_open(conn: &Connection, artifact_id: i32) -> Result<String, String> {
+    let row = row(conn, artifact_id)?;
+    let kind =
+        ArtifactKind::parse(&row.kind).ok_or_else(|| format!("Unknown kind {}.", row.kind))?;
+    let path = if DERIVED_KINDS.contains(&kind) {
+        row.path
+    } else {
+        own_file(&row, kind)
+    };
+    if !std::path::Path::new(&path).is_file() {
+        return Err("That file is no longer on disk.".to_string());
+    }
+    Ok(path)
+}
+
+/// The extensions "Open in editor" will hand to LaunchServices.
+///
+/// LaunchServices picks the app by extension, and some extensions *execute*:
+/// a `.command` runs in Terminal. The paths here are ones the scan found, but
+/// a cloned repo decides what files sit under its `.claude/`, so the button
+/// opens text formats only. Anything else can still be revealed in Finder.
+const OPENABLE_EXTENSIONS: &[&str] = &[
+    "md", "markdown", "mdc", "json", "jsonc", "toml", "yaml", "yml", "txt",
+];
+
+/// Whether `path` is a text format [`OPENABLE_EXTENSIONS`] allows opening.
+pub fn opens_as_text(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| OPENABLE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
 }
 
 /// An opaque equality token for a file's modification time.
@@ -472,6 +529,77 @@ mod tests {
 
         let err = read_source(&conn, id).expect_err("entry removed since the scan");
         assert!(err.contains("no longer in"), "got: {err}");
+    }
+
+    #[test]
+    fn the_file_to_open_for_a_skill_is_its_own_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("SKILL.md");
+        std::fs::write(&path, "# x\n").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "skill", path.to_str().unwrap());
+
+        assert_eq!(file_to_open(&conn, id).unwrap(), path.to_str().unwrap());
+    }
+
+    /// The same redirect the read makes: a plugin row names a directory, and
+    /// what opens is the file the sheet is showing, not the folder.
+    #[test]
+    fn the_file_to_open_for_a_plugin_is_the_file_the_sheet_shows() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join(".claude-plugin")).unwrap();
+        let manifest = dir.path().join(".claude-plugin").join("plugin.json");
+        std::fs::write(&manifest, "{}").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "plugin", dir.path().to_str().unwrap());
+
+        assert_eq!(file_to_open(&conn, id).unwrap(), manifest.to_str().unwrap());
+    }
+
+    /// A config-derived row opens the whole file it lives in — the excerpt is
+    /// a view, and there is no file of its own to hand an editor.
+    #[test]
+    fn the_file_to_open_for_an_mcp_server_is_its_config_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".mcp.json");
+        std::fs::write(&path, r#"{"mcpServers":{"posthog":{}}}"#).unwrap();
+        let conn = test_conn();
+        let id = insert_named(&conn, "mcp_server", "posthog", path.to_str().unwrap(), None);
+
+        assert_eq!(file_to_open(&conn, id).unwrap(), path.to_str().unwrap());
+    }
+
+    #[test]
+    fn a_file_that_left_the_disk_is_not_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gone.md");
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "agent", path.to_str().unwrap());
+
+        let err = file_to_open(&conn, id).expect_err("nothing to open");
+        assert!(err.contains("no longer on disk"), "got: {err}");
+    }
+
+    /// "Open" hands the path to LaunchServices, which picks the app by
+    /// extension — and a `.command` file *runs* in Terminal. Only text
+    /// formats may be opened; anything else can still be revealed.
+    #[test]
+    fn only_text_files_may_be_opened_in_an_app() {
+        assert!(opens_as_text("/a/SKILL.md"));
+        assert!(opens_as_text("/a/.claude.json"));
+        assert!(opens_as_text("/a/config.TOML"));
+        assert!(opens_as_text("/a/rules.yml"));
+        assert!(!opens_as_text("/a/run.command"));
+        assert!(!opens_as_text("/a/evil.terminal"));
+        assert!(!opens_as_text("/a/tool.app"));
+        assert!(!opens_as_text("/a/no-extension"));
+    }
+
+    #[test]
+    fn opening_an_unknown_artifact_id_is_an_error() {
+        let conn = test_conn();
+        let err = file_to_open(&conn, 9999).expect_err("no such artifact");
+        assert!(err.contains("no longer in the inventory"), "got: {err}");
     }
 
     #[test]

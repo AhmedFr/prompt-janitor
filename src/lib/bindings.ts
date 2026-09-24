@@ -149,6 +149,15 @@ export const commands = {
 	 *  else has changed since. `None` overwrites deliberately.
 	 */
 	saveArtifactSource: (artifactId: number, content: string, expectedModified: string | null) => typedError<ArtifactSaved, string>(__TAURI_INVOKE("save_artifact_source", { artifactId, content, expectedModified })),
+	/**
+	 *  Reveal an artifact's file in Finder, or open it in its default app.
+	 * 
+	 *  Rust-side rather than the opener plugin's JS API: that one takes a path, so
+	 *  granting it would let the webview open anything on disk. This takes an
+	 *  artifact id and opens only the file the scan found for it — see
+	 *  `artifact_source::file_to_open`.
+	 */
+	openArtifact: (artifactId: number, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_artifact", { artifactId, action })),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**
@@ -506,6 +515,16 @@ export type NlVerdict = {
 	violates: boolean,
 	explanation: string,
 };
+
+/**  What the sheet asks the system to do with an artifact's file. */
+export type OpenAction = 
+/**  Select it in a Finder window. */
+"reveal" | 
+/**
+ *  Open it in the app macOS associates with its type — the user's editor
+ *  for `.md` and `.json` on a developer's machine.
+ */
+"open";
 
 export type Overview = {
 	has_data: boolean,

@@ -5,13 +5,11 @@ import type { ArtifactView } from "@/lib/ipc";
 
 const getArtifactSource = vi.hoisted(() => vi.fn());
 const saveArtifactSource = vi.hoisted(() => vi.fn());
+const openArtifact = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
-  return { ...actual, commands: { getArtifactSource, saveArtifactSource } };
+  return { ...actual, isTauri: true, commands: { getArtifactSource, saveArtifactSource, openArtifact } };
 });
-
-const openExternal = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/open-external", () => ({ openExternal }));
 
 import { SkillPanel } from "./index";
 
@@ -41,7 +39,7 @@ const skill = (over: Partial<ArtifactView> = {}): ArtifactView => ({
 async function open(props: Partial<Parameters<typeof SkillPanel>[0]> = {}) {
   const onClose = vi.fn();
   const view = render(<SkillPanel skill={skill()} scope="Global" onClose={onClose} {...props} />);
-  await waitFor(() => expect(screen.queryByText("Loading…")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByText("Reading adapt…")).not.toBeInTheDocument());
   return { ...view, onClose };
 }
 
@@ -50,7 +48,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue(ok({ path: "/s/SKILL.md", content: SOURCE, bytes: 64, modified: "111", format: "markdown", editable: true }));
   saveArtifactSource.mockReset().mockResolvedValue(ok({ bytes: 12 }));
-  openExternal.mockReset();
+  openArtifact.mockReset().mockResolvedValue(ok(null));
 });
 
 afterEach(cleanup);
@@ -90,7 +88,7 @@ describe("SkillPanel", () => {
   it("says so while the file is loading", () => {
     getArtifactSource.mockReturnValue(new Promise(() => {}));
     render(<SkillPanel skill={skill()} scope="Global" onClose={vi.fn()} />);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.getByText("Reading adapt…")).toBeInTheDocument();
   });
 
   it("shows a failed read instead of an empty document", async () => {
@@ -99,10 +97,25 @@ describe("SkillPanel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't read the file: nope");
   });
 
-  it("opens the file in Finder on request", async () => {
+  it("shows the exact file, frontmatter and all, in the Source view", async () => {
     await open();
-    fireEvent.click(screen.getByRole("button", { name: /open .* on disk/i }));
-    expect(openExternal).toHaveBeenCalledWith("/s/SKILL.md");
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const region = screen.getByRole("region", { name: "adapt source" });
+    expect(region.querySelectorAll(".cv__text")[1]).toHaveTextContent("name: adapt");
+  });
+
+  it("reveals the file in Finder on request", async () => {
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Reveal in Finder" }));
+    await waitFor(() => expect(openArtifact).toHaveBeenCalledWith(7, "reveal"));
+  });
+
+  it("offers Edit only for a file the backend will accept a save for", async () => {
+    getArtifactSource.mockResolvedValue(
+      ok({ path: "/s/SKILL.md", content: SOURCE, bytes: 64, modified: "111", format: "markdown", editable: false }),
+    );
+    await open();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 
   it("closes on the close button", async () => {
@@ -123,6 +136,11 @@ describe("SkillPanel", () => {
       fireEvent.click(screen.getByRole("button", { name: "Edit" }));
       return screen.getByRole("textbox", { name: /markdown/i });
     };
+
+    it("puts the cursor in the editor, since Edit is a request to type", async () => {
+      await open();
+      expect(startEditing()).toHaveFocus();
+    });
 
     it("puts the raw file — frontmatter included — into the editor", async () => {
       await open();

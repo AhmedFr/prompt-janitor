@@ -1,5 +1,4 @@
 /** Copy for the panel. Collected here so the wording is changed in one place. */
-export const LOADING = "Loading…";
 export const EMPTY_BODY = "This skill has no body — only its frontmatter.";
 export const EDITOR_LABEL = "Skill markdown";
 export const DIRTY_LABEL = "Unsaved";

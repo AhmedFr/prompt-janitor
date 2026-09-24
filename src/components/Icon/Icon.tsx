@@ -71,6 +71,26 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   chevronRight: <polyline points="9 5 16 12 9 19" />,
   chevronDown: <polyline points="5 9 12 16 19 9" />,
+  chevronUp: <polyline points="5 15 12 8 19 15" />,
+  copy: (
+    <>
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+      <path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2" />
+    </>
+  ),
+  external: (
+    <>
+      <path d="M13.5 4.5H19.5V10.5" />
+      <line x1="19.5" y1="4.5" x2="11" y2="13" />
+      <path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4" />
+    </>
+  ),
+  code: (
+    <>
+      <polyline points="8.5 7.5 4 12 8.5 16.5" />
+      <polyline points="15.5 7.5 20 12 15.5 16.5" />
+    </>
+  ),
   sparkles: (
     <>
       <path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z" />

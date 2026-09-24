@@ -19,6 +19,13 @@
   outline: none;
 }
 
+/* The reader: most of the window, the table still visible down the left so
+   the sheet reads as that row, opened. Past ~1180px a wider pane only makes
+   the code lines longer, not the file easier to read. */
+.sheet--wide {
+  width: clamp(640px, 68vw, 1180px);
+}
+
 .sheet__hd {
   display: flex;
   align-items: flex-start;
@@ -28,6 +35,7 @@
 }
 
 .sheet__id {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -80,6 +88,15 @@
   padding: 16px 20px;
 }
 
+/* The body belongs to a child that scrolls itself (a file viewer with a fixed
+   bar); the sheet only gives it the height. */
+.sheet__body--flush {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
 .sheet__error {
   flex: 0 0 auto;
   margin: 0;
@@ -103,6 +120,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.sheet-path__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* The path is the least important thing here and the longest — it truncates

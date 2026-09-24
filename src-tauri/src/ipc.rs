@@ -47,6 +47,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
             crate::commands::get_setup,
             crate::commands::get_artifact_source,
             crate::commands::save_artifact_source,
+            crate::commands::open_artifact,
             crate::commands::get_effective_rules,
             crate::commands::get_usage_overview,
             crate::commands::get_project_usage,

@@ -28,6 +28,21 @@
   --blue-press: #0060df;
   --blue-tint: rgba(10, 132, 255, 0.12);
 
+  /* syntax — Xcode's Default (Light) hues, darkened where needed so each clears
+     AA on the card and on a find highlight. Ratios in `codeView.contrast.test.ts`. */
+  --syn-keyword: #9b2393;
+  --syn-string: #b31a14;
+  --syn-number: #1c00cf;
+  --syn-attr: #0b5a8a;
+  --syn-comment: #51606c;
+  --syn-code: #643820;
+  --syn-punct: #5c5c61;
+
+  /* find-in-file — the yellow every macOS find bar uses, one step for every
+     match and a stronger one for the current match. */
+  --find-match: #fff1a8;
+  --find-current: #ffe066;
+
   /* status */
   --green: #2fb457;
   --orange: #f59e0b;

@@ -44,6 +44,7 @@ const source = (over: Partial<ArtifactSourceState> = {}): ArtifactSourceState =>
   saving: false,
   error: null,
   save: async () => null,
+  reload: () => {},
   ...over,
 });
 
@@ -107,4 +108,63 @@ export const ReadFailed: Story = {
 /** A file with nothing in it. */
 export const EmptyFile: Story = {
   args: { source: source({ content: "", format: "text" }) },
+};
+
+/** The failure the owner hit in v0.1.4 (#192): the backend's words, verbatim, with a retry. */
+export const PermissionDenied: Story = {
+  args: {
+    source: source({ content: null, format: null, error: "Command get_artifact_source not allowed by ACL" }),
+  },
+};
+
+/** A settings file: whole file, env masked at any depth. */
+export const SettingsFile: Story = {
+  args: {
+    artifact: { ...server, kind: "settings", name: "settings.json", path: "/Users/a/.claude/settings.json", usage: null },
+    source: source({
+      path: "/Users/a/.claude/settings.json",
+      content: JSON.stringify(
+        {
+          model: "opus",
+          env: { ANTHROPIC_API_KEY: "••••••", DISABLE_TELEMETRY: "••••••" },
+          permissions: {
+            allow: ["Bash(pnpm check:*)", "Bash(git status:*)", "mcp__claude-in-chrome__computer"],
+            deny: ["Bash(rm -rf:*)"],
+          },
+          hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "pnpm -s lint --fix" }] }] },
+        },
+        null,
+        2,
+      ),
+    }),
+  },
+};
+
+/** An MCP server that fails a third of its calls: the rate reads red, with an icon. */
+export const FailingServer: Story = {
+  args: {
+    artifact: {
+      ...server,
+      name: "github",
+      description: "Issues, pull requests and code search",
+      usage: server.usage ? { ...server.usage, error_rate: 0.31 } : null,
+    },
+  },
+};
+
+/** 5,000 lines: rows off screen skip layout, and find stays quick. */
+export const LongFile: Story = {
+  args: {
+    artifact: { ...server, kind: "agent", name: "big-agent", path: "/Users/a/.claude/agents/big-agent.md" },
+    source: source({
+      format: "markdown",
+      path: "/Users/a/.claude/agents/big-agent.md",
+      content: [
+        "---",
+        "name: big-agent",
+        "---",
+        ...Array.from({ length: 4997 }, (_, i) => `- step ${i + 1}: check the env for KEY_${i}`),
+      ].join("\n"),
+    }),
+  },
 };
