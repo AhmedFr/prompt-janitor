@@ -165,6 +165,7 @@ export function Project({ path, navigate, data: override }: ProjectProps) {
                     ctx={ctx}
                     onOpen={openDetail}
                     onSeeAll={seeAllFiles}
+                    onSaved={() => void state.refetch()}
                   />
                 )}
               </Tabs>
@@ -197,6 +198,7 @@ function TabPanel({
   ctx,
   onOpen,
   onSeeAll,
+  onSaved,
 }: {
   id: string;
   data: ProjectData;
@@ -204,9 +206,11 @@ function TabPanel({
   ctx: ColumnsCtx;
   onOpen: (fileId: string) => void;
   onSeeAll: () => void;
+  /** A skill edit landed in the Setup tab's sheet. */
+  onSaved: () => void;
 }) {
   if (id === "effective") return <EffectiveRulesTab rules={data.effective} harness={data.harness} />;
-  if (id === "setup") return <SetupTab artifacts={artifacts} ctx={ctx} />;
+  if (id === "setup") return <SetupTab artifacts={artifacts} ctx={ctx} onSaved={onSaved} />;
   if (id === "usage") return <UsageTab usage={data.usage} harness={data.harness} />;
   return <RulesTab files={data.files} onOpen={onOpen} onSeeAll={onSeeAll} />;
 }

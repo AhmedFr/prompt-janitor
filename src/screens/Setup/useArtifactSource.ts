@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { commands } from "@/lib/ipc";
-import type { SkillSource } from "./SkillPanel.types";
+import { commands, type SourceFormat } from "@/lib/ipc";
+import type { ArtifactSourceState } from "./Setup.types";
 
 /**
  * The phrase Rust uses when it refuses a save because the file changed under
@@ -11,7 +11,8 @@ import type { SkillSource } from "./SkillPanel.types";
 const CONFLICT_MARKER = "changed on disk";
 
 /**
- * Loads one skill's file and saves edits back to it.
+ * Loads one artifact's file (or, for a config-derived kind, its redacted
+ * excerpt) and saves edits back to it when the backend says it may.
  *
  * `content` is always what is *on disk* — the read's result, or the text of
  * the last save that landed. The editor's in-progress draft lives in the
@@ -23,13 +24,15 @@ const CONFLICT_MARKER = "changed on disk";
  * finds a token that has moved on and drops its result instead of painting
  * the previous skill's text into the panel the user is now looking at.
  */
-export function useSkillSource(artifactId: number): SkillSource {
+export function useArtifactSource(artifactId: number): ArtifactSourceState {
   const [content, setContent] = useState<string | null>(null);
   const [path, setPath] = useState<string | null>(null);
   // The file's modification stamp as of the read the panel is showing. Sent
   // back on save so Rust can refuse to overwrite a file something else has
   // changed since — there is no undo, so a silent clobber is unrecoverable.
   const [modified, setModified] = useState<string | null>(null);
+  const [format, setFormat] = useState<SourceFormat | null>(null);
+  const [editable, setEditable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +49,8 @@ export function useSkillSource(artifactId: number): SkillSource {
         setContent(null);
         setPath(null);
         setModified(null);
+        setFormat(null);
+        setEditable(false);
       }
 
       const result = await commands.getArtifactSource(id);
@@ -54,6 +59,8 @@ export function useSkillSource(artifactId: number): SkillSource {
         setContent(result.data.content);
         setPath(result.data.path);
         setModified(result.data.modified);
+        setFormat(result.data.format);
+        setEditable(result.data.editable);
       } else if (!quiet) {
         // A quiet re-read is a courtesy after a conflict; if it fails, the
         // conflict message is the more useful thing to leave on screen.
@@ -94,5 +101,5 @@ export function useSkillSource(artifactId: number): SkillSource {
     [artifactId, modified, read],
   );
 
-  return { content, path, modified, loading, saving, error, save };
+  return { content, path, format, editable, modified, loading, saving, error, save };
 }

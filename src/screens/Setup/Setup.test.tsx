@@ -254,7 +254,14 @@ beforeEach(() => {
   scanNow.mockResolvedValue({ status: "error", error: "no" });
   getArtifactSource.mockResolvedValue({
     status: "ok",
-    data: { path: "/s/SKILL.md", content: "# From disk\n", bytes: 12, modified: "111" },
+    data: {
+      path: "/s/SKILL.md",
+      content: "# From disk\n",
+      bytes: 12,
+      modified: "111",
+      format: "markdown",
+      editable: true,
+    },
   });
   saveArtifactSource.mockResolvedValue({ status: "ok", data: { bytes: 20 } });
   open.mockResolvedValue(null);
@@ -579,14 +586,49 @@ describe("Setup", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });
 
-    it("stays shut when a row on a tab with no panel is clicked", async () => {
+  });
+
+  describe("the detail sheet", () => {
+    it.each([
+      [/^MCP/, "linear", 6, "linear — MCP server"],
+      [/^Hooks/, "PreToolUse: fmt", 7, "PreToolUse: fmt — Hook"],
+      [/^Agents/, "code-reviewer", 5, "code-reviewer — Agent"],
+      [/^Plugins/, "superpowers", 8, "superpowers — Plugin"],
+    ])("opens read-only for a row on the %s tab", async (tab, name, id, label) => {
+      getArtifactSource.mockResolvedValue({
+        status: "ok",
+        data: { path: "/x", content: '{ "command": "npx" }', bytes: 20, modified: "1", format: "json", editable: false },
+      });
       await renderSetup();
       await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^Plugins/);
-      fireEvent.click(rowFor("superpowers"));
+      openTab(tab);
+      fireEvent.click(rowFor(name));
 
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(getArtifactSource).not.toHaveBeenCalled();
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveAccessibleName(label);
+      await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(id));
+      expect(within(sheet).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    });
+
+    it("shows what the inventory knows about the row, usage included", async () => {
+      await renderSetup();
+      await screen.findByRole("tablist", { name: /setup/i });
+      openTab(/^MCP/);
+      fireEvent.click(rowFor("linear"));
+
+      const sheet = await screen.findByRole("dialog");
+      expect(within(sheet).getByText("Error rate")).toBeInTheDocument();
+      expect(within(sheet).getByText("50%")).toBeInTheDocument();
+    });
+
+    it("closes on Escape", async () => {
+      await renderSetup();
+      await screen.findByRole("tablist", { name: /setup/i });
+      openTab(/^MCP/);
+      fireEvent.click(rowFor("linear"));
+
+      fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     });
   });
 

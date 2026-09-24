@@ -8,7 +8,7 @@ vi.mock("@/lib/ipc", async () => {
   return { ...actual, commands: { getArtifactSource, saveArtifactSource } };
 });
 
-import { useSkillSource } from "./useSkillSource";
+import { useArtifactSource } from "./useArtifactSource";
 
 const ok = <T,>(data: T) => ({ status: "ok" as const, data });
 const err = (error: string) => ({ status: "error" as const, error });
@@ -20,11 +20,11 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("useSkillSource", () => {
+describe("useArtifactSource", () => {
   it("reads the artifact's file on mount", async () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/s/SKILL.md", content: "# a", bytes: 3, modified: "111" }));
 
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(getArtifactSource).toHaveBeenCalledWith(7);
@@ -33,10 +33,29 @@ describe("useSkillSource", () => {
     expect(result.current.error).toBeNull();
   });
 
+  it("carries how to draw the file and whether it may be edited", async () => {
+    getArtifactSource.mockResolvedValue(
+      ok({ path: "/.mcp.json", content: "{}", bytes: 2, modified: "1", format: "json", editable: false }),
+    );
+
+    const { result } = renderHook(() => useArtifactSource(7));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.format).toBe("json");
+    expect(result.current.editable).toBe(false);
+  });
+
+  it("assumes nothing is editable before a read lands", () => {
+    getArtifactSource.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useArtifactSource(7));
+    expect(result.current.editable).toBe(false);
+    expect(result.current.format).toBeNull();
+  });
+
   it("surfaces a failed read as an error rather than empty content", async () => {
     getArtifactSource.mockResolvedValue(err("Couldn't read the file: nope"));
 
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe("Couldn't read the file: nope");
@@ -45,7 +64,7 @@ describe("useSkillSource", () => {
 
   it("re-reads when it is pointed at a different artifact", async () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/a", content: "a", bytes: 1, modified: "111" }));
-    const { result, rerender } = renderHook(({ id }) => useSkillSource(id), {
+    const { result, rerender } = renderHook(({ id }) => useArtifactSource(id), {
       initialProps: { id: 1 },
     });
     await waitFor(() => expect(result.current.content).toBe("a"));
@@ -65,7 +84,7 @@ describe("useSkillSource", () => {
   it("ignores a read that resolves after it has moved to another artifact", async () => {
     let settleFirst: (v: unknown) => void = () => {};
     getArtifactSource.mockReturnValueOnce(new Promise((r) => (settleFirst = r)));
-    const { result, rerender } = renderHook(({ id }) => useSkillSource(id), {
+    const { result, rerender } = renderHook(({ id }) => useArtifactSource(id), {
       initialProps: { id: 1 },
     });
 
@@ -83,7 +102,7 @@ describe("useSkillSource", () => {
   it("saves the edited text and adopts it as the on-disk content", async () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValue(ok({ bytes: 3 }));
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
 
     let landed: number | null | undefined;
@@ -104,7 +123,7 @@ describe("useSkillSource", () => {
   it("reports a failed save and leaves the on-disk content untouched", async () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValue(err("That file is no longer on disk."));
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
 
     let landed: number | null | undefined;
@@ -121,7 +140,7 @@ describe("useSkillSource", () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValueOnce(err("boom"));
     saveArtifactSource.mockResolvedValueOnce(ok({ bytes: 3 }));
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
 
     await act(async () => {
@@ -136,13 +155,13 @@ describe("useSkillSource", () => {
   });
 });
 
-describe("useSkillSource — a file that moved underneath the panel", () => {
+describe("useArtifactSource — a file that moved underneath the panel", () => {
   it("re-reads after a rejected save, so the next attempt carries the new stamp", async () => {
     getArtifactSource.mockResolvedValueOnce(
       ok({ path: "/s", content: "old", bytes: 3, modified: "111" }),
     );
     saveArtifactSource.mockResolvedValueOnce(err("That file changed on disk since you opened it."));
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
 
     getArtifactSource.mockResolvedValueOnce(
@@ -160,7 +179,7 @@ describe("useSkillSource — a file that moved underneath the panel", () => {
   it("does not re-read after an ordinary save failure", async () => {
     getArtifactSource.mockResolvedValue(ok({ path: "/s", content: "old", bytes: 3, modified: "111" }));
     saveArtifactSource.mockResolvedValue(err("That file is no longer on disk."));
-    const { result } = renderHook(() => useSkillSource(7));
+    const { result } = renderHook(() => useArtifactSource(7));
     await waitFor(() => expect(result.current.content).toBe("old"));
     const reads = getArtifactSource.mock.calls.length;
 

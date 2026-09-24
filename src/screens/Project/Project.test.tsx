@@ -31,6 +31,7 @@ const emit = async (event: string) => {
 const listProjects = vi.hoisted(() => vi.fn());
 const listFiles = vi.hoisted(() => vi.fn());
 const getSetup = vi.hoisted(() => vi.fn());
+const getArtifactSource = vi.hoisted(() => vi.fn());
 const getEffectiveRules = vi.hoisted(() => vi.fn());
 const getProjectUsage = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
@@ -40,7 +41,7 @@ vi.mock("@/lib/ipc", async () => {
   return {
     ...actual,
     isTauri: true,
-    commands: { listProjects, listFiles, getSetup, getEffectiveRules, getProjectUsage, scanNow },
+    commands: { listProjects, listFiles, getSetup, getEffectiveRules, getProjectUsage, scanNow, getArtifactSource },
   };
 });
 
@@ -390,6 +391,31 @@ describe("Project", () => {
       openTab("Setup");
 
       expect(await screen.findByText(/Nothing configured in this project/)).toBeInTheDocument();
+    });
+
+    it("opens a row's detail sheet, scoped to this project", async () => {
+      getArtifactSource.mockResolvedValue({
+        status: "ok",
+        data: { path: "/s.json", content: "{}", bytes: 2, modified: "1", format: "json", editable: false },
+      });
+      await renderScreen();
+      await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
+      openTab("Setup");
+      fireEvent.click(await screen.findByText("settings.json"));
+
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveAccessibleName("settings.json — Settings file");
+      await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(3));
+    });
+
+    it("sends a graded rule to its Detail screen instead", async () => {
+      const { navigate } = await renderScreen();
+      await waitFor(() => expect(screen.getByRole("tablist")).toBeInTheDocument());
+      openTab("Setup");
+      fireEvent.click(await screen.findByText("CLAUDE.md"));
+
+      expect(navigate).toHaveBeenCalledWith("detail", `${PATH}/CLAUDE.md`);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 
