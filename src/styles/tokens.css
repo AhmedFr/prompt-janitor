@@ -42,6 +42,16 @@
   --tone-error-fg: #992620;
   --tone-stale-tint: #fef1dd;
   --tone-stale-fg: #7a4a00;
+  /* Healthy-rate ink. Not --green: that is a fill colour at 2.6:1 on white.
+     Clears AA on every row ground (see `cells.contrast.test.ts`). */
+  --tone-good-fg: #1d7a3a;
+
+  /* scope badges — one opaque tint per layer, fg measured on its own tint in
+     `cells.contrast.test.ts`. Global keeps --blue-tint / --blue-press. */
+  --scope-project-tint: #dff3ef;
+  --scope-project-fg: #0b6b5e;
+  --scope-plugin-tint: #eeebfa;
+  --scope-plugin-fg: #4a3aa7;
 
   /* RankedList bar fills — opaque enough over --group (#f5f5f7) to clear the
      3:1 WCAG 1.4.11 non-text-contrast floor a progress-style bar needs

@@ -20,6 +20,16 @@ export const KIND_ORDER: readonly ArtifactKind[] = [
 export const ERROR_RATE_THRESHOLD = 0.25;
 
 /**
+ * Where the Error % column turns amber: failing one call in ten is not yet a
+ * finding (the "Errors" filter still starts at {@link ERROR_RATE_THRESHOLD}),
+ * but it is the band a rate passes through on its way there.
+ */
+export const ERROR_RATE_WATCH = 0.1;
+
+/** The Error % column's green / amber / red lines. Red is exactly what the "Errors" filter keeps. */
+export const ERROR_RATE_BANDS = { watch: ERROR_RATE_WATCH, bad: ERROR_RATE_THRESHOLD } as const;
+
+/**
  * "High cost" is relative, not absolute: an artifact costs a lot when its
  * average turn burns at least twice what the typical measured artifact burns.
  */

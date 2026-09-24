@@ -23,7 +23,8 @@ export type IconName =
   | "wand"
   | "lock"
   | "barChart"
-  | "layers";
+  | "layers"
+  | "alert";
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;

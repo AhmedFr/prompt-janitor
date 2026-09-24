@@ -126,6 +126,11 @@ describe("PROJECT_RULE_COLUMNS", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
   });
 
+  it("draws the name through NameCell, so it carries the same weight as every other table's name", () => {
+    const { container } = mount(PROJECT_RULE_COLUMNS, [file({ name: "CLAUDE.md" })], rowId);
+    expect(container.querySelector("td .dt-name__label")).toHaveTextContent("CLAUDE.md");
+  });
+
   it("renders the modified time as a relative age", () => {
     mount(PROJECT_RULE_COLUMNS, [file()], rowId);
     expect(screen.getByText("2h")).toBeInTheDocument();

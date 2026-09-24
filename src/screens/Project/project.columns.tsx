@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ArtifactKind, ArtifactView, FileRow } from "@/lib/ipc";
-import { GradeCell, type PillGroup } from "@/components/DataTable";
+import { GradeCell, NameCell, type PillGroup } from "@/components/DataTable";
 import { relativeTime } from "@/lib/format";
 import { KIND_ORDER } from "@/screens/Setup/Setup.constants";
 import {
@@ -39,7 +39,7 @@ const INVOCABLE_KINDS: ReadonlySet<ArtifactKind> = new Set<ArtifactKind>([
  * parameterise.
  */
 export const PROJECT_RULE_COLUMNS: ColumnDef<FileRow, unknown>[] = [
-  { id: "name", header: "Name", accessorKey: "name" },
+  { id: "name", header: "Name", accessorKey: "name", cell: (c) => <NameCell name={c.row.original.name} /> },
   {
     id: "kind",
     header: "Kind",

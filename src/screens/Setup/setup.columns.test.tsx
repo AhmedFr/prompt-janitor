@@ -425,6 +425,17 @@ describe("columnsFor", () => {
     expect(rowNames()).toEqual(["high-error", "low-error", "never"]);
   });
 
+  it("tones the Error % cell against the Setup error bands", () => {
+    mount("skill", [
+      artifact({ id: 1, kind: "skill", name: "fine", usage: usage({ error_rate: 0.02 }) }),
+      artifact({ id: 2, kind: "skill", name: "shaky", usage: usage({ error_rate: 0.12 }) }),
+      artifact({ id: 3, kind: "skill", name: "broken", usage: usage({ error_rate: 0.5 }) }),
+    ]);
+    expect(screen.getByText("2%").closest(".dt-num")).toHaveAttribute("data-tone", "good");
+    expect(screen.getByText("12%").closest(".dt-num")).toHaveAttribute("data-tone", "watch");
+    expect(screen.getByText("50%").closest(".dt-num")).toHaveAttribute("data-tone", "bad");
+  });
+
   it("sorts by avg tokens descending via the avgTokens column, never-used trailing", () => {
     mount(
       "skill",

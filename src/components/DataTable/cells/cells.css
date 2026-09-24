@@ -9,6 +9,35 @@
   color: var(--text);
 }
 
+/* Unknown recedes: a column of em dashes is background, not a finding. */
+.dt-num.muted {
+  color: var(--text-2);
+}
+
+/* ---------- rate tones (PercentCell `thresholds`) ----------
+   Ink only, no fill: a column of green pills would out-shout the one red row
+   it exists to surface. Bad adds weight and a glyph so the band survives for
+   someone who cannot tell the three inks apart. */
+.dt-num[data-tone="good"] {
+  color: var(--tone-good-fg);
+}
+
+.dt-num[data-tone="watch"] {
+  color: var(--tone-stale-fg);
+}
+
+.dt-num[data-tone="bad"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tone-error-fg);
+  font-weight: 600;
+}
+
+.dt-num__alert {
+  display: inline-flex;
+}
+
 /* ---------- name + description, on one line ---------- */
 
 /*
@@ -31,6 +60,10 @@
  * last thing that should give.
  */
 .dt-name__label {
+  /* The row's identity, and the first thing an eye scanning down the column
+     should land on — heavier than every other cell in the row. */
+  font-weight: 600;
+  color: var(--text);
   flex: 0 1 auto;
   min-width: 9ch;
   overflow: hidden;
@@ -66,11 +99,25 @@
   font-size: 11px;
 }
 
-/* The global layer is the one every project inherits — worth reading as a
-   statement about scope rather than as one more neutral chip. */
+/* One tint per layer, so a Scope column reads as three groups at a glance
+   instead of one grey list of names. Global is the layer every project
+   inherits and keeps the accent; project and plugin get their own opaque
+   tints (pairs measured in `cells.contrast.test.ts`). */
 .dt-scope[data-layer="global"] {
   background: var(--blue-tint);
   color: var(--blue-press);
+  border-color: transparent;
+}
+
+.dt-scope[data-layer="project"] {
+  background: var(--scope-project-tint);
+  color: var(--scope-project-fg);
+  border-color: transparent;
+}
+
+.dt-scope[data-layer="plugin"] {
+  background: var(--scope-plugin-tint);
+  color: var(--scope-plugin-fg);
   border-color: transparent;
 }
 

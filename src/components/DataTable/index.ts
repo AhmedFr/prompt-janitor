@@ -33,6 +33,7 @@ export {
   formatCount,
   formatTokens,
   lastUsedAt,
+  rateTone,
   EMPTY_MARK,
   NEVER_MARK,
 } from "./cells";
@@ -51,6 +52,8 @@ export type {
   CountCellProps,
   LastUsedCellProps,
   PercentCellProps,
+  RateThresholds,
+  RateTone,
   TokensCellProps,
   ScopeCellProps,
   PathCellProps,
