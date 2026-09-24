@@ -38,6 +38,10 @@ export function formatPercent(value: number | null | undefined): string {
  * on their lower edge, so a rate sitting exactly on a threshold reads as the
  * worse band — the same `>=` Setup's "Errors" filter uses. Unknown stays
  * unknown rather than defaulting to good.
+ *
+ * Banded on the raw value, not the rounded one {@link formatPercent} shows:
+ * 24.9% prints "25%" yet stays `watch`, because the "Errors" filter excludes
+ * it too, and a red row the filter then hides would be the worse mismatch.
  */
 export function rateTone(value: number | null | undefined, thresholds: RateThresholds): RateTone {
   if (value == null || !Number.isFinite(value)) return "unknown";
