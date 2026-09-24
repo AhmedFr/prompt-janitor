@@ -27,6 +27,7 @@ import {
   TAB_STATE_KEY,
   TABLE_STATE_PREFIX,
 } from "./Rules.constants";
+import { RulePanel } from "./RulePanel";
 import type { RulesProps, RuleTabId } from "./Rules.types";
 import { useRules } from "./useRules";
 import "./Rules.css";
@@ -113,6 +114,12 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
 
   const { importPack, toggle, deleteRule } = state;
 
+  // An id, re-resolved against the live rules, so a rule deleted while its
+  // sheet is open takes the sheet with it — and a toggle shows up in the
+  // sheet's Status line without reopening it.
+  const [openRuleId, setOpenRuleId] = useState<string | null>(null);
+  const openRule = openRuleId === null ? null : (rules.find((r) => r.id === openRuleId) ?? null);
+
   const doImport = useCallback(async () => {
     const n = await importPack();
     if (n > 0) say(`Imported ${n} rule${n === 1 ? "" : "s"}`);
@@ -173,6 +180,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
                       ctx={ctx}
                       loading={loading}
                       highlight={highlight}
+                      onOpen={setOpenRuleId}
                       toolbarRight={
                         <>
                           {/* Always present, empty or not: a live region that
@@ -201,6 +209,8 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
           )}
         </div>
       </div>
+
+      {openRule && <RulePanel key={openRule.id} rule={openRule} onClose={() => setOpenRuleId(null)} />}
     </section>
   );
 }
@@ -238,6 +248,7 @@ function RuleTable({
   ctx,
   loading,
   highlight,
+  onOpen,
   toolbarRight,
 }: {
   tab: RuleTabId;
@@ -245,6 +256,8 @@ function RuleTable({
   ctx: RuleColumnsCtx;
   loading: boolean;
   highlight?: string;
+  /** Opens a rule's sheet. The switch and actions stop their own clicks. */
+  onOpen: (id: string) => void;
   toolbarRight: ReactNode;
 }) {
   // Rebuilt only when a tab's row set changes — the source chips are derived
@@ -262,6 +275,10 @@ function RuleTable({
       pills={pills}
       defaultSort={DEFAULT_SORT}
       highlightRowId={highlight}
+      onRowClick={(row) => onOpen(row.id)}
+      // The first column is the switch, whose value would name every row
+      // "true" or "false" to a screen reader.
+      rowLabel={(row) => row.title}
       toolbarRight={toolbarRight}
       loading={loading}
       density="compact"

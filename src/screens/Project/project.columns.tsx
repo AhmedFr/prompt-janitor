@@ -138,9 +138,7 @@ export function projectSetupColumns(ctx: ColumnsCtx): ColumnDef<ArtifactView, un
     const invocable = (row: ArtifactView) => INVOCABLE_KINDS.has(row.kind);
     defs = [
       kindColumn(),
-      // Unlike Setup's tables, this one keeps the description beside the name
-      // — see `nameColumn`'s doc comment for why the two differ.
-      nameColumn({ withDescription: true }),
+      nameColumn(),
       usesColumn(invocable),
       sessionsColumn(invocable),
       lastUsedColumn(invocable),
