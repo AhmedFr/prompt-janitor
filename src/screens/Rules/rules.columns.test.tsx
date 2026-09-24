@@ -174,10 +174,15 @@ describe("columnsFor", () => {
     expect(toggle).toHaveBeenCalledWith("r7", true);
   });
 
-  it("renders the title with its description muted beside it", () => {
+  it("renders the title alone, with the description one hover away", () => {
     mount([rule({ title: "No Slack", description: "Flags any file mentioning Slack." })]);
-    expect(bodyRows()[0][1]).toContain("No Slack");
-    expect(bodyRows()[0][1]).toContain("Flags any file mentioning Slack.");
+    expect(bodyRows()[0][1]).toBe("No Slack");
+    expect(screen.getByText("No Slack")).toHaveAttribute("title", "No Slack — Flags any file mentioning Slack.");
+  });
+
+  it("titles a rule with no description by its title alone", () => {
+    mount([rule({ title: "No Slack", description: "" })]);
+    expect(screen.getByText("No Slack")).toHaveAttribute("title", "No Slack");
   });
 
   it("renders the source as its attribution badge", () => {

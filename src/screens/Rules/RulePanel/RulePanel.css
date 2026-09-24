@@ -1,0 +1,42 @@
+.rp__facts {
+  margin: 0 0 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.rp__fact {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 10px;
+}
+
+.rp__fact dt {
+  color: var(--text-3);
+}
+
+.rp__fact dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.rp__section {
+  margin-bottom: 18px;
+}
+
+.rp__heading {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rp__description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

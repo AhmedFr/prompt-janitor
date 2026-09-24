@@ -176,18 +176,18 @@ describe("projectSetupColumns", () => {
   });
 
   /**
-   * Setup's tables dropped the description from the name cell (#175); this one
-   * keeps it. The project page has no skill panel to move it into, and the
-   * combined table is where a description does the most work — it is the only
-   * thing separating two same-named artifacts of different kinds.
+   * Name only, like every other table (#182): the row's sheet carries the
+   * description now, and the Kind column is what tells two same-named
+   * artifacts apart.
    */
-  it("keeps the description beside the name, unlike Setup's own tables", () => {
+  it("renders the name alone, with the description one hover away", () => {
     mount(
       projectSetupColumns(ctx()),
       [artifact({ kind: "skill", name: "adapt", description: "Adapts designs" })],
       rowId,
     );
-    expect(screen.getByText(/Adapts designs/)).toHaveClass("muted");
+    expect(screen.queryByText(/Adapts designs/)).not.toBeInTheDocument();
+    expect(screen.getByText("adapt")).toHaveAttribute("title", "adapt — Adapts designs");
   });
 
   it("pills each row with the kind it is", () => {

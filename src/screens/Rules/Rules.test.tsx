@@ -243,11 +243,34 @@ describe("Rules", () => {
     expect(screen.getByRole("switch", { name: "Enable No Slack references" })).toBeChecked();
   });
 
-  it("does not make rows clickable, so a switch can never open something", async () => {
+  it("opens a rule's sheet, with its full description, when its row is clicked", async () => {
     await renderScreen();
     await rowsSettle(2);
-    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
-    for (const row of rows) expect(row).not.toHaveAttribute("tabindex");
+
+    fireEvent.click(screen.getByText("No Slack references"));
+
+    const sheet = await screen.findByRole("dialog");
+    expect(sheet).toHaveAccessibleName("No Slack references — rule");
+    expect(within(sheet).getByText("Flags any file that mentions Slack.")).toBeInTheDocument();
+
+    fireEvent.keyDown(sheet, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("names each clickable row after its rule, not after its switch's value", async () => {
+    await renderScreen();
+    await rowsSettle(2);
+    expect(screen.getByRole("row", { name: "No Slack references" })).toHaveAttribute("tabindex", "0");
+  });
+
+  it("does not open the sheet when the row's switch is flipped", async () => {
+    await renderScreen();
+    await rowsSettle(2);
+
+    fireEvent.click(screen.getByRole("switch", { name: "Enable No Slack references" }));
+
+    await waitFor(() => expect(setRule).toHaveBeenCalled());
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("deletes a custom rule and drops it from the table", async () => {

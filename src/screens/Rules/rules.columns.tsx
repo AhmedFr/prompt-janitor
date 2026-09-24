@@ -23,7 +23,7 @@ export interface RuleColumnsCtx {
 
 /**
  * What each short column asks for (see `ColumnMeta.width`). Title declares
- * none, so it absorbs the slack and its description ellipsizes rather than
+ * none, so it absorbs the slack and a long title ellipsizes rather than
  * wrapping the row onto a second line.
  */
 const COLUMN_WIDTH = {
@@ -35,7 +35,7 @@ const COLUMN_WIDTH = {
 } as const;
 
 /** Severity as the dots read it, worst first. */
-const SEVERITY_LABELS: Record<Severity, string> = { hi: "Critical", mid: "Warning", lo: "Nit" };
+export const SEVERITY_LABELS: Record<Severity, string> = { hi: "Critical", mid: "Warning", lo: "Nit" };
 
 const SEVERITY_ORDER: Severity[] = ["hi", "mid", "lo"];
 
@@ -107,17 +107,23 @@ function enabledColumn(ctx: RuleColumnsCtx): ColumnDef<RuleInfo, unknown> {
 }
 
 /**
- * Title with its description muted beside it — the description is what makes
- * a terse rule name mean something, and it is one of the three things the
- * search box looks at.
+ * The title alone (#182). The description still makes a terse title mean
+ * something, so it stays one hover away, in the search keys, and in the
+ * sheet the row opens — just not inline, where a column of both reads as
+ * prose instead of a list of names.
  */
 function titleColumn(): ColumnDef<RuleInfo, unknown> {
   return {
     id: "title",
     header: "Title",
     accessorKey: "title",
-    cell: (c) => <NameCell name={c.row.original.title} description={c.row.original.description} />,
+    cell: (c) => <NameCell name={c.row.original.title} title={ruleTitle(c.row.original)} />,
   };
+}
+
+/** The title cell's hover text: the title, plus the description it no longer shows. */
+export function ruleTitle(rule: Pick<RuleInfo, "title" | "description">): string {
+  return rule.description ? `${rule.title} — ${rule.description}` : rule.title;
 }
 
 function sourceColumn(): ColumnDef<RuleInfo, unknown> {
