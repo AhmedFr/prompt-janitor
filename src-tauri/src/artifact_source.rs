@@ -180,13 +180,22 @@ pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource
         });
     }
 
-    let (content, meta) = read_capped(&row.path, MAX_BYTES)?;
+    // Only a directory row is ever redirected, and only to a file inside it,
+    // so the set of readable paths stays within what the scan found.
+    let path = crate::harness::by_id(&row.harness)
+        .map(|h| {
+            h.source_file(kind, &row.path)
+                .to_string_lossy()
+                .into_owned()
+        })
+        .unwrap_or(row.path);
+    let (content, meta) = read_capped(&path, MAX_BYTES)?;
     Ok(ArtifactSource {
-        format: format_of(&row.path),
+        format: format_of(&path),
         editable: EDITABLE_KINDS.contains(&row.kind.as_str()),
         bytes: content.len() as i32,
         content,
-        path: row.path,
+        path,
         modified: stamp_of(&meta),
     })
 }
@@ -370,14 +379,21 @@ mod tests {
     }
 
     #[test]
-    fn a_plugin_manifest_reads_as_json() {
+    /// A plugin's row names its install directory; it reads as the manifest
+    /// inside it, and the path the sheet shows is that file's.
+    #[test]
+    fn a_plugin_root_reads_as_its_manifest() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("plugin.json");
-        std::fs::write(&path, r#"{"name":"p"}"#).unwrap();
+        std::fs::create_dir(dir.path().join(".claude-plugin")).unwrap();
+        let manifest = dir.path().join(".claude-plugin").join("plugin.json");
+        std::fs::write(&manifest, r#"{"name":"p"}"#).unwrap();
         let conn = test_conn();
-        let id = insert_artifact(&conn, "plugin", path.to_str().unwrap());
+        let id = insert_artifact(&conn, "plugin", dir.path().to_str().unwrap());
 
-        assert_eq!(read_source(&conn, id).unwrap().format, SourceFormat::Json);
+        let source = read_source(&conn, id).unwrap();
+        assert_eq!(source.format, SourceFormat::Json);
+        assert_eq!(source.content, r#"{"name":"p"}"#);
+        assert_eq!(source.path, manifest.to_str().unwrap());
     }
 
     /// A settings file can hold API keys under `env`; the webview only ever

@@ -166,6 +166,10 @@ impl Harness for ClaudeCode {
     ) -> Option<String> {
         excerpt::excerpt(kind, name, project_path, file_text)
     }
+
+    fn source_file(&self, kind: ArtifactKind, path: &str) -> std::path::PathBuf {
+        excerpt::readable_file(kind, Path::new(path))
+    }
 }
 
 #[cfg(test)]

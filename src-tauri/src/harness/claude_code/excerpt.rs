@@ -6,6 +6,8 @@
 //! Showing such a row means cutting out its own entry and masking whatever
 //! could be a credential, never handing the raw file to the webview.
 
+use std::path::{Path, PathBuf};
+
 use serde_json::Value;
 
 use crate::harness::model::ArtifactKind;
@@ -35,6 +37,22 @@ pub fn excerpt(
     };
     redact(&mut picked);
     serde_json::to_string_pretty(&picked).ok()
+}
+
+/// The file that stands for an artifact whose row names a directory. A
+/// plugin's row is its install root; it reads as its README when it ships
+/// one, else its manifest. Every other path is already the file.
+pub fn readable_file(kind: ArtifactKind, path: &Path) -> PathBuf {
+    if kind != ArtifactKind::Plugin || !path.is_dir() {
+        return path.to_path_buf();
+    }
+    [
+        path.join("README.md"),
+        path.join(".claude-plugin").join("plugin.json"),
+    ]
+    .into_iter()
+    .find(|candidate| candidate.is_file())
+    .unwrap_or_else(|| path.to_path_buf())
 }
 
 /// A server registered under the project's entry in `~/.claude.json` wins
@@ -226,5 +244,26 @@ mod tests {
     fn markdown_kinds_and_malformed_json_are_none() {
         assert!(excerpt(K::Skill, "x", None, "{}").is_none());
         assert!(excerpt(K::Settings, "settings.json", None, "{not json").is_none());
+    }
+
+    #[test]
+    fn a_plugin_root_reads_as_its_readme_then_its_manifest() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir(root.join(".claude-plugin")).unwrap();
+        let manifest = root.join(".claude-plugin").join("plugin.json");
+        std::fs::write(&manifest, "{}").unwrap();
+        assert_eq!(readable_file(K::Plugin, root), manifest);
+
+        std::fs::write(root.join("README.md"), "# P").unwrap();
+        assert_eq!(readable_file(K::Plugin, root), root.join("README.md"));
+    }
+
+    #[test]
+    fn a_plugin_root_with_neither_stays_a_directory_and_other_kinds_are_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(readable_file(K::Plugin, dir.path()), dir.path());
+        let skill = dir.path().join("SKILL.md");
+        assert_eq!(readable_file(K::Skill, &skill), skill);
     }
 }

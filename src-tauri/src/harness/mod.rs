@@ -42,6 +42,11 @@ pub trait Harness: Send + Sync {
     ) -> Option<String> {
         None
     }
+    /// The file to read for an artifact whose row `path` may name a
+    /// directory (a plugin's install root). Identity by default.
+    fn source_file(&self, _kind: ArtifactKind, path: &str) -> PathBuf {
+        PathBuf::from(path)
+    }
 }
 
 /// The registered harness with this id, detected or not.
