@@ -15,7 +15,12 @@ export const commands = {
 	scanNow: () => typedError<ScanSummary, string>(__TAURI_INVOKE("scan_now")),
 	/**  Aggregated data for the Overview screen. */
 	getOverview: () => typedError<Overview, string>(__TAURI_INVOKE("get_overview")),
-	/**  Persist the extra folders to scan on top of the harness's own projects. */
+	/**
+	 *  Persist the extra folders to scan on top of the harness's own projects,
+	 *  drop the projects a removed folder alone covered, and emit
+	 *  `projects-changed` so the sidebar and Projects table drop them now rather
+	 *  than when the follow-up scan finishes.
+	 */
 	setExtraScanFolders: (folders: string[]) => typedError<null, string>(__TAURI_INVOKE("set_extra_scan_folders", { folders })),
 	/**  The extra folders currently configured (empty when none). */
 	getExtraScanFolders: () => typedError<string[], string>(__TAURI_INVOKE("get_extra_scan_folders")),
