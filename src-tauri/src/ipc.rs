@@ -106,6 +106,45 @@ mod tests {
         );
     }
 
+    /// The other half of the ACL: a command registered with the ACL but granted
+    /// by no capability file is denied in every window at runtime, and nothing
+    /// short of a bundled build shows it — Storybook and Vitest mock the IPC.
+    /// `get_artifact_source` shipped that way in v0.1.4 (#192). Every command
+    /// must be granted as `allow-<kebab-name>` by the main window or the panel.
+    #[test]
+    fn every_command_is_granted_to_some_window() {
+        let granted: BTreeSet<String> = [
+            include_str!("../capabilities/default.json"),
+            include_str!("../capabilities/panel.json"),
+        ]
+        .iter()
+        .flat_map(|file| {
+            let doc: serde_json::Value = serde_json::from_str(file).expect("capability JSON");
+            doc["permissions"]
+                .as_array()
+                .expect("permissions array")
+                .iter()
+                .filter_map(|p| {
+                    p.as_str()?
+                        .strip_prefix("allow-")
+                        .map(|name| name.replace('-', "_"))
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+        let ungranted: Vec<&str> = crate::command_names::COMMANDS
+            .iter()
+            .copied()
+            .filter(|name| !granted.contains(*name))
+            .collect();
+
+        assert!(
+            ungranted.is_empty(),
+            "granted by no capability file, so denied at runtime: {ungranted:?}"
+        );
+    }
+
     /// Regenerates `src/lib/bindings.ts` headlessly (run via `cargo test`).
     /// Keeps the frontend types in lockstep with the Rust commands without
     /// needing to launch the GUI.
