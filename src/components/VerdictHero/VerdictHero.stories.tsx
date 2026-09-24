@@ -14,7 +14,7 @@ const overview: Overview = {
   warnings: 5,
   nits: 4,
   worklist: [],
-  trend: [64, 66, 66, 69, 71],
+  trend: [64, 66, 66, 69, 71].map((score, i) => ({ t: String(1_788_000_000 + i * 86_400), score })),
   trend_delta: 7,
   last_scan: null,
 };

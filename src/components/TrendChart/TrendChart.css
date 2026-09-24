@@ -1,0 +1,32 @@
+/* ResponsiveContainer measures this box, so it must carry a width. */
+.trend-chart {
+  width: 100%;
+}
+
+/* Hover readout: value first and strong, the date muted underneath. */
+.trend-tip {
+  background: var(--card);
+  border: 1px solid var(--sep-strong);
+  border-radius: var(--r-ctrl);
+  box-shadow: var(--shadow-card);
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.trend-tip__value {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-tip__detail {
+  color: var(--text);
+}
+
+.trend-tip__label {
+  color: var(--text-2);
+  margin-top: 1px;
+}

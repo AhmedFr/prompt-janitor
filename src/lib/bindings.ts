@@ -513,7 +513,11 @@ export type Overview = {
 	warnings: number,
 	nits: number,
 	worklist: WorklistItem[],
-	trend: number[],
+	/**
+	 *  The last seven overall scores, oldest first, each with when it was
+	 *  recorded so the chart can date its x axis.
+	 */
+	trend: TrendPoint[],
 	/**  Change across the trend window (latest − earliest). */
 	trend_delta: number,
 	/**  Most recent scan finish time (epoch seconds string). */
