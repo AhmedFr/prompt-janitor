@@ -459,6 +459,7 @@
     }
   ],
   "recent": [
+    "2026-09-24 — Fix #192: every detail sheet (and the #177 skill panel) failed in a real build with \"Command get_artifact_source not allowed by ACL\" — the command was registered but granted by no capability file. Granted get/save_artifact_source to the main window, plus a Rust test that fails whenever any registered command is granted to no window.",
     "2026-09-24 — v0.1.4 published from a local build to spare the Actions quota: universal DMG + signed updater archive (signature verified against the app's pubkey) + hand-written latest.json; the tag-triggered Release run was cancelled before it started. `releases/latest/download/latest.json` now serves 0.1.4.",
     "2026-09-24 — v0.1.4 tagged: Phase 12 UI polish (#185–#189: sidebar recents + logos, health trend chart, table hierarchy, detail sheet, name-only Name columns) plus the post-0.1.3 skill panel (#177) and multi-select filters (#178)",
     "2026-09-24 — Phase 12 UI polish merged: #186 (sidebar recents + logos, #180), #187 (health trend chart, #184), #185 (table hierarchy, #183), #188 (detail sheet, #181), #189 (name-only Name columns, #182). Each rebased on the one before and gated with a full `pnpm check` on its final commit; on-device check added to actions.",
