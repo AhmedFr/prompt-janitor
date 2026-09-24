@@ -2,22 +2,41 @@
 //!
 //! Skills are not in the `files` table — only graded rule files are — so
 //! `get_file_detail` cannot reach them and this module exists to fill that
-//! gap for the Setup screen's skill panel.
+//! gap for the Setup screen's detail sheet.
 //!
 //! Both entry points take an **artifact id**, never a path. The path is read
 //! back out of the `artifacts` row the id names, so the set of files the
 //! webview can address is exactly the set the scanner already found. A
 //! compromised or buggy frontend cannot ask this module for `/etc/passwd`,
 //! because there is no parameter in which to say it.
+//!
+//! Every kind can be *read*; only skills can be *written*. Hooks, MCP servers
+//! and settings are rows cut out of a larger JSON file, so what they read back
+//! is the harness's redacted excerpt of that file, never the file itself.
 
 use rusqlite::Connection;
+
+use crate::harness::model::ArtifactKind;
+
+/// How the sheet should draw `content`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceFormat {
+    Markdown,
+    Json,
+    Text,
+}
 
 /// One artifact's file, as the panel reads it.
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct ArtifactSource {
     /// Absolute path on disk, shown in the panel header.
     pub path: String,
+    /// The file, or for a config-derived kind its redacted excerpt.
     pub content: String,
+    pub format: SourceFormat,
+    /// Whether `save_artifact_source` will accept a write for this artifact.
+    pub editable: bool,
     /// Size of `content` in bytes — what the Size column shows.
     pub bytes: i32,
     /// The file's modification time when it was read, as an opaque stamp.
@@ -42,61 +61,132 @@ pub struct ArtifactSaved {
 /// because anyone expects to hit it.
 pub const MAX_BYTES: usize = 1024 * 1024;
 
-/// The artifact kinds this module will open.
+/// The largest config file a derived kind will read in order to cut its
+/// excerpt out. `~/.claude.json` carries session history and runs to
+/// megabytes; only the excerpt, not the file, ever reaches the webview.
+pub const MAX_CONFIG_BYTES: usize = 64 * 1024 * 1024;
+
+/// The artifact kinds this module will write.
 ///
 /// Only skills for now. Agents and commands are the same shape and would slot
 /// in here unchanged, but each one added is a new file the app can overwrite,
 /// so the list grows when a screen actually needs it and not before.
 const EDITABLE_KINDS: &[&str] = &["skill"];
 
-/// Resolves an artifact id to a path this module is willing to touch.
+/// The kinds that are an entry inside a shared JSON file rather than a file of
+/// their own. They read back as the harness's redacted excerpt, never raw.
+const DERIVED_KINDS: &[ArtifactKind] = &[
+    ArtifactKind::Hook,
+    ArtifactKind::McpServer,
+    ArtifactKind::Settings,
+];
+
+/// The columns of an `artifacts` row this module needs.
+struct Row {
+    harness: String,
+    kind: String,
+    name: String,
+    path: String,
+    project_path: Option<String>,
+}
+
+fn row(conn: &Connection, artifact_id: i32) -> Result<Row, String> {
+    conn.query_row(
+        "SELECT harness, kind, name, path, project_path FROM artifacts WHERE id = ?1",
+        [artifact_id],
+        |r| {
+            Ok(Row {
+                harness: r.get(0)?,
+                kind: r.get(1)?,
+                name: r.get(2)?,
+                path: r.get(3)?,
+                project_path: r.get(4)?,
+            })
+        },
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => {
+            "That artifact is no longer in the inventory.".to_string()
+        }
+        other => other.to_string(),
+    })
+}
+
+/// Resolves an artifact id to a path this module is willing to write.
 ///
 /// The kind check is the security boundary, not a convenience: it is what
 /// stops an id that happens to name a `settings.json` — or any other artifact
-/// row — from being read into the panel or written through it.
+/// row — from being written through the panel.
 fn editable_path(conn: &Connection, artifact_id: i32) -> Result<String, String> {
-    let row: Option<(String, String)> = conn
-        .query_row(
-            "SELECT kind, path FROM artifacts WHERE id = ?1",
-            [artifact_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )
-        .map(Some)
-        .or_else(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            other => Err(other.to_string()),
-        })?;
-
-    let (kind, path) =
-        row.ok_or_else(|| "That artifact is no longer in the inventory.".to_string())?;
+    let Row { kind, path, .. } = row(conn, artifact_id)?;
     if !EDITABLE_KINDS.contains(&kind.as_str()) {
         return Err(format!("A {kind} can't be edited here."));
     }
     Ok(path)
 }
 
-/// Reads an artifact's file for the panel.
-pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource, String> {
-    let path = editable_path(conn, artifact_id)?;
-
-    let meta = std::fs::metadata(&path).map_err(|e| format!("Couldn't open the file: {e}"))?;
+/// Reads `path` as UTF-8 text, refusing directories and anything over `cap`.
+fn read_capped(path: &str, cap: usize) -> Result<(String, std::fs::Metadata), String> {
+    let meta = std::fs::metadata(path).map_err(|e| format!("Couldn't open the file: {e}"))?;
     if !meta.is_file() {
         return Err("That path is not a file.".to_string());
     }
-    if meta.len() as usize > MAX_BYTES {
+    if meta.len() as usize > cap {
         return Err("That file is too large to open here.".to_string());
     }
-
     // `read_to_string` rather than a lossy decode: a skill that is not UTF-8
     // is a skill Claude Code cannot read either, and silently rendering
     // replacement characters would invite the user to save that damage back.
     let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("Couldn't read the file: {e}"))?;
-    let bytes = content.len() as i32;
+        std::fs::read_to_string(path).map_err(|e| format!("Couldn't read the file: {e}"))?;
+    Ok((content, meta))
+}
+
+/// A file of its own is drawn by its extension; everything else is text.
+fn format_of(path: &str) -> SourceFormat {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("md" | "markdown" | "mdc") => SourceFormat::Markdown,
+        Some("json") => SourceFormat::Json,
+        _ => SourceFormat::Text,
+    }
+}
+
+/// Reads an artifact for the detail sheet.
+pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource, String> {
+    let row = row(conn, artifact_id)?;
+    let kind =
+        ArtifactKind::parse(&row.kind).ok_or_else(|| format!("Unknown kind {}.", row.kind))?;
+
+    if DERIVED_KINDS.contains(&kind) {
+        let (text, meta) = read_capped(&row.path, MAX_CONFIG_BYTES)?;
+        let file_name = std::path::Path::new(&row.path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| row.path.clone());
+        let content = crate::harness::by_id(&row.harness)
+            .and_then(|h| h.source_excerpt(kind, &row.name, row.project_path.as_deref(), &text))
+            .ok_or_else(|| format!("That entry is no longer in {file_name}."))?;
+        return Ok(ArtifactSource {
+            path: row.path,
+            bytes: content.len() as i32,
+            content,
+            format: SourceFormat::Json,
+            editable: false,
+            modified: stamp_of(&meta),
+        });
+    }
+
+    let (content, meta) = read_capped(&row.path, MAX_BYTES)?;
     Ok(ArtifactSource {
-        path,
+        format: format_of(&row.path),
+        editable: EDITABLE_KINDS.contains(&row.kind.as_str()),
+        bytes: content.len() as i32,
         content,
-        bytes,
+        path: row.path,
         modified: stamp_of(&meta),
     })
 }
@@ -234,16 +324,139 @@ mod tests {
         assert!(err.contains("no longer in the inventory"), "got: {err}");
     }
 
+    /// Inserts a row with a real name and project, for the config-derived
+    /// kinds whose entry is looked up by name inside the file.
+    fn insert_named(
+        conn: &Connection,
+        kind: &str,
+        name: &str,
+        path: &str,
+        project_path: Option<&str>,
+    ) -> i32 {
+        conn.execute(
+            "INSERT INTO artifacts(harness, layer, project_path, kind, name, path, bytes, hash, seen_at)
+             VALUES('claude_code', 'global', ?1, ?2, ?3, ?4, 0, 'h', '2026-09-24T00:00:00Z')",
+            rusqlite::params![project_path, kind, name, path],
+        )
+        .unwrap();
+        conn.last_insert_rowid() as i32
+    }
+
     #[test]
-    fn reading_a_non_skill_artifact_is_refused() {
+    fn a_skill_reads_as_editable_markdown() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("SKILL.md");
+        std::fs::write(&path, "# x\n").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "skill", path.to_str().unwrap());
+
+        let source = read_source(&conn, id).unwrap();
+        assert_eq!(source.format, SourceFormat::Markdown);
+        assert!(source.editable);
+    }
+
+    #[test]
+    fn an_agent_reads_as_markdown_but_is_not_editable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("reviewer.md");
+        std::fs::write(&path, "---\nname: reviewer\n---\nReview.").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "agent", path.to_str().unwrap());
+
+        let source = read_source(&conn, id).unwrap();
+        assert_eq!(source.content, "---\nname: reviewer\n---\nReview.");
+        assert_eq!(source.format, SourceFormat::Markdown);
+        assert!(!source.editable);
+    }
+
+    #[test]
+    fn a_plugin_manifest_reads_as_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("plugin.json");
+        std::fs::write(&path, r#"{"name":"p"}"#).unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "plugin", path.to_str().unwrap());
+
+        assert_eq!(read_source(&conn, id).unwrap().format, SourceFormat::Json);
+    }
+
+    /// A settings file can hold API keys under `env`; the webview only ever
+    /// sees them masked.
+    #[test]
+    fn settings_read_back_redacted_never_raw() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.json");
-        std::fs::write(&path, "{}").unwrap();
+        std::fs::write(&path, r#"{"env":{"ANTHROPIC_API_KEY":"sk-live"}}"#).unwrap();
         let conn = test_conn();
         let id = insert_artifact(&conn, "settings", path.to_str().unwrap());
 
-        let err = read_source(&conn, id).expect_err("only skills open here");
-        assert!(err.contains("can't be edited here"), "got: {err}");
+        let source = read_source(&conn, id).unwrap();
+        assert!(
+            !source.content.contains("sk-live"),
+            "got: {}",
+            source.content
+        );
+        assert!(source.content.contains("ANTHROPIC_API_KEY"));
+        assert_eq!(source.format, SourceFormat::Json);
+        assert!(!source.editable);
+    }
+
+    /// `~/.claude.json` holds history and can run to megabytes; the row only
+    /// ever gets its own server's entry out of it.
+    #[test]
+    fn an_mcp_server_reads_only_its_own_entry_even_from_a_large_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".claude.json");
+        let history = "h".repeat(MAX_BYTES + 10);
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"history":"{history}","mcpServers":{{"posthog":{{"command":"npx","env":{{"KEY":"phx_1"}}}}}}}}"#
+            ),
+        )
+        .unwrap();
+        let conn = test_conn();
+        let id = insert_named(&conn, "mcp_server", "posthog", path.to_str().unwrap(), None);
+
+        let source = read_source(&conn, id).unwrap();
+        assert!(source.content.contains("\"npx\""));
+        assert!(!source.content.contains("phx_1"));
+        assert!(!source.content.contains("hhhh"));
+    }
+
+    #[test]
+    fn a_hook_reads_its_entry_by_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say done"}]}]}}"#,
+        )
+        .unwrap();
+        let conn = test_conn();
+        let id = insert_named(
+            &conn,
+            "hook",
+            "Stop: say done",
+            path.to_str().unwrap(),
+            None,
+        );
+
+        let source = read_source(&conn, id).unwrap();
+        assert!(source.content.contains("say done"));
+        assert!(source.content.contains("\"event\": \"Stop\""));
+    }
+
+    #[test]
+    fn a_config_entry_that_left_the_file_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".mcp.json");
+        std::fs::write(&path, r#"{"mcpServers":{}}"#).unwrap();
+        let conn = test_conn();
+        let id = insert_named(&conn, "mcp_server", "gone", path.to_str().unwrap(), None);
+
+        let err = read_source(&conn, id).expect_err("entry removed since the scan");
+        assert!(err.contains("no longer in"), "got: {err}");
     }
 
     #[test]
