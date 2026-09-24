@@ -152,6 +152,11 @@
         "title": "Check the Phase 12 UI polish on your Mac (#180–#184)",
         "detail": "Build and open the app. Sidebar: after a scan it lists the projects you actually worked in, with their logos; removing a folder in Settings drops its projects at once (note: it deletes them, so check you're fine losing their history). Setup: click an agent, hook, MCP server, settings file and plugin row — each opens the detail sheet, and no MCP env value, header or token shows in clear. Rules: a row opens its sheet, the Name column shows the title only. Tables: bold names, blue/teal/violet scope badges, green/amber/red Error %. Overview and Analytics: the health trend has axes, dates and a hover readout.",
         "kind": "testing"
+      },
+      {
+        "title": "Check the file viewer in a real build (#193, needs #194 first)",
+        "detail": "Merge #194 first — without its ACL grant every sheet still reads 'Command get_artifact_source not allowed by ACL'. Then in a bundled build open Setup and click a skill, an agent, an MCP server, a hook and settings.json: the file text should fill the sheet; Source shows numbered, coloured lines; ⌘F finds inside the file (WKWebView gives the shortcut to the page, unlike Chrome); Reveal selects the file in Finder; Open launches it in your default app for that file type (for .md/.json that is whatever you set in Finder — the button cannot pick an editor). Copy on an MCP server copies the masked excerpt, never the raw config.",
+        "kind": "testing"
       }
     ],
     "marketing": [
@@ -406,11 +411,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1335/1335 passing (108 files)"
+      "result": "1479/1479 passing (121 files)"
     },
     {
       "name": "cargo test",
-      "result": "349/349 passing"
+      "result": "387/387 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -459,6 +464,7 @@
     }
   ],
   "recent": [
+    "2026-09-24 — Detail sheet becomes a file viewer (#193): a wide reader where the file is the page — one meta line (kind · scope · uses · toned error % · last used) with the full facts behind Details, Rendered / Source for markdown, a numbered and highlighted Source view (lowlight + five highlight.js grammars; frontmatter coloured as YAML), find in file (⌘F, n of m, Enter / ⇧Enter, CSS Custom Highlight API over static ranges), Copy, and Reveal in Finder / Open in editor through a new `open_artifact` command keyed on the artifact id. Skills edit in place from the viewer. The old Open button never worked (it fed a file path to `openUrl`).",
     "2026-09-24 — v0.1.4 published from a local build to spare the Actions quota: universal DMG + signed updater archive (signature verified against the app's pubkey) + hand-written latest.json; the tag-triggered Release run was cancelled before it started. `releases/latest/download/latest.json` now serves 0.1.4.",
     "2026-09-24 — v0.1.4 tagged: Phase 12 UI polish (#185–#189: sidebar recents + logos, health trend chart, table hierarchy, detail sheet, name-only Name columns) plus the post-0.1.3 skill panel (#177) and multi-select filters (#178)",
     "2026-09-24 — Phase 12 UI polish merged: #186 (sidebar recents + logos, #180), #187 (health trend chart, #184), #185 (table hierarchy, #183), #188 (detail sheet, #181), #189 (name-only Name columns, #182). Each rebased on the one before and gated with a full `pnpm check` on its final commit; on-device check added to actions.",
