@@ -378,7 +378,6 @@ mod tests {
         assert!(!source.editable);
     }
 
-    #[test]
     /// A plugin's row names its install directory; it reads as the manifest
     /// inside it, and the path the sheet shows is that file's.
     #[test]

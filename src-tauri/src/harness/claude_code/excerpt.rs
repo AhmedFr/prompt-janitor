@@ -129,11 +129,51 @@ pub(super) fn hook_entries(json: &Value) -> Vec<HookEntry> {
     out
 }
 
-/// Masks every scalar under an `env` or `headers` object, at any depth.
+/// Words that make a command-line flag's value a credential. Over-masking a
+/// harmless flag costs a reader one value; under-masking leaks a key.
+const SECRET_FLAG_WORDS: &[&str] = &["key", "token", "secret", "password", "passwd", "auth"];
+
+fn is_secret_flag(flag: &str) -> bool {
+    let name = flag.trim_start_matches('-').to_ascii_lowercase();
+    flag.starts_with('-') && SECRET_FLAG_WORDS.iter().any(|w| name.contains(w))
+}
+
+/// Masks the value of every secret-named flag in a process's `args`, whether
+/// written `--token=abc` or `--token abc`.
+fn redact_args(args: &mut [Value]) {
+    let mut mask_next = false;
+    for arg in args.iter_mut() {
+        let Some(text) = arg.as_str() else {
+            mask_next = false;
+            continue;
+        };
+        if mask_next && !text.starts_with('-') {
+            *arg = Value::String(REDACTED.to_string());
+            mask_next = false;
+            continue;
+        }
+        mask_next = false;
+        if let Some((flag, _)) = text.split_once('=') {
+            if is_secret_flag(flag) {
+                *arg = Value::String(format!("{flag}={REDACTED}"));
+            }
+        } else if is_secret_flag(text) {
+            mask_next = true;
+        }
+    }
+}
+
+/// Masks every scalar under an `env` or `headers` object, and every
+/// secret-named flag's value in an `args` list, at any depth.
 fn redact(value: &mut Value) {
     match value {
         Value::Object(map) => {
             for (key, child) in map.iter_mut() {
+                if key == "args" {
+                    if let Value::Array(args) = child {
+                        redact_args(args);
+                    }
+                }
                 if SECRET_MAPS.contains(&key.as_str()) {
                     if let Value::Object(secrets) = child {
                         for secret in secrets.values_mut() {
@@ -155,6 +195,35 @@ fn redact(value: &mut Value) {
 mod tests {
     use super::*;
     use ArtifactKind as K;
+
+    /// A token passed on the command line is as much a secret as one in `env`.
+    #[test]
+    fn secret_named_command_line_flags_are_masked_in_either_form() {
+        let mcp = r#"{"mcpServers": {"x": {"command": "npx", "args": [
+            "-y", "server", "--api-key=sk-1", "--token", "t-2", "--region", "eu", "--PASSWORD", "p-3"
+        ]}}}"#;
+        let out = excerpt(K::McpServer, "x", None, mcp).unwrap();
+        let args: Vec<String> = parsed(&out)["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(
+            args,
+            vec![
+                "-y".to_string(),
+                "server".into(),
+                format!("--api-key={REDACTED}"),
+                "--token".into(),
+                REDACTED.into(),
+                "--region".into(),
+                "eu".into(),
+                "--PASSWORD".into(),
+                REDACTED.into(),
+            ]
+        );
+    }
 
     const CLAUDE_JSON: &str = r#"{
         "numStartups": 12,
