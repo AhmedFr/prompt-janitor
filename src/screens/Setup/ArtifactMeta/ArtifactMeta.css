@@ -1,0 +1,83 @@
+/* The whole subtitle row: the sheet's subtitle is a wrapping flex line, and
+   without this the Details table shrinks to its longest value. */
+.am {
+  flex: 1 1 100%;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.am__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.am__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.am__sep {
+  color: var(--text-3);
+}
+
+.am__rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 500;
+}
+
+.am__rate[data-tone="good"] {
+  color: var(--tone-good-fg);
+}
+
+.am__rate[data-tone="watch"] {
+  color: var(--tone-stale-fg);
+}
+
+.am__rate[data-tone="bad"] {
+  color: var(--tone-error-fg);
+  font-weight: 600;
+}
+
+.am__toggle {
+  flex: 0 0 auto;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 11px;
+  gap: 3px;
+}
+
+/* Two lines at most: the description frames the file, it is not the file. */
+.am__desc {
+  margin: 0;
+  max-width: 80ch;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.am__details:not([hidden]) {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--sep);
+}
+
+/* The facts table under the line reads as more of the same line, not a box. */
+.am__details .af {
+  margin: 0;
+}

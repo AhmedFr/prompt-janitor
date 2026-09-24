@@ -45,6 +45,19 @@ describe("useArtifactSource", () => {
     expect(result.current.editable).toBe(false);
   });
 
+  it("reads the file again on reload, clearing the previous error", async () => {
+    getArtifactSource.mockResolvedValueOnce(err("Command get_artifact_source not allowed by ACL"));
+    getArtifactSource.mockResolvedValueOnce(ok({ path: "/s/SKILL.md", content: "# a", bytes: 3, modified: "1" }));
+
+    const { result } = renderHook(() => useArtifactSource(7));
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.content).toBe("# a"));
+    expect(result.current.error).toBeNull();
+    expect(getArtifactSource).toHaveBeenCalledTimes(2);
+  });
+
   it("assumes nothing is editable before a read lands", () => {
     getArtifactSource.mockReturnValue(new Promise(() => {}));
     const { result } = renderHook(() => useArtifactSource(7));

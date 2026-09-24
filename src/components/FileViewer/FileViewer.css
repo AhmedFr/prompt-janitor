@@ -1,0 +1,162 @@
+/* The viewer fills whatever height it is given (a flush sheet body) and
+   scrolls only its own body, so the bar and find stay put. */
+.fv {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fv__bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px 0 20px;
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.fv__modes button {
+  font-size: 11.5px;
+  padding: 2px 10px;
+}
+
+.fv__lang {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+
+.fv__stats {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fv__spacer {
+  flex: 1 1 auto;
+}
+
+.fv__kbd {
+  font-family: var(--font);
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+/* A layout boundary: the body's size comes from the column, never from the
+   file, so a keystroke in the find strip no longer re-lays out 5,000 rows.
+   Measured on the 5,000-line story: 350–700 ms a keystroke without it,
+   110–170 ms with it (dev build). */
+.fv__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  contain: strict;
+}
+
+.fv__body--editor {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Rendered markdown keeps a reading measure; the pane can be 1,100px wide
+   and a 140-character line of prose is a line nobody finishes. */
+.fv__rendered {
+  padding: 20px 20px 32px;
+}
+
+.fv__rendered > * {
+  max-width: 720px;
+}
+
+/* ---- states ---- */
+.fv__state {
+  margin: 0;
+  padding: 20px;
+  font-size: 12.5px;
+}
+
+.fv__state-label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.fv__skeleton {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.fv__skeleton-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 20px;
+}
+
+.fv__skeleton-num {
+  width: 2ch;
+  text-align: right;
+  color: var(--text-3);
+  opacity: 0.6;
+}
+
+.fv__skeleton-bar {
+  height: 8px;
+  max-width: 70%;
+  border-radius: 3px;
+  background: var(--group);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fv__skeleton-bar {
+    animation: fv-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes fv-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.fv__error {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.fv__error-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--tone-error-fg);
+}
+
+.fv__error-text {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  min-width: 0;
+}
+
+.fv__error-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* The backend's own words, in mono: "not allowed by ACL" is a message someone
+   pastes into an issue, and it should paste exactly. */
+.fv__error-message {
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}

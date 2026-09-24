@@ -10,7 +10,7 @@ const meta = {
     title: "posthog",
     subtitle: "MCP server",
     onClose: () => {},
-    toolbar: <SheetPath path="/Users/a/.claude.json" name="posthog" />,
+    toolbar: <SheetPath path="/Users/a/.claude.json" />,
     children: <p>The body scrolls on its own while the header and footer stay put.</p>,
   },
 } satisfies Meta<typeof Sheet>;
@@ -40,6 +40,9 @@ export const WithFooter: Story = {
 export const WithError: Story = {
   args: { error: "That entry is no longer in .claude.json." },
 };
+
+/** The reader: most of the window, for a sheet whose point is a file's text. */
+export const Wide: Story = { args: { size: "wide" } };
 
 /** A body long enough to scroll. */
 export const LongBody: Story = {

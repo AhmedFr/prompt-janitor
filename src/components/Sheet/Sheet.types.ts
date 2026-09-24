@@ -19,13 +19,26 @@ export interface SheetProps {
   footer?: ReactNode;
   /** Laid over the whole panel, such as a confirm. */
   overlay?: ReactNode;
+  /**
+   * `wide` is the reader: most of the window, for a sheet whose point is a
+   * file's text. The default is the narrow drawer that reads as "this row,
+   * expanded".
+   */
+  size?: SheetSize;
+  /**
+   * The body neither pads nor scrolls — for a child that keeps its own bar
+   * fixed and scrolls only its content, such as `FileViewer`.
+   */
+  flush?: boolean;
   /** The scrollable body. */
   children: ReactNode;
 }
 
+export type SheetSize = "default" | "wide";
+
 export interface SheetPathProps {
   /** Absolute path on disk. */
   path: string;
-  /** What the Open button's accessible name says it opens. */
-  name: string;
+  /** Buttons for the file, drawn at the end of the row. */
+  actions?: ReactNode;
 }

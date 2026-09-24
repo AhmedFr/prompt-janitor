@@ -13,7 +13,19 @@ import "./Sheet.css";
  * the opener on close, Tab kept inside, Escape and the backdrop routed to
  * `onClose`. What goes in the body is the caller's.
  */
-export function Sheet({ title, ariaLabel, onClose, subtitle, toolbar, error, footer, overlay, children }: SheetProps) {
+export function Sheet({
+  title,
+  ariaLabel,
+  onClose,
+  subtitle,
+  toolbar,
+  error,
+  footer,
+  overlay,
+  size = "default",
+  flush = false,
+  children,
+}: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   // Whatever had focus when the sheet opened — the table row, in the app.
   const opener = useRef<HTMLElement | null>(null);
@@ -31,7 +43,7 @@ export function Sheet({ title, ariaLabel, onClose, subtitle, toolbar, error, foo
     <div className="sheet-scrim" onMouseDown={onClose}>
       <div
         ref={panelRef}
-        className="sheet"
+        className={size === "wide" ? "sheet sheet--wide" : "sheet"}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel ?? title}
@@ -61,7 +73,7 @@ export function Sheet({ title, ariaLabel, onClose, subtitle, toolbar, error, foo
 
         {toolbar && <div className="sheet__toolbar">{toolbar}</div>}
 
-        <div className="sheet__body">{children}</div>
+        <div className={flush ? "sheet__body sheet__body--flush" : "sheet__body"}>{children}</div>
 
         {error && (
           <p className="sheet__error" role="alert">

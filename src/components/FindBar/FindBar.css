@@ -1,0 +1,112 @@
+/* A slim strip under the viewer's bar, flush with it: find is a mode of the
+   viewer, not a floating widget over the text. */
+.find {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px 0 20px;
+  background: var(--group);
+  border-bottom: 0.5px solid var(--sep);
+}
+
+/* The field, macOS-style: a small rounded box on the strip's grey, with the
+   focus glow on the box rather than a ring around the bare input. */
+.find__field {
+  flex: 0 1 340px;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  border: 0.5px solid var(--sep-strong);
+  border-radius: 6px;
+  background: var(--card);
+  cursor: text;
+}
+
+.find__field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 25%, transparent);
+}
+
+.find__icon {
+  flex: 0 0 auto;
+  color: var(--text-3);
+}
+
+.find__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+
+.find__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.find__spacer {
+  flex: 1 1 auto;
+}
+
+.find__status {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.find__status--none {
+  color: var(--tone-error-fg);
+}
+
+.find__btn {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.find__btn:hover:not(:disabled) {
+  background: var(--sep);
+  color: var(--text);
+}
+
+.find__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.find__btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+/* The paint for `useFind`'s ranges. Only colour properties are allowed on a
+   highlight; the current match is the stronger yellow. */
+::highlight(pj-find) {
+  background-color: var(--find-match);
+  color: inherit;
+}
+
+::highlight(pj-find-current) {
+  background-color: var(--find-current);
+  color: inherit;
+}

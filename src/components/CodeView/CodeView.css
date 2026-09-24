@@ -1,0 +1,102 @@
+/* An editor's reading surface: SF Mono at 12px on a 20px row, which is the
+   Xcode default and dense enough to hold a skill file on one screen. */
+.cv {
+  --cv-row: 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: var(--cv-row);
+  color: var(--text);
+  font-variant-ligatures: none;
+  tab-size: 2;
+  padding: 8px 0 24px;
+}
+
+.cv__line {
+  display: grid;
+  grid-template-columns: calc(var(--cv-gutter, 2ch) + 36px) minmax(0, 1fr);
+  /* Rows far off screen skip layout and paint; a 5,000-line file then costs
+     roughly what one screenful does. The intrinsic size keeps the scrollbar
+     honest before a row has been laid out. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--cv-row);
+}
+
+.cv__line:hover {
+  background: color-mix(in srgb, var(--group) 70%, transparent);
+}
+
+.cv__num {
+  padding: 0 16px 0 20px;
+  text-align: right;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Wrapped, not scrolled sideways: the value at the end of a config line is
+   what someone opened the file to read. The number stays at the row's top. */
+.cv__text {
+  min-width: 0;
+  min-height: var(--cv-row);
+  padding-right: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---- syntax ---- */
+.cv .hljs-keyword,
+.cv .hljs-built_in,
+.cv .hljs-literal,
+.cv .hljs-selector-tag {
+  color: var(--syn-keyword);
+}
+
+.cv .hljs-string,
+.cv .hljs-regexp,
+.cv .hljs-link {
+  color: var(--syn-string);
+}
+
+.cv .hljs-number,
+.cv .hljs-symbol {
+  color: var(--syn-number);
+}
+
+.cv .hljs-attr,
+.cv .hljs-attribute,
+.cv .hljs-variable,
+.cv .hljs-template-variable,
+.cv .hljs-property {
+  color: var(--syn-attr);
+}
+
+.cv .hljs-comment,
+.cv .hljs-quote {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+
+.cv .hljs-code {
+  color: var(--syn-code);
+}
+
+.cv .hljs-punctuation,
+.cv .hljs-meta,
+.cv .hljs-bullet {
+  color: var(--syn-punct);
+}
+
+/* Markdown structure reads through weight, not colour: headings and bold are
+   the skeleton of a skill file, and colouring them would shout. */
+.cv .hljs-section,
+.cv .hljs-strong,
+.cv .hljs-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Emphasis is deliberately not styled: highlight.js reads any two underscores
+   as `_emphasis_`, even across list items, and a skill file full of
+   snake_case identifiers (`get_artifact_source`) would slant at random. The
+   Rendered view shows real emphasis; Source shows the characters. */

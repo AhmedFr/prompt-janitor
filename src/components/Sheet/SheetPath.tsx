@@ -1,10 +1,13 @@
-import { Button } from "@/components/Button";
-import { Icon } from "@/components/Icon";
-import { openExternal } from "@/lib/open-external";
 import type { SheetPathProps } from "./Sheet.types";
 
-/** The file a sheet is showing, with the one action every file has: open it. */
-export function SheetPath({ path, name }: SheetPathProps) {
+/**
+ * The file a sheet is showing, with the caller's actions for it at the end
+ * of the row (reveal, open, copy — whatever the caller can back with a real
+ * command). It carries none of its own: the "Open" it used to have handed the
+ * path to the opener plugin's `openUrl`, which refuses file paths, so it did
+ * nothing at all.
+ */
+export function SheetPath({ path, actions }: SheetPathProps) {
   return (
     <div className="sheet-path">
       {/* `bdi` keeps the path itself left-to-right inside the right-to-left
@@ -13,12 +16,7 @@ export function SheetPath({ path, name }: SheetPathProps) {
       <span className="sheet-path__text" title={path}>
         <bdi>{path}</bdi>
       </span>
-      {/* "Open", not "Reveal": this is the opener plugin, the same call the
-          table's own action makes, and it opens the file in the default app
-          rather than selecting it in Finder. */}
-      <Button size="sm" aria-label={`Open ${name} on disk`} onClick={() => void openExternal(path)}>
-        <Icon name="folder" /> Open
-      </Button>
+      {actions && <div className="sheet-path__actions">{actions}</div>}
     </div>
   );
 }

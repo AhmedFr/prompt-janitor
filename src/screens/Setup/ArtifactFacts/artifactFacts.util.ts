@@ -30,7 +30,7 @@ export function factsFor(artifact: ArtifactView, scope: string, { showDescriptio
 }
 
 /** "3d ago", or "never" for an artifact nothing ever invoked. */
-function lastUsedLabel(lastUsed: string | null | undefined): string {
+export function lastUsedLabel(lastUsed: string | null | undefined): string {
   const at = lastUsedAt(lastUsed);
   if (at === null) return NEVER_MARK;
   const age = relativeTime(String(Math.floor(at / 1000)));

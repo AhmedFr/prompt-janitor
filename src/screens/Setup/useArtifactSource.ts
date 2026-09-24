@@ -101,5 +101,7 @@ export function useArtifactSource(artifactId: number): ArtifactSourceState {
     [artifactId, modified, read],
   );
 
-  return { content, path, format, editable, modified, loading, saving, error, save };
+  const reload = useCallback(() => void read(artifactId), [artifactId, read]);
+
+  return { content, path, format, editable, modified, loading, saving, error, save, reload };
 }

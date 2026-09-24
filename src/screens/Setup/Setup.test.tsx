@@ -617,6 +617,9 @@ describe("Setup", () => {
       fireEvent.click(rowFor("linear"));
 
       const sheet = await screen.findByRole("dialog");
+      // At a glance on the meta line; the labelled facts wait behind Details.
+      expect(within(sheet).getByText("50% errors")).toBeInTheDocument();
+      fireEvent.click(within(sheet).getByRole("button", { name: "Details" }));
       expect(within(sheet).getByText("Error rate")).toBeInTheDocument();
       expect(within(sheet).getByText("50%")).toBeInTheDocument();
     });

@@ -33,6 +33,7 @@ export type {
   SetupView,
   ArtifactView,
   ArtifactSource,
+  OpenAction,
   SourceFormat,
   ArtifactSaved,
   ProjectSetup,

@@ -100,7 +100,9 @@
 .md__quote {
   margin: 0 0 10px;
   padding-left: 12px;
-  border-left: 2px solid var(--sep-strong);
+  /* A hairline, the weight of every other rule on this surface: a quotation
+     is marked, not decorated. */
+  border-left: 1px solid var(--sep-strong);
   color: var(--text-2);
 }
 

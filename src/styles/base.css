@@ -184,6 +184,41 @@ button {
   height: 6px;
 }
 
+/* ---- tool button ----
+   A quiet icon-and-word control for chrome that sits next to content (a file
+   viewer's bar, a path row): no fill until pointed at, so the content stays
+   the loud thing on screen. */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tool-btn:hover:not(:disabled) {
+  background: var(--group);
+  color: var(--text);
+}
+.tool-btn:active:not(:disabled) {
+  background: var(--sep);
+}
+.tool-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tool-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
 /* ---- segmented control ---- */
 .seg {
   display: inline-flex;

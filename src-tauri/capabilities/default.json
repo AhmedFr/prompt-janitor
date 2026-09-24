@@ -54,6 +54,7 @@
     "allow-get-usage-overview",
     "allow-get-project-usage",
     "allow-list-harnesses",
+    "allow-open-artifact",
     "allow-reset-app-data",
     "allow-uninstall-app"
   ]

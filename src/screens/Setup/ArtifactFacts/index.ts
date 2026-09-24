@@ -1,4 +1,4 @@
 export { ArtifactFacts } from "./ArtifactFacts";
-export { factsFor } from "./artifactFacts.util";
-export { KIND_NAME } from "./ArtifactFacts.constants";
+export { factsFor, lastUsedLabel } from "./artifactFacts.util";
+export { INVOKED_KINDS, KIND_NAME } from "./ArtifactFacts.constants";
 export type { ArtifactFactsProps, Fact, FactsOptions } from "./ArtifactFacts.types";

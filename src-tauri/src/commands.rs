@@ -877,6 +877,41 @@ pub fn save_artifact_source(
     crate::artifact_source::write_source(&conn, artifact_id, &content, expected_modified.as_deref())
 }
 
+/// Reveal an artifact's file in Finder, or open it in its default app.
+///
+/// Rust-side rather than the opener plugin's JS API: that one takes a path, so
+/// granting it would let the webview open anything on disk. This takes an
+/// artifact id and opens only the file the scan found for it — see
+/// `artifact_source::file_to_open`.
+#[tauri::command]
+#[specta::specta]
+pub fn open_artifact(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    artifact_id: i32,
+    action: crate::artifact_source::OpenAction,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::artifact_source::file_to_open(&conn, artifact_id)?
+    };
+    let opener = app.opener();
+    match action {
+        crate::artifact_source::OpenAction::Reveal => opener.reveal_item_in_dir(&path),
+        crate::artifact_source::OpenAction::Open => {
+            if !crate::artifact_source::opens_as_text(&path) {
+                return Err(
+                    "Only text files open from here — use Reveal to find this one in Finder."
+                        .to_string(),
+                );
+            }
+            opener.open_path(&path, None::<&str>)
+        }
+    }
+    .map_err(|e| format!("Couldn't open {path}: {e}"))
+}
+
 /// The rule files `harness` loads inside `project_path`, in load order.
 #[tauri::command]
 #[specta::specta]

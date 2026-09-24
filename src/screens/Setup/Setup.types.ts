@@ -43,4 +43,6 @@ export interface ArtifactSourceState {
    * write landed, or `null` when it failed — in which case `error` says why.
    */
   save: (next: string) => Promise<number | null>;
+  /** Reads the file again — the retry beside a failed read. */
+  reload: () => void;
 }
