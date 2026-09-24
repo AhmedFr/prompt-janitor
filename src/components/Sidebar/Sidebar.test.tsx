@@ -30,8 +30,8 @@ describe("Sidebar", () => {
     mockSidebar.mockReturnValue({
       counts: { prompts: 42, rules: 27 },
       projects: [
-        { id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" },
-        { id: "/scripts", name: "scripts", grade: "F", logo: null, modified: "100" },
+        { id: "/web-app", name: "web-app", grade: "A", logo: null },
+        { id: "/scripts", name: "scripts", grade: "F", logo: null },
       ],
     });
     const { getByRole, getByText } = render(
@@ -80,7 +80,7 @@ describe("Sidebar", () => {
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({
       counts: {},
-      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" }],
+      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
     const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
     getByRole("button", { name: /web-app/ }).click();
@@ -90,7 +90,7 @@ describe("Sidebar", () => {
   it("has no accessibility violations", async () => {
     mockSidebar.mockReturnValue({
       counts: { prompts: 42, rules: 27 },
-      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null, modified: "200" }],
+      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
     const { container } = render(
       <Sidebar active="overview" onNavigate={() => {}} onReplay={() => {}} />,

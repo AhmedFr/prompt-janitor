@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri } from "@/lib/ipc";
 import { RECENT_PROJECTS_LIMIT } from "./Sidebar.constants";
 import type { NavCounts, SidebarProject } from "./Sidebar.types";
+import { recentProjects } from "./sidebar.util";
 
 /**
  * Loads the sidebar's live data — the recent-projects list and the nav badge
@@ -21,15 +22,7 @@ export function useSidebar() {
       commands.listRules(),
     ]);
     if (projectsRes.status === "ok") {
-      setProjects(
-        projectsRes.data.slice(0, RECENT_PROJECTS_LIMIT).map((p) => ({
-          id: p.id,
-          name: p.name,
-          grade: p.grade,
-          logo: p.logo,
-          modified: p.modified,
-        })),
-      );
+      setProjects(recentProjects(projectsRes.data, RECENT_PROJECTS_LIMIT));
     }
     if (files.status === "ok") setCounts((prev) => ({ ...prev, prompts: files.data.length }));
     if (rules.status === "ok") setCounts((prev) => ({ ...prev, rules: rules.data.length }));

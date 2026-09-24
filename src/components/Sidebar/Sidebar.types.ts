@@ -32,8 +32,6 @@ export interface SidebarProject {
   grade: Grade;
   /** Detected logo data URI, if any. */
   logo: string | null;
-  /** Most recent file mtime in the project (epoch seconds string), for ordering. */
-  modified: string | null;
 }
 
 /** Optional per-route badge counts shown on the right of a nav item. */

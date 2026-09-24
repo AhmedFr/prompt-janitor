@@ -285,6 +285,7 @@ pub fn run_scan_all(
     let mut project_scores: HashMap<String, Vec<u32>> = HashMap::new();
     let (mut critical, mut warnings, mut nits) = (0u32, 0u32, 0u32);
     let mut root_cache = RootCache::default();
+    let mut logo_cache: HashMap<String, Option<String>> = HashMap::new();
 
     for (i, file) in files.iter().enumerate() {
         let file_path = Path::new(&file.path);
@@ -325,7 +326,12 @@ pub fn run_scan_all(
         let (project_id, project_name, project_root) = resolve_project(file_path, &mut root_cache);
         let issue_count = issues.len() + carried_nl.len();
 
-        let logo = crate::project_logo::detect_logo(Path::new(&project_root));
+        // Once per project, not once per file: the probe reads directories
+        // and base64-encodes up to 256 KB, and a project holds many files.
+        let logo = logo_cache
+            .entry(project_root.clone())
+            .or_insert_with(|| crate::project_logo::detect_logo(Path::new(&project_root)))
+            .clone();
         conn.execute(
             "INSERT OR IGNORE INTO projects(id, name, root_path, logo) VALUES(?1, ?2, ?3, ?4)",
             params![project_id, project_name, project_root, logo],
@@ -515,6 +521,32 @@ For example:
             .query_row("SELECT COUNT(*) FROM grade_history", [], |r| r.get(0))
             .unwrap();
         assert_eq!(history, 3);
+    }
+
+    #[test]
+    fn run_scan_stores_a_logo_found_in_a_framework_folder() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::store::migrate(&conn).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("web-app/src/app")).unwrap();
+        fs::write(dir.path().join("web-app/AGENTS.md"), CLEAN).unwrap();
+        fs::write(dir.path().join("web-app/src/app/icon.png"), b"png").unwrap();
+        fs::create_dir_all(dir.path().join("api-worker")).unwrap();
+        fs::write(dir.path().join("api-worker/CLAUDE.md"), CLEAN).unwrap();
+
+        run_scan(&conn, dir.path(), |_, _| {}).unwrap();
+
+        let logo = |name: &str| -> Option<String> {
+            conn.query_row("SELECT logo FROM projects WHERE name = ?1", [name], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        assert!(logo("web-app")
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
+        assert_eq!(logo("api-worker"), None);
     }
 
     #[test]
