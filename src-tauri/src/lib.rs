@@ -28,6 +28,7 @@ mod query;
 mod repo_root;
 pub mod rules;
 mod scan;
+mod scan_folders;
 pub mod scanner;
 mod scheduler;
 mod store;

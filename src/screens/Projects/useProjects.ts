@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { PROJECT_EVENTS } from "@/lib/project-events";
 import { commands, isTauri, type ProjectRow } from "@/lib/ipc";
 import type { ProjectsState } from "./Projects.types";
 
 /**
  * Every scanned project in one round trip, refetched whenever a scan finishes
- * — a scan is the only thing that can add a project, change a grade or notice
- * that a folder is gone.
+ * or the project set changes outside one — removing a scan folder drops its
+ * projects before any rescan runs.
  */
 export function useProjects(): ProjectsState {
   const [data, setData] = useState<ProjectRow[] | null>(null);
@@ -35,11 +36,9 @@ export function useProjects(): ProjectsState {
 
   useEffect(() => {
     if (!isTauri) return;
-    const unlisten = listen("scan-done", () => {
-      void refetch();
-    });
+    const unlisteners = PROJECT_EVENTS.map((event) => listen(event, () => void refetch()));
     return () => {
-      void unlisten.then((fn) => fn());
+      for (const unlisten of unlisteners) void unlisten.then((fn) => fn());
     };
   }, [refetch]);
 

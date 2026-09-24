@@ -137,6 +137,17 @@ describe("Projects", () => {
     await waitFor(() => expect(rowNames()).toHaveLength(4));
   });
 
+  it("refetches when the project set changes outside a scan", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowNames()).toHaveLength(3));
+
+    // Removing a scan folder drops its projects before any rescan runs.
+    listProjects.mockResolvedValue({ status: "ok", data: populated.slice(0, 1) });
+    await emit("projects-changed");
+
+    await waitFor(() => expect(rowNames()).toHaveLength(1));
+  });
+
   it("says so when nothing has been scanned yet", async () => {
     listProjects.mockResolvedValue({ status: "ok", data: [] });
     await renderScreen();

@@ -171,16 +171,24 @@ pub fn get_overview(db: tauri::State<'_, AppDb>) -> Result<Overview, String> {
     query::get_overview(&conn).map_err(|e| e.to_string())
 }
 
-/// Persist the extra folders to scan on top of the harness's own projects.
+/// Persist the extra folders to scan on top of the harness's own projects,
+/// drop the projects a removed folder alone covered, and emit
+/// `projects-changed` so the sidebar and Projects table drop them now rather
+/// than when the follow-up scan finishes.
 #[tauri::command]
 #[specta::specta]
 pub fn set_extra_scan_folders(
+    app: tauri::AppHandle,
     db: tauri::State<'_, AppDb>,
     folders: Vec<String>,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    let json = serde_json::to_string(&folders).map_err(|e| e.to_string())?;
-    query::set_setting(&conn, "extra_scan_folders", &json).map_err(|e| e.to_string())
+    use tauri::Emitter;
+    {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::scan_folders::replace_extra_folders(&conn, &folders).map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("projects-changed", ());
+    Ok(())
 }
 
 /// The extra folders currently configured (empty when none).
