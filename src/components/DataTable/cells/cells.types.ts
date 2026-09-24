@@ -12,6 +12,12 @@ export interface NameCellProps {
   name: string;
   /** Muted context beside it; `null`/empty renders nothing at all. */
   description?: string | null;
+  /**
+   * Hover text for the name. Defaults to the name itself; a table that shows
+   * the description somewhere other than this cell passes the fuller string
+   * here so hovering still reveals it (Setup's tables do exactly that).
+   */
+  title?: string;
 }
 
 export interface CountCellProps {

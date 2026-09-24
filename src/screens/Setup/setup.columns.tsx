@@ -93,17 +93,47 @@ export function formatSize(bytes: number): string {
   return `${unit === 0 ? value : value.toFixed(1)} ${SIZE_UNITS[unit]}`;
 }
 
-export function nameColumn(): ColumnDef<ArtifactView, unknown> {
+/**
+ * The Name column.
+ *
+ * Setup's own tables call this bare, and get the name and nothing else: the
+ * description is the longer half of "name · description", so a column of both
+ * reads as prose and defeats the one thing a name column is for — scanning
+ * down it for a name (#175). The description is not lost, it moves: into the
+ * tooltip here, into the table's search keys (see `Setup.tsx`), and, for
+ * skills, into the panel the row opens.
+ *
+ * `withDescription` is for the project page's combined table, which keeps the
+ * two-part cell. It has no panel to move a description into, and it is the one
+ * table that mixes kinds — where a description is often all that separates two
+ * same-named artifacts.
+ *
+ * The one column that declares no width: it takes whatever the sized columns
+ * leave.
+ */
+export function nameColumn(
+  { withDescription = false }: { withDescription?: boolean } = {},
+): ColumnDef<ArtifactView, unknown> {
   return {
     id: "name",
     header: "Name",
     accessorKey: "name",
-    // Description muted alongside the name, both clamped to one line by
-    // `NameCell` — hooks bake "event: cmd" into `name` already and carry no
-    // description, so this degrades to plain text for them. The one column
-    // that declares no width: it takes whatever the sized columns leave.
-    cell: (c) => <NameCell name={c.row.original.name} description={c.row.original.description} />,
+    cell: (c) => (
+      <NameCell
+        name={c.row.original.name}
+        description={withDescription ? c.row.original.description : undefined}
+        // What is left of the description on the tabs with no panel to open.
+        // Hooks bake "event: cmd" into `name` and carry no description at
+        // all, so this degrades to the plain name for them.
+        title={titleFor(c.row.original)}
+      />
+    ),
   };
+}
+
+/** The name cell's hover text: the name, plus the description it no longer shows. */
+export function titleFor(row: ArtifactView): string {
+  return row.description ? `${row.name} — ${row.description}` : row.name;
 }
 
 /** Mirrors `ScopeCell`'s own label rule exactly, so sorting the Scope column orders by the same text it renders. */

@@ -1,0 +1,120 @@
+/* Reading typography, not document typography: a skill file is scanned in a
+   narrow panel next to a table, so the rhythm is tighter than a web page's and
+   the first block never carries a top margin. */
+.md {
+  font-size: 13px;
+  line-height: 1.62;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md__h {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 20px 0 8px;
+}
+
+/* Levels 1 and 2 carry the panel's structure; 3 and below are close to body
+   text on purpose — a skill file nests deeply and six distinct sizes would
+   turn the panel into a ransom note. */
+.md__h--1 {
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
+.md__h--2 {
+  font-size: 15px;
+}
+
+.md__h--3 {
+  font-size: 13.5px;
+}
+
+.md__h--4,
+.md__h--5,
+.md__h--6 {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.md__p {
+  margin: 0 0 10px;
+}
+
+.md__list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.md__list li {
+  margin-bottom: 3px;
+}
+
+.md__pre {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--group);
+  border: 0.5px solid var(--sep);
+  border-radius: var(--r-ctrl);
+  /* Code is the one thing that must not be reflowed to fit the panel — a
+     wrapped shell command reads as two commands. It scrolls instead. */
+  overflow-x: auto;
+}
+
+.md__pre code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+/* The fence's info string, floated in the corner as a quiet label. Only drawn
+   when the fence declared one — `data-lang` is absent otherwise. */
+.md__pre[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.md__code {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 1px 4px;
+  background: var(--group);
+  border-radius: 4px;
+}
+
+.md__quote {
+  margin: 0 0 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--sep-strong);
+  color: var(--text-2);
+}
+
+.md__hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 0.5px solid var(--sep);
+}
+
+.md__link {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.md__link:hover {
+  text-decoration: underline;
+}

@@ -51,6 +51,19 @@ describe("NameCell", () => {
     expect(screen.getByText("v6.3.0 · claude-plugins-official")).toHaveClass("muted");
   });
 
+  it("defaults the name's hover text to the name itself", () => {
+    render(<NameCell name="superpowers" />);
+    expect(screen.getByText("superpowers")).toHaveAttribute("title", "superpowers");
+  });
+
+  it("takes an explicit title, for a cell whose description is shown elsewhere", () => {
+    render(<NameCell name="adapt" title="adapt — Adapts designs across screen sizes" />);
+    expect(screen.getByText("adapt")).toHaveAttribute(
+      "title",
+      "adapt — Adapts designs across screen sizes",
+    );
+  });
+
   it("renders nothing beside the name when there is no description", () => {
     const { container } = render(<NameCell name="deploy" description={null} />);
     expect(container.querySelector(".dt-name__desc")).toBeNull();
