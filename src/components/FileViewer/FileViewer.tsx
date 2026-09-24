@@ -56,17 +56,23 @@ export function FileViewer({
     );
   else main = <CodeView content={content} language={language} ariaLabel={sourceLabel(name)} />;
 
+  // A failed read has no format, no size and nothing to find; an empty strip
+  // above the error would be chrome for its own sake.
+  const showBar = !(error !== null && format === null && !actions);
+
   return (
     <div className="fv">
-      <FileViewerBar
-        modes={modes}
-        mode={viewer.mode}
-        onMode={viewer.setMode}
-        language={format === null ? null : language ? LANGUAGE_LABEL[language] : PLAIN_TEXT}
-        stats={content !== null && !loading ? fileStats(content) : null}
-        onFind={searchable ? viewer.openFind : undefined}
-        actions={actions}
-      />
+      {showBar && (
+        <FileViewerBar
+          modes={modes}
+          mode={viewer.mode}
+          onMode={viewer.setMode}
+          language={format === null ? null : language ? LANGUAGE_LABEL[language] : PLAIN_TEXT}
+          stats={content !== null && !loading ? fileStats(content) : null}
+          onFind={searchable ? viewer.openFind : undefined}
+          actions={actions}
+        />
+      )}
       {searchable && viewer.findOpen && (
         <FindBar
           query={viewer.query}

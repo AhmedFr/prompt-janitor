@@ -65,6 +65,11 @@ describe("FileViewer", () => {
     expect(screen.queryByText("Plain text")).toBeNull();
   });
 
+  it("draws no empty bar over a failed read", () => {
+    const { container } = view({ content: null, format: null, error: "nope" });
+    expect(container.querySelector(".fv__bar")).toBeNull();
+  });
+
   it("says so when the file is empty", () => {
     view({ content: "  \n", format: "text", path: "/a/empty.txt" });
     expect(screen.getByText("This file is empty.")).toBeInTheDocument();

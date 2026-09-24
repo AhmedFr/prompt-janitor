@@ -411,7 +411,7 @@
     },
     {
       "name": "Vitest",
-      "result": "1479/1479 passing (121 files)"
+      "result": "1480/1480 passing (121 files)"
     },
     {
       "name": "cargo test",
