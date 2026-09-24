@@ -48,6 +48,8 @@
     "allow-list-templates",
     "allow-apply-template",
     "allow-get-setup",
+    "allow-get-artifact-source",
+    "allow-save-artifact-source",
     "allow-get-effective-rules",
     "allow-get-usage-overview",
     "allow-get-project-usage",
