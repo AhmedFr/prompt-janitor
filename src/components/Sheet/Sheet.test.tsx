@@ -114,7 +114,9 @@ describe("Sheet", () => {
 describe("SheetPath", () => {
   it("shows the path and opens it on request", () => {
     render(<SheetPath path="/Users/a/.mcp.json" name="posthog" />);
-    expect(screen.getByText("/Users/a/.mcp.json")).toBeInTheDocument();
+    // Isolated from the truncating box's right-to-left direction, or the
+    // leading slash renders at the end.
+    expect(screen.getByText("/Users/a/.mcp.json").tagName).toBe("BDI");
     fireEvent.click(screen.getByRole("button", { name: "Open posthog on disk" }));
     expect(openExternal).toHaveBeenCalledWith("/Users/a/.mcp.json");
   });

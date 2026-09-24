@@ -7,8 +7,11 @@ import type { SheetPathProps } from "./Sheet.types";
 export function SheetPath({ path, name }: SheetPathProps) {
   return (
     <div className="sheet-path">
+      {/* `bdi` keeps the path itself left-to-right inside the right-to-left
+          box that truncates it from the left; without it the bidi algorithm
+          moves the leading "/" to the end ("Users/a/.claude.json/"). */}
       <span className="sheet-path__text" title={path}>
-        {path}
+        <bdi>{path}</bdi>
       </span>
       {/* "Open", not "Reveal": this is the opener plugin, the same call the
           table's own action makes, and it opens the file in the default app
