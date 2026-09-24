@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { ArtifactView } from "@/lib/ipc";
 import { SkillPanelView } from "./index";
-import type { SkillSource } from "./index";
+import type { ArtifactSourceState } from "../Setup.types";
 
 /**
  * The stories render `SkillPanelView`, not `SkillPanel`: the connected
@@ -50,10 +50,12 @@ const skill: ArtifactView = {
   usage: null,
 };
 
-/** A settled `SkillSource` whose save always succeeds — overridden per story. */
-const source = (over: Partial<SkillSource> = {}): SkillSource => ({
+/** A settled `ArtifactSourceState` whose save always succeeds — overridden per story. */
+const source = (over: Partial<ArtifactSourceState> = {}): ArtifactSourceState => ({
   content: SOURCE,
   path: skill.path,
+  format: "markdown",
+  editable: true,
   modified: "1757462400000000000",
   loading: false,
   saving: false,
@@ -66,7 +68,7 @@ const meta = {
   title: "Screens/Setup/SkillPanel",
   component: SkillPanelView,
   parameters: { layout: "fullscreen" },
-  args: { skill, source: source(), onClose: () => {}, onSaved: () => {} },
+  args: { skill, scope: "Global", source: source(), onClose: () => {}, onSaved: () => {} },
   decorators: [
     // Something behind the drawer, so the scrim and the drawer's left edge
     // read the way they do over a real table.

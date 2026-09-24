@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import { Markdown } from "@/components/Markdown";
-import { openExternal } from "@/lib/open-external";
+import { Sheet, SheetPath } from "@/components/Sheet";
+import { SourceViewer } from "@/components/SourceViewer";
+import { ArtifactFacts } from "../ArtifactFacts";
 import {
   DIRTY_LABEL,
   DISCARD_BODY,
@@ -12,12 +13,12 @@ import {
   LOADING,
 } from "./SkillPanel.constants";
 import type { PanelMode, SkillPanelViewProps } from "./SkillPanel.types";
-import { splitFrontmatter } from "./skillPanel.util";
 import "./SkillPanel.css";
 
 /**
- * The panel's layout and interaction, with the file handed in rather than
- * loaded.
+ * The skill sheet's editing flow, with the file handed in rather than
+ * loaded. The frame (focus, Escape, Tab trap, backdrop) is `Sheet`'s and the
+ * read view is `SourceViewer`'s; what is left here is read ↔ edit.
  *
  * Presentational on purpose, the way `TemplatePicker` is: `SkillPanel` owns
  * the IO and this owns the pixels, which is what lets every state below have
@@ -36,7 +37,7 @@ import "./SkillPanel.css";
  * held apart so "dirty" is a comparison rather than a flag — there is no path
  * where a save forgets to clear it.
  */
-export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = "read" }: SkillPanelViewProps) {
+export function SkillPanelView({ skill, scope, source, onClose, onSaved, initialMode = "read" }: SkillPanelViewProps) {
   const [mode, setMode] = useState<PanelMode>(initialMode);
   const [draft, setDraft] = useState(source.content ?? "");
   // What a confirmed discard should do: leave the editor, or close the panel
@@ -44,21 +45,7 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
   // rather than a boolean is what lets Cancel and Close share one dialog
   // without either of them doing the other's job.
   const [pendingDiscard, setPendingDiscard] = useState<"stop-editing" | "close" | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  // Whatever had focus when the panel opened — the table row, in the app.
-  const opener = useRef<HTMLElement | null>(null);
-
   const dirty = mode === "edit" && source.content !== null && draft !== source.content;
-
-  // Focus moves into the panel on open so Escape and Tab land here rather than
-  // in the table behind it, and goes back where it came from on close —
-  // otherwise it lands on `<body>` and the keyboard user loses their place in
-  // a table they may have scrolled a long way down.
-  useEffect(() => {
-    opener.current = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-    return () => opener.current?.focus();
-  }, []);
 
   /** Leaves the editor, keeping the panel open. */
   const stopEditing = () => {
@@ -96,154 +83,60 @@ export function SkillPanelView({ skill, source, onClose, onSaved, initialMode = 
   };
 
   return (
-    <div className="sp-scrim" onMouseDown={requestClose}>
-      <div
-        ref={panelRef}
-        className="sp"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${skill.name} — skill source`}
-        tabIndex={-1}
-        // The scrim closes on a click that started on the scrim; without this
-        // a drag that ends outside the panel (selecting text to the edge)
-        // would close it mid-selection.
-        onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.stopPropagation();
-            requestClose();
-            return;
-          }
-          // `aria-modal` claims the rest of the page is inert, so Tab has to
-          // behave that way too. Without this, Tab walks into the table behind
-          // the scrim — which cannot be clicked, and from which Escape (bound
-          // here) no longer reaches this handler.
-          if (e.key === "Tab") trapTab(e, panelRef.current);
-        }}
-      >
-        <header className="sp__hd">
-          {/* Name only. The description lives in the frontmatter strip below,
-              which is where the file itself keeps it — printing the indexed
-              copy here as well would show the same sentence twice, and would
-              show a stale one whenever the file has been edited since the
-              last scan. */}
-          <div className="sp__id">
-            <h2 className="sp__title">{skill.name}</h2>
-          </div>
-          {/* `requestClose`, not `onClose`: this is the most obvious way out
-              of the panel, so it is the one that must not discard a draft
-              silently. */}
-          <button className="sp__close" onClick={requestClose} aria-label="Close">
-            <Icon name="x" size={15} />
-          </button>
-        </header>
-
-        {source.path && (
-          <div className="sp__path">
-            <span className="path" title={source.path}>
-              {source.path}
-            </span>
-            {/* "Open", not "Reveal": this is the opener plugin, the same
-                call the table's own action makes, and it opens the file in
-                the default app rather than selecting it in Finder. */}
-            <Button
-              size="sm"
-              aria-label={`Open ${skill.name} on disk`}
-              onClick={() => void openExternal(source.path!)}
-            >
-              <Icon name="folder" /> Open
+    // `requestClose`, not `onClose`: every way out of the sheet — the close
+    // button, Escape, the backdrop — must stop at the discard confirm first.
+    <Sheet
+      title={skill.name}
+      ariaLabel={`${skill.name} — skill source`}
+      onClose={requestClose}
+      toolbar={source.path ? <SheetPath path={source.path} name={skill.name} /> : undefined}
+      error={source.error}
+      footer={
+        mode === "read" ? (
+          <Button size="sm" disabled={source.content === null || !source.editable} onClick={startEditing}>
+            <Icon name="wand" /> Edit
+          </Button>
+        ) : (
+          <>
+            {dirty && <span className="sp__dirty">{DIRTY_LABEL}</span>}
+            <span className="toolbar-spacer" />
+            <Button size="sm" disabled={source.saving} onClick={requestStopEditing}>
+              Cancel
             </Button>
-          </div>
-        )}
-
-        <div className="sp__body">
-          {source.loading ? (
-            <p className="muted sp__state">{LOADING}</p>
-          ) : mode === "edit" ? (
-            <textarea
-              className="sp__editor"
-              aria-label={EDITOR_LABEL}
-              value={draft}
-              spellCheck={false}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-          ) : source.content !== null ? (
-            <ReadView source={source.content} />
-          ) : null}
-        </div>
-
-        {source.error && (
-          <p className="sp__error" role="alert">
-            {source.error}
-          </p>
-        )}
-
-        <footer className="sp__ft">
-          {mode === "read" ? (
-            <Button size="sm" disabled={source.content === null} onClick={startEditing}>
-              <Icon name="wand" /> Edit
+            <Button variant="primary" size="sm" disabled={source.saving} onClick={() => void handleSave()}>
+              {source.saving ? "Saving…" : "Save"}
             </Button>
-          ) : (
-            <>
-              {dirty && <span className="sp__dirty">{DIRTY_LABEL}</span>}
-              <span className="toolbar-spacer" />
-              <Button size="sm" disabled={source.saving} onClick={requestStopEditing}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" disabled={source.saving} onClick={() => void handleSave()}>
-                {source.saving ? "Saving…" : "Save"}
-              </Button>
-            </>
-          )}
-        </footer>
-
-        {pendingDiscard && (
+          </>
+        )
+      }
+      overlay={
+        pendingDiscard && (
           <DiscardConfirm
             onKeep={() => setPendingDiscard(null)}
             onDiscard={pendingDiscard === "close" ? onClose : stopEditing}
           />
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Everything inside the panel that can hold focus, in document order. */
-const FOCUSABLE = 'button:not([disabled]), textarea, a[href], [tabindex]:not([tabindex="-1"])';
-
-/** Wraps Tab and Shift+Tab around the panel's own focusable elements. */
-function trapTab(e: React.KeyboardEvent, panel: HTMLElement | null) {
-  const stops = panel ? [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)] : [];
-  if (stops.length === 0) return;
-
-  const first = stops[0];
-  const last = stops[stops.length - 1];
-  const active = document.activeElement;
-  // The panel itself holds focus until the user Tabs off it, so an unknown
-  // active element means "at the start" rather than "somewhere in the middle".
-  if (e.shiftKey ? active === first || !stops.includes(active as HTMLElement) : active === last) {
-    e.preventDefault();
-    (e.shiftKey ? last : first).focus();
-  }
-}
-
-/** The file's header as a key/value strip, then its body rendered as markdown. */
-function ReadView({ source }: { source: string }) {
-  const { fields, body } = splitFrontmatter(source);
-  return (
-    <>
-      {fields.length > 0 && (
-        <dl className="sp__meta">
-          {fields.map(([key, value]) => (
-            <div className="sp__meta-row" key={key}>
-              <dt>{key}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {body.trim().length > 0 ? <Markdown source={body} /> : <p className="muted">{EMPTY_BODY}</p>}
-    </>
+        )
+      }
+    >
+      {/* No description here: the frontmatter strip below is where the file
+          itself keeps it — printing the indexed copy as well would show the
+          same sentence twice, and a stale one whenever the file has been
+          edited since the last scan. */}
+      {mode === "read" && <ArtifactFacts artifact={skill} scope={scope} showDescription={false} />}
+      {source.loading ? (
+        <p className="muted sp__state">{LOADING}</p>
+      ) : mode === "edit" ? (
+        <textarea
+          className="sp__editor"
+          aria-label={EDITOR_LABEL}
+          value={draft}
+          spellCheck={false}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+      ) : source.content !== null ? (
+        <SourceViewer content={source.content} format={source.format ?? "markdown"} emptyBody={EMPTY_BODY} />
+      ) : null}
+    </Sheet>
   );
 }
 

@@ -7,7 +7,7 @@ pub mod time;
 
 use std::path::PathBuf;
 
-use model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
+use model::{Artifact, ArtifactKind, ProjectRef, UsageBatch, UsageCursor};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
@@ -30,6 +30,28 @@ pub trait Harness: Send + Sync {
     fn projects(&self) -> Vec<ProjectRef>;
     fn inventory(&self, scope: &Scope) -> Vec<Artifact>;
     fn index_usage(&self, cursor: &mut UsageCursor) -> UsageBatch;
+    /// The readable, redacted slice of `file_text` that one config-derived
+    /// artifact row (a hook, an MCP server, a settings file) stands for.
+    /// `None` means the kind is a file of its own, or its entry is gone.
+    fn source_excerpt(
+        &self,
+        _kind: ArtifactKind,
+        _name: &str,
+        _project_path: Option<&str>,
+        _file_text: &str,
+    ) -> Option<String> {
+        None
+    }
+    /// The file to read for an artifact whose row `path` may name a
+    /// directory (a plugin's install root). Identity by default.
+    fn source_file(&self, _kind: ArtifactKind, path: &str) -> PathBuf {
+        PathBuf::from(path)
+    }
+}
+
+/// The registered harness with this id, detected or not.
+pub fn by_id(id: &str) -> Option<Box<dyn Harness>> {
+    all().into_iter().find(|h| h.id() == id)
 }
 
 pub fn all() -> Vec<Box<dyn Harness>> {

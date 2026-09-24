@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitFrontmatter } from "./skillPanel.util";
+import { splitFrontmatter } from "./sourceViewer.util";
 
 describe("splitFrontmatter", () => {
   it("separates a leading --- block from the body", () => {

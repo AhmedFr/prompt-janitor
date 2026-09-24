@@ -40,7 +40,7 @@ const skill = (over: Partial<ArtifactView> = {}): ArtifactView => ({
 /** Renders the panel and waits for the initial read to land. */
 async function open(props: Partial<Parameters<typeof SkillPanel>[0]> = {}) {
   const onClose = vi.fn();
-  const view = render(<SkillPanel skill={skill()} onClose={onClose} {...props} />);
+  const view = render(<SkillPanel skill={skill()} scope="Global" onClose={onClose} {...props} />);
   await waitFor(() => expect(screen.queryByText("Loading…")).not.toBeInTheDocument());
   return { ...view, onClose };
 }
@@ -48,7 +48,7 @@ async function open(props: Partial<Parameters<typeof SkillPanel>[0]> = {}) {
 beforeEach(() => {
   getArtifactSource
     .mockReset()
-    .mockResolvedValue(ok({ path: "/s/SKILL.md", content: SOURCE, bytes: 64, modified: "111" }));
+    .mockResolvedValue(ok({ path: "/s/SKILL.md", content: SOURCE, bytes: 64, modified: "111", format: "markdown", editable: true }));
   saveArtifactSource.mockReset().mockResolvedValue(ok({ bytes: 12 }));
   openExternal.mockReset();
 });
@@ -89,7 +89,7 @@ describe("SkillPanel", () => {
 
   it("says so while the file is loading", () => {
     getArtifactSource.mockReturnValue(new Promise(() => {}));
-    render(<SkillPanel skill={skill()} onClose={vi.fn()} />);
+    render(<SkillPanel skill={skill()} scope="Global" onClose={vi.fn()} />);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
@@ -199,7 +199,7 @@ describe("SkillPanel", () => {
      */
     it.each([
       ["the close button", () => fireEvent.click(screen.getByRole("button", { name: "Close" }))],
-      ["the scrim", () => fireEvent.mouseDown(document.querySelector(".sp-scrim")!)],
+      ["the scrim", () => fireEvent.mouseDown(document.querySelector(".sheet-scrim")!)],
       ["Escape", () => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })],
       ["Cancel", () => fireEvent.click(screen.getByRole("button", { name: "Cancel" }))],
     ])("asks before %s throws away unsaved edits", async (_label, close) => {

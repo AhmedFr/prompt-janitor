@@ -845,7 +845,8 @@ pub fn get_setup(db: tauri::State<'_, AppDb>) -> Result<crate::harness_query::Se
     crate::harness_query::setup_view(&conn).map_err(|e| e.to_string())
 }
 
-/// One skill's markdown, for the Setup screen's skill panel.
+/// One artifact's source for the Setup screen's detail sheet: the file itself,
+/// or for a hook, MCP server or settings file its redacted excerpt.
 ///
 /// Keyed on the artifact id rather than a path — see `artifact_source` for why
 /// that is the security boundary and not just an interface choice.

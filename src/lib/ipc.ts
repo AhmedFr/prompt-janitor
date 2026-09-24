@@ -33,6 +33,7 @@ export type {
   SetupView,
   ArtifactView,
   ArtifactSource,
+  SourceFormat,
   ArtifactSaved,
   ProjectSetup,
   HarnessInfo,

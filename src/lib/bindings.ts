@@ -134,7 +134,8 @@ export const commands = {
 	 */
 	getSetup: () => typedError<SetupView, string>(__TAURI_INVOKE("get_setup")),
 	/**
-	 *  One skill's markdown, for the Setup screen's skill panel.
+	 *  One artifact's source for the Setup screen's detail sheet: the file itself,
+	 *  or for a hook, MCP server or settings file its redacted excerpt.
 	 * 
 	 *  Keyed on the artifact id rather than a path — see `artifact_source` for why
 	 *  that is the security boundary and not just an interface choice.
@@ -284,7 +285,11 @@ export type ArtifactSaved = {
 export type ArtifactSource = {
 	/**  Absolute path on disk, shown in the panel header. */
 	path: string,
+	/**  The file, or for a config-derived kind its redacted excerpt. */
 	content: string,
+	format: SourceFormat,
+	/**  Whether `save_artifact_source` will accept a write for this artifact. */
+	editable: boolean,
 	/**  Size of `content` in bytes — what the Size column shows. */
 	bytes: number,
 	/**
@@ -735,6 +740,9 @@ export type Severity =
 
 /**  Where a rule's authority comes from (drives the source badge). */
 export type Source = "anthropic" | "openai" | "cursor" | "karpathy" | "custom";
+
+/**  How the sheet should draw `content`. */
+export type SourceFormat = "markdown" | "json" | "text";
 
 export type TargetRate = {
 	target: string,

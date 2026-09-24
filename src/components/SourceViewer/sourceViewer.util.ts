@@ -1,4 +1,4 @@
-import type { Frontmatter } from "./SkillPanel.types";
+import type { Frontmatter } from "./SourceViewer.types";
 
 /** The fence that opens and closes a frontmatter block. */
 const FENCE = "---";

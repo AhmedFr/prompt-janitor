@@ -1,0 +1,54 @@
+/* The frontmatter, as a strip rather than as rendered markdown: it is metadata
+   the harness reads, and showing it as prose implies it is part of the text. */
+.sv__meta {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  background: var(--group);
+  border-radius: var(--r-ctrl);
+  font-size: 12px;
+}
+
+.sv__meta-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.sv__meta-row dt {
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.sv__meta-row dd {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Wrapped, not scrolled sideways: a config line that runs off the edge hides
+   exactly the value (a path, an argument) someone opened the sheet to read. */
+.sv__code {
+  margin: 0;
+  padding: 12px;
+  background: var(--group);
+  border-radius: var(--r-ctrl);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+.sv__empty {
+  margin: 0;
+  font-size: 13px;
+}

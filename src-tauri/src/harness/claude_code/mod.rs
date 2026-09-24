@@ -1,6 +1,7 @@
 //! Claude Code harness: `~/.claude` + per-project `.claude/` + session logs.
 
 pub mod classify;
+pub mod excerpt;
 pub mod inventory;
 pub mod log_index;
 pub mod log_records;
@@ -16,7 +17,7 @@ use std::path::Path;
 
 use paths::ClaudeHome;
 
-use crate::harness::model::{Artifact, ProjectRef, UsageBatch, UsageCursor};
+use crate::harness::model::{Artifact, ArtifactKind, ProjectRef, UsageBatch, UsageCursor};
 use crate::harness::{Harness, Scope};
 
 pub struct ClaudeCode {
@@ -154,6 +155,20 @@ impl Harness for ClaudeCode {
             Some(home) => log_index::index_all(home, cursor),
             None => UsageBatch::default(),
         }
+    }
+
+    fn source_excerpt(
+        &self,
+        kind: ArtifactKind,
+        name: &str,
+        project_path: Option<&str>,
+        file_text: &str,
+    ) -> Option<String> {
+        excerpt::excerpt(kind, name, project_path, file_text)
+    }
+
+    fn source_file(&self, kind: ArtifactKind, path: &str) -> std::path::PathBuf {
+        excerpt::readable_file(kind, Path::new(path))
     }
 }
 

@@ -1,6 +1,5 @@
 //! Discover Claude Code artifacts on disk for one layer.
 
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -170,34 +169,8 @@ fn settings_file(ctx: &Ctx, out: &mut Vec<Artifact>, f: &Path, include_settings_
     let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
         return;
     };
-    if let Some(hooks) = json.get("hooks").and_then(|h| h.as_object()) {
-        // Hook names must be unique within one settings file: a repeated
-        // "<event>: <cmd>" name gets " #2", " #3", ... appended.
-        let mut seen: HashMap<String, u32> = HashMap::new();
-        for (event, matchers) in hooks {
-            for m in matchers.as_array().into_iter().flatten() {
-                for h in m
-                    .get("hooks")
-                    .and_then(|x| x.as_array())
-                    .into_iter()
-                    .flatten()
-                {
-                    let cmd = h
-                        .get("command")
-                        .and_then(|c| c.as_str())
-                        .unwrap_or("(inline)");
-                    let base: String = format!("{event}: {cmd}").chars().take(80).collect();
-                    let count = seen.entry(base.clone()).or_insert(0);
-                    *count += 1;
-                    let name = if *count == 1 {
-                        base
-                    } else {
-                        format!("{base} #{count}")
-                    };
-                    out.push(ctx.artifact(ArtifactKind::Hook, name, f, None, &bytes));
-                }
-            }
-        }
+    for entry in super::excerpt::hook_entries(&json) {
+        out.push(ctx.artifact(ArtifactKind::Hook, entry.name, f, None, &bytes));
     }
     if let Some(servers) = json.get("mcpServers").and_then(|s| s.as_object()) {
         for key in servers.keys() {

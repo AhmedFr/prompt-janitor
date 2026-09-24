@@ -10,6 +10,7 @@ import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
 import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
+import { ArtifactPanel } from "./ArtifactPanel";
 import { SkillPanel } from "./SkillPanel";
 import { pillsFor } from "./setup.pills";
 import {
@@ -149,6 +150,15 @@ const TAB_IDS = KIND_TABS.map((tab) => tab.id);
 /** A row is its artifact: one database id, unique across the whole inventory. */
 const rowId = (row: ArtifactView) => String(row.id);
 
+/** The row with this artifact id on whichever kind's tab holds it. */
+function findRow(tables: SetupTables, id: number): ArtifactView | null {
+  for (const { id: kind } of KIND_TABS) {
+    const row = tables.rowsFor(kind).find((r) => r.id === id);
+    if (row) return row;
+  }
+  return null;
+}
+
 function Inventory({
   data,
   detected,
@@ -167,19 +177,19 @@ function Inventory({
   const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
   const tables = useSetupTables(data, openDetail);
   const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
-  // The *id* of the skill whose panel is open, not the row itself. Held here
-  // rather than in `KindTable` so it survives that component's prop changes,
-  // and so the drawer renders over the whole inventory rather than inside a
-  // tab panel.
+  // The *id* of the artifact whose sheet is open, not the row itself. Held
+  // here rather than in `KindTable` so it survives that component's prop
+  // changes, and so the drawer renders over the whole inventory rather than
+  // inside a tab panel.
   //
   // An id rather than a snapshot because the row is re-derived below: saving
-  // an edited `name:` changes what the skill is called, and a header pinned to
+  // an edited `name:` changes what a skill is called, and a header pinned to
   // the row as it was at click time would keep announcing the old name until
-  // the panel was closed and reopened.
-  const [openSkillId, setOpenSkillId] = useState<number | null>(null);
-  const openSkill = useMemo(
-    () => (openSkillId === null ? null : tables.rowsFor("skill").find((r) => r.id === openSkillId)),
-    [openSkillId, tables],
+  // the sheet was closed and reopened.
+  const [openId, setOpenId] = useState<number | null>(null);
+  const openArtifact = useMemo(
+    () => (openId === null ? null : findRow(tables, openId)),
+    [openId, tables],
   );
 
   // A deep link names the tab it means; the remembered one only decides where
@@ -225,27 +235,35 @@ function Inventory({
               tab={tab}
               tables={tables}
               search={search}
-              onOpenSkill={(row) => setOpenSkillId(row.id)}
+              onOpenArtifact={(row) => setOpenId(row.id)}
             />
           );
         }}
       </Tabs>
 
-      {/* A rescan can remove the skill outright, in which case `openSkill`
-          resolves to nothing and the panel goes with it — better than a
-          drawer describing a file that is no longer there. */}
-      {openSkill && (
+      {/* A rescan can remove the artifact outright, in which case
+          `openArtifact` resolves to nothing and the sheet goes with it —
+          better than a drawer describing a file that is no longer there.
+          Both sheets are keyed on the artifact so switching rows remounts
+          them rather than leaving the previous row's draft or read behind. */}
+      {openArtifact?.kind === "skill" ? (
         <SkillPanel
-          // Keyed on the artifact so switching rows remounts the panel rather
-          // than leaving the previous skill's draft in the editor.
-          key={openSkill.id}
-          skill={openSkill}
-          onClose={() => setOpenSkillId(null)}
+          key={openArtifact.id}
+          skill={openArtifact}
+          scope={scopeLabel(openArtifact, tables.projectNames)}
+          onClose={() => setOpenId(null)}
           // The save already updated `artifacts.bytes`; refetching is what
           // carries that into the Size column without waiting for a rescan.
           onSaved={() => void onRefetch()}
         />
-      )}
+      ) : openArtifact ? (
+        <ArtifactPanel
+          key={openArtifact.id}
+          artifact={openArtifact}
+          scope={scopeLabel(openArtifact, tables.projectNames)}
+          onClose={() => setOpenId(null)}
+        />
+      ) : null}
     </>
   );
 }
@@ -260,27 +278,22 @@ function KindTable({
   tab,
   tables,
   search,
-  onOpenSkill,
+  onOpenArtifact,
 }: {
   tab: TabItem & { id: ArtifactKind };
   tables: SetupTables;
   search: DataTableSearch<ArtifactView>;
-  /** Opens the skill panel. Only the Skills tab ever calls it. */
-  onOpenSkill: (skill: ArtifactView) => void;
+  /** Opens a row's detail sheet. */
+  onOpenArtifact: (artifact: ArtifactView) => void;
 }) {
   const { rowsFor, ctx, projectNames, costBar } = tables;
   const rows = rowsFor(tab.id);
-  // Two kinds have somewhere to go: a rule opens its graded Detail screen,
-  // a skill opens its markdown in the panel. The rest are files on disk with
-  // nothing to say beyond their row, and keep their Finder action only.
-  const onRowClick =
-    tab.id === "rule"
-      ? (row: ArtifactView) => {
-          if (row.file_id) ctx.onOpen(row.file_id);
-        }
-      : tab.id === "skill"
-        ? onOpenSkill
-        : undefined;
+  // A graded rule opens its Detail screen, which says far more than a sheet
+  // could; every other row — an ungraded rule included — opens its sheet.
+  const onRowClick = (row: ArtifactView) => {
+    if (row.kind === "rule" && row.file_id) ctx.onOpen(row.file_id);
+    else onOpenArtifact(row);
+  };
 
   return (
     <DataTable

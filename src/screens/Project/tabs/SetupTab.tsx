@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ArtifactView } from "@/lib/ipc";
+import { ArtifactPanel } from "@/screens/Setup/ArtifactPanel";
+import { scopeLabel } from "@/screens/Setup/setup.columns";
+import { SkillPanel } from "@/screens/Setup/SkillPanel";
 import {
   SETUP_EMPTY_HINT,
   SETUP_EMPTY_TITLE,
@@ -25,21 +28,51 @@ const SEARCH: DataTableSearch<ArtifactView> = {
  * the scope is fixed, so a Kind column does the work the tabs were doing and
  * the whole project stays comparable in a single sort.
  */
-export function SetupTab({ artifacts, ctx }: SetupTabProps) {
+export function SetupTab({ artifacts, ctx, onSaved }: SetupTabProps) {
   const pills = useMemo(() => projectSetupPills(artifacts), [artifacts]);
+  // An id, re-resolved against `artifacts`, so a rescan that drops the row
+  // closes its sheet — the same rule the Setup screen follows.
+  const [openId, setOpenId] = useState<number | null>(null);
+  const open = openId === null ? null : (artifacts.find((a) => a.id === openId) ?? null);
+  const close = () => setOpenId(null);
+
+  // A graded rule opens its Detail screen; everything else opens its sheet.
+  const onRowClick = (row: ArtifactView) => {
+    if (row.kind === "rule" && row.file_id) ctx.onOpen(row.file_id);
+    else setOpenId(row.id);
+  };
 
   return (
-    <DataTable
-      ariaLabel="Project setup"
-      stateKey={SETUP_TABLE_KEY}
-      columns={projectSetupColumns(ctx)}
-      rows={artifacts}
-      rowId={rowId}
-      search={SEARCH}
-      pills={pills}
-      defaultSort={SETUP_DEFAULT_SORT}
-      density="compact"
-      empty={{ title: SETUP_EMPTY_TITLE, hint: SETUP_EMPTY_HINT }}
-    />
+    <>
+      <DataTable
+        ariaLabel="Project setup"
+        stateKey={SETUP_TABLE_KEY}
+        columns={projectSetupColumns(ctx)}
+        rows={artifacts}
+        rowId={rowId}
+        search={SEARCH}
+        pills={pills}
+        defaultSort={SETUP_DEFAULT_SORT}
+        onRowClick={onRowClick}
+        density="compact"
+        empty={{ title: SETUP_EMPTY_TITLE, hint: SETUP_EMPTY_HINT }}
+      />
+      {open?.kind === "skill" ? (
+        <SkillPanel
+          key={open.id}
+          skill={open}
+          scope={scopeLabel(open, ctx.projectNames)}
+          onClose={close}
+          onSaved={onSaved}
+        />
+      ) : open ? (
+        <ArtifactPanel
+          key={open.id}
+          artifact={open}
+          scope={scopeLabel(open, ctx.projectNames)}
+          onClose={close}
+        />
+      ) : null}
+    </>
   );
 }

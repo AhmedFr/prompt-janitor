@@ -21,6 +21,8 @@ export interface SetupTabProps {
   artifacts: ArtifactView[];
   /** Identity-stable, which is what makes `projectSetupColumns`' cache hit. */
   ctx: ColumnsCtx;
+  /** After a skill edit lands, so the page can refetch its inventory. */
+  onSaved?: () => void;
 }
 
 export interface UsageTabProps {
