@@ -401,7 +401,7 @@
     },
     {
       "name": "Vitest",
-      "result": "1205/1205 passing (93 files)"
+      "result": "1245/1245 passing (100 files)"
     },
     {
       "name": "cargo test",
@@ -454,6 +454,7 @@
     }
   ],
   "recent": [
+    "2026-09-24 — Health trend chart redone (#184): the Overview card drops the stretched sparkline for the Recharts TrendChart, which now draws hairline gridlines, a 0–100 y axis, dated x labels, a crosshair tooltip (score, grade, date and time) and one ringed dot on the latest point; Analytics' Health trend and the project Usage chart share it. `get_overview` now returns each trend point with its `recorded_at`, and the delta reads \"+18 since Sep 1\" instead of the false \"this week\" (the window is the last seven scans). Sparkline, still on Scans, keeps a round end dot and a constant stroke at any width",
     "2026-09-24 \u2014 Fix #180: sidebar recents were the six best-graded projects (a slice of the grade-sorted `list_projects`), now the six most recently active ones still on disk; logo detection now also looks in Next `app/` and `src/app/`, Expo `assets/`, Tauri `src-tauri/icons/`, `public/brand/` and monorepo `apps/*` (on the owner's DB 19 of 20 projects had no logo), runs once per project instead of per file, and a logo that fails to load falls back to the folder. Removing a scan folder now drops the projects only it covered and emits `projects-changed`, which the sidebar and Projects table refetch on, so they update before (or without) the follow-up rescan",
     "2026-09-24 — Open-PR sweep: merged #177 (skill panel; full `pnpm check` green on its final commit: 1205 frontend, 343+6 Rust, 26 fulfillment tests) and Dependabot action bumps #160 (setup-node 7.0.0), #161 (checkout 7.0.1), #170 (pnpm/action-setup 6.1.0), #162 (tauri-action 1.0.0, which renames `includeUpdaterJson` to `uploadUpdaterJson` and version-stamps the `.app.tar.gz` names, so watch the next release's latest.json). Closed stale conflicting #166 (Keychain key storage, appsec M-2) and #105 (landing reskin); branches kept for a rebase",
     "2026-09-10 — Setup → Skills reads and edits a skill in place (#175, PR #177): the Name column carries the name alone across every Setup tab (the description moves to the tooltip, the search keys and the panel), and clicking a skill opens a drawer with its frontmatter as a key/value strip and its body rendered by a dependency-free markdown renderer. Two new IPC commands key on the artifact id rather than a path, so the set of files the webview can address is exactly the set the scan found. Review hardening: `safeHref` now strips C0 controls before reading the scheme (a leading \\u0001 hid `javascript:` from the check but not from the URL parser) and refuses protocol-relative hrefs; the link regex is length-bounded after an unmatched-`[` run measured 19 s at 200 KB and minutes at the 1 MiB cap; saves are atomic (temp file + rename) and refuse to overwrite a file that changed on disk since the panel opened, since there is no undo",

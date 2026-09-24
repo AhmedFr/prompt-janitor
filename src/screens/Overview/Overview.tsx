@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
-import { Sparkline } from "@/components/Sparkline";
+import { TrendChart, scoreGradeDetail } from "@/components/TrendChart";
 import { Heatmap, bucketFiles } from "@/components/Heatmap";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -13,6 +13,7 @@ import { relativeTime } from "@/lib/format";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useOverview } from "./useOverview";
+import { formatTrendDelta } from "./overview.util";
 import "./Overview.css";
 
 interface Progress {
@@ -130,8 +131,8 @@ function RealOverview({
               {data.file_count} files · {data.project_count} projects · <strong>{data.overall_score}</strong>/100
               {data.trend_delta !== 0 && (
                 <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", marginLeft: 8 }}>
-                  ▲ {data.trend_delta > 0 ? "+" : ""}
-                  {data.trend_delta} this week
+                  <span aria-hidden="true">{data.trend_delta > 0 ? "▲" : "▼"} </span>
+                  {formatTrendDelta(data.trend_delta, data.trend[0]?.t)}
                 </span>
               )}
             </div>
@@ -211,13 +212,12 @@ function RealOverview({
             <span className="muted">Health trend</span>
             {data.trend_delta !== 0 && (
               <span style={{ color: data.trend_delta > 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
-                {data.trend_delta > 0 ? "+" : ""}
-                {data.trend_delta} this week
+                {formatTrendDelta(data.trend_delta, data.trend[0]?.t)}
               </span>
             )}
           </div>
-          <div style={{ marginTop: 6 }}>
-            <Sparkline data={data.trend} height={42} />
+          <div style={{ marginTop: 10 }}>
+            <TrendChart data={data.trend} height={160} valueDetail={scoreGradeDetail} />
           </div>
         </Card>
       )}

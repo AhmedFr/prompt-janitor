@@ -56,7 +56,13 @@ const mockOverviewData: OverviewData = {
       modified: "1234567890",
     },
   ],
-  trend: [60, 65, 70, 78],
+  trend: [
+    // Noon UTC keeps each calendar day stable in every timezone the suite runs in.
+    { t: String(Date.UTC(2026, 8, 1, 12) / 1000), score: 60 },
+    { t: String(Date.UTC(2026, 8, 3, 12) / 1000), score: 65 },
+    { t: String(Date.UTC(2026, 8, 5, 12) / 1000), score: 70 },
+    { t: String(Date.UTC(2026, 8, 8, 12) / 1000), score: 78 },
+  ],
   trend_delta: 18,
   last_scan: "1234567890",
 };
@@ -196,6 +202,19 @@ describe("Overview", () => {
     const row = getByText("Missing AI goals section").closest("button");
     row?.click();
     expect(navigate).toHaveBeenCalledWith("detail", "/api/CLAUDE.md");
+  });
+
+  it("draws the health trend as a labelled chart, not a stretched sparkline", () => {
+    const { getByRole, container } = render(<Overview navigate={vi.fn()} />);
+    expect(getByRole("img", { name: "Health trend" })).toBeInTheDocument();
+    expect(container.querySelector(".sparkline")).toBeNull();
+  });
+
+  it("dates the change from the first point instead of claiming a week", () => {
+    const { getAllByText, container } = render(<Overview navigate={vi.fn()} />);
+    // The hero and the trend card both carry it.
+    expect(getAllByText("+18 since Sep 1")).toHaveLength(2);
+    expect(container.textContent).not.toMatch(/this week/);
   });
 
   it("has no accessibility violations", async () => {

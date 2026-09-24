@@ -18,3 +18,12 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const Declining: Story = { args: { data: [80, 76, 74, 60, 58, 50, 44], color: "var(--red)" } };
+
+/** Stretched far past its viewBox: the stroke keeps its width and the end dot stays round. */
+export const Wide: Story = {
+  render: (args) => (
+    <div style={{ width: 900 }}>
+      <Sparkline {...args} />
+    </div>
+  ),
+};

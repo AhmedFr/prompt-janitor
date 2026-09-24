@@ -1,0 +1,19 @@
+.sparkline {
+  position: relative;
+  width: 100%;
+}
+
+.sparkline svg {
+  display: block;
+}
+
+/* The end marker: an 8px dot ringed in the card surface, centred on the last point. */
+.sparkline__dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--card);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}

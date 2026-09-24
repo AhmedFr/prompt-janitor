@@ -3,7 +3,7 @@ import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts
 import { Card } from "@/components/Card";
 import { Grade } from "@/components/Grade";
 import { Button } from "@/components/Button";
-import { TrendChart } from "@/components/TrendChart";
+import { TrendChart, scoreGradeDetail } from "@/components/TrendChart";
 import { isTauri, type Analytics as AnalyticsData } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import { UsageTab } from "./UsageTab";
@@ -184,7 +184,7 @@ function AnalyticsBody({
         <Card padded>
           <div className="an-card__title">Health trend</div>
           <div style={{ marginTop: 8 }}>
-            <TrendChart data={data.trend} />
+            <TrendChart data={data.trend} valueDetail={scoreGradeDetail} />
           </div>
         </Card>
 

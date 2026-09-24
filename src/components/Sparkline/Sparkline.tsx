@@ -1,7 +1,15 @@
 import { useId } from "react";
 import type { SparklineProps } from "./Sparkline.types";
+import "./Sparkline.css";
 
-/** Compact trend line with a soft gradient fill. Used for health-over-time. */
+/**
+ * Compact trend line with a soft gradient fill, sized to whatever width its
+ * container gives it. The svg stretches (`preserveAspectRatio="none"`) so the
+ * line always spans the card, which is why nothing round lives inside it:
+ * the stroke opts out of the stretch with `vector-effect`, and the end marker
+ * is an HTML dot positioned by percentage over the svg — an svg `<circle>`
+ * there would render as an ellipse at every width but the viewBox's own.
+ */
 export function Sparkline({ data, width = 220, height = 46, color = "var(--blue)" }: SparklineProps) {
   const gradientId = useId();
   const max = Math.max(...data);
@@ -20,22 +28,30 @@ export function Sparkline({ data, width = 220, height = 46, color = "var(--blue)
   const area = `${line} L${last[0].toFixed(1)} ${height} L${first[0].toFixed(1)} ${height} Z`;
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      width="100%"
-      height={height}
-      preserveAspectRatio="none"
-      style={{ display: "block" }}
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity="0.22" />
-          <stop offset="1" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${gradientId})`} />
-      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={last[0]} cy={last[1]} r="3" fill={color} />
-    </svg>
+    <div className="sparkline" style={{ height }}>
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity="0.22" />
+            <stop offset="1" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gradientId})`} />
+        <path
+          d={line}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <span
+        className="sparkline__dot"
+        style={{ left: `${(last[0] / width) * 100}%`, top: `${(last[1] / height) * 100}%`, background: color }}
+        aria-hidden="true"
+      />
+    </div>
   );
 }

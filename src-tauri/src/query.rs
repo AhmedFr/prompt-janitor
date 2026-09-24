@@ -32,7 +32,9 @@ pub struct Overview {
     pub warnings: u32,
     pub nits: u32,
     pub worklist: Vec<WorklistItem>,
-    pub trend: Vec<u32>,
+    /// The last seven overall scores, oldest first, each with when it was
+    /// recorded so the chart can date its x axis.
+    pub trend: Vec<TrendPoint>,
     /// Change across the trend window (latest − earliest).
     pub trend_delta: i32,
     /// Most recent scan finish time (epoch seconds string).
@@ -229,15 +231,20 @@ pub fn get_overview(conn: &Connection) -> rusqlite::Result<Overview> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
 
     let mut trend_stmt = conn.prepare(
-        "SELECT score FROM grade_history WHERE scope = 'overall' ORDER BY id DESC LIMIT 7",
+        "SELECT recorded_at, score FROM grade_history WHERE scope = 'overall' ORDER BY id DESC LIMIT 7",
     )?;
     let mut trend = trend_stmt
-        .query_map([], |r| r.get::<_, i64>(0).map(|n| n as u32))?
+        .query_map([], |r| {
+            Ok(TrendPoint {
+                t: r.get::<_, String>(0)?,
+                score: r.get::<_, i64>(1)? as u32,
+            })
+        })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     trend.reverse();
 
     let trend_delta = if trend.len() >= 2 {
-        trend[trend.len() - 1] as i32 - trend[0] as i32
+        trend[trend.len() - 1].score as i32 - trend[0].score as i32
     } else {
         0
     };
@@ -1548,6 +1555,15 @@ mod tests {
         assert!(after.overall_score > before.overall_score);
         assert!(after.trend_delta > 0, "trend_delta: {}", after.trend_delta);
         assert!(after.last_scan.is_some());
+
+        // Each point carries when it was recorded, oldest first, so the chart
+        // can put dates on its x axis instead of an unlabelled index.
+        assert_eq!(after.trend.len(), 2);
+        assert_eq!(after.trend[0].score, before.overall_score);
+        assert_eq!(after.trend[1].score, after.overall_score);
+        let t0: i64 = after.trend[0].t.parse().unwrap();
+        let t1: i64 = after.trend[1].t.parse().unwrap();
+        assert!(t0 > 0 && t0 <= t1, "timestamps: {t0}, {t1}");
 
         let id = list_files(&conn).unwrap()[0].id.clone();
         let detail = get_file_detail(&conn, &id).unwrap().unwrap();
