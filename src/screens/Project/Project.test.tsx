@@ -404,7 +404,7 @@ describe("Project", () => {
       fireEvent.click(await screen.findByText("settings.json"));
 
       const sheet = await screen.findByRole("dialog");
-      expect(sheet).toHaveAccessibleName("settings.json — Settings file");
+      expect(sheet).toHaveAccessibleName("settings.json — Config file");
       await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(3));
     });
 

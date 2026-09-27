@@ -93,14 +93,14 @@ function rowNames(): string[] {
 describe("KIND_TABS", () => {
   it("lists every artifact tab in display order, with the exact labels", () => {
     expect(KIND_TABS).toEqual([
-      { id: "rule", label: "Rules" },
+      { id: "rule", label: "Instructions" },
       { id: "skill", label: "Skills" },
       { id: "agent", label: "Agents" },
       { id: "command", label: "Commands" },
       { id: "hook", label: "Hooks" },
-      { id: "mcp_server", label: "MCP" },
+      { id: "mcp_server", label: "MCP servers" },
       { id: "plugin", label: "Plugins" },
-      { id: "settings", label: "Settings" },
+      { id: "settings", label: "Config" },
     ]);
   });
 });

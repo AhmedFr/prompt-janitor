@@ -65,7 +65,7 @@ describe("metaSegments", () => {
   });
 
   it("says nothing about use for kinds that are never invoked", () => {
-    expect(texts(row({ kind: "settings" }), "Global")).toEqual(["Settings file", "Global"]);
+    expect(texts(row({ kind: "settings" }), "Global")).toEqual(["Config file", "Global"]);
   });
 
   it("carries the grade when the artifact was graded", () => {

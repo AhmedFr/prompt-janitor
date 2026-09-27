@@ -275,22 +275,22 @@ describe("Setup", () => {
 
     const tabs = await screen.findByRole("tablist", { name: /setup/i });
     // Accessible names, not text content: the badge is hidden from the name
-    // and spelled out, so a tab reads as "Rules, 2" rather than "Rules2".
+    // and spelled out, so a tab reads as "Instructions, 2" rather than "Instructions2".
     expect(
       within(tabs)
         .getAllByRole("tab")
         .map((tab) => tab.getAttribute("aria-label")),
     ).toEqual([
-      "Rules, 2",
+      "Instructions, 2",
       "Skills, 5",
       "Agents, 1",
       "Commands, 0",
       "Hooks, 1",
-      "MCP, 1",
+      "MCP servers, 1",
       "Plugins, 2",
-      "Settings, 1",
+      "Config, 1",
     ]);
-    expect(within(tabs).getByRole("tab", { name: "Rules, 2" })).toBeInTheDocument();
+    expect(within(tabs).getByRole("tab", { name: "Instructions, 2" })).toBeInTheDocument();
   });
 
   it("summarises the detected harness and when it was last scanned", async () => {
@@ -300,11 +300,11 @@ describe("Setup", () => {
     expect(screen.getByText(/last scan/i)).toBeInTheDocument();
   });
 
-  it("opens on Rules, ordered best grade first", async () => {
+  it("opens on Instructions, ordered best grade first", async () => {
     await renderSetup();
-    await screen.findByRole("tab", { name: /^Rules/ });
+    await screen.findByRole("tab", { name: /^Instructions/ });
 
-    expect(screen.getByRole("tab", { name: /^Rules/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Instructions/ })).toHaveAttribute("aria-selected", "true");
     expect(rowNames()).toEqual(["global-style", "web-rules"]);
   });
 
@@ -399,7 +399,7 @@ describe("Setup", () => {
 
   it("gives settings files a tab of their own", async () => {
     await renderSetup();
-    openTab(/^Settings/);
+    openTab(/^Config/);
 
     expect(rowNames()).toEqual(["settings.json"]);
     expect(within(rowFor("settings.json")).getByText("Global")).toBeInTheDocument();
@@ -413,14 +413,14 @@ describe("Setup", () => {
     await screen.findByRole("heading", { name: "Setup", level: 1 });
 
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /^MCP/ })).toHaveAttribute("aria-selected", "true"),
+      expect(screen.getByRole("tab", { name: /^MCP servers/ })).toHaveAttribute("aria-selected", "true"),
     );
     expect(rowNames()).toEqual(["linear"]);
   });
 
   it("opens a rule's detail when its row is clicked", async () => {
     const { navigate } = await renderSetup();
-    await screen.findByRole("tab", { name: /^Rules/ });
+    await screen.findByRole("tab", { name: /^Instructions/ });
 
     fireEvent.click(rowFor("web-rules"));
 
@@ -590,7 +590,7 @@ describe("Setup", () => {
 
   describe("the detail sheet", () => {
     it.each([
-      [/^MCP/, "linear", 6, "linear — MCP server"],
+      [/^MCP servers/, "linear", 6, "linear — MCP server"],
       [/^Hooks/, "PreToolUse: fmt", 7, "PreToolUse: fmt — Hook"],
       [/^Agents/, "code-reviewer", 5, "code-reviewer — Agent"],
       [/^Plugins/, "superpowers", 8, "superpowers — Plugin"],
@@ -613,7 +613,7 @@ describe("Setup", () => {
     it("shows what the inventory knows about the row, usage included", async () => {
       await renderSetup();
       await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^MCP/);
+      openTab(/^MCP servers/);
       fireEvent.click(rowFor("linear"));
 
       const sheet = await screen.findByRole("dialog");
@@ -627,7 +627,7 @@ describe("Setup", () => {
     it("closes on Escape", async () => {
       await renderSetup();
       await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^MCP/);
+      openTab(/^MCP servers/);
       fireEvent.click(rowFor("linear"));
 
       fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });

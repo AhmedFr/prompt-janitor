@@ -14,6 +14,7 @@ import {
   TokensCell,
 } from "@/components/DataTable";
 import { openExternal } from "@/lib/open-external";
+import { KIND_LABEL } from "@/lib/vocabulary";
 import { projectNameFor } from "./setup.util";
 import { ERROR_RATE_BANDS } from "./Setup.constants";
 
@@ -22,16 +23,9 @@ import { ERROR_RATE_BANDS } from "./Setup.constants";
  * `settings.json` is where hooks, permissions and MCP wiring actually live, so
  * a scan that finds one and shows it nowhere leaves the inventory incomplete.
  */
-export const KIND_TABS: { id: ArtifactKind; label: string }[] = [
-  { id: "rule", label: "Rules" },
-  { id: "skill", label: "Skills" },
-  { id: "agent", label: "Agents" },
-  { id: "command", label: "Commands" },
-  { id: "hook", label: "Hooks" },
-  { id: "mcp_server", label: "MCP" },
-  { id: "plugin", label: "Plugins" },
-  { id: "settings", label: "Settings" },
-];
+export const KIND_TABS: { id: ArtifactKind; label: string }[] = (
+  ["rule", "skill", "agent", "command", "hook", "mcp_server", "plugin", "settings"] as const
+).map((id) => ({ id, label: KIND_LABEL[id] }));
 
 /**
  * What `columnsFor` closes over. `onOpen`/`projectNames` are the shape the

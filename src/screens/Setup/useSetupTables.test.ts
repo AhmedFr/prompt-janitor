@@ -62,14 +62,14 @@ describe("useSetupTables", () => {
     const { result } = renderHook(() => useSetupTables(view, onOpen));
 
     expect(result.current.tabs.map((tab) => [tab.label, tab.count])).toEqual([
-      ["Rules", 1],
+      ["Instructions", 1],
       ["Skills", 3],
       ["Agents", 0],
       ["Commands", 0],
       ["Hooks", 0],
-      ["MCP", 0],
+      ["MCP servers", 0],
       ["Plugins", 1],
-      ["Settings", 1],
+      ["Config", 1],
     ]);
   });
 

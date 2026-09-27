@@ -1,16 +1,7 @@
-import type { ArtifactKind } from "@/lib/ipc";
+import { KIND_SINGULAR } from "@/lib/vocabulary";
 
-/** One artifact's kind, singular, as the sheet names it. */
-export const KIND_NAME: Record<ArtifactKind, string> = {
-  rule: "Rule",
-  skill: "Skill",
-  agent: "Agent",
-  command: "Command",
-  hook: "Hook",
-  mcp_server: "MCP server",
-  plugin: "Plugin",
-  settings: "Settings file",
-};
+/** A kind as the header names it — see `@/lib/vocabulary`. */
+export const KIND_NAME = KIND_SINGULAR;
 
 /** The kinds the usage index can attribute an invocation to. */
 export const INVOKED_KINDS: ReadonlySet<ArtifactKind> = new Set(["skill", "agent", "command", "mcp_server"]);
