@@ -1,7 +1,7 @@
 # Setup-first navigation — design
 
 **Date:** 2026-09-27
-**Status:** approved in brainstorm, section by section (owner, 2026-09-27); spec awaiting review
+**Status:** approved in brainstorm, section by section (owner, 2026-09-27); open questions answered on review (§16)
 **Issue:** #198 · **Milestone:** Phase 13: Setup-first navigation
 **Mock:** before/after canvas at https://claude.ai/artifact/DPux78scLbiLBbipNQSyyg (private to the owner)
 **Supersedes:** the verdict-first home of `verdict-first-ux` (PR #90). The grade stays, demoted to a badge.
@@ -98,7 +98,7 @@ of projects, most recently active first). Choosing a project turns on the lens (
 
 - **Grade badge:** tinted by grade. Click → popover with the 90-day health trend (the
   `TrendChart` from #187), open findings count, and "Fix N issues automatically" (the old
-  Overview Auto-fix, same entitlement gate as Detail's today).
+  Overview Auto-fix; free, no gate, see §13a).
 - **The three counts are toggle filters.** "Never used", "Erroring" and "Costly" keep the
   definitions Setup's Status filter uses today (`ERROR_RATE_THRESHOLD`, the high-cost rule).
   A zero count is not rendered.
@@ -188,7 +188,7 @@ Everything Detail does, in one column:
   - This fixes Detail preselecting the first finding with a line instead of the one clicked.
 - **Per finding:** Suggest fix (with the AI provider, when set), Apply, Undo, Commit to a
   branch, all as today.
-- **File level:** "Fix all automatically" (same entitlement gate) and "Run AI checks" (when an
+- **File level:** "Fix all automatically" (free, see §13a) and "Run AI checks" (when an
   AI provider is set).
 - **Ungraded kinds:** "Not graded. Checks run on instruction files only." with no actions.
 
@@ -214,7 +214,7 @@ One table:
 
 ## 8. Settings
 
-8 tabs become 7:
+8 tabs become 6:
 
 | Tab | Holds | Was |
 |---|---|---|
@@ -223,7 +223,6 @@ One table:
 | **Notifications** | weekly digest, regression alert | Alerts |
 | **Checks** | Built-in / Custom / AI checks tables, Import pack…, Add check (the RulesNew form, inline) | the Rules screen + RulesNew + the Rules stub |
 | **AI** | provider, key, model | AI |
-| **License** | as today | License |
 | **About** | version, updates, storage path, danger zone | General + App |
 
 The UpdateBanner's "Open Settings" opens **About**.
@@ -277,11 +276,25 @@ erroring" and its button, "Open my setup", lands on Setup. The grade reveal is r
 ## 13. Out of scope
 
 - Dark mode (no dark theme exists).
-- Pricing, license and paywall behaviour. The IA audit found inconsistent Pro copy while gates
-  are open (`lib/monetization.ts` says paused, Detail still shows "$69"). This spec moves that
-  copy as-is and lists it as an open question (§16).
+- Charging for anything, and the license flow's backend (kept, just unreachable; see §13a).
 - Windows/Linux.
 - New checks or grading changes.
+
+## 13a. Everything is free (owner decision, 2026-09-27)
+
+No payments for now, so every paywall surface is hidden rather than half-shown:
+
+- **UI:** no "$69", "Get Pro", "paid feature" or license prompts anywhere (the Detail/Auto-fix
+  copy, the TemplatePicker license redirect). Settings has no License tab.
+- **Gates:** Auto-fix, Fix all, templates and every other gated action behave as unlocked,
+  through the one switch `lib/monetization.ts` already has for "paused". The entitlement
+  check in `apply_fix` (#91) stays in the backend but is satisfied while paused, so turning
+  payments on later is one change in one place.
+- **Kept:** the license verification code, `set_license`/`clear_license` and their tests stay.
+  No screen reaches them.
+
+A test asserts that no rendered screen contains "$69", "Get Pro" or "License" while
+monetisation is paused.
 
 ## 14. Testing
 
@@ -304,15 +317,17 @@ each.
 
 | Step | Delivers | Done when |
 |---|---|---|
-| 1 | Vocabulary + Settings: 7 tabs, Checks moved in, labels unified (§3.3, §8) | the labels test passes; the Rules screen redirects to Settings → Checks |
+| 1 | Vocabulary + Settings: 6 tabs, License tab hidden, Checks moved in, labels unified (§3.3, §8) | the labels test passes; the Rules screen redirects to Settings → Checks |
 | 2 | Unified Setup table + summary line; Setup becomes home (§4) | the app opens on Setup; the kind chips replace the tabs; the three filters work |
 | 3 | Viewer tabs Findings + Usage, markdown editing, grade popover (§6, §4.2) | a finding click jumps to its line; Auto-fix works from the popover |
 | 4 | Project lens + Projects list + Recent → lens, backend §11 rows 1–2 (§5, §7) | the web-app lens lists only its items, in load order, with its own usage |
 | 5 | Navigation state + history, panel + onboarding re-pointed, old screens, commands and hints removed (§9, §10, §12) | the navigation tests pass; the real-build check passes |
 
-## 16. Open questions
+## 16. Decisions taken on review (2026-09-27)
 
-1. **Pro copy while monetisation is paused:** keep the "$69" prompts on Auto-fix, or hide
-   them until the gates close? Decide before step 3.
-2. **Removing a scan folder deletes its projects' history** (#186 behaviour). Keep that, or
-   hide the projects instead? It affects the Folders tab (step 1).
+1. **Payments:** everything is free and all paywall UI is hidden (§13a). The hiding lands in step 1
+   (License tab) and step 3 (Auto-fix and Fix-all copy).
+2. **Removing a scan folder** keeps #186's behaviour: its projects are deleted with it, history
+   included. This is the simplest option, so no "hidden project" state is added. The Folders tab's Remove
+   button says so in its confirmation: "Removes N projects and their history from Prompt
+   Janitor. Files on disk are not touched.".
