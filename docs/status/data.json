@@ -464,6 +464,7 @@
     }
   ],
   "recent": [
+    "2026-09-27 — Setup-first navigation spec written (#198, milestone Phase 13): 8 destinations become Setup (home) / Projects / Settings, one vocabulary (Instructions, Checks, Findings), a project lens on Setup instead of project pages, and a viewer with Content / Findings / Usage. 5-step rollout; awaiting owner review.",
     "2026-09-24 — v0.1.5 published from a local build (Release run cancelled): universal DMG + signed updater archive (signature verified; ACL grants for get/save/open_artifact confirmed in the binary) + latest.json; the feed serves 0.1.5.",
     "2026-09-24 — v0.1.5 tagged: the detail sheet actually reads files in a real build (ACL fix #192/#194) and becomes a file viewer — content first, Rendered/Source with highlighting, find, copy/reveal/open (#193/#195)",
     "2026-09-24 — Fix #192: every detail sheet (and the #177 skill panel) failed in a real build with \"Command get_artifact_source not allowed by ACL\" — the command was registered but granted by no capability file. Granted get/save_artifact_source to the main window, plus a Rust test that fails whenever any registered command is granted to no window.",
