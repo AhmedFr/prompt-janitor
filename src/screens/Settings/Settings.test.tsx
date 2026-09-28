@@ -5,8 +5,7 @@ vi.mock("./useSettings", () => ({
   useSettings: () => ({ loading: false, schedule: "6h", digest: true, regressions: true, status: null,
     ai: null, setSchedule: vi.fn(), setDigest: vi.fn(), setRegressions: vi.fn(), saveAi: vi.fn(), testAi: vi.fn() }),
 }));
-// Task 1.5 renames this mock to `./FoldersTab` / `FoldersTab` when it moves the folder.
-vi.mock("./HarnessTab", () => ({ HarnessTab: () => <div data-testid="folders" /> }));
+vi.mock("./FoldersTab", () => ({ FoldersTab: () => <div data-testid="folders" /> }));
 vi.mock("./ChecksTab", () => ({ ChecksTab: () => <div data-testid="checks" /> }));
 vi.mock("./AboutTab", () => ({ AboutTab: () => <div data-testid="about" /> }));
 import { Settings } from "./Settings";

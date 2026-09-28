@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { HarnessTab } from "./HarnessTab";
+import { FoldersTab } from "./FoldersTab";
 import type { HarnessInfo } from "@/lib/ipc";
 
 const open = vi.hoisted(() => vi.fn());
@@ -20,13 +20,14 @@ const listHarnesses = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
+const listProjects = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
     ...actual,
     isTauri: true,
-    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow },
+    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow, listProjects },
   };
 });
 
@@ -55,6 +56,7 @@ beforeEach(() => {
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: ["/code/scratch"] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "ok", data: { files: 0, ms: 1 } });
+  listProjects.mockResolvedValue({ status: "ok", data: [] });
   open.mockResolvedValue(null);
 });
 
@@ -63,9 +65,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("HarnessTab rows", () => {
+describe("FoldersTab rows", () => {
   it("lists each registered harness as detected or not detected", async () => {
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     expect(await screen.findByText("Claude Code — detected · 32 projects · 177 sessions")).toBeInTheDocument();
     expect(screen.getByText("Cursor — not detected")).toBeInTheDocument();
   });
@@ -77,7 +79,7 @@ describe("HarnessTab rows", () => {
     ];
     listHarnesses.mockResolvedValue({ status: "ok", data: recent });
 
-    render(<HarnessTab />);
+    render(<FoldersTab />);
 
     expect(await screen.findByText(/^last scanned \d+m ago$/)).toBeInTheDocument();
     expect(screen.queryByText("Cursor — not detected")?.parentElement?.textContent).not.toMatch(
@@ -86,9 +88,9 @@ describe("HarnessTab rows", () => {
   });
 });
 
-describe("HarnessTab extra folders", () => {
+describe("FoldersTab extra folders", () => {
   it("lists extra folders with a Remove button that drops the path", async () => {
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     expect(await screen.findByText("/code/scratch")).toBeInTheDocument();
 
     getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
@@ -100,7 +102,7 @@ describe("HarnessTab extra folders", () => {
 
   it("names each Remove button after its own folder", async () => {
     getExtraScanFolders.mockResolvedValue({ status: "ok", data: ["/code/scratch", "/code/spikes"] });
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     await screen.findByText("/code/spikes");
 
     // Two identically-labelled "Remove" buttons are indistinguishable to a
@@ -112,7 +114,7 @@ describe("HarnessTab extra folders", () => {
 
   it("shows an empty-state message when there are no extra folders", async () => {
     getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     expect(
       await screen.findByText("No extra folders — every detected agent harness is scanned already."),
     ).toBeInTheDocument();
@@ -120,7 +122,7 @@ describe("HarnessTab extra folders", () => {
 
   it("Add folder prompts for a directory, appends it, and rescans", async () => {
     open.mockResolvedValue("/code/new-folder");
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     await screen.findByText("/code/scratch");
 
     fireEvent.click(screen.getByRole("button", { name: "Add folder…" }));
@@ -134,7 +136,7 @@ describe("HarnessTab extra folders", () => {
 
   it("does nothing when the folder dialog is cancelled", async () => {
     open.mockResolvedValue(null);
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     await screen.findByText("/code/scratch");
 
     fireEvent.click(screen.getByRole("button", { name: "Add folder…" }));
@@ -145,18 +147,67 @@ describe("HarnessTab extra folders", () => {
   });
 });
 
-describe("HarnessTab rescan", () => {
-  it("Rescan now calls scanNow", async () => {
-    render(<HarnessTab />);
+describe("FoldersTab removal", () => {
+  const withProjects = (ids: string[]) =>
+    listProjects.mockResolvedValue({ status: "ok", data: ids.map((id) => ({ id, harness: null })) });
+
+  it("asks first, with the count, when the removal deletes projects", async () => {
+    withProjects(["/code/scratch/a", "/code/scratch/b"]);
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    expect(await screen.findByRole("alertdialog", { name: "Remove /code/scratch" })).toHaveTextContent(
+      "Removes 2 projects and their history from Prompt Janitor. Files on disk are not touched.",
+    );
+    expect(setExtraScanFolders).not.toHaveBeenCalled();
+  });
+
+  it("uses the singular for one project", async () => {
+    withProjects(["/code/scratch/a"]);
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
+      "Removes 1 project and its history from Prompt Janitor. Files on disk are not touched.",
+    );
+  });
+
+  it("removes the folder on confirm", async () => {
+    withProjects(["/code/scratch/a"]);
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove folder" }));
+    await waitFor(() => expect(setExtraScanFolders).toHaveBeenCalledWith([]));
+  });
+
+  it("cancel removes nothing", async () => {
+    withProjects(["/code/scratch/a"]);
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(setExtraScanFolders).not.toHaveBeenCalled();
+  });
+
+  it("removes at once, with no confirmation, when no project would go", async () => {
+    withProjects(["/elsewhere/x"]);
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    await waitFor(() => expect(setExtraScanFolders).toHaveBeenCalledWith([]));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
+
+describe("FoldersTab rescan", () => {
+  it("Scan calls scanNow", async () => {
+    render(<FoldersTab />);
     await screen.findByText("/code/scratch");
 
-    fireEvent.click(screen.getByRole("button", { name: "Rescan now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan" }));
 
     await waitFor(() => expect(scanNow).toHaveBeenCalled());
   });
 
   it("refetches harnesses and folders when a scan finishes elsewhere", async () => {
-    render(<HarnessTab />);
+    render(<FoldersTab />);
     await screen.findByText("/code/scratch");
     expect(listHarnesses).toHaveBeenCalledTimes(1);
 
@@ -168,9 +219,9 @@ describe("HarnessTab rescan", () => {
   });
 });
 
-describe("HarnessTab a11y", () => {
+describe("FoldersTab a11y", () => {
   it("has no obvious accessibility violations", async () => {
-    const { container } = render(<HarnessTab />);
+    const { container } = render(<FoldersTab />);
     await screen.findByText("/code/scratch");
     expect(await axe(container)).toHaveNoViolations();
   });

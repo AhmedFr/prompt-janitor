@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { isTauri } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import { useSettings } from "./useSettings";
-import { HarnessTab } from "./HarnessTab";
+import { FoldersTab } from "./FoldersTab";
 import { ScanningTab } from "./ScanningTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { ChecksTab } from "./ChecksTab";
@@ -64,7 +64,7 @@ export function Settings({ navigate: _navigate, initialTab }: SettingsProps) {
             </Card>
           ) : (
             <>
-              {tab === "folders" && <HarnessTab />}
+              {tab === "folders" && <FoldersTab />}
 
               {tab === "scanning" && (
                 <ScanningTab schedule={s.schedule} onChange={(k) => void s.setSchedule(k)} />

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { HarnessTabBody } from "./HarnessTab";
-import type { HarnessInfo } from "@/lib/ipc";
+import { FoldersTabBody } from "./FoldersTab";
+import type { HarnessInfo, ProjectRow } from "@/lib/ipc";
 import "../Settings.css";
 
 const noop = async () => {};
@@ -17,15 +17,19 @@ const detected: HarnessInfo[] = [
 ];
 
 const meta = {
-  title: "Screens/Settings/HarnessTab",
-  component: HarnessTabBody,
+  title: "Screens/Settings/FoldersTab",
+  component: FoldersTabBody,
   args: {
     harnesses: detected,
     extraFolders: ["/Users/dev/code/scratch-prompts"],
+    projects: [],
     scanning: false,
     scanProgress: { phase: null, progress: null, reset: () => {} },
+    armed: null,
     addFolder: noop,
-    removeFolder: async () => {},
+    askRemove: () => {},
+    cancelRemove: () => {},
+    confirmRemove: noop,
     rescan: noop,
   },
   decorators: [
@@ -35,7 +39,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof HarnessTabBody>;
+} satisfies Meta<typeof FoldersTabBody>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -62,5 +66,16 @@ export const Scanning: Story = {
       progress: { done: 42, total: 177 },
       reset: () => {},
     },
+  },
+};
+
+/** A folder's Remove button armed the confirmation, counting what it would delete. */
+export const ArmedRemoval: Story = {
+  args: {
+    armed: "/Users/dev/code/scratch-prompts",
+    projects: [
+      { id: "/Users/dev/code/scratch-prompts/a", harness: null } as ProjectRow,
+      { id: "/Users/dev/code/scratch-prompts/b", harness: null } as ProjectRow,
+    ],
   },
 };

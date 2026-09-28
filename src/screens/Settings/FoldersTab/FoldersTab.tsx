@@ -3,13 +3,12 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import type { HarnessInfo } from "@/lib/ipc";
 import { scanPercent, scanStatusLine } from "@/lib/useScanProgress";
+import { LABEL } from "@/lib/vocabulary";
 import { plural } from "@/screens/Setup/setup.util";
-import { useHarnessTab } from "./useHarnessTab";
-import type { HarnessTabBodyProps } from "./HarnessTab.types";
-
-const MINUTE_MS = 60_000;
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
+import { projectsRemovedBy, removalWarning } from "../folders.util";
+import { useFoldersTab } from "./useFoldersTab";
+import { DAY_MS, HOUR_MS, MINUTE_MS, NO_EXTRA_FOLDERS, NO_HARNESSES } from "./FoldersTab.constants";
+import type { FoldersTabBodyProps } from "./FoldersTab.types";
 
 /**
  * "last scanned Xm/Xh/Xd ago" for a harness row. `relativeSession` in
@@ -37,9 +36,9 @@ function harnessLabel(h: HarnessInfo): string {
   ].join(" · ");
 }
 
-/** Settings → Harnesses: what's registered, and the extra folders scanned alongside them. */
-export function HarnessTab() {
-  const { loading, ...body } = useHarnessTab();
+/** Settings → Folders: what's registered, and the extra folders scanned alongside them. */
+export function FoldersTab() {
+  const { loading, ...body } = useFoldersTab();
 
   if (loading) {
     return (
@@ -49,18 +48,22 @@ export function HarnessTab() {
     );
   }
 
-  return <HarnessTabBody {...body} />;
+  return <FoldersTabBody {...body} />;
 }
 
-export function HarnessTabBody({
+export function FoldersTabBody({
   harnesses,
   extraFolders,
+  projects,
   scanning,
   scanProgress,
+  armed,
   addFolder,
-  removeFolder,
+  askRemove,
+  cancelRemove,
+  confirmRemove,
   rescan,
-}: HarnessTabBodyProps) {
+}: FoldersTabBodyProps) {
   const active = harnesses.find((h) => h.detected)?.display_name ?? "agent";
 
   return (
@@ -81,7 +84,7 @@ export function HarnessTabBody({
       <Card>
         {harnesses.length === 0 ? (
           <div className="set-row">
-            <span className="muted grow">No harnesses registered.</span>
+            <span className="muted grow">{NO_HARNESSES}</span>
           </div>
         ) : (
           harnesses.map((h) => {
@@ -108,7 +111,7 @@ export function HarnessTabBody({
       </Card>
       <div className="row" style={{ gap: 8, marginTop: 10 }}>
         <Button size="sm" disabled={scanning} onClick={() => void rescan()}>
-          <Icon name="refresh" /> {scanning ? "Scanning…" : "Rescan now"}
+          <Icon name="refresh" /> {scanning ? LABEL.scanning : LABEL.scan}
         </Button>
       </div>
 
@@ -118,32 +121,51 @@ export function HarnessTabBody({
       <Card>
         {extraFolders.length === 0 ? (
           <div className="set-row">
-            <span className="muted grow">
-              No extra folders — every detected agent harness is scanned already.
-            </span>
+            <span className="muted grow">{NO_EXTRA_FOLDERS}</span>
           </div>
         ) : (
           extraFolders.map((f) => (
-            <div className="set-row" key={f}>
-              <span style={{ display: "flex", color: "var(--blue)" }}>
-                <Icon name="folder" size={18} />
-              </span>
-              <span className="path grow">{f}</span>
-              <Button
-                size="sm"
-                disabled={scanning}
-                aria-label={`Remove ${f}`}
-                onClick={() => void removeFolder(f)}
-              >
-                Remove
-              </Button>
+            <div key={f}>
+              <div className="set-row">
+                <span style={{ display: "flex", color: "var(--blue)" }}>
+                  <Icon name="folder" size={18} />
+                </span>
+                <span className="path grow">{f}</span>
+                <Button
+                  size="sm"
+                  disabled={scanning}
+                  aria-label={`Remove ${f}`}
+                  onClick={() => askRemove(f)}
+                >
+                  Remove
+                </Button>
+              </div>
+              {armed === f && (
+                <div className="set-confirm" role="alertdialog" aria-label={`Remove ${f}`}>
+                  <p>
+                    {removalWarning(
+                      projectsRemovedBy(
+                        f,
+                        extraFolders.filter((x) => x !== f),
+                        projects,
+                      ),
+                    )}
+                  </p>
+                  <Button size="sm" onClick={cancelRemove}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" variant="primary" onClick={() => void confirmRemove()}>
+                    Remove folder
+                  </Button>
+                </div>
+              )}
             </div>
           ))
         )}
       </Card>
       <div className="row" style={{ gap: 8, marginTop: 10 }}>
         <Button size="sm" disabled={scanning} onClick={() => void addFolder()}>
-          <Icon name="folder" /> Add folder…
+          <Icon name="folder" /> {LABEL.addFolder}
         </Button>
       </div>
       <p className="faint" style={{ fontSize: 12, marginTop: 12, maxWidth: 560 }}>
