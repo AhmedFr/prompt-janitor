@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import {
   ActionsCell,
   CountCell,
+  FindingsCell,
   GradeCell,
   LastUsedCell,
   NameCell,
@@ -237,6 +238,33 @@ describe("ActionsCell", () => {
   });
 });
 
+describe("FindingsCell", () => {
+  it("shows a muted dash when there is nothing to report", () => {
+    const { container } = render(<FindingsCell count={0} severity={null} />);
+    expect(container.textContent).toBe("—");
+    expect(container.querySelector(".dt-findings")).toBeNull();
+  });
+
+  it("shows the same muted dash for an item that was never graded", () => {
+    const { container } = render(<FindingsCell count={null} severity={null} />);
+    expect(container.textContent).toBe("—");
+    expect(container.firstElementChild).toHaveClass("muted");
+    expect(container.querySelector("[data-severity]")).toBeNull();
+  });
+
+  it("tints the count by the worst finding", () => {
+    render(<FindingsCell count={3} severity="hi" />);
+    const badge = screen.getByText("3");
+    expect(badge).toHaveAttribute("data-severity", "hi");
+    expect(badge).toHaveAccessibleName("3 findings, worst critical");
+  });
+
+  it("says one finding in the singular", () => {
+    render(<FindingsCell count={1} severity="lo" />);
+    expect(screen.getByText("1")).toHaveAccessibleName("1 finding, worst nit");
+  });
+});
+
 describe("cells accessibility", () => {
   it("has no axe violations", async () => {
     const { container } = render(
@@ -249,6 +277,7 @@ describe("cells accessibility", () => {
         <ScopeCell layer="global" />
         <PathCell path="/Users/someone/.claude/rules/web.md" />
         <ActionsCell actions={[{ label: "Edit", icon: "wand", onClick: vi.fn() }]} />
+        <FindingsCell count={3} severity="hi" />
       </div>,
     );
     expect(await axe(container)).toHaveNoViolations();

@@ -24,6 +24,12 @@ const RATE_TONES = {
   bad: "#992620", // --tone-error-fg
 };
 
+const FINDINGS_TONES = {
+  hi: "#992620", // --tone-error-fg
+  mid: "#7a4a00", // --tone-stale-fg
+  lo: "#5c5c61", // --tone-never-fg
+};
+
 /**
  * The muted "—" is `--text-2`, the same ink as every path and description in
  * the table. It clears AA at rest and on hover; on the transient
@@ -43,6 +49,14 @@ describe("toned cell contrast", () => {
   for (const [tone, fg] of Object.entries(RATE_TONES)) {
     for (const [state, ground] of Object.entries(ROW_GROUNDS)) {
       it(`keeps a ${tone} rate readable on a ${state} row`, () => {
+        expect(contrastRatio(fg, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
+      });
+    }
+  }
+
+  for (const [severity, fg] of Object.entries(FINDINGS_TONES)) {
+    for (const [state, ground] of Object.entries(ROW_GROUNDS)) {
+      it(`keeps a ${severity} finding readable on a ${state} row`, () => {
         expect(contrastRatio(fg, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
       });
     }
