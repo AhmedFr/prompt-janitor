@@ -5,6 +5,7 @@ import type {
   ProjectSetup,
   SetupView,
 } from "@/lib/ipc";
+import type { SetupFilter } from "@/lib/setupFilter";
 import {
   COST_MEDIAN_MULTIPLIER,
   ERROR_RATE_THRESHOLD,
@@ -12,8 +13,7 @@ import {
   MIN_COST_SAMPLES,
 } from "./Setup.constants";
 
-/** Which slice of the inventory the screen is showing. */
-export type SetupFilter = "all" | "never" | "errors" | "cost";
+export type { SetupFilter };
 
 /** Middle value of a sorted-ascending copy; the mean of the middle pair when even. */
 function median(values: number[]): number {
