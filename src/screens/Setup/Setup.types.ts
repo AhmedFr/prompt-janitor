@@ -1,19 +1,35 @@
-import type { ArtifactKind, SetupView, SourceFormat } from "@/lib/ipc";
+import type { FileRow, HarnessInfo, SetupView, SourceFormat } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
+import type { SetupTarget } from "@/App/setupTarget";
 
 export interface SetupProps {
   navigate: Navigate;
-  /** Override the live data (Storybook only); the hook supplies it in the app. */
+  /** Override the live data (Storybook and tests); the hook supplies it in the app. */
   data?: SetupView | null;
-  /** The kind tab to open on. Defaults to the remembered one, then to Rules. */
-  initialTab?: ArtifactKind;
+  /** Override the graded files (Storybook and tests). */
+  files?: FileRow[];
+  /** Where a deep link lands: kind, filter, lens, open item, tab. */
+  target?: SetupTarget;
 }
 
 /** What {@link useSetup} hands the screen. */
 export interface SetupState {
   data: SetupView | null;
+  /** Every graded file, so one the inventory never saw still gets a row; empty when the query fails. */
+  files: FileRow[];
   loading: boolean;
   refetch: () => Promise<void>;
+}
+
+export interface InventoryProps {
+  data: SetupView;
+  files: FileRow[];
+  /** The harnesses the scan found, for the header line. */
+  detected: HarnessInfo[];
+  navigate: Navigate;
+  target?: SetupTarget;
+  /** Reloads the inventory — how a saved skill's new size reaches the table. */
+  onRefetch: () => Promise<void>;
 }
 
 /** The load/save state of one artifact's source, as `useArtifactSource` maintains it. */

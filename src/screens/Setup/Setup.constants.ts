@@ -38,31 +38,20 @@ export const COST_MEDIAN_MULTIPLIER = 2;
 /** Fewest measured artifacts a median needs before "high cost" means anything. */
 export const MIN_COST_SAMPLES = 2;
 
-/** `sessionStorage` suffix the kind tab strip remembers itself under (`pj.tabs.setup`). */
-export const TAB_STATE_KEY = "setup";
+/** `sessionStorage` suffix Setup's one table remembers its search, pills and sort under (`pj.table.setup.unified`). */
+export const TABLE_STATE_KEY = "setup.unified";
 
-/** Prefix of each kind table's own `pj.table.setup.<kind>` entry. */
-export const TABLE_STATE_PREFIX = "setup.";
-
-/** What an empty tab suggests doing about it — the only lever from this screen. */
+/** What an empty slice suggests doing about it — the only lever from this screen. */
 export const EMPTY_HINT = "Rescan to pick up anything added since the last scan.";
 
-/**
- * What an empty tab says. Spelled per kind rather than derived from the tab
- * label: "No mcp found" is what lower-casing "MCP" gets you, and a screen
- * that only ever shows this line when there is nothing at all to show is the
- * wrong place to be clever.
- */
-export const EMPTY_TITLE: Record<ArtifactKind, string> = {
-  rule: "No rule files found",
-  skill: "No skills installed",
-  agent: "No agents installed",
-  command: "No commands installed",
-  hook: "No hooks configured",
-  mcp_server: "No MCP servers configured",
-  plugin: "No plugins installed",
-  settings: "No settings files found",
-};
+/** What the table says when the chips, filters or search leave nothing. */
+export const EMPTY_FILTERED = "No items match";
+
+/** The Instructions chip's one action: write a starter instruction file from a template. */
+export const NEW_FROM_TEMPLATE = "New from template…";
+
+/** What Setup says when the scan found no harness at all (spec §4.5). */
+export const NO_HARNESS_TITLE = "No Claude Code setup found";
 
 /** One box searches every column that holds words, so it says so once. */
 export const SEARCH_PLACEHOLDER = "Search name, description or scope";

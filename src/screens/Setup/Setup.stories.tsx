@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Setup } from "./Setup";
-import type { TableState } from "@/components/DataTable";
-import type { ArtifactView, SetupView, UsageStat } from "@/lib/ipc";
+import type { ArtifactView, FileRow, SetupView, UsageStat } from "@/lib/ipc";
 import "@/styles/shell.css";
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
@@ -243,79 +242,99 @@ const noHarness: SetupView = {
   projects: [],
 };
 
+/** Graded files no inventory row points at — an extra scan folder's instruction files. */
+const gradedOnly: FileRow[] = [
+  {
+    id: "/code/side-project/AGENTS.md",
+    name: "AGENTS.md",
+    path: "/code/side-project/AGENTS.md",
+    project: "side-project",
+    project_id: "/code/side-project",
+    kind: "AGENTS.md",
+    grade: "D",
+    score: 58,
+    issue_count: 4,
+    modified: null,
+    worst_severity: "hi",
+  },
+  {
+    id: "/code/side-project/.cursorrules",
+    name: ".cursorrules",
+    path: "/code/side-project/.cursorrules",
+    project: "side-project",
+    project_id: "/code/side-project",
+    kind: ".cursorrules",
+    grade: "B",
+    score: 84,
+    issue_count: 1,
+    modified: null,
+    worst_severity: "lo",
+  },
+];
+
 /**
- * Tab strips and tables remember themselves in `sessionStorage`, which
- * outlives a story swap — so every story starts from a clean slate and the
- * filtered one seeds exactly the view it means to show. Written during the
- * decorator's render, before the table below it mounts and reads.
+ * The table remembers its search, pills and sort in `sessionStorage`, which
+ * outlives a story swap — so every story starts from a clean slate. Run
+ * during the decorator's render, before the table below it mounts and reads.
  */
-const seedState = (entries: Record<string, TableState> = {}) => {
+const clearState = () => {
   for (const key of Object.keys(window.sessionStorage)) {
-    if (key.startsWith("pj.table.") || key.startsWith("pj.tabs.")) {
-      window.sessionStorage.removeItem(key);
-    }
-  }
-  for (const [key, state] of Object.entries(entries)) {
-    window.sessionStorage.setItem(`pj.table.${key}`, JSON.stringify(state));
+    if (key.startsWith("pj.table.")) window.sessionStorage.removeItem(key);
   }
 };
 
 /**
- * The setup inventory: one table per artifact kind, sortable, searchable and
- * annotated with whether anything ever used what is installed. Storybook feeds
- * the screen a fixture through the `data` prop — in the app it comes from
- * `useSetup`.
+ * The Setup home: one table over every kind, narrowed by the kind chips and
+ * the summary line's filters. Storybook feeds the screen a fixture through
+ * `data` and `files` — in the app they come from `useSetup`.
  */
 const meta = {
   title: "Screens/Setup",
   component: Setup,
-  args: { navigate: () => {}, data: populated },
+  args: { navigate: () => {}, data: populated, files: [] },
   parameters: { layout: "fullscreen" },
   decorators: [
-    (Story) => (
-      <div style={{ height: "100vh", background: "var(--bg)" }}>
-        <Story />
-      </div>
-    ),
+    (Story) => {
+      clearState();
+      return (
+        <div style={{ height: "100vh", background: "var(--bg)" }}>
+          <Story />
+        </div>
+      );
+    },
   ],
 } satisfies Meta<typeof Setup>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A detected harness with a full global layer, a plugin and two projects. */
-export const Populated: Story = {
-  decorators: [
-    (Story) => {
-      seedState();
-      return <Story />;
-    },
-  ],
+/** The All chip: every kind in one table, Kind then Name, with the Kind column. */
+export const AllItems: Story = {};
+
+/** One kind (Skills): the Kind column drops away and the usage columns stay. */
+export const OneKind: Story = {
+  args: { target: { kind: "skill" } },
 };
 
 /**
- * The Skills tab pinned to "Never used": what is installed but has never
- * fired, which is the whole reason the annotation is there.
+ * "never used" pressed on the summary line: what is installed but has never
+ * fired, across every kind the usage index counts.
  */
-export const FilteredToNeverUsed: Story = {
-  args: { initialTab: "skill" },
-  decorators: [
-    (Story) => {
-      seedState({
-        "setup.skill": { search: "", pills: { status: ["never"] }, sort: { id: "uses", desc: true } },
-      });
-      return <Story />;
-    },
-  ],
+export const NeverUsedFilter: Story = {
+  args: { target: { filter: "never" } },
 };
 
-/** Nothing installed — the only way forward is to name a folder. */
-export const NoHarnessDetected: Story = {
+/** Graded files the inventory never saw join as Instructions, with their findings. */
+export const WithGradedOnlyFiles: Story = {
+  args: { files: gradedOnly, target: { kind: "rule" } },
+};
+
+/** Nothing installed — the only way forward is to add a folder. */
+export const NoHarness: Story = {
   args: { data: noHarness },
-  decorators: [
-    (Story) => {
-      seedState();
-      return <Story />;
-    },
-  ],
+};
+
+/** The inventory query failed: say so, and offer the retry. */
+export const Unreadable: Story = {
+  args: { data: null },
 };

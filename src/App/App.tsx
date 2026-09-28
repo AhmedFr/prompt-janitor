@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Sidebar } from "@/components/Sidebar";
 import { Onboarding } from "@/components/Onboarding";
@@ -12,27 +12,23 @@ import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
 import { Analytics } from "@/screens/Analytics";
 import { Settings } from "@/screens/Settings";
-import { isTauri, type ArtifactKind, type NavigateEvent } from "@/lib/ipc";
+import { isTauri, type NavigateEvent } from "@/lib/ipc";
 import { useUpdateCheck } from "@/lib/useUpdateCheck";
-// Deep import, not the screen barrel: this is the tab strip's own id list,
-// and the barrel would pull the whole Setup screen in behind it.
-import { KIND_TABS } from "@/screens/Setup/setup.columns";
 import { isRuleTab } from "@/screens/Settings/ChecksTab/ChecksLibrary/checksLibrary.columns";
 import type { RuleTabId } from "@/screens/Settings/ChecksTab/ChecksLibrary/ChecksLibrary.types";
 import { isRoute } from "./App.constants";
 import type { Route } from "./App.types";
+import { parseSetupTarget } from "./setupTarget";
 
 const ONBOARDED_KEY = "pj-onboarded";
-
-/** A `setup` target only counts when it names a kind the tab strip actually has. */
-const isKindTab = (value: string | undefined): value is ArtifactKind =>
-  KIND_TABS.some((tab) => tab.id === value);
 
 export function App() {
   const [route, setRoute] = useState<Route>("overview");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
-  const [setupTab, setSetupTab] = useState<ArtifactKind | undefined>(undefined);
+  // The raw deep link, parsed below: it arrives as a plain string (the panel's
+  // `navigate` event carries nothing richer).
+  const [setupTarget, setSetupTarget] = useState<string | undefined>(undefined);
   const [promptsTarget, setPromptsTarget] = useState<string | undefined>(undefined);
   const [projectPath, setProjectPath] = useState<string | undefined>(undefined);
   const [checksTab, setChecksTab] = useState<RuleTabId | undefined>(undefined);
@@ -42,6 +38,8 @@ export function App() {
   // A quiet probe a few seconds after launch. News, never a modal — see
   // `useUpdateCheck` for why the failure path says nothing at all.
   const update = useUpdateCheck();
+  // Parsed once per link, so Setup's target-syncing effects see a stable object.
+  const parsedSetupTarget = useMemo(() => parseSetupTarget(setupTarget), [setupTarget]);
 
   // Stable across renders: screens hand `navigate` to `useCallback`s of their
   // own, and Setup's column cache keys on the identity of the context those
@@ -62,12 +60,11 @@ export function App() {
     // An ordinary settings visit forgets the rule table: only an old Rules
     // deep link (above) means to open on one.
     if (next === "settings") setChecksTab(undefined);
-    // Which kind tab Setup opens on — a ranked usage row links to the tab
-    // that holds it. Validated rather than cast: the target is a bare string
-    // from anywhere in the app, and a typo stored as a tab id would open a
-    // kind that does not exist. Cleared by an untargeted visit (the sidebar),
-    // so a deep link cannot keep reopening a kind the user asked for once.
-    if (next === "setup") setSetupTab(isKindTab(target) ? target : undefined);
+    // Where Setup lands — a kind, a filter, an item. `parseSetupTarget`
+    // validates it, so a typo cannot open a kind that does not exist.
+    // Cleared by an untargeted visit (the sidebar), so a deep link cannot
+    // keep reopening a slice the user asked for once.
+    if (next === "setup") setSetupTarget(target);
     if (next === "prompts") setPromptsTarget(target);
     // Unlike `detail`, an untargeted `project` clears rather than keeps: the
     // screen is addressed by path, and carrying the last one forward would
@@ -123,7 +120,7 @@ export function App() {
           />
         )}
         {route === "overview" && <Overview navigate={navigate} />}
-        {route === "setup" && <Setup navigate={navigate} initialTab={setupTab} />}
+        {route === "setup" && <Setup navigate={navigate} target={parsedSetupTarget} />}
         {route === "projects" && <Projects navigate={navigate} />}
         {route === "project" && <Project path={projectPath} navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}

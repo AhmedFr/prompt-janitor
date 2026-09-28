@@ -117,30 +117,36 @@ describe("App", () => {
   it("opens Setup on the kind a deep link names", () => {
     render(<App />);
     go("setup", "mcp_server");
-    expect(propsOf("setup").initialTab).toBe("mcp_server");
+    expect(propsOf("setup").target).toEqual({ kind: "mcp_server" });
+  });
+
+  it("hands Setup every part of a deep link, parsed", () => {
+    render(<App />);
+    go("setup", "kind=skill&filter=never");
+    expect(propsOf("setup").target).toEqual({ kind: "skill", filter: "never" });
   });
 
   /**
    * A plain sidebar visit to Setup names no kind, so it must clear the last
-   * deep link's tab — otherwise the strip keeps reopening on a kind the user
-   * asked for once, from a screen they have since left.
+   * deep link — otherwise Setup keeps reopening on a slice the user asked for
+   * once, from a screen they have since left.
    */
-  it("clears the Setup tab when `setup` is reached without one", () => {
+  it("clears the Setup target when `setup` is reached without one", () => {
     render(<App />);
     go("setup", "mcp_server");
     go("overview");
     go("setup");
-    expect(propsOf("setup").initialTab).toBeUndefined();
+    expect(propsOf("setup").target).toEqual({});
   });
 
   /**
    * The target arrives as a bare string from anywhere in the app; a typo or a
-   * stale link would otherwise be stored as a kind tab that does not exist.
+   * stale link would otherwise open a kind that does not exist.
    */
-  it("ignores a `setup` target that names no kind tab", () => {
+  it("ignores a `setup` target that names no kind", () => {
     render(<App />);
     go("setup", "not-a-kind");
-    expect(propsOf("setup").initialTab).toBeUndefined();
+    expect(propsOf("setup").target).toEqual({});
   });
 
   it("keeps the file id when `detail` is reached without one", () => {

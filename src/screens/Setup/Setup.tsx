@@ -3,38 +3,45 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
+import { KindChips } from "@/components/KindChips";
 import { ScanBar } from "@/components/ScanBar";
-import { Tabs, useTabState, type TabItem } from "@/components/Tabs";
-import { isTauri, type ArtifactKind, type ArtifactView, type HarnessInfo, type SetupView } from "@/lib/ipc";
+import { SummaryLine } from "@/components/SummaryLine";
+import { TemplatePicker, useTemplatePicker } from "@/components/TemplatePicker";
+import { isTauri, type HarnessInfo } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
+import type { SetupFilter } from "@/lib/setupFilter";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
-import type { Navigate } from "@/App/App.types";
-import { LABEL } from "@/lib/vocabulary";
-import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
+import { LABEL, type KindFilter } from "@/lib/vocabulary";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { SkillPanel } from "./SkillPanel";
-import { pillsFor } from "./setup.pills";
+import { scopeLabel, type ColumnsCtx } from "./setup.columns";
+import { scopePillsFor } from "./setup.pills";
+import { unifiedColumns, visibleColumnIds } from "./setup.unified";
+import { costThreshold, harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
+import { applySetupFilter, setupFilterCounts } from "./setupFilter.util";
+import { byKindThenName, setupRows, type SetupRow } from "./setupRows.util";
 import {
+  EMPTY_FILTERED,
   EMPTY_HINT,
-  EMPTY_TITLE,
+  NEW_FROM_TEMPLATE,
+  NO_HARNESS_TITLE,
   SEARCH_PLACEHOLDER,
-  TAB_STATE_KEY,
-  TABLE_STATE_PREFIX,
+  TABLE_STATE_KEY,
 } from "./Setup.constants";
-import type { SetupProps } from "./Setup.types";
-import { harnessSummary, lastScanAt, relativeSession } from "./setup.util";
+import type { InventoryProps, SetupProps } from "./Setup.types";
+import { useOverallGrade } from "./useOverallGrade";
 import { useSetup } from "./useSetup";
-import { useSetupTables, type SetupTables } from "./useSetupTables";
 import "./Setup.css";
 
 /**
- * The whole Claude Code setup in one place: one table per artifact kind,
- * sortable and searchable, annotated with whether anything ever actually used
- * what is installed.
+ * The whole Claude Code setup in one place: one table over every kind,
+ * narrowed by kind chips and the summary line's filters, annotated with
+ * whether anything ever actually used what is installed.
  */
-export function Setup({ navigate, data: override, initialTab }: SetupProps) {
+export function Setup({ navigate, data: override, files: filesOverride, target }: SetupProps) {
   const state = useSetup();
   const data = override ?? state.data;
+  const files = filesOverride ?? (override ? [] : state.files);
   const loading = state.loading && !override;
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
@@ -92,9 +99,10 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
           ) : (
             <Inventory
               data={data}
+              files={files}
               detected={detected}
               navigate={navigate}
-              initialTab={initialTab}
+              target={target}
               onRefetch={state.refetch}
             />
           )}
@@ -132,7 +140,7 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
   return (
     <Card padded>
       <div className="setup-empty">
-        <h2 className="setup-empty__title">No supported agent harness found</h2>
+        <h2 className="setup-empty__title">{NO_HARNESS_TITLE}</h2>
         <p className="muted setup-empty__body">
           Prompt Janitor reads the setup Claude Code already keeps on disk. Nothing was detected
           here, so point it at a folder and it will grade the prompt files inside.
@@ -145,73 +153,66 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
   );
 }
 
-/** Every tab id, for `useTabState` to resolve a remembered (or passed-in) one against. */
-const TAB_IDS = KIND_TABS.map((tab) => tab.id);
+/** A row is its artifact (or its graded file's synthetic id): unique across the whole table. */
+const rowId = (row: SetupRow) => String(row.id);
 
-/** A row is its artifact: one database id, unique across the whole inventory. */
-const rowId = (row: ArtifactView) => String(row.id);
-
-/** The row with this artifact id on whichever kind's tab holds it. */
-function findRow(tables: SetupTables, id: number): ArtifactView | null {
-  for (const { id: kind } of KIND_TABS) {
-    const row = tables.rowsFor(kind).find((r) => r.id === id);
-    if (row) return row;
-  }
-  return null;
-}
-
-function Inventory({
-  data,
-  detected,
-  navigate,
-  initialTab,
-  onRefetch,
-}: {
-  data: SetupView;
-  detected: HarnessInfo[];
-  navigate: Navigate;
-  initialTab?: ArtifactKind;
-  /** Reloads the inventory — how a saved skill's new size reaches the table. */
-  onRefetch: () => Promise<void>;
-}) {
-  // Stable so `columnsFor`'s per-`ctx` cache can hit; see `useSetupTables`.
-  const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
-  const tables = useSetupTables(data, openDetail);
-  const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
-  // The *id* of the artifact whose sheet is open, not the row itself. Held
-  // here rather than in `KindTable` so it survives that component's prop
-  // changes, and so the drawer renders over the whole inventory rather than
-  // inside a tab panel.
-  //
-  // An id rather than a snapshot because the row is re-derived below: saving
-  // an edited `name:` changes what a skill is called, and a header pinned to
-  // the row as it was at click time would keep announcing the old name until
-  // the sheet was closed and reopened.
-  const [openId, setOpenId] = useState<number | null>(null);
-  const openArtifact = useMemo(
-    () => (openId === null ? null : findRow(tables, openId)),
-    [openId, tables],
-  );
-
-  // A deep link names the tab it means; the remembered one only decides where
-  // an unqualified visit lands. `useTabState` reads storage first, so without
-  // this the link would lose to wherever the user last was.
+/**
+ * The one table over every kind (spec §4). The chips pick a kind, the summary
+ * line a status filter; both start from a deep link's `target` when there is
+ * one. Rows arrive Kind then Name, so every slice starts in that order.
+ */
+function Inventory({ data, files, detected, navigate, target, onRefetch }: InventoryProps) {
+  const projectNames = useMemo(() => projectNameMap(data.projects), [data]);
+  const rows = useMemo(() => byKindThenName(setupRows(data, files)), [data, files]);
+  // Over the whole setup, not the slice: "costly" means the same on every chip.
+  const costBar = useMemo(() => costThreshold(rows), [rows]);
+  const [kind, setKind] = useState<KindFilter>(target?.kind ?? "all");
+  const [filter, setFilter] = useState<SetupFilter>(target?.filter ?? "all");
+  // A deep link names the slice it means, even when Setup is already mounted.
   useEffect(() => {
-    if (initialTab) setActive(initialTab);
-  }, [initialTab, setActive]);
+    if (target?.kind) setKind(target.kind);
+  }, [target?.kind]);
+  useEffect(() => {
+    if (target?.filter) setFilter(target.filter);
+  }, [target?.filter]);
 
-  // Identity-stable per project set, which is all `DataTable`'s memoised
-  // filtering asks of it. `scopeLabel` is the column's own label rule, so
-  // searching "posthog" or a project name finds exactly the rows whose Scope
-  // cell reads that way; `plugin_name` is searched directly as well, for a
-  // row that names a plugin without being scanned out of one.
-  const search = useMemo<DataTableSearch<ArtifactView>>(
+  // Stable so `unifiedColumns`' per-`ctx` cache can hit.
+  const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
+  const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openDetail, projectNames }), [openDetail, projectNames]);
+
+  const kindCounts = useMemo(() => {
+    const out: Partial<Record<KindFilter, number>> = { all: rows.length };
+    for (const r of rows) out[r.kind] = (out[r.kind] ?? 0) + 1;
+    return out;
+  }, [rows]);
+  const ofKind = useMemo(() => (kind === "all" ? rows : rows.filter((r) => r.kind === kind)), [rows, kind]);
+  const counts = useMemo(() => setupFilterCounts(ofKind, costBar), [ofKind, costBar]);
+  const visible = useMemo(() => applySetupFilter(ofKind, filter, costBar), [ofKind, filter, costBar]);
+  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, false), ctx);
+  const pills = useMemo(() => scopePillsFor(ofKind, projectNames), [ofKind, projectNames]);
+  // `scopeLabel` is the Scope column's own label rule (a graded-only row's
+  // project label included), so searching a project or plugin name finds
+  // exactly the rows whose Scope cell reads that way.
+  const search = useMemo<DataTableSearch<SetupRow>>(
     () => ({
       placeholder: SEARCH_PLACEHOLDER,
-      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, tables.projectNames)],
+      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, projectNames)],
     }),
-    [tables.projectNames],
+    [projectNames],
   );
+  const { grade } = useOverallGrade();
+  const templates = useTemplatePicker();
+  const [picking, setPicking] = useState(false);
+  // The *id* of the open row, re-derived below so a rename or a rescan shows
+  // through — and a row a rescan removed closes its sheet.
+  const [openId, setOpenId] = useState<number | null>(null);
+  const open = useMemo(() => (openId === null ? null : (rows.find((r) => r.id === openId) ?? null)), [openId, rows]);
+
+  const onRowClick = (row: SetupRow) => {
+    // Until the viewer gains its Findings tab (Task 3.9), a graded instruction still opens Detail.
+    if (row.kind === "rule" && row.file_id) openDetail(row.file_id);
+    else setOpenId(row.id);
+  };
 
   return (
     <>
@@ -221,95 +222,68 @@ function Inventory({
             {harnessSummary(h)}
           </span>
         ))}
-        <span className="setup-harness setup-harness--scan">
-          Last scan {relativeSession(lastScanAt(detected))}
-        </span>
+        <span className="setup-harness setup-harness--scan">Last scan {relativeSession(lastScanAt(detected))}</span>
       </p>
-
-      <Tabs items={tables.tabs} active={active} onChange={setActive} ariaLabel="Setup kinds">
-        {(id) => {
-          // `Tabs` only ever calls back with an id from `items`, but resolving
-          // it against `KIND_TABS` keeps the kind typed without a cast.
-          const tab = KIND_TABS.find((candidate) => candidate.id === id) ?? KIND_TABS[0];
-          return (
-            <KindTable
-              tab={tab}
-              tables={tables}
-              search={search}
-              onOpenArtifact={(row) => setOpenId(row.id)}
-            />
-          );
-        }}
-      </Tabs>
-
-      {/* A rescan can remove the artifact outright, in which case
-          `openArtifact` resolves to nothing and the sheet goes with it —
-          better than a drawer describing a file that is no longer there.
-          Both sheets are keyed on the artifact so switching rows remounts
-          them rather than leaving the previous row's draft or read behind. */}
-      {openArtifact?.kind === "skill" ? (
+      <SummaryLine grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
+      <DataTable
+        ariaLabel="Setup"
+        stateKey={TABLE_STATE_KEY}
+        columns={columns}
+        rows={visible}
+        rowId={rowId}
+        search={search}
+        pills={pills}
+        // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), in every slice.
+        onRowClick={onRowClick}
+        density="compact"
+        virtualize
+        empty={{ title: EMPTY_FILTERED, hint: EMPTY_HINT }}
+        // Next to the search and Scope (spec §4.3); the toolbar wraps, so the
+        // chips drop to their own line in a narrow window.
+        toolbarRight={
+          <>
+            <KindChips counts={kindCounts} active={kind} onChange={setKind} />
+            {kind === "rule" && (
+              <Button size="sm" onClick={() => setPicking(true)}>
+                <Icon name="plus" /> {NEW_FROM_TEMPLATE}
+              </Button>
+            )}
+          </>
+        }
+      />
+      {picking && (
+        <TemplatePicker
+          templates={templates.templates}
+          entitled={templates.entitled}
+          loading={templates.loading}
+          onApply={templates.applyTemplate}
+          onClose={() => setPicking(false)}
+          navigate={navigate}
+        />
+      )}
+      {/* The sheets as they are before the viewer (Task 3.9 replaces both): a
+          skill opens SkillPanel, every other row ArtifactPanel; a graded
+          instruction never gets here (onRowClick sends it to Detail). Keyed
+          on the row so switching rows remounts them rather than leaving the
+          previous row's draft or read behind. */}
+      {open?.kind === "skill" ? (
         <SkillPanel
-          key={openArtifact.id}
-          skill={openArtifact}
-          scope={scopeLabel(openArtifact, tables.projectNames)}
+          key={open.id}
+          skill={open}
+          scope={scopeLabel(open, projectNames)}
           onClose={() => setOpenId(null)}
-          // The save already updated `artifacts.bytes`; refetching is what
-          // carries that into the Size column without waiting for a rescan.
+          // The save already updated `artifacts.bytes`; refetching carries
+          // that into the table without waiting for a rescan.
           onSaved={() => void onRefetch()}
         />
-      ) : openArtifact ? (
+      ) : open ? (
         <ArtifactPanel
-          key={openArtifact.id}
-          artifact={openArtifact}
-          scope={scopeLabel(openArtifact, tables.projectNames)}
+          key={open.id}
+          artifact={open}
+          scope={scopeLabel(open, projectNames)}
           onClose={() => setOpenId(null)}
         />
       ) : null}
     </>
-  );
-}
-
-/**
- * One kind's table. Rendered by the tab panel, so a tab switch changes this
- * component's props rather than remounting it — which is exactly what
- * `DataTable`'s `stateKey` handling expects: each kind keeps its own search,
- * pills and sort under `pj.table.setup.<kind>`.
- */
-function KindTable({
-  tab,
-  tables,
-  search,
-  onOpenArtifact,
-}: {
-  tab: TabItem & { id: ArtifactKind };
-  tables: SetupTables;
-  search: DataTableSearch<ArtifactView>;
-  /** Opens a row's detail sheet. */
-  onOpenArtifact: (artifact: ArtifactView) => void;
-}) {
-  const { rowsFor, ctx, projectNames, costBar } = tables;
-  const rows = rowsFor(tab.id);
-  // A graded rule opens its Detail screen, which says far more than a sheet
-  // could; every other row — an ungraded rule included — opens its sheet.
-  const onRowClick = (row: ArtifactView) => {
-    if (row.kind === "rule" && row.file_id) ctx.onOpen(row.file_id);
-    else onOpenArtifact(row);
-  };
-
-  return (
-    <DataTable
-      ariaLabel={tab.label}
-      stateKey={TABLE_STATE_PREFIX + tab.id}
-      columns={columnsFor(tab.id, ctx)}
-      rows={rows}
-      rowId={rowId}
-      search={search}
-      pills={pillsFor(tab.id, rows, costBar, projectNames)}
-      defaultSort={defaultSortFor(tab.id)}
-      onRowClick={onRowClick}
-      density="compact"
-      virtualize
-      empty={{ title: EMPTY_TITLE[tab.id], hint: EMPTY_HINT }}
-    />
   );
 }

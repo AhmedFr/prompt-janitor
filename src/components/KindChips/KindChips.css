@@ -1,5 +1,8 @@
+/* Nine chips need ~850px; below that they wrap rather than scroll sideways
+   (the Setup content area is ~750px in a 1024px window). */
 .kind-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
