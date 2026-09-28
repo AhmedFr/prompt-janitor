@@ -116,22 +116,6 @@
   font-weight: 700;
 }
 
-.grade-fg--a {
-  color: var(--grade-a);
-}
-.grade-fg--b {
-  color: var(--grade-b);
-}
-.grade-fg--c {
-  color: var(--grade-c);
-}
-.grade-fg--d {
-  color: var(--grade-d);
-}
-.grade-fg--f {
-  color: var(--grade-f);
-}
-
 .d-issue-list {
   display: flex;
   flex-direction: column;

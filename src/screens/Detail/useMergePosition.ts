@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { commands, isTauri, type EffectiveRule, type FileDetail, type SetupView } from "@/lib/ipc";
-import { isUnlocked } from "@/lib/monetization";
 import type { MergePositionState } from "./MergePosition";
 import {
   globalRuleStack,
@@ -10,63 +9,6 @@ import {
   referencedArtifacts,
 } from "./mergePosition.util";
 
-/** Loads a single file's source + issues whenever the selected file changes. */
-export function useFileDetail(fileId: string | null) {
-  const [detail, setDetail] = useState<FileDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [aiReady, setAiReady] = useState(false);
-  const [entitled, setEntitled] = useState(isUnlocked(undefined));
-
-  /** Re-fetch the file from disk + DB (after an apply/undo, or a fresh scan). */
-  const reload = useCallback(async () => {
-    if (!isTauri || !fileId) return;
-    const res = await commands.getFileDetail(fileId);
-    setDetail(res.status === "ok" ? res.data : null);
-  }, [fileId]);
-
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      if (!isTauri || !fileId) {
-        setDetail(null);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      const res = await commands.getFileDetail(fileId);
-      if (!active) return;
-      setDetail(res.status === "ok" ? res.data : null);
-      setLoading(false);
-    }
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [fileId]);
-
-  // Provider config + entitlement are stable across files — load once. A rewrite
-  // needs a provider + key (or `suggest_fix` fails) AND a paid license (or it's
-  // gated server-side).
-  useEffect(() => {
-    let active = true;
-    async function loadGates() {
-      if (!isTauri) return;
-      const [cfg, ent] = await Promise.all([commands.getAiConfig(), commands.getEntitlement()]);
-      if (!active) return;
-      if (cfg.status === "ok") setAiReady(cfg.data.provider !== "none" && cfg.data.has_key);
-      setEntitled(isUnlocked(ent.status === "ok" ? ent.data.paid : undefined));
-    }
-    void loadGates();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const mergePosition = useMergePosition(detail);
-
-  return { detail, loading, aiReady, entitled, reload, mergePosition };
-}
-
 /**
  * Places the viewed file in its harness's merge order.
  *
@@ -75,7 +17,7 @@ export function useFileDetail(fileId: string | null) {
  * for a full inventory walk to redraw an unchanged panel. Setup's `useSetup`
  * fetches the same view; a shared cache across screens is a later refactor.
  */
-function useMergePosition(detail: FileDetail | null): MergePositionState {
+export function useMergePosition(detail: FileDetail | null): MergePositionState {
   const [setup, setSetup] = useState<SetupView | null>(null);
   // A failed lookup is not an empty setup: reporting `null` here would leave the
   // panel spinning forever, and `[]` would claim nothing applies to the file.

@@ -9,10 +9,13 @@ import { commands, isTauri, type DimensionScore, type FileDetail, type FixSugges
 import { openExternal } from "@/lib/open-external";
 import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE, PAYMENTS_ENABLED } from "@/lib/monetization";
 import type { Navigate } from "@/App/App.types";
-import { useFileDetail } from "./useFileDetail";
+import { useFileDetail } from "@/lib/useFileDetail";
+import { fixableEdits } from "@/lib/fixableEdits";
+import { useMergePosition } from "./useMergePosition";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
 import { NlRulesPanel } from "./NlRulesPanel";
 import { MergePosition, type MergePositionState } from "./MergePosition";
+import "@/styles/grades.css";
 import "./Detail.css";
 
 export interface DetailProps {
@@ -21,7 +24,8 @@ export interface DetailProps {
 }
 
 export function Detail({ fileId, navigate }: DetailProps) {
-  const { detail, loading, aiReady, entitled, reload, mergePosition } = useFileDetail(fileId);
+  const { detail, loading, aiReady, entitled, reload } = useFileDetail(fileId);
+  const mergePosition = useMergePosition(detail);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
@@ -47,9 +51,7 @@ export function Detail({ fileId, navigate }: DetailProps) {
       void openExternal(POLAR_CHECKOUT_URL);
       return;
     }
-    const edits = detail.issues
-      .filter((i) => i.fix_from && i.fix_to)
-      .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
+    const edits = fixableEdits(detail);
     if (edits.length === 0) return;
     setAutoBusy(true);
     setAutoError(null);
