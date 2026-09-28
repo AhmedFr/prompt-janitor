@@ -7,7 +7,8 @@ import { Settings } from "@/screens/Settings";
 import { SETTINGS_TABS } from "@/screens/Settings/Settings.constants";
 import { FoldersTabBody } from "@/screens/Settings/FoldersTab";
 import { KIND_LABEL as USAGE_KIND_LABEL } from "@/lib/usage";
-import { LABEL } from "@/lib/vocabulary";
+import { LABEL, KIND_CHIP_ORDER, KIND_LABEL } from "@/lib/vocabulary";
+import { KindChips } from "@/components/KindChips";
 
 vi.mock("@/components/Sidebar/useSidebar", () => ({ useSidebar: () => ({ projects: [], counts: {} }) }));
 vi.mock("@/screens/Settings/useSettings", () => ({
@@ -87,5 +88,15 @@ describe("glossary in the UI (spec §3.3)", () => {
 
   it("points empty Projects at the Folders tab, not at Setup", () => {
     expect(EMPTY_HINT).toBe("Add folder… in Settings → Folders and Prompt Janitor will read what it finds inside.");
+  });
+
+  it("renders the kind chips as All, then every kind's vocabulary label, in chip order", () => {
+    render(<KindChips counts={{}} active="all" onChange={vi.fn()} />);
+    const labels = screen.getAllByRole("radio").map((b) => b.textContent?.replace(/\d+$/, ""));
+    expect(labels).toEqual(KIND_CHIP_ORDER.map((k) => (k === "all" ? LABEL.all : KIND_LABEL[k])));
+    expect(labels).toEqual([
+      "All", "Instructions", "Skills", "Agents", "Commands", "MCP servers", "Hooks", "Plugins", "Config",
+    ]);
+    for (const retired of ["Rules", "Prompts", "Settings", "MCP"]) expect(labels).not.toContain(retired);
   });
 });
