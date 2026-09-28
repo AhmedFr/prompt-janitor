@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactView, FileRow, SetupView } from "@/lib/ipc";
-import { setupRows, syntheticId } from "./setupRows.util";
+import { byKindThenName, setupRows, syntheticId, type SetupRow } from "./setupRows.util";
 
 const artifact = (over: Partial<ArtifactView>): ArtifactView => ({
   id: 1,
@@ -92,5 +92,33 @@ describe("syntheticId", () => {
     expect(syntheticId("/a/b")).toBeLessThan(0);
     expect(syntheticId("/a/b")).toBe(syntheticId("/a/b"));
     expect(syntheticId("/a/b")).not.toBe(syntheticId("/a/c"));
+  });
+});
+
+const row = (over: Partial<SetupRow>): SetupRow => ({
+  ...artifact({}),
+  origin: "inventory",
+  project_label: null,
+  project_path: null,
+  load_order: null,
+  ...over,
+});
+
+describe("byKindThenName", () => {
+  it("orders by chip order, then by name without regard to case", () => {
+    const rows = [
+      row({ id: 1, kind: "skill", name: "zeta" }),
+      row({ id: 2, kind: "rule", name: "CLAUDE.md" }),
+      row({ id: 3, kind: "skill", name: "Alpha" }),
+      row({ id: 4, kind: "mcp_server", name: "github" }),
+      row({ id: 5, kind: "rule", name: "AGENTS.md" }),
+    ];
+    expect(byKindThenName(rows).map((r) => r.id)).toEqual([5, 2, 3, 1, 4]);
+  });
+
+  it("does not mutate its input", () => {
+    const rows = [row({ id: 1, name: "b" }), row({ id: 2, name: "a" })];
+    byKindThenName(rows);
+    expect(rows.map((r) => r.id)).toEqual([1, 2]);
   });
 });

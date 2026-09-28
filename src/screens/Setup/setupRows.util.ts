@@ -1,4 +1,5 @@
 import type { ArtifactView, FileRow, SetupView } from "@/lib/ipc";
+import { KIND_CHIP_ORDER } from "@/lib/vocabulary";
 
 /** Where a row came from: the harness inventory, or a graded file the inventory never saw. */
 export type RowOrigin = "inventory" | "graded";
@@ -78,4 +79,15 @@ export function setupRows(setup: SetupView, files: FileRow[]): SetupRow[] {
   const known = new Set(inventory.map((r) => r.file_id).filter((id): id is string => id !== null));
   const graded = files.filter((f) => !known.has(f.id)).map(fromGraded);
   return [...inventory, ...graded];
+}
+
+const KIND_RANK = new Map(KIND_CHIP_ORDER.map((k, i) => [k, i]));
+
+/** Every slice's default order (spec §4.4): kind in chip order, then name, case-insensitive. */
+export function byKindThenName(rows: SetupRow[]): SetupRow[] {
+  return [...rows].sort(
+    (a, b) =>
+      (KIND_RANK.get(a.kind) ?? 0) - (KIND_RANK.get(b.kind) ?? 0) ||
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
 }

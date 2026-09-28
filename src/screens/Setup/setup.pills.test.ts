@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ArtifactKind, ArtifactView, UsageStat } from "@/lib/ipc";
-import { pillsFor } from "./setup.pills";
+import { pillsFor, scopePillsFor } from "./setup.pills";
+import type { SetupRow } from "./setupRows.util";
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
   total: 5,
@@ -221,5 +222,37 @@ describe("pillsFor: identity stability", () => {
     const forSkill = pillsFor("skill", rows, 1000, PROJECT_NAMES);
     expect(pillsFor("agent", rows, 1000, PROJECT_NAMES)).not.toBe(forSkill);
     expect(pillsFor("skill", rows, 2000, PROJECT_NAMES)).not.toBe(forSkill);
+  });
+});
+
+describe("scopePillsFor: one Scope group over every kind", () => {
+  const row = (o: Partial<SetupRow>): SetupRow => ({
+    ...artifact(o),
+    origin: "inventory",
+    project_label: null,
+    project_path: null,
+    load_order: null,
+    ...o,
+  });
+
+  it("offers Global, each project and each plugin present across mixed kinds", () => {
+    const rows = [
+      row({ id: 1, kind: "rule", layer: "global" }),
+      row({ id: 2, kind: "hook", layer: "project", path: "/code/widgets/.claude/settings.json" }),
+      row({ id: 3, kind: "skill", layer: "plugin", plugin_name: "superpowers" }),
+    ];
+    const groups = scopePillsFor(rows, PROJECT_NAMES);
+    expect(groups.map((g) => g.id)).toEqual(["scope"]);
+    expect(groups[0].options.map((o) => o.label)).toEqual(["Global", "widgets", "superpowers"]);
+  });
+
+  it("builds its options from scoped kinds only — a plugin manifest row adds no option", () => {
+    const rows = [row({ id: 1, kind: "rule" }), row({ id: 2, kind: "plugin", layer: "plugin", plugin_name: "posthog" })];
+    expect(scopePillsFor(rows, PROJECT_NAMES)[0].options.map((o) => o.label)).toEqual(["Global"]);
+  });
+
+  it("offers no Scope group when no row in the slice has a scope", () => {
+    const rows = [row({ id: 1, kind: "plugin", layer: "plugin", plugin_name: "posthog" })];
+    expect(scopePillsFor(rows, PROJECT_NAMES)).toEqual([]);
   });
 });

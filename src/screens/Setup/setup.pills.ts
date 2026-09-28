@@ -2,6 +2,7 @@ import type { ArtifactKind, ArtifactView } from "@/lib/ipc";
 import type { PillGroup } from "@/components/DataTable";
 import { ERROR_RATE_THRESHOLD } from "./Setup.constants";
 import { filterCounts, matchProject } from "./setup.util";
+import type { SetupRow } from "./setupRows.util";
 
 /** Kinds whose Setup tab shows a Uses/Error %/Avg tokens column — the only ones "Never used", "Errors" and "High cost" mean anything for. */
 const USAGE_KINDS: ReadonlySet<ArtifactKind> = new Set(["skill", "agent", "command", "mcp_server"]);
@@ -152,6 +153,21 @@ function buildPills(
   return [scopeGroup(kind, rows, projectNames), statusGroup(kind, rows, costBar), bundledGroup(kind, rows)].filter(
     (group): group is PillGroup<ArtifactView> => group != null,
   );
+}
+
+/**
+ * The Scope filter over rows of every kind (Setup's single table); no group at
+ * all when no row in the slice has a scope (the Plugins chip). Not cached —
+ * the caller memoises it on the slice.
+ */
+export function scopePillsFor(rows: SetupRow[], projectNames: Map<string, string>): PillGroup<SetupRow>[] {
+  const scoped = rows.filter((r) => SCOPED_KINDS.has(r.kind));
+  if (scoped.length === 0) return [];
+  // `scopeGroup` gates on one kind; over a mixed table every scoped row
+  // counts, so it is called with a scoped kind and the rows decide. Its
+  // predicates read only ArtifactView fields, so they accept any SetupRow.
+  const group: PillGroup<SetupRow> | null = scopeGroup("skill", scoped, projectNames);
+  return group ? [group] : [];
 }
 
 /**
