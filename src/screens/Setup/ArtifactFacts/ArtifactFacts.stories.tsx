@@ -15,6 +15,8 @@ const base: ArtifactView = {
   grade: null,
   score: null,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: null,
 };
 

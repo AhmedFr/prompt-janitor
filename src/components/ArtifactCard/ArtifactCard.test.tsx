@@ -17,6 +17,8 @@ const baseArtifact: ArtifactView = {
   grade: "B",
   score: 82,
   file_id: "file-123",
+  issue_count: null,
+  worst_severity: null,
   usage: {
     total: 42,
     sessions: 12,

@@ -75,6 +75,8 @@ const skill: ArtifactView = {
   grade: "A",
   score: 91,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: null,
 };
 

@@ -63,6 +63,10 @@ pub struct ArtifactView {
     pub grade: Option<String>,
     pub score: Option<u32>,
     pub file_id: Option<String>,
+    /// Open findings on the graded file, when the grader saw one.
+    pub issue_count: Option<u32>,
+    /// The worst of them; `None` when there are none or nothing was graded.
+    pub worst_severity: Option<crate::engine::Severity>,
     pub usage: Option<UsageStat>,
 }
 
@@ -263,9 +267,15 @@ fn usage_by_artifact(conn: &Connection) -> rusqlite::Result<HashMap<i64, UsageSt
     Ok(out)
 }
 
-const ARTIFACT_COLUMNS: &str = "SELECT a.id, a.harness, a.layer, a.kind, a.name, a.path,
-            a.plugin_name, a.description, a.bytes, f.grade, f.score, f.id, a.project_path
-       FROM artifacts a LEFT JOIN files f ON f.id = a.file_id";
+fn artifact_columns() -> String {
+    format!(
+        "SELECT a.id, a.harness, a.layer, a.kind, a.name, a.path,
+                a.plugin_name, a.description, a.bytes, f.grade, f.score, f.id, a.project_path,
+                f.issue_count, {}
+           FROM artifacts a LEFT JOIN files f ON f.id = a.file_id",
+        crate::severity_sql::worst_severity_sql("f.id")
+    )
+}
 
 /// Maps one `ARTIFACT_COLUMNS` row. Rows whose `layer`/`kind` are not in the
 /// model are dropped by the caller (`None`) rather than guessed at.
@@ -292,6 +302,8 @@ fn artifact_row(
         grade: r.get(9)?,
         score: r.get::<_, Option<i64>>(10)?.map(as_u32),
         file_id: r.get(11)?,
+        issue_count: r.get::<_, Option<i64>>(13)?.map(as_u32),
+        worst_severity: crate::severity_sql::parse_severity(r.get(14)?),
         usage: usage.get(&id).cloned(),
     }))
 }
@@ -303,7 +315,8 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
     let order = kind_order("a.kind");
 
     let mut global_stmt = conn.prepare(&format!(
-        "{ARTIFACT_COLUMNS} WHERE a.project_path IS NULL ORDER BY {order}, a.name"
+        "{} WHERE a.project_path IS NULL ORDER BY {order}, a.name",
+        artifact_columns()
     ))?;
     let mut global = Vec::new();
     for row in global_stmt.query_map([], |r| artifact_row(r, &usage))? {
@@ -316,7 +329,8 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
     // inventoried there.
     let mut per_project: HashMap<(String, String), Vec<ArtifactView>> = HashMap::new();
     let mut proj_stmt = conn.prepare(&format!(
-        "{ARTIFACT_COLUMNS} WHERE a.project_path IS NOT NULL ORDER BY {order}, a.name"
+        "{} WHERE a.project_path IS NOT NULL ORDER BY {order}, a.name",
+        artifact_columns()
     ))?;
     for row in proj_stmt.query_map([], |r| {
         Ok((
@@ -739,6 +753,37 @@ mod tests {
         assert_eq!(v.projects[0].name, "app");
         assert!(v.projects[0].exists);
         assert!(!v.projects[1].exists);
+    }
+
+    #[test]
+    fn setup_view_carries_each_graded_rows_finding_count_and_worst_severity() {
+        let (conn, _home) = seeded();
+        let v = setup_view(&conn).unwrap();
+        let rule = v
+            .global
+            .iter()
+            .find(|a| a.kind == ArtifactKind::Rule)
+            .unwrap();
+        let file_id = rule.file_id.clone().unwrap();
+        let expected: i64 = conn
+            .query_row(
+                "SELECT issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rule.issue_count, Some(expected as u32));
+        let has_any: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM issues WHERE file_id = ?1",
+                [&file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rule.worst_severity.is_some(), has_any > 0);
+        // An ungraded item has neither.
+        let skill = v.global.iter().find(|a| a.name == "adapt").unwrap();
+        assert_eq!((skill.issue_count, skill.worst_severity), (None, None));
     }
 
     #[test]

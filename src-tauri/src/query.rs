@@ -294,18 +294,21 @@ pub struct FileRow {
     pub grade: Grade,
     pub score: u32,
     pub issue_count: u32,
+    /// The worst open finding on this file; `None` when it has none.
+    pub worst_severity: Option<crate::engine::Severity>,
     pub modified: Option<String>,
 }
 
 /// All scanned files, best grade first.
 pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
-    let mut stmt = conn.prepare(
+    let mut stmt = conn.prepare(&format!(
         "SELECT f.id, f.path, f.kind, p.name, f.grade, f.score, f.issue_count, f.modified_at,
-                rtrim(f.project_id, '/')
+                rtrim(f.project_id, '/'), {}
          FROM files f JOIN projects p ON p.id = f.project_id
          ORDER BY CASE f.grade WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2 WHEN 'D' THEN 3 ELSE 4 END,
                   p.name, f.kind",
-    )?;
+        crate::severity_sql::worst_severity_sql("f.id")
+    ))?;
     let rows = stmt
         .query_map([], |r| {
             let path: String = r.get(1)?;
@@ -326,6 +329,7 @@ pub fn list_files(conn: &Connection) -> rusqlite::Result<Vec<FileRow>> {
                 issue_count: r.get::<_, i64>(6)? as u32,
                 modified: r.get::<_, Option<String>>(7)?,
                 project_id: r.get(8)?,
+                worst_severity: crate::severity_sql::parse_severity(r.get(9)?),
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;

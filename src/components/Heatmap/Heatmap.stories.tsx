@@ -14,6 +14,7 @@ const files: FileRow[] = Array.from({ length: 24 }, (_, i) => ({
   grade: grades[i % 5],
   score: 100 - i * 3,
   issue_count: 0,
+  worst_severity: null,
   modified: "1",
 }));
 

@@ -335,6 +335,10 @@ export type ArtifactView = {
 	grade: string | null,
 	score: number | null,
 	file_id: string | null,
+	/**  Open findings on the graded file, when the grader saw one. */
+	issue_count: number | null,
+	/**  The worst of them; `None` when there are none or nothing was graded. */
+	worst_severity: Severity | null,
 	usage: UsageStat | null,
 };
 
@@ -423,6 +427,8 @@ export type FileRow = {
 	grade: Grade,
 	score: number,
 	issue_count: number,
+	/**  The worst open finding on this file; `None` when it has none. */
+	worst_severity: Severity | null,
 	modified: string | null,
 };
 

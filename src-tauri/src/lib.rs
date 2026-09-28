@@ -31,6 +31,7 @@ mod scan;
 mod scan_folders;
 pub mod scanner;
 mod scheduler;
+mod severity_sql;
 mod store;
 pub mod templates;
 mod tray;

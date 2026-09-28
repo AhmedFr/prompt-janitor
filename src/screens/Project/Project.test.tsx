@@ -79,6 +79,7 @@ const file = (o: Partial<FileRow> = {}): FileRow => ({
   grade: "B",
   score: 80,
   issue_count: 3,
+  worst_severity: null,
   modified: "1700000000",
   ...o,
 });
@@ -96,6 +97,8 @@ const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   grade: null,
   score: null,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: null,
   ...o,
 });

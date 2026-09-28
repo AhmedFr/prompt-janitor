@@ -12,6 +12,7 @@ const file = (o: Partial<FileRow> = {}): FileRow => ({
   grade: "B",
   score: 80,
   issue_count: 1,
+  worst_severity: null,
   modified: "1700000000",
   ...o,
 });

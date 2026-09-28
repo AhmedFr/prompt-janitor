@@ -27,6 +27,8 @@ const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   grade: "A",
   score: 92,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: {
     total: 42,
     sessions: 12,

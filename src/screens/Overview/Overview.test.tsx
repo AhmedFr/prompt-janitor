@@ -78,6 +78,7 @@ const mockFiles: FileRow[] = [
     grade: "A",
     score: 95,
     issue_count: 0,
+    worst_severity: null,
     modified: "1234567890",
   },
   {
@@ -90,6 +91,7 @@ const mockFiles: FileRow[] = [
     grade: "B",
     score: 82,
     issue_count: 3,
+    worst_severity: null,
     modified: "1234567890",
   },
   {
@@ -102,6 +104,7 @@ const mockFiles: FileRow[] = [
     grade: "C",
     score: 65,
     issue_count: 5,
+    worst_severity: null,
     modified: "1234567890",
   },
   {
@@ -114,6 +117,7 @@ const mockFiles: FileRow[] = [
     grade: "D",
     score: 50,
     issue_count: 8,
+    worst_severity: null,
     modified: "1234567890",
   },
   {
@@ -126,6 +130,7 @@ const mockFiles: FileRow[] = [
     grade: "F",
     score: 30,
     issue_count: 12,
+    worst_severity: null,
     modified: "1234567890",
   },
 ];

@@ -13,6 +13,7 @@ const f = (id: string, grade: FileRow["grade"], score: number): FileRow => ({
   grade,
   score,
   issue_count: 0,
+  worst_severity: null,
   modified: "1",
 });
 
