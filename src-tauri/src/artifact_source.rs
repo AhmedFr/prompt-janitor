@@ -79,10 +79,15 @@ pub const MAX_CONFIG_BYTES: usize = 64 * 1024 * 1024;
 
 /// The artifact kinds this module will write.
 ///
-/// Only skills for now. Agents and commands are the same shape and would slot
-/// in here unchanged, but each one added is a new file the app can overwrite,
-/// so the list grows when a screen actually needs it and not before.
-const EDITABLE_KINDS: &[&str] = &["skill"];
+/// `rule` only when the file is markdown: a `.cursorrules` or other
+/// plain-text rule file has no edit view worth offering, and every kind
+/// added is a new file the app can overwrite.
+const EDITABLE_KINDS: &[&str] = &["skill", "agent", "command", "rule"];
+
+/// Whether this row's file may be written from the viewer.
+fn is_editable(kind: &str, path: &str) -> bool {
+    EDITABLE_KINDS.contains(&kind) && (kind != "rule" || format_of(path) == SourceFormat::Markdown)
+}
 
 /// The kinds that are an entry inside a shared JSON file rather than a file of
 /// their own. They read back as the harness's redacted excerpt, never raw.
@@ -130,7 +135,7 @@ fn row(conn: &Connection, artifact_id: i32) -> Result<Row, String> {
 /// row — from being written through the panel.
 fn editable_path(conn: &Connection, artifact_id: i32) -> Result<String, String> {
     let Row { kind, path, .. } = row(conn, artifact_id)?;
-    if !EDITABLE_KINDS.contains(&kind.as_str()) {
+    if !is_editable(kind.as_str(), &path) {
         return Err(format!("A {kind} can't be edited here."));
     }
     Ok(path)
@@ -195,7 +200,7 @@ pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource
     let (content, meta) = read_capped(&path, MAX_BYTES)?;
     Ok(ArtifactSource {
         format: format_of(&path),
-        editable: EDITABLE_KINDS.contains(&row.kind.as_str()),
+        editable: is_editable(row.kind.as_str(), &path),
         bytes: content.len() as i32,
         content,
         path,
@@ -422,17 +427,46 @@ mod tests {
     }
 
     #[test]
-    fn an_agent_reads_as_markdown_but_is_not_editable() {
+    fn an_agent_reads_as_editable_markdown() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("reviewer.md");
         std::fs::write(&path, "---\nname: reviewer\n---\nReview.").unwrap();
         let conn = test_conn();
         let id = insert_artifact(&conn, "agent", path.to_str().unwrap());
-
         let source = read_source(&conn, id).unwrap();
-        assert_eq!(source.content, "---\nname: reviewer\n---\nReview.");
         assert_eq!(source.format, SourceFormat::Markdown);
-        assert!(!source.editable);
+        assert!(source.editable);
+    }
+
+    #[test]
+    fn a_markdown_instruction_file_is_editable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("CLAUDE.md");
+        std::fs::write(&path, "# Rules\n").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "rule", path.to_str().unwrap());
+        assert!(read_source(&conn, id).unwrap().editable);
+    }
+
+    #[test]
+    fn a_cursorrules_instruction_file_stays_read_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".cursorrules");
+        std::fs::write(&path, "be nice").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "rule", path.to_str().unwrap());
+        assert!(!read_source(&conn, id).unwrap().editable);
+        assert!(editable_path(&conn, id).is_err());
+    }
+
+    #[test]
+    fn a_settings_file_is_never_editable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "settings", path.to_str().unwrap());
+        assert!(editable_path(&conn, id).is_err());
     }
 
     /// A plugin's row names its install directory; it reads as the manifest
