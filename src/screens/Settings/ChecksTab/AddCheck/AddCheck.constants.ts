@@ -2,9 +2,10 @@ import type { Severity } from "@/lib/ipc";
 import type { RuleTabId } from "../ChecksLibrary/ChecksLibrary.types";
 import type { RuleDraft, RuleKind } from "./AddCheck.types";
 
-export const SCREEN_TITLE = "New check";
+/** The form's in-tab heading — not a screen title; it sits inside Settings' own toolbar. */
+export const FORM_HEADING = "New check";
 
-/** The toolbar's back arrow — it abandons the flow, so it is named for where it lands. */
+/** The back arrow's accessible name — it abandons the flow, so it is named for where it lands. */
 export const BACK_TO_CHECKS_LABEL = "Back to checks";
 
 /** Where Cancel goes when the flow was reached without a tab to return to. */

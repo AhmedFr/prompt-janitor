@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { AddCheck } from "./AddCheck";
-import "@/styles/shell.css";
 
 /**
- * Writing a check, as its own form: choose the kind, fill three fields, and
- * land back on the rule table the new check belongs to. Storybook has no
+ * Writing a check: choose the kind, fill three fields, and land back on the
+ * rule table the new check belongs to. It has no screen chrome of its own —
+ * it renders inside the Checks tab's body, in the place `ChecksLibrary`
+ * otherwise holds — so the decorator here is the same `.page` wrapper
+ * Settings puts around every tab, not a full-screen frame.  Storybook has no
  * Tauri to ask about a provider, so `aiReady` is passed explicitly — in the
  * app it comes from `get_ai_config`.
  */
@@ -12,10 +14,9 @@ const meta = {
   title: "Settings/AddCheck",
   component: AddCheck,
   args: { onDone: () => {}, aiReady: true },
-  parameters: { layout: "fullscreen" },
   decorators: [
     (Story) => (
-      <div style={{ height: "100vh", background: "var(--bg)" }}>
+      <div className="page" style={{ maxWidth: 720 }}>
         <Story />
       </div>
     ),

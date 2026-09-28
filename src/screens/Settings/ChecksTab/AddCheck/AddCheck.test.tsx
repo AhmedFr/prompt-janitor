@@ -76,6 +76,20 @@ describe("AddCheck", () => {
     expect(screen.queryByRole("textbox", { name: /Check name/ })).not.toBeInTheDocument();
   });
 
+  /**
+   * `AddCheck` renders inside the Checks tab's body, in the place
+   * `ChecksLibrary` otherwise holds — Settings already owns the one screen
+   * toolbar and its drag region. A second one nested inside it (as this
+   * screen used to render) would show up as two title bars stacked on top
+   * of each other.
+   */
+  it("renders no screen chrome of its own — no drag region, no nested toolbar", () => {
+    const { container } = renderScreen();
+    expect(container.querySelector("[data-tauri-drag-region]")).not.toBeInTheDocument();
+    expect(container.querySelector(".screen")).not.toBeInTheDocument();
+    expect(container.querySelector(".screen__toolbar")).not.toBeInTheDocument();
+  });
+
   it("opens the pattern form once Pattern check is chosen", () => {
     renderScreen();
     fireEvent.click(patternCard());

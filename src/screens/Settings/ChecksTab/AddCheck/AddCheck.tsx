@@ -18,7 +18,7 @@ import {
   NL_HINT_ID,
   SAVE_LABEL,
   SAVING_LABEL,
-  SCREEN_TITLE,
+  FORM_HEADING,
   SEVERITIES,
   SEVERITY_LABEL,
   STEP_TYPE_BLURB,
@@ -42,34 +42,30 @@ export function AddCheck({ initialType, aiReady: override, onDone }: AddCheckPro
   const state = useAddCheck({ initialType, onDone, aiReady: override });
 
   return (
-    <section className="screen">
-      <header className="screen__toolbar" data-tauri-drag-region>
+    <div className="rules-new-page">
+      <div className="add-check__header">
         <button type="button" className="add-check__back" onClick={state.cancel} aria-label={BACK_TO_CHECKS_LABEL}>
           <Icon name="chevronRight" size={14} />
         </button>
-        <h1 className="screen__title">{SCREEN_TITLE}</h1>
-      </header>
-
-      <div className="scroll-area">
-        <div className="page rules-new-page">
-          {state.kind === null ? (
-            <TypeStep aiReady={state.aiReady} onChoose={state.choose} onCancel={state.cancel} />
-          ) : (
-            <RuleForm
-              kind={state.kind}
-              draft={state.draft}
-              aiReady={state.aiReady}
-              saving={state.saving}
-              error={state.error}
-              onUpdate={state.update}
-              onBack={state.back}
-              onCancel={state.cancel}
-              onSave={() => void state.save()}
-            />
-          )}
-        </div>
+        <h2 className="add-check__title">{FORM_HEADING}</h2>
       </div>
-    </section>
+
+      {state.kind === null ? (
+        <TypeStep aiReady={state.aiReady} onChoose={state.choose} onCancel={state.cancel} />
+      ) : (
+        <RuleForm
+          kind={state.kind}
+          draft={state.draft}
+          aiReady={state.aiReady}
+          saving={state.saving}
+          error={state.error}
+          onUpdate={state.update}
+          onBack={state.back}
+          onCancel={state.cancel}
+          onSave={() => void state.save()}
+        />
+      )}
+    </div>
   );
 }
 

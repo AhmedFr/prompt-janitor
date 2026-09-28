@@ -165,7 +165,29 @@
   flex: 1;
 }
 
-/* The form's back arrow (was Detail's `.d-back`, which Task 5.5 deletes). */
+/*
+ * The form's in-tab header: back arrow plus heading, sitting inside the
+ * Checks tab's body rather than a screen toolbar of its own — Settings
+ * already owns the one toolbar and its drag region (Settings.tsx), and a
+ * second one nested inside it read as two title bars stacked on top of
+ * each other.
+ */
+.add-check__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.add-check__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The back arrow (was Detail's `.d-back`, which Task 5.5 deletes). */
 .add-check__back {
   display: flex;
   flex: 0 0 auto;
