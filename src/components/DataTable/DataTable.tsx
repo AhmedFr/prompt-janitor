@@ -78,6 +78,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     rowClassName,
     loading = false,
     stateKey,
+    onVisibleRowsChange,
   } = props;
 
   const {
@@ -104,6 +105,13 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     estimateSize: () => ROW_HEIGHT[density],
     overscan: VIRTUAL_OVERSCAN,
   });
+
+  const visibleKey = modelRows.map((r) => r.id).join("\u0000");
+  useEffect(() => {
+    onVisibleRowsChange?.(visibleKey.length > 0 ? visibleKey.split("\u0000") : []);
+    // Keyed on the ids, not the array: a new array of the same rows is not a change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey]);
 
   // Row heights are pinned per density in CSS; when that changes, every cached
   // measurement describes the old rhythm and the scroll offsets drift.

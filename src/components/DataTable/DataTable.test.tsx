@@ -805,6 +805,16 @@ describe("DataTable", () => {
     expect(rowNames()).toEqual(["Bravo"]);
   });
 
+  it("reports the visible row ids in sorted order", async () => {
+    const onVisible = vi.fn();
+    render(
+      <DataTable ariaLabel="t" stateKey="t.visible" rows={[{ id: "b", name: "B", kind: "rule", score: 2 }, { id: "a", name: "A", kind: "rule", score: 1 }]}
+        rowId={(r) => r.id} columns={[{ id: "score", header: "Score", accessorKey: "score" }]}
+        defaultSort={{ id: "score" }} empty={{ title: "none" }} onVisibleRowsChange={onVisible} />,
+    );
+    await waitFor(() => expect(onVisible).toHaveBeenLastCalledWith(["a", "b"]));
+  });
+
   it("marks the highlighted row and scrolls it into view", () => {
     const scrollIntoView = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {

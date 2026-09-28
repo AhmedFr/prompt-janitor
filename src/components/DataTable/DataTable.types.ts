@@ -130,6 +130,12 @@ export interface DataTableProps<Row> {
    */
   stateKey: string;
   ariaLabel: string;
+  /**
+   * Called with the sorted, filtered row ids whenever that list changes.
+   * Allows consumers to track which rows are visible on screen for
+   * operations like stepping through visible items.
+   */
+  onVisibleRowsChange?: (ids: string[]) => void;
 }
 
 /**
