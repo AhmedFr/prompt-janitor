@@ -1,3 +1,4 @@
+import type { ArtifactKind } from "@/lib/ipc";
 import { KIND_SINGULAR } from "@/lib/vocabulary";
 
 /** A kind as the header names it — see `@/lib/vocabulary`. */
