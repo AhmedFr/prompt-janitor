@@ -20,6 +20,7 @@ export function useFileViewer(
   format: SourceFormat | null,
   searchable: boolean,
   initialMode?: ViewMode,
+  forceSource?: boolean,
 ): FileViewerState {
   const [preferred, setMode] = useState<ViewMode | null>(initialMode ?? null);
   const [findOpen, setFindOpen] = useState(false);
@@ -27,7 +28,14 @@ export function useFileViewer(
   const [findFocus, setFindFocus] = useState(0);
 
   const available = format ? modesFor(format) : [];
-  const mode = preferred && available.includes(preferred) ? preferred : format ? defaultMode(format) : "rendered";
+  const mode =
+    forceSource && available.includes("source")
+      ? "source"
+      : preferred && available.includes(preferred)
+        ? preferred
+        : format
+          ? defaultMode(format)
+          : "rendered";
 
   const openFind = useCallback(() => {
     setFindOpen(true);

@@ -15,4 +15,6 @@ export interface CodeViewProps {
   language: CodeLanguage | null;
   /** Names the region for assistive tech ("SKILL.md source"). */
   ariaLabel: string;
+  /** 1-based line number to scroll into view and highlight. */
+  focusLine?: number | null;
 }

@@ -1,4 +1,4 @@
-import { memo, useMemo, type CSSProperties } from "react";
+import { memo, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { highlightLines } from "./codeView.util";
 import type { CodeViewProps } from "./CodeView.types";
 import "./CodeView.css";
@@ -16,16 +16,26 @@ import "./CodeView.css";
  * Memoised: find re-renders the viewer on every keystroke, and reconciling
  * 5,000 unchanged rows each time is what made typing in a long file lag.
  */
-export const CodeView = memo(function CodeView({ content, language, ariaLabel }: CodeViewProps) {
+export const CodeView = memo(function CodeView({ content, language, ariaLabel, focusLine }: CodeViewProps) {
   const lines = useMemo(() => highlightLines(content, language), [content, language]);
+  const focusedRef = useRef<HTMLDivElement | null>(null);
   // The gutter is as wide as the largest line number, so a 5,000-line file
   // does not reflow its text when the reader scrolls past line 999.
   const gutter = `${String(lines.length).length}ch`;
 
+  useEffect(() => {
+    focusedRef.current?.scrollIntoView({ block: "center" });
+  }, [focusLine]);
+
   return (
     <div className="cv" role="region" aria-label={ariaLabel} style={{ "--cv-gutter": gutter } as CSSProperties}>
       {lines.map((tokens, i) => (
-        <div className="cv__line" key={i} data-find-block="">
+        <div
+          className={i + 1 === focusLine ? "cv__line cv__line--focus" : "cv__line"}
+          key={i}
+          data-find-block=""
+          ref={i + 1 === focusLine ? focusedRef : null}
+        >
           <span className="cv__num" aria-hidden="true" data-find-skip="">
             {i + 1}
           </span>
