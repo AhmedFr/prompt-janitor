@@ -5,14 +5,21 @@
 
 use rusqlite::{Connection, OptionalExtension};
 
-/// The graded file's path, if `file_id` is one the grader recorded.
+/// The graded file's path, if `file_id` is one the grader recorded and its
+/// file is still there — the same on-disk check `open_artifact` runs, so a
+/// row the scan has not yet caught up with can't be handed to LaunchServices.
 pub fn graded_file_path(conn: &Connection, file_id: &str) -> Result<String, String> {
-    conn.query_row("SELECT path FROM files WHERE id = ?1", [file_id], |r| {
-        r.get::<_, String>(0)
-    })
-    .optional()
-    .map_err(|e| e.to_string())?
-    .ok_or_else(|| "That file is no longer in the scan.".to_string())
+    let path = conn
+        .query_row("SELECT path FROM files WHERE id = ?1", [file_id], |r| {
+            r.get::<_, String>(0)
+        })
+        .optional()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "That file is no longer in the scan.".to_string())?;
+    if !std::path::Path::new(&path).is_file() {
+        return Err("That file is no longer on disk.".to_string());
+    }
+    Ok(path)
 }
 
 /// The project folder, if some harness or the grader knows it as a project.
@@ -49,11 +56,14 @@ mod tests {
 
     #[test]
     fn a_graded_file_resolves_to_its_own_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("AGENTS.md");
+        std::fs::write(&path, "# rules\n").unwrap();
         let conn = test_conn();
-        graded(&conn, "/code/app/AGENTS.md");
+        graded(&conn, path.to_str().unwrap());
         assert_eq!(
-            graded_file_path(&conn, "/code/app/AGENTS.md").unwrap(),
-            "/code/app/AGENTS.md"
+            graded_file_path(&conn, path.to_str().unwrap()).unwrap(),
+            path.to_str().unwrap()
         );
     }
 
@@ -61,6 +71,14 @@ mod tests {
     fn an_unknown_file_id_is_refused() {
         let conn = test_conn();
         assert!(graded_file_path(&conn, "/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn a_row_whose_file_left_the_disk_is_refused() {
+        let conn = test_conn();
+        graded(&conn, "/code/app/AGENTS.md");
+        let err = graded_file_path(&conn, "/code/app/AGENTS.md").expect_err("file is gone");
+        assert!(err.contains("no longer on disk"), "got: {err}");
     }
 
     #[test]

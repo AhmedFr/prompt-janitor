@@ -262,6 +262,21 @@ pub fn opens_as_text(path: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The security gate every "reveal or open" command runs before touching
+/// LaunchServices: Reveal is always fine (Finder just selects the file), but
+/// Open refuses anything [`opens_as_text`] would not — the one place that
+/// rule is enforced, so `open_artifact` and `open_file` share it rather than
+/// each re-deciding what is safe to hand to LaunchServices.
+pub fn check_openable(path: &str, action: OpenAction) -> Result<(), String> {
+    match action {
+        OpenAction::Reveal => Ok(()),
+        OpenAction::Open if opens_as_text(path) => Ok(()),
+        OpenAction::Open => Err(
+            "Only text files open from here — use Reveal to find this one in Finder.".to_string(),
+        ),
+    }
+}
+
 /// An opaque equality token for a file's modification time.
 ///
 /// Nanoseconds since the epoch, as a string. A filesystem that cannot report
@@ -627,6 +642,18 @@ mod tests {
         assert!(!opens_as_text("/a/evil.terminal"));
         assert!(!opens_as_text("/a/tool.app"));
         assert!(!opens_as_text("/a/no-extension"));
+    }
+
+    #[test]
+    fn opening_refuses_a_command_or_app_but_allows_a_text_file() {
+        assert!(check_openable("/a/notes.md", OpenAction::Open).is_ok());
+        assert!(check_openable("/a/run.command", OpenAction::Open).is_err());
+        assert!(check_openable("/a/tool.app", OpenAction::Open).is_err());
+    }
+
+    #[test]
+    fn revealing_allows_anything_open_would_refuse() {
+        assert!(check_openable("/a/run.command", OpenAction::Reveal).is_ok());
     }
 
     #[test]

@@ -159,10 +159,8 @@ export const commands = {
 	/**
 	 *  Reveal an artifact's file in Finder, or open it in its default app.
 	 * 
-	 *  Rust-side rather than the opener plugin's JS API: that one takes a path, so
-	 *  granting it would let the webview open anything on disk. This takes an
-	 *  artifact id and opens only the file the scan found for it — see
-	 *  `artifact_source::file_to_open`.
+	 *  This takes an artifact id and opens only the file the scan found for it —
+	 *  see `artifact_source::file_to_open`.
 	 */
 	openArtifact: (artifactId: number, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_artifact", { artifactId, action })),
 	/**  Reveal or open a graded file that has no inventory row. */
