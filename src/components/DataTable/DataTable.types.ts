@@ -105,7 +105,15 @@ export interface DataTableProps<Row> {
    * answer has arrived.
    */
   loading?: boolean;
-  empty: { title: string; hint?: string };
+  /**
+   * What an empty table says. `title`/`hint` for a table with nothing to
+   * list at all. `clear` is for a caller that narrows `rows` itself before
+   * handing them over (Setup's kind chips and summary filters): whenever the
+   * table is empty but that is down to filtering — the caller's or its own —
+   * it says `clear.title`, and its Clear filters button resets the table's
+   * search and pills and calls `clear.onClear` for the rest.
+   */
+  empty: { title: string; hint?: string; clear?: { title: string; onClear: () => void } };
   density?: "compact" | "regular";
   /**
    * Defaults to `true` and costs nothing below `VIRTUAL_THRESHOLD` rows —

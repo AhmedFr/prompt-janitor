@@ -163,10 +163,19 @@ function buildPills(
 export function scopePillsFor(rows: SetupRow[], projectNames: Map<string, string>): PillGroup<SetupRow>[] {
   const scoped = rows.filter((r) => SCOPED_KINDS.has(r.kind));
   if (scoped.length === 0) return [];
+  // A graded-only row's project may be one no inventory project knows (an
+  // extra scan folder), so it lends its own path and label to the lookup —
+  // for the option and for the predicate that matches it.
+  const names = new Map(projectNames);
+  for (const r of scoped) {
+    if (r.origin === "graded" && r.project_path && r.project_label && !names.has(r.project_path)) {
+      names.set(r.project_path, r.project_label);
+    }
+  }
   // `scopeGroup` gates on one kind; over a mixed table every scoped row
   // counts, so it is called with a scoped kind and the rows decide. Its
   // predicates read only ArtifactView fields, so they accept any SetupRow.
-  const group: PillGroup<SetupRow> | null = scopeGroup("skill", scoped, projectNames);
+  const group: PillGroup<SetupRow> | null = scopeGroup("skill", scoped, names);
   return group ? [group] : [];
 }
 

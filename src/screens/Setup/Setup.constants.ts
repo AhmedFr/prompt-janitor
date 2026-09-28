@@ -44,8 +44,11 @@ export const TABLE_STATE_KEY = "setup.unified";
 /** What an empty slice suggests doing about it — the only lever from this screen. */
 export const EMPTY_HINT = "Rescan to pick up anything added since the last scan.";
 
-/** What the table says when the chips, filters or search leave nothing. */
+/** What the table says when the chips, filters or search leave nothing (spec §4.5). */
 export const EMPTY_FILTERED = "No items match";
+
+/** What the table says when the scan found a harness but no items at all. */
+export const NO_ITEMS_TITLE = "No items in this setup yet";
 
 /** The Instructions chip's one action: write a starter instruction file from a template. */
 export const NEW_FROM_TEMPLATE = "New from template…";
@@ -54,4 +57,4 @@ export const NEW_FROM_TEMPLATE = "New from template…";
 export const NO_HARNESS_TITLE = "No Claude Code setup found";
 
 /** One box searches every column that holds words, so it says so once. */
-export const SEARCH_PLACEHOLDER = "Search name, description or scope";
+export const SEARCH_PLACEHOLDER = "Search name, description, path or scope";

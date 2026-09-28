@@ -355,15 +355,22 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
             {!loading && modelRows.length === 0 && (
               <tr className="dt__empty-row">
                 <td colSpan={columnCount}>
-                  {total === 0 ? (
+                  {total === 0 && !empty.clear ? (
                     <div className="dt__empty">
                       <p className="dt__empty-title">{empty.title}</p>
                       {empty.hint && <p className="dt__empty-hint">{empty.hint}</p>}
                     </div>
                   ) : (
                     <div className="dt__empty">
-                      <p className="dt__empty-title">{NO_MATCH_TITLE}</p>
-                      <button type="button" className="dt__clear" onClick={clearFilters}>
+                      <p className="dt__empty-title">{empty.clear?.title ?? NO_MATCH_TITLE}</p>
+                      <button
+                        type="button"
+                        className="dt__clear"
+                        onClick={() => {
+                          clearFilters();
+                          empty.clear?.onClear();
+                        }}
+                      >
                         {CLEAR_FILTERS_LABEL}
                       </button>
                     </div>

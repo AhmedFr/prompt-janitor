@@ -6,6 +6,7 @@ import { Setup } from "./Setup";
 import type { FileRow } from "@/lib/ipc";
 import { KIND_CHIP_ORDER, KIND_SINGULAR, LABEL } from "@/lib/vocabulary";
 import { artifact, noHarness, populated } from "./setup.fixtures";
+import { NO_ITEMS_TITLE } from "./Setup.constants";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
@@ -126,11 +127,13 @@ describe("Setup", () => {
     expect(chipCount(/^Config/)).toBe("1");
   });
 
-  it("summarises the detected harness and when it was last scanned", async () => {
+  it("summarises the detected harness, and says when it was last scanned in the header only", async () => {
     await renderSetup();
 
     expect(screen.getByText(/Claude Code · 2 projects · 177 sessions/)).toBeInTheDocument();
-    expect(screen.getByText(/last scan/i)).toBeInTheDocument();
+    const header = document.querySelector("header.screen__toolbar") as HTMLElement;
+    expect(within(header).getByText(/^scanned /)).toBeInTheDocument();
+    expect(screen.getAllByText(/scan(ned)? .*ago|last scan/i)).toHaveLength(1);
   });
 
   it("shows the overall grade and the slice's item count on the summary line", async () => {
@@ -217,6 +220,14 @@ describe("Setup", () => {
     await waitFor(() => expect(rowNames()).toEqual(["adapt"]));
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "web" } });
+    await waitFor(() => expect(rowNames()).toEqual(["deploy"]));
+  });
+
+  it("searches by path, finding a row whose name and scope say nothing of it", async () => {
+    await renderSetup();
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "web/.claude/skills" } });
+
     await waitFor(() => expect(rowNames()).toEqual(["deploy"]));
   });
 
@@ -331,6 +342,38 @@ describe("Setup", () => {
     await waitFor(() => expect(chipCount(/^Skills/)).toBe("6"));
     expect(rowNames()).toContain("zzz-new");
     expect(screen.getByRole("button", { name: /never used/ })).toHaveTextContent("4 never used");
+  });
+
+  it("says no items match when the chips and summary leave nothing, and one Clear filters resets them", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "rule", filter: "never" }} />);
+
+    expect(screen.getByText("No items match")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: /never used/ })).toHaveAttribute("aria-pressed", "false");
+    expect(bodyRows()).toHaveLength(13);
+  });
+
+  it("says no items match when the search leaves nothing, and Clear filters resets the search and the chips", async () => {
+    await renderSetup();
+    pickKind(/^Skills/);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zzz-nothing" } });
+
+    expect(await screen.findByText("No items match")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+    await waitFor(() => expect(bodyRows()).toHaveLength(13));
+  });
+
+  it("says the setup has no items, not that nothing matches, when a detected harness has none", () => {
+    render(<Setup navigate={vi.fn()} data={{ ...fixture, global: [], projects: [] }} files={[]} />);
+
+    expect(screen.getByText(NO_ITEMS_TITLE)).toBeInTheDocument();
+    expect(screen.queryByText("No items match")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
   });
 
   it("says no Claude Code setup was found, and offers Add folder…, when no harness was detected", async () => {

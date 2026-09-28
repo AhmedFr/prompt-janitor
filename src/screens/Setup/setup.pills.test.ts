@@ -251,6 +251,25 @@ describe("scopePillsFor: one Scope group over every kind", () => {
     expect(scopePillsFor(rows, PROJECT_NAMES)[0].options.map((o) => o.label)).toEqual(["Global"]);
   });
 
+  it("offers a graded-only row's project, one the inventory never knew, and keeps the row when it is picked", () => {
+    const graded = row({
+      id: -7,
+      kind: "rule",
+      layer: "project",
+      name: "AGENTS.md",
+      path: "/code/side/AGENTS.md",
+      origin: "graded",
+      project_label: "side",
+      project_path: "/code/side",
+    });
+    const rows = [row({ id: 1, kind: "rule", layer: "global" }), graded];
+    const [scope] = scopePillsFor(rows, PROJECT_NAMES);
+    const side = scope.options.find((o) => o.label === "side");
+    expect(scope.options.map((o) => o.label)).toEqual(["Global", "side"]);
+    expect(side?.predicate(graded)).toBe(true);
+    expect(side?.predicate(rows[0])).toBe(false);
+  });
+
   it("offers no Scope group when no row in the slice has a scope", () => {
     const rows = [row({ id: 1, kind: "plugin", layer: "plugin", plugin_name: "posthog" })];
     expect(scopePillsFor(rows, PROJECT_NAMES)).toEqual([]);

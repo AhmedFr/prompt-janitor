@@ -14,13 +14,10 @@
   color: var(--text-2);
 }
 
-/*
- * The scan recency reads as a fact about the numbers next to it, not as
- * another harness, so it drops the border and keeps only the text.
- */
-.setup-harness--scan {
-  border-color: transparent;
-  background: var(--group);
+/* The last scan's age, beside the Scan button it dates. */
+.setup-scanned {
+  font-size: 12px;
+  margin-right: 8px;
 }
 
 .setup-empty {

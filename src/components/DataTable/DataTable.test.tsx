@@ -432,6 +432,30 @@ describe("DataTable", () => {
     expect(screen.getByText("Run a scan to populate this table.")).toBeInTheDocument();
   });
 
+  describe("filters the caller holds outside the table (empty.clear)", () => {
+    it("says the caller's no-match copy and clears both sides when the caller's filters left nothing", () => {
+      const onClear = vi.fn();
+      setup({ rows: [], empty: { title: "No artifacts yet", clear: { title: "No items match", onClear } } });
+
+      expect(screen.getByText("No items match")).toBeInTheDocument();
+      expect(screen.queryByText("No artifacts yet")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+      expect(onClear).toHaveBeenCalledTimes(1);
+    });
+
+    it("says the caller's no-match copy when the search left nothing, and clears the caller's filters with its own", async () => {
+      const onClear = vi.fn();
+      setup({ search: SEARCH, empty: { title: "No artifacts yet", clear: { title: "No items match", onClear } } });
+      fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zzz" } });
+
+      expect(await screen.findByText("No items match")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+      expect(onClear).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("searchbox")).toHaveValue("");
+      await waitFor(() => expect(rowNames()).toEqual(["Alpha", "Bravo", "Charlie"]));
+    });
+  });
+
   it("ignores a remembered pill whose option no longer exists", () => {
     // The kind pill set can shrink under a table that remembered one of its
     // chips (a project dropped by the last scan, a plugin uninstalled).

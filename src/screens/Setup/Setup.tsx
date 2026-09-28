@@ -25,6 +25,7 @@ import {
   EMPTY_HINT,
   NEW_FROM_TEMPLATE,
   NO_HARNESS_TITLE,
+  NO_ITEMS_TITLE,
   SEARCH_PLACEHOLDER,
   TABLE_STATE_KEY,
 } from "./Setup.constants";
@@ -64,6 +65,10 @@ export function Setup({ navigate, data: override, files: filesOverride, target }
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Setup</h1>
         <span className="toolbar-spacer" />
+        {/* The one place the main window says when the last scan ran (spec §4.1). */}
+        {detected.length > 0 && (
+          <span className="muted setup-scanned">scanned {relativeSession(lastScanAt(detected))}</span>
+        )}
         {detected.length > 0 && (
           <Button
             size="sm"
@@ -196,7 +201,7 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
   const search = useMemo<DataTableSearch<SetupRow>>(
     () => ({
       placeholder: SEARCH_PLACEHOLDER,
-      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, projectNames)],
+      keys: ["name", "description", "path", "plugin_name", (row) => scopeLabel(row, projectNames)],
     }),
     [projectNames],
   );
@@ -207,6 +212,21 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
   // through — and a row a rescan removed closes its sheet.
   const [openId, setOpenId] = useState<number | null>(null);
   const open = useMemo(() => (openId === null ? null : (rows.find((r) => r.id === openId) ?? null)), [openId, rows]);
+
+  // An empty table is either a setup with nothing in it, or a slice the
+  // filters emptied — then one Clear filters resets the chip and the summary
+  // filter here, and the table's own search and Scope with them (spec §4.5).
+  const clearSlice = useCallback(() => {
+    setKind("all");
+    setFilter("all");
+  }, []);
+  const empty = useMemo(
+    () =>
+      rows.length === 0
+        ? { title: NO_ITEMS_TITLE, hint: EMPTY_HINT }
+        : { title: EMPTY_FILTERED, clear: { title: EMPTY_FILTERED, onClear: clearSlice } },
+    [rows.length, clearSlice],
+  );
 
   const onRowClick = (row: SetupRow) => {
     // Until the viewer gains its Findings tab (Task 3.9), a graded instruction still opens Detail.
@@ -222,7 +242,6 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
             {harnessSummary(h)}
           </span>
         ))}
-        <span className="setup-harness setup-harness--scan">Last scan {relativeSession(lastScanAt(detected))}</span>
       </p>
       <SummaryLine grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
       <DataTable
@@ -237,7 +256,7 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
         onRowClick={onRowClick}
         density="compact"
         virtualize
-        empty={{ title: EMPTY_FILTERED, hint: EMPTY_HINT }}
+        empty={empty}
         // Next to the search and Scope (spec §4.3); the toolbar wraps, so the
         // chips drop to their own line in a narrow window.
         toolbarRight={
