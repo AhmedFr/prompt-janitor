@@ -45,7 +45,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("TemplatePicker — free (locked)", () => {
+describe("TemplatePicker — not entitled (payments paused)", () => {
   it("shows the full preview of the first template without gating reading", () => {
     renderPicker();
     expect(screen.getByText(/You are a senior React engineer/)).toBeInTheDocument();
@@ -57,21 +57,31 @@ describe("TemplatePicker — free (locked)", () => {
     expect(screen.getByText(/You are an autonomous coding agent/)).toBeInTheDocument();
   });
 
-  it("opens checkout instead of applying when locked", async () => {
-    const onApply = vi.fn(async (): Promise<ApplyOutcome> => ({ status: "cancelled" }));
-    renderPicker({ onApply });
-    fireEvent.click(screen.getByRole("button", { name: /Get Pro/ }));
-    await waitFor(() => expect(openExternal).toHaveBeenCalledWith(expect.stringContaining("polar")));
-    expect(onApply).not.toHaveBeenCalled();
+  it("never shows a purchase prompt while payments are off", () => {
+    // entitled={false}: the state that used to show "Get Pro"
+    renderPicker();
+    expect(screen.getByRole("button", { name: /Use this template/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Get Pro|\$69|License/)).toBeNull();
   });
 
-  it("offers the paste-a-key escape hatch into Settings → License", () => {
+  it("applies the template when not entitled, because payments are paused", async () => {
+    const onApply = vi.fn(
+      async (): Promise<ApplyOutcome> => ({ status: "done", path: "/demo/CLAUDE.md", fileId: "f9" }),
+    );
+    renderPicker({ onApply });
+    fireEvent.click(screen.getByRole("button", { name: /Use this template/ }));
+    expect(await screen.findByText("Added CLAUDE.md")).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith("react-ts-claude");
+  });
+
+  it("never opens checkout or the license tab while payments are paused", async () => {
     const navigate = vi.fn();
-    const onClose = vi.fn();
-    renderPicker({ navigate, onClose });
-    fireEvent.click(screen.getByText("Settings → License"));
-    expect(onClose).toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith("settings", "license");
+    const onApply = vi.fn(async (): Promise<ApplyOutcome> => ({ status: "cancelled" }));
+    renderPicker({ onApply, navigate });
+    fireEvent.click(screen.getByRole("button", { name: /Use this template/ }));
+    await waitFor(() => expect(onApply).toHaveBeenCalled());
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalledWith("settings", "license");
   });
 });
 

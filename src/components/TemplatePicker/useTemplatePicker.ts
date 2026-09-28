@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { commands, isTauri, type TemplateInfo } from "@/lib/ipc";
+import { isUnlocked } from "@/lib/monetization";
 import type { ApplyOutcome } from "./TemplatePicker.types";
 
 /** Rescan everything so a freshly-written file gets graded. */
@@ -35,7 +36,7 @@ export function useTemplatePicker() {
       const [list, ent] = await Promise.all([commands.listTemplates(), commands.getEntitlement()]);
       if (!active) return;
       setTemplates(list);
-      setEntitled(ent.status === "ok" && ent.data.paid);
+      setEntitled(isUnlocked(ent.status === "ok" ? ent.data.paid : undefined));
       setLoading(false);
     }
     void load();

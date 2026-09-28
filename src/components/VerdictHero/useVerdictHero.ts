@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri, type FileDetail, type Severity } from "@/lib/ipc";
+import { isUnlocked } from "@/lib/monetization";
 import {
   fixesToReachA,
   gradeForScore,
@@ -191,7 +192,7 @@ export function useVerdictHero() {
       ...compute(files, details),
       detStandards: rules.filter((r) => !r.nl).length,
       totalStandards: rules.length,
-      entitled: entRes.status === "ok" && entRes.data.paid,
+      entitled: isUnlocked(entRes.status === "ok" ? entRes.data.paid : undefined),
       aiReady: cfgRes.status === "ok" && cfgRes.data.provider !== "none" && cfgRes.data.has_key,
       loading: false,
     });

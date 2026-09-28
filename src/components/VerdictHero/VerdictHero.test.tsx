@@ -146,22 +146,18 @@ describe("VerdictHero", () => {
     expect(screen.getByText("Grading against 30 standards.")).toBeInTheDocument();
   });
 
-  it("opens the checkout instead of fixing when Auto-fix is locked", () => {
+  it("runs auto-fix instead of opening checkout while payments are paused, even when not entitled", () => {
+    // verdict.entitled: false — the state that used to show "Unlock Auto-fix".
     const onAutoFix = vi.fn();
     renderHero({ onAutoFix });
-    fireEvent.click(screen.getByRole("button", { name: /Unlock Auto-fix/ }));
-    expect(openExternal).toHaveBeenCalledWith(expect.stringContaining("polar"));
-    expect(onAutoFix).not.toHaveBeenCalled();
-    // The paste-a-key escape hatch is offered next to the locked button.
-    expect(screen.getByText("Settings → License")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Auto-fix 4/ }));
+    expect(onAutoFix).toHaveBeenCalled();
+    expect(openExternal).not.toHaveBeenCalled();
   });
 
-  it("gives the locked Auto-fix button a distinct label from the unlocked one", () => {
-    // Locked and unlocked previously differed only by icon — easy to miss.
-    // The label itself must now differ, matching TemplatePicker's idiom.
+  it("never shows purchase copy or the paste-a-key hint while payments are off", () => {
     renderHero();
-    expect(screen.getByRole("button", { name: "Unlock Auto-fix" })).toBeInTheDocument();
-    expect(screen.queryByText("Auto-fix 4")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unlock Auto-fix|\$69|License/)).toBeNull();
   });
 
   it("runs the auto-fix when entitled", () => {

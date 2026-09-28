@@ -2,6 +2,18 @@
 // Single home for the purchase link + price copy, so every Pro CTA in the app
 // stays consistent and there is exactly one place to update.
 
+/**
+ * The one switch for charging (spec §13a). Off: every gated action is open and
+ * no purchase copy renders anywhere. Turning payments on later is this line
+ * plus the backend's `entitlement_of`.
+ */
+export const PAYMENTS_ENABLED = false;
+
+/** Whether a gated action may run. Always true while payments are off. */
+export function isUnlocked(paid: boolean | undefined): boolean {
+  return !PAYMENTS_ENABLED || paid === true;
+}
+
 export const POLAR_CHECKOUT_URL = "https://buy.polar.sh/polar_cl_PLACEHOLDER"; // TODO(#78): replace with the real Polar checkout link
 
 /** Price line shown next to purchase CTAs. */

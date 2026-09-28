@@ -7,7 +7,7 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { commands, isTauri, type DimensionScore, type FileDetail, type FixSuggestion } from "@/lib/ipc";
 import { openExternal } from "@/lib/open-external";
-import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE } from "@/lib/monetization";
+import { POLAR_CHECKOUT_URL, GET_PRO_LABEL, FOUNDER_PRICE, PAYMENTS_ENABLED } from "@/lib/monetization";
 import type { Navigate } from "@/App/App.types";
 import { useFileDetail } from "./useFileDetail";
 import { applyFix as runApply, undoFix as runUndo } from "./fixActions";
@@ -112,10 +112,12 @@ export function Detail({ fileId, navigate }: DetailProps) {
                       {autoError}
                     </span>
                   ) : (
-                    <span className="faint" style={{ fontSize: 12 }}>
-                      ✦ Auto-fix across a whole file is a paid feature — {FOUNDER_PRICE}, or add a
-                      license in <strong>Settings → License</strong>.
-                    </span>
+                    PAYMENTS_ENABLED && (
+                      <span className="faint" style={{ fontSize: 12 }}>
+                        ✦ Auto-fix across a whole file is a paid feature — {FOUNDER_PRICE}, or add a
+                        license in <strong>Settings → License</strong>.
+                      </span>
+                    )
                   )}
                 </div>
               )}
@@ -452,17 +454,21 @@ function IssuePanel({
         <div className="row" style={{ gap: 10, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           {!entitled ? (
             <>
-              <Button
-                size="sm"
-                onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
-                title={FOUNDER_PRICE}
-              >
-                <Icon name="sparkles" /> {GET_PRO_LABEL}
-              </Button>
-              <span className="faint" style={{ fontSize: 12 }}>
-                ✦ AI auto-fix &amp; rewrites are a paid feature — {FOUNDER_PRICE}, or add a license
-                in <strong>Settings → License</strong>.
-              </span>
+              {PAYMENTS_ENABLED && (
+                <Button
+                  size="sm"
+                  onClick={() => void openExternal(POLAR_CHECKOUT_URL)}
+                  title={FOUNDER_PRICE}
+                >
+                  <Icon name="sparkles" /> {GET_PRO_LABEL}
+                </Button>
+              )}
+              {PAYMENTS_ENABLED && (
+                <span className="faint" style={{ fontSize: 12 }}>
+                  ✦ AI auto-fix &amp; rewrites are a paid feature — {FOUNDER_PRICE}, or add a license
+                  in <strong>Settings → License</strong>.
+                </span>
+              )}
             </>
           ) : (
             <span className="faint" style={{ fontSize: 12 }}>

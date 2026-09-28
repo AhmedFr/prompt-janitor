@@ -10,6 +10,7 @@ import {
   FOUNDER_PRICE,
   PASTE_KEY_HINT_PREFIX,
   PASTE_KEY_HINT_LOCATION,
+  PAYMENTS_ENABLED,
 } from "@/lib/monetization";
 import { verdictSentence, costSentence, plural } from "./VerdictHero.constants";
 import type { VerdictHeroProps } from "./VerdictHero.types";
@@ -33,7 +34,9 @@ export function VerdictHero({
   // The B sentence needs the computed n — hold it back for the brief moment
   // the fix data is still loading rather than showing a wrong number.
   const sentence = grade === "B" && verdict.loading ? null : verdictSentence(grade, verdict.fixesToA);
-  const locked = !verdict.entitled;
+  // Payments-off is the outer switch: no purchase copy or checkout redirect
+  // renders while it's false, whatever an individual `verdict.entitled` says.
+  const locked = PAYMENTS_ENABLED && !verdict.entitled;
 
   const handleAutoFix = () => {
     if (locked) {

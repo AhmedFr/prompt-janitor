@@ -128,16 +128,20 @@ describe("Detail file scorecard", () => {
 });
 
 describe("Detail toolbar Auto-fix", () => {
-  it("opens the checkout instead of calling apply_fix when the user isn't entitled", async () => {
+  it("applies fixes even when not entitled, because payments are paused", async () => {
+    // getEntitlement resolves paid: false — the state that used to open checkout.
     setup(false);
+    applyFix.mockResolvedValue({ status: "ok", data: { git_ref: null } });
     render(<Detail fileId="f1" navigate={() => {}} />);
 
     const button = await screen.findByRole("button", { name: /Auto-fix 1/ });
     fireEvent.click(button);
 
-    await waitFor(() => expect(openExternal).toHaveBeenCalledWith(expect.stringContaining("polar")));
-    expect(applyFix).not.toHaveBeenCalled();
-    expect(screen.getByText(/Auto-fix across a whole file is a paid feature/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(applyFix).toHaveBeenCalledWith("f1", [{ from: "gpt-3", to: "current model" }], false, "auto"),
+    );
+    expect(openExternal).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Auto-fix across a whole file is a paid feature/)).toBeNull();
   });
 
   it("applies fixes and rescans when entitled", async () => {
