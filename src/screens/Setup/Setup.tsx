@@ -9,6 +9,7 @@ import { isTauri, type ArtifactKind, type ArtifactView, type HarnessInfo, type S
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import type { Navigate } from "@/App/App.types";
+import { LABEL } from "@/lib/vocabulary";
 import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { SkillPanel } from "./SkillPanel";
@@ -65,7 +66,7 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
               void run(rescan);
             }}
           >
-            <Icon name="refresh" /> {busy ? "Scanning…" : "Rescan"}
+            <Icon name="refresh" /> {busy ? LABEL.scanning : LABEL.scan}
           </Button>
         )}
       </header>
@@ -137,7 +138,7 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
           here, so point it at a folder and it will grade the prompt files inside.
         </p>
         <Button variant="primary" disabled={busy} onClick={onAddFolder}>
-          <Icon name="folder" /> Add a folder
+          <Icon name="folder" /> {LABEL.addFolder}
         </Button>
       </div>
     </Card>

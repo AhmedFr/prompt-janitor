@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { UsageTab } from "./UsageTab";
 import type { UsageOverview } from "@/lib/ipc";
+import { LABEL } from "@/lib/vocabulary";
 
 const fullData: UsageOverview = {
   window_days: 90,
@@ -181,7 +182,7 @@ describe("UsageTab", () => {
     const { getByRole } = renderTab();
     const list = getByRole("region", { name: "Top used" });
 
-    fireEvent.click(within(list).getByRole("button", { name: "Built-in" }));
+    fireEvent.click(within(list).getByRole("button", { name: LABEL.harnessTools }));
 
     expect(within(list).queryByRole("button", { name: "Details" })).not.toBeInTheDocument();
   });

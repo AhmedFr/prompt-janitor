@@ -493,7 +493,7 @@ describe("Setup", () => {
     expect(await screen.findByText("No supported agent harness found")).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Add a folder/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Add folder/ }));
     await waitFor(() => expect(open).toHaveBeenCalled());
   });
 

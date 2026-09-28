@@ -12,7 +12,8 @@ export const SEARCH_PLACEHOLDER = "Search project name or path";
 
 /** Nothing scanned yet — the honest headline, and the one lever from here. */
 export const EMPTY_TITLE = "No projects scanned yet";
-export const EMPTY_HINT = "Add a folder from Setup and Prompt Janitor will grade what it finds inside.";
+export const EMPTY_HINT =
+  "Add folder… in Settings → Folders and Prompt Janitor will read what it finds inside.";
 
 /**
  * The load finished with nothing to show — not because nothing is scanned,

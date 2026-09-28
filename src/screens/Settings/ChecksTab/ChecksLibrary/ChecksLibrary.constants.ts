@@ -37,13 +37,13 @@ export const SEARCH_PLACEHOLDER = "Search rule name, description or pattern";
 export const EMPTY_TITLE: Record<RuleTabId, string> = {
   builtin: "No built-in rules loaded",
   custom: "No rules of your own yet",
-  ai: "No AI standards yet",
+  ai: `No ${LABEL.aiChecks} yet`,
 };
 
 export const EMPTY_HINT: Record<RuleTabId, string> = {
   builtin: "The rule packs failed to load — rescan, or reinstall the app.",
   custom: "Add a rule and Prompt Janitor will flag every file that breaks it.",
-  ai: "Add a natural-language standard and your AI provider will judge each file against it.",
+  ai: "Add an AI check and your AI provider will judge each file against it.",
 };
 
 export const ADD_RULE_LABEL = "Add check";
@@ -57,8 +57,7 @@ export const AI_NOTE_READY =
  * And what it says when there is none. Gated on a configured provider only:
  * monetisation is paused, so a licence never decides what this screen shows.
  */
-export const AI_NOTE_NO_PROVIDER =
-  "Not evaluated yet — connect an AI provider in Settings → AI and these standards start running on the files you check.";
+export const AI_NOTE_NO_PROVIDER = `Not evaluated yet — connect an AI provider in Settings → AI and these ${LABEL.aiChecks} start running on the files you check.`;
 
 /**
  * A browser, not the desktop app: the rule set lives in a local database the

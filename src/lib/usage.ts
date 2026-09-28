@@ -1,4 +1,5 @@
 import type { ArtifactKind, InvocationKind, RankedTarget } from "@/lib/ipc";
+import { LABEL } from "@/lib/vocabulary";
 
 /**
  * Shared vocabulary for the two places that rank harness invocations — the
@@ -15,7 +16,7 @@ export const KIND_LABEL: Record<InvocationKind, string> = {
   skill: "Skills",
   agent: "Agents",
   mcp: "MCP",
-  builtin: "Built-in",
+  builtin: LABEL.harnessTools,
 };
 
 /** The selector chips, built once — the kinds never change. */

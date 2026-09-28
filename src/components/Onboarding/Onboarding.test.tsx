@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Onboarding } from "./Onboarding";
+import { LABEL } from "@/lib/vocabulary";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
@@ -43,7 +44,7 @@ const harness = (detected: boolean) => ({
   session_count: detected ? 88 : 0,
 });
 
-const scanButton = () => screen.getByRole("button", { name: /scan everything/i });
+const scanButton = () => screen.getByRole("button", { name: LABEL.scan });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -92,7 +93,7 @@ describe("Onboarding", () => {
     expect(
       await screen.findByRole("heading", { name: "No supported agent harness found" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add a folder/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: LABEL.addFolder })).toBeEnabled();
   });
 
   it("takes focus back to the dialog whenever the step changes", async () => {
@@ -142,7 +143,7 @@ describe("Onboarding", () => {
       await screen.findByRole("heading", { name: "No supported agent harness found" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /scan everything/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /add a folder/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: LABEL.addFolder })).toBeEnabled();
   });
 
   it("appends a picked folder to the ones already configured", async () => {
@@ -151,7 +152,7 @@ describe("Onboarding", () => {
     listHarnesses.mockResolvedValue({ status: "ok", data: [harness(false)] });
     render(<Onboarding onDone={vi.fn()} />);
 
-    const add = await screen.findByRole("button", { name: /add a folder/i });
+    const add = await screen.findByRole("button", { name: LABEL.addFolder });
     await act(async () => {
       fireEvent.click(add);
     });

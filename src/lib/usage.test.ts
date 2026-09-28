@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { KIND_LABEL, KIND_OPTIONS, SETUP_TAB_FOR_KIND, USAGE_KINDS, rankedKey } from "./usage";
+import { LABEL } from "./vocabulary";
 
 describe("USAGE_KINDS", () => {
   it("lists every invocation kind in the bindings' own order", () => {
@@ -12,7 +13,7 @@ describe("KIND_LABEL", () => {
     expect(KIND_LABEL.skill).toBe("Skills");
     expect(KIND_LABEL.agent).toBe("Agents");
     expect(KIND_LABEL.mcp).toBe("MCP");
-    expect(KIND_LABEL.builtin).toBe("Built-in");
+    expect(KIND_LABEL.builtin).toBe(LABEL.harnessTools);
   });
 });
 
@@ -22,7 +23,7 @@ describe("KIND_OPTIONS", () => {
       { id: "skill", label: "Skills" },
       { id: "agent", label: "Agents" },
       { id: "mcp", label: "MCP" },
-      { id: "builtin", label: "Built-in" },
+      { id: "builtin", label: LABEL.harnessTools },
     ]);
   });
 });

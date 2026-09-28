@@ -8,6 +8,7 @@ import { detectedSummary } from "./onboarding.util";
 import { scanPercent } from "@/lib/useScanProgress";
 import { useOnboarding } from "./useOnboarding";
 import type { OnboardingProps } from "./Onboarding.types";
+import { LABEL } from "@/lib/vocabulary";
 import "./Onboarding.css";
 
 const STEPS = ["Detect", "Scan", "Verdict"] as const;
@@ -100,7 +101,7 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
         )}
         {found && (
           <Button onClick={() => void addFolder()}>
-            <Icon name="folder" /> Add a folder…
+            <Icon name="folder" /> {LABEL.addFolder}
           </Button>
         )}
       </div>
@@ -111,11 +112,11 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
         </Button>
         {found ? (
           <Button variant="primary" size="sm" onClick={() => void start()}>
-            <Icon name="sparkles" /> Scan everything
+            <Icon name="sparkles" /> {LABEL.scan}
           </Button>
         ) : (
           <Button variant="primary" size="sm" onClick={() => void addFolder()}>
-            <Icon name="folder" /> Add a folder
+            <Icon name="folder" /> {LABEL.addFolder}
           </Button>
         )}
       </div>
