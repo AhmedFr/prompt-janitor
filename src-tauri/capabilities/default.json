@@ -54,6 +54,7 @@
     "allow-get-effective-rules",
     "allow-get-usage-overview",
     "allow-get-project-usage",
+    "allow-get-artifact-usage",
     "allow-list-harnesses",
     "allow-open-artifact",
     "allow-reset-app-data",

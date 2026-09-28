@@ -19,6 +19,7 @@ mod harness_query;
 mod harness_scan;
 mod harness_store;
 mod ipc;
+mod item_usage;
 pub mod license;
 mod notify;
 mod panel;

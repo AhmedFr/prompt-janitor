@@ -968,6 +968,20 @@ pub fn get_project_usage(
         .map_err(|e| e.to_string())
 }
 
+/// One item's usage over `window_days`, for the viewer's Usage tab.
+#[tauri::command]
+#[specta::specta]
+pub fn get_artifact_usage(
+    db: tauri::State<'_, AppDb>,
+    artifact_id: i32,
+    window_days: u32,
+) -> Result<crate::item_usage::ArtifactUsage, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::item_usage::artifact_usage(&conn, artifact_id, now, window_days)
+        .map_err(|e| e.to_string())
+}
+
 /// Every harness we know of, detected or not.
 #[tauri::command]
 #[specta::specta]

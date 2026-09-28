@@ -178,6 +178,8 @@ export const commands = {
 	 *  `window_days` is capped at a year — the daily series has a point per day.
 	 */
 	getProjectUsage: (harness: string, projectPath: string, windowDays: number) => typedError<ProjectUsage, string>(__TAURI_INVOKE("get_project_usage", { harness, projectPath, windowDays })),
+	/**  One item's usage over `window_days`, for the viewer's Usage tab. */
+	getArtifactUsage: (artifactId: number, windowDays: number) => typedError<ArtifactUsage, string>(__TAURI_INVOKE("get_artifact_usage", { artifactId, windowDays })),
 	/**  Every harness we know of, detected or not. */
 	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
 	/**
@@ -316,6 +318,15 @@ export type ArtifactSource = {
 	 *  ever asked of it, so its format is free to change.
 	 */
 	modified: string,
+};
+
+export type ArtifactUsage = {
+	window_days: number,
+	/**  Oldest day first, zero-filled. */
+	per_day: UsageDay[],
+	/**  Busiest project first. */
+	by_project: ProjectUses[],
+	avg_turn_tokens: number | null,
 };
 
 /**
@@ -682,6 +693,13 @@ export type ProjectUsage = {
 	sessions_per_day: DayCount[],
 };
 
+export type ProjectUses = {
+	path: string,
+	name: string,
+	uses: number,
+	sessions: number,
+};
+
 /**
  *  One invoked target over the reporting window — the row the ranked usage
  *  lists render.
@@ -803,6 +821,13 @@ export type TrendPoint = {
 	/**  Epoch-seconds string (matches `grade_history.recorded_at`). */
 	t: string,
 	score: number,
+};
+
+export type UsageDay = {
+	/**  `YYYY-MM-DD`, UTC. */
+	day: string,
+	uses: number,
+	errors: number,
 };
 
 /**

@@ -58,6 +58,7 @@ pub const COMMANDS: &[&str] = &[
     "get_effective_rules",
     "get_usage_overview",
     "get_project_usage",
+    "get_artifact_usage",
     "list_harnesses",
     "get_panel_snapshot",
     "open_main",
