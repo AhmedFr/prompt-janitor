@@ -1,5 +1,12 @@
-import type { HarnessInfo, ProjectRow } from "@/lib/ipc";
+import type { HarnessInfo } from "@/lib/ipc";
 import type { ScanProgressState } from "@/lib/useScanProgress";
+
+/** An extra folder armed for removal, with the backend's own count of what it would delete. */
+export interface ArmedRemoval {
+  path: string;
+  /** How many projects removing `path` would delete — from `previewFolderRemoval`. */
+  count: number;
+}
 
 /**
  * Presentational half of the tab — rendered from state `useFoldersTab` already
@@ -9,17 +16,15 @@ import type { ScanProgressState } from "@/lib/useScanProgress";
 export interface FoldersTabBodyProps {
   harnesses: HarnessInfo[];
   extraFolders: string[];
-  /** Every project on record, for counting what a folder's removal would delete. */
-  projects: ProjectRow[];
   /** A scan (rescan, or the one an added folder triggers) is in flight. */
   scanning: boolean;
   scanProgress: ScanProgressState;
-  /** The extra folder path currently armed for removal, or null. */
-  armed: string | null;
+  /** The extra folder currently armed for removal, with its count, or null. */
+  armed: ArmedRemoval | null;
   /** Prompt for a folder, add it to the extra scan list, and scan. */
   addFolder: () => Promise<void>;
   /** Ask to remove `path`: removes at once if nothing would be deleted, otherwise arms the confirmation. */
-  askRemove: (path: string) => void;
+  askRemove: (path: string) => Promise<void>;
   /** Disarm without removing anything. */
   cancelRemove: () => void;
   /** Remove the armed folder and rescan. */
@@ -30,6 +35,6 @@ export interface FoldersTabBodyProps {
 
 /** What `useFoldersTab` returns: the body's props, plus the initial load state. */
 export interface UseFoldersTab extends FoldersTabBodyProps {
-  /** True until the first `listHarnesses`/`getExtraScanFolders`/`listProjects` round trip lands. */
+  /** True until the first `listHarnesses`/`getExtraScanFolders` round trip lands. */
   loading: boolean;
 }

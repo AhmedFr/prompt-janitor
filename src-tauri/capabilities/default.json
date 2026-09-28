@@ -17,6 +17,7 @@
     "allow-get-overview",
     "allow-set-extra-scan-folders",
     "allow-get-extra-scan-folders",
+    "allow-preview-folder-removal",
     "allow-set-schedule",
     "allow-get-schedule",
     "allow-set-alert",

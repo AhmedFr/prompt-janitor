@@ -24,6 +24,13 @@ export const commands = {
 	setExtraScanFolders: (folders: string[]) => typedError<null, string>(__TAURI_INVOKE("set_extra_scan_folders", { folders })),
 	/**  The extra folders currently configured (empty when none). */
 	getExtraScanFolders: () => typedError<string[], string>(__TAURI_INVOKE("get_extra_scan_folders")),
+	/**
+	 *  The project ids that setting the extra scan folders to `folders` would
+	 *  delete right now — the same rule `set_extra_scan_folders` applies, without
+	 *  applying it. Lets Settings ask "how many projects?" before the owner
+	 *  confirms a removal.
+	 */
+	previewFolderRemoval: (folders: string[]) => typedError<string[], string>(__TAURI_INVOKE("preview_folder_removal", { folders })),
 	/**  Persist the scan schedule ("1h", "6h", "1d", "save", or "manual"). */
 	setSchedule: (value: string) => typedError<null, string>(__TAURI_INVOKE("set_schedule", { value })),
 	/**  The current scan schedule (defaults to "6h"). */

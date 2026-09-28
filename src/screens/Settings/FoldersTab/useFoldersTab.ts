@@ -1,23 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { commands, isTauri, type HarnessInfo, type ProjectRow } from "@/lib/ipc";
+import { commands, isTauri, type HarnessInfo } from "@/lib/ipc";
 import { addFolderAndScan, removeExtraFolder, rescan as rescanNow } from "@/lib/scan-actions";
 import { useScanProgress } from "@/lib/useScanProgress";
-import { projectsRemovedBy } from "../folders.util";
-import type { UseFoldersTab } from "./FoldersTab.types";
+import type { ArmedRemoval, UseFoldersTab } from "./FoldersTab.types";
 
 /**
- * Loads the registered harnesses, the extra scan folders and the project
- * list for Settings → Folders, and wires up add/remove/rescan — refetching
- * whenever a scan finishes, the same way Setup's inventory does.
+ * Loads the registered harnesses and the extra scan folders for Settings →
+ * Folders, and wires up add/remove/rescan — refetching whenever a scan
+ * finishes, the same way Setup's inventory does.
  */
 export function useFoldersTab(): UseFoldersTab {
   const [harnesses, setHarnesses] = useState<HarnessInfo[]>([]);
   const [extraFolders, setExtraFolders] = useState<string[]>([]);
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [armed, setArmed] = useState<string | null>(null);
+  const [armed, setArmed] = useState<ArmedRemoval | null>(null);
   const scanProgress = useScanProgress();
 
   const refetch = useCallback(async () => {
@@ -25,14 +23,9 @@ export function useFoldersTab(): UseFoldersTab {
       setLoading(false);
       return;
     }
-    const [h, f, p] = await Promise.all([
-      commands.listHarnesses(),
-      commands.getExtraScanFolders(),
-      commands.listProjects(),
-    ]);
+    const [h, f] = await Promise.all([commands.listHarnesses(), commands.getExtraScanFolders()]);
     if (h.status === "ok") setHarnesses(h.data);
     if (f.status === "ok") setExtraFolders(f.data);
-    if (p.status === "ok") setProjects(p.data);
     setLoading(false);
   }, []);
 
@@ -74,25 +67,26 @@ export function useFoldersTab(): UseFoldersTab {
     [run],
   );
 
-  // Nothing to lose, nothing to confirm: a removal that deletes no project happens at once.
+  // Nothing to lose, nothing to confirm: a removal that deletes no project
+  // happens at once. The backend's own rule is the count — asking it here
+  // (rather than recomputing client-side) is the only way the confirmation
+  // can never disagree with what the removal actually deletes.
   const askRemove = useCallback(
-    (path: string) => {
-      const n = projectsRemovedBy(
-        path,
-        extraFolders.filter((x) => x !== path),
-        projects,
-      );
-      if (n === 0) void removeFolder(path);
-      else setArmed(path);
+    async (path: string) => {
+      const remaining = extraFolders.filter((x) => x !== path);
+      const preview = await commands.previewFolderRemoval(remaining);
+      const count = preview.status === "ok" ? preview.data.length : 0;
+      if (count === 0) await removeFolder(path);
+      else setArmed({ path, count });
     },
-    [extraFolders, projects, removeFolder],
+    [extraFolders, removeFolder],
   );
 
   const cancelRemove = useCallback(() => setArmed(null), []);
 
   const confirmRemove = useCallback(async () => {
     if (!armed) return;
-    const path = armed;
+    const path = armed.path;
     setArmed(null);
     await removeFolder(path);
   }, [armed, removeFolder]);
@@ -100,7 +94,6 @@ export function useFoldersTab(): UseFoldersTab {
   return {
     harnesses,
     extraFolders,
-    projects,
     loading,
     scanning,
     scanProgress,

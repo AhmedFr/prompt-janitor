@@ -20,6 +20,7 @@ pub const COMMANDS: &[&str] = &[
     "get_overview",
     "set_extra_scan_folders",
     "get_extra_scan_folders",
+    "preview_folder_removal",
     "set_schedule",
     "get_schedule",
     "set_alert",

@@ -14,6 +14,7 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
             crate::commands::get_overview,
             crate::commands::set_extra_scan_folders,
             crate::commands::get_extra_scan_folders,
+            crate::commands::preview_folder_removal,
             crate::commands::set_schedule,
             crate::commands::get_schedule,
             crate::commands::set_alert,

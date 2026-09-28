@@ -199,6 +199,20 @@ pub fn get_extra_scan_folders(db: tauri::State<'_, AppDb>) -> Result<Vec<String>
     Ok(query::extra_scan_folders(&conn))
 }
 
+/// The project ids that setting the extra scan folders to `folders` would
+/// delete right now — the same rule `set_extra_scan_folders` applies, without
+/// applying it. Lets Settings ask "how many projects?" before the owner
+/// confirms a removal.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_folder_removal(
+    db: tauri::State<'_, AppDb>,
+    folders: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::scan_folders::projects_dropped_by(&conn, &folders).map_err(|e| e.to_string())
+}
+
 /// Persist the scan schedule ("1h", "6h", "1d", "save", or "manual").
 #[tauri::command]
 #[specta::specta]

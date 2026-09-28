@@ -5,7 +5,7 @@ import type { HarnessInfo } from "@/lib/ipc";
 import { scanPercent, scanStatusLine } from "@/lib/useScanProgress";
 import { LABEL } from "@/lib/vocabulary";
 import { plural } from "@/screens/Setup/setup.util";
-import { projectsRemovedBy, removalWarning } from "../folders.util";
+import { removalWarning } from "../folders.util";
 import { useFoldersTab } from "./useFoldersTab";
 import { DAY_MS, HOUR_MS, MINUTE_MS, NO_EXTRA_FOLDERS, NO_HARNESSES } from "./FoldersTab.constants";
 import type { FoldersTabBodyProps } from "./FoldersTab.types";
@@ -54,7 +54,6 @@ export function FoldersTab() {
 export function FoldersTabBody({
   harnesses,
   extraFolders,
-  projects,
   scanning,
   scanProgress,
   armed,
@@ -135,22 +134,14 @@ export function FoldersTabBody({
                   size="sm"
                   disabled={scanning}
                   aria-label={`Remove ${f}`}
-                  onClick={() => askRemove(f)}
+                  onClick={() => void askRemove(f)}
                 >
                   Remove
                 </Button>
               </div>
-              {armed === f && (
+              {armed?.path === f && (
                 <div className="set-confirm" role="alertdialog" aria-label={`Remove ${f}`}>
-                  <p>
-                    {removalWarning(
-                      projectsRemovedBy(
-                        f,
-                        extraFolders.filter((x) => x !== f),
-                        projects,
-                      ),
-                    )}
-                  </p>
+                  <p>{removalWarning(armed.count)}</p>
                   <Button size="sm" onClick={cancelRemove}>
                     Cancel
                   </Button>

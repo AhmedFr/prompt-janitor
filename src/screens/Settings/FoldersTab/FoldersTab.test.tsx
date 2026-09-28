@@ -20,14 +20,14 @@ const listHarnesses = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
-const listProjects = vi.hoisted(() => vi.fn());
+const previewFolderRemoval = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
     ...actual,
     isTauri: true,
-    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow, listProjects },
+    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow, previewFolderRemoval },
   };
 });
 
@@ -56,7 +56,7 @@ beforeEach(() => {
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: ["/code/scratch"] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "ok", data: { files: 0, ms: 1 } });
-  listProjects.mockResolvedValue({ status: "ok", data: [] });
+  previewFolderRemoval.mockResolvedValue({ status: "ok", data: [] });
   open.mockResolvedValue(null);
 });
 
@@ -148,21 +148,26 @@ describe("FoldersTab extra folders", () => {
 });
 
 describe("FoldersTab removal", () => {
-  const withProjects = (ids: string[]) =>
-    listProjects.mockResolvedValue({ status: "ok", data: ids.map((id) => ({ id, harness: null })) });
+  // The frontend never counts this itself — it asks `previewFolderRemoval`,
+  // the same backend rule `set_extra_scan_folders` applies, and renders
+  // whatever it says. `data` is just an array of that length; the ids in it
+  // are never read.
+  const withPreview = (n: number) =>
+    previewFolderRemoval.mockResolvedValue({ status: "ok", data: Array.from({ length: n }, (_, i) => `p${i}`) });
 
   it("asks first, with the count, when the removal deletes projects", async () => {
-    withProjects(["/code/scratch/a", "/code/scratch/b"]);
+    withPreview(2);
     render(<FoldersTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
     expect(await screen.findByRole("alertdialog", { name: "Remove /code/scratch" })).toHaveTextContent(
       "Removes 2 projects and their history from Prompt Janitor. Files on disk are not touched.",
     );
     expect(setExtraScanFolders).not.toHaveBeenCalled();
+    expect(previewFolderRemoval).toHaveBeenCalledWith([]);
   });
 
   it("uses the singular for one project", async () => {
-    withProjects(["/code/scratch/a"]);
+    withPreview(1);
     render(<FoldersTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
     expect(await screen.findByRole("alertdialog")).toHaveTextContent(
@@ -171,7 +176,7 @@ describe("FoldersTab removal", () => {
   });
 
   it("removes the folder on confirm", async () => {
-    withProjects(["/code/scratch/a"]);
+    withPreview(1);
     render(<FoldersTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove folder" }));
@@ -179,7 +184,7 @@ describe("FoldersTab removal", () => {
   });
 
   it("cancel removes nothing", async () => {
-    withProjects(["/code/scratch/a"]);
+    withPreview(1);
     render(<FoldersTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
     fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
@@ -188,7 +193,7 @@ describe("FoldersTab removal", () => {
   });
 
   it("removes at once, with no confirmation, when no project would go", async () => {
-    withProjects(["/elsewhere/x"]);
+    withPreview(0);
     render(<FoldersTab />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
     await waitFor(() => expect(setExtraScanFolders).toHaveBeenCalledWith([]));

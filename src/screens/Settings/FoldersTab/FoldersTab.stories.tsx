@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { FoldersTabBody } from "./FoldersTab";
-import type { HarnessInfo, ProjectRow } from "@/lib/ipc";
+import type { HarnessInfo } from "@/lib/ipc";
 import "../Settings.css";
 
 const noop = async () => {};
@@ -22,12 +22,11 @@ const meta = {
   args: {
     harnesses: detected,
     extraFolders: ["/Users/dev/code/scratch-prompts"],
-    projects: [],
     scanning: false,
     scanProgress: { phase: null, progress: null, reset: () => {} },
     armed: null,
     addFolder: noop,
-    askRemove: () => {},
+    askRemove: noop,
     cancelRemove: () => {},
     confirmRemove: noop,
     rescan: noop,
@@ -72,10 +71,6 @@ export const Scanning: Story = {
 /** A folder's Remove button armed the confirmation, counting what it would delete. */
 export const ArmedRemoval: Story = {
   args: {
-    armed: "/Users/dev/code/scratch-prompts",
-    projects: [
-      { id: "/Users/dev/code/scratch-prompts/a", harness: null } as ProjectRow,
-      { id: "/Users/dev/code/scratch-prompts/b", harness: null } as ProjectRow,
-    ],
+    armed: { path: "/Users/dev/code/scratch-prompts", count: 2 },
   },
 };
