@@ -125,6 +125,13 @@ export function titleFor(row: ArtifactView): string {
 
 /** Mirrors `ScopeCell`'s own label rule exactly, so sorting the Scope column orders by the same text it renders. */
 export function scopeLabel(row: ArtifactView, projectNames: Map<string, string>): string {
+  // A graded-only row (`SetupRow`, `origin: "graded"`) carries its project's
+  // name directly — its path may not fall under any inventory project the
+  // lookup below knows about. `row` stays typed as `ArtifactView` so this
+  // helper keeps serving both row shapes; the cast reads the extra field
+  // when it's there and falls through to the lookup when it isn't.
+  const graded = row as ArtifactView & { project_label?: string | null };
+  if (graded.project_label) return graded.project_label;
   if (row.layer === "global") return "Global";
   // The plugin's name, not the word "Plugin": two installs can ship a skill
   // of the same name, and provenance is the only thing that tells the rows
