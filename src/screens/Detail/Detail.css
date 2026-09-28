@@ -145,31 +145,6 @@
   background: var(--blue-tint);
 }
 
-.d-diff-line {
-  border-radius: 5px;
-  padding: 3px 10px;
-  font-family: var(--mono);
-  font-size: 12.5px;
-  line-height: 1.7;
-}
-
-.d-diff-from {
-  background: rgba(255, 59, 48, 0.1);
-}
-.d-diff-to {
-  background: rgba(47, 180, 87, 0.12);
-  margin-top: 4px;
-}
-
-.d-kbd {
-  font-family: var(--mono);
-  font-size: 11px;
-  background: #f0f0f2;
-  border: 0.5px solid var(--sep-strong);
-  border-radius: 4px;
-  padding: 1px 5px;
-}
-
 .d-back {
   display: flex;
   width: 28px;

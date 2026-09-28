@@ -3,24 +3,18 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { commands, type NlVerdict } from "@/lib/ipc";
+import { LABEL } from "@/lib/vocabulary";
+import type { AiChecksProps } from "./AiChecks.types";
 
-/** Runs the built-in prompting standards (plus any custom NL rules, when
- * licensed) against a file via the AI provider, folding hits into the score.
+/** Runs the AI checks (the built-in ones plus any custom natural-language
+ * checks) against a file via the AI provider, folding hits into the score.
  *
  * `content` is the file's current on-disk content — not read directly, just
  * used as a change signal. This panel isn't remounted when the user switches
  * files or applies a fix (no `key` upstream), so without this it could keep
  * showing verdicts from a prior check after the file's content — and thus
- * its actual standards compliance — has since changed underneath it. */
-export function NlRulesPanel({
-  fileId,
-  content,
-  onApplied,
-}: {
-  fileId: string;
-  content: string;
-  onApplied?: () => void;
-}) {
+ * what the checks would say about it — has since changed underneath it. */
+export function AiChecks({ fileId, content, onApplied }: AiChecksProps) {
   const [verdicts, setVerdicts] = useState<NlVerdict[] | null>(null);
   const [newScore, setNewScore] = useState<{ score: number; grade: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,15 +64,15 @@ export function NlRulesPanel({
         <span style={{ display: "flex", color: "var(--blue)" }}>
           <Icon name="sparkles" size={16} />
         </span>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>AI standards</div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{LABEL.aiChecks}</div>
         <span className="toolbar-spacer" />
         <Button size="sm" onClick={() => void check()} disabled={busy}>
-          {busy ? "Checking…" : "Check standards"}
+          {busy ? "Checking…" : `Run ${LABEL.aiChecks}`}
         </Button>
       </div>
       <div className="muted" style={{ marginTop: 6, fontSize: 12.5, maxWidth: 620 }}>
-        Audit this file against the built-in prompting standards (Anthropic, OpenAI, Cursor,
-        community) — plus your own AI rules on the Pro tier. Violations fold into the score.
+        Ask your AI provider to check this file against the built-in guidance (Anthropic, OpenAI,
+        Cursor, community) and your own AI checks. Violations fold into the score.
       </div>
 
       {error && (
@@ -89,7 +83,7 @@ export function NlRulesPanel({
 
       {verdicts && verdicts.length === 0 && (
         <div className="faint" style={{ fontSize: 12, marginTop: 10 }}>
-          All standards are toggled off — enable them on the Rules tab.
+          Every AI check is turned off — turn some on in Settings → Checks.
         </div>
       )}
 
@@ -97,7 +91,7 @@ export function NlRulesPanel({
         <div className="col" style={{ gap: 10, marginTop: 12 }}>
           {verdicts.every((v) => !v.violates) && (
             <div className="faint" style={{ fontSize: 12, color: "var(--green)" }}>
-              All {verdicts.length} standard{verdicts.length === 1 ? "" : "s"} pass.
+              {verdicts.length === 1 ? "The AI check passes." : `All ${verdicts.length} AI checks pass.`}
             </div>
           )}
           {verdicts.map((v) => (
