@@ -926,6 +926,54 @@ pub fn open_artifact(
     .map_err(|e| format!("Couldn't open {path}: {e}"))
 }
 
+/// Reveal or open a graded file that has no inventory row.
+#[tauri::command]
+#[specta::specta]
+pub fn open_file(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+    action: crate::artifact_source::OpenAction,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::file_open::graded_file_path(&conn, &file_id)?
+    };
+    let opener = app.opener();
+    match action {
+        crate::artifact_source::OpenAction::Reveal => opener.reveal_item_in_dir(&path),
+        crate::artifact_source::OpenAction::Open => {
+            if !crate::artifact_source::opens_as_text(&path) {
+                return Err(
+                    "Only text files open from here — use Reveal to find this one in Finder."
+                        .to_string(),
+                );
+            }
+            opener.open_path(&path, None::<&str>)
+        }
+    }
+    .map_err(|e| format!("Couldn't open {path}: {e}"))
+}
+
+/// Select a scanned project's folder in Finder.
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_project(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    project_path: String,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::file_open::project_folder(&conn, &project_path)?
+    };
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| format!("Couldn't reveal {path}: {e}"))
+}
+
 /// The rule files `harness` loads inside `project_path`, in load order.
 #[tauri::command]
 #[specta::specta]

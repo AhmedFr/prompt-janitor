@@ -55,6 +55,8 @@ pub const COMMANDS: &[&str] = &[
     "get_artifact_source",
     "save_artifact_source",
     "open_artifact",
+    "open_file",
+    "reveal_project",
     "get_effective_rules",
     "get_usage_overview",
     "get_project_usage",

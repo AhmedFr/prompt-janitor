@@ -14,6 +14,7 @@ mod artifact_source;
 mod command_names;
 mod commands;
 pub mod engine;
+mod file_open;
 pub mod harness;
 mod harness_query;
 mod harness_scan;

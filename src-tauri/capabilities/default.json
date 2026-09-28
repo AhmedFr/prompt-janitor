@@ -57,6 +57,8 @@
     "allow-get-artifact-usage",
     "allow-list-harnesses",
     "allow-open-artifact",
+    "allow-open-file",
+    "allow-reveal-project",
     "allow-reset-app-data",
     "allow-uninstall-app"
   ]

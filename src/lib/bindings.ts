@@ -165,6 +165,10 @@ export const commands = {
 	 *  `artifact_source::file_to_open`.
 	 */
 	openArtifact: (artifactId: number, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_artifact", { artifactId, action })),
+	/**  Reveal or open a graded file that has no inventory row. */
+	openFile: (fileId: string, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_file", { fileId, action })),
+	/**  Select a scanned project's folder in Finder. */
+	revealProject: (projectPath: string) => typedError<null, string>(__TAURI_INVOKE("reveal_project", { projectPath })),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**
