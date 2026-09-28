@@ -62,6 +62,8 @@ export interface PercentCellProps {
 export interface TokensCellProps {
   /** Token count; `null` renders "—" rather than a misleading zero. */
   value: number | null | undefined;
+  /** Renders a leading "≈" — a size-based estimate rather than a measured count. */
+  approx?: boolean;
 }
 
 export interface FindingsCellProps {

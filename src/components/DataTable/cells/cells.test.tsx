@@ -151,6 +151,11 @@ describe("TokensCell", () => {
     render(<TokensCell value={null} />);
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("prefixes an estimate with ≈", () => {
+    render(<TokensCell value={1000} approx />);
+    expect(screen.getByText("≈1,000")).toBeInTheDocument();
+  });
 });
 
 describe("ScopeCell", () => {
