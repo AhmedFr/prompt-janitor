@@ -1,14 +1,13 @@
 import type { Route } from "@/App/App.types";
 import type { NavItem } from "./Sidebar.types";
 
-/** Primary sidebar destinations. `detail` is intentionally excluded — it opens from Prompts. */
+/** Primary sidebar destinations. `detail` is intentionally excluded — it opens from Setup. */
 export const NAV_ITEMS: NavItem[] = [
-  { route: "overview", label: "Overview", icon: "dashboard" },
   { route: "setup", label: "Setup", icon: "layers" },
+  { route: "overview", label: "Overview", icon: "dashboard" },
   // The canonical list of projects; the recents underneath are a shortcut
   // into the six most recent, not the inventory (spec §4.2).
   { route: "projects", label: "Projects", icon: "folder" },
-  { route: "prompts", label: "Prompts", icon: "prompts" },
   { route: "scans", label: "Scans", icon: "scans" },
   { route: "analytics", label: "Analytics", icon: "barChart" },
   { route: "settings", label: "Settings", icon: "settings" },
@@ -26,8 +25,8 @@ export const RECENT_PROJECTS_LIMIT = 6;
  */
 export const NAV_OWNER: Partial<Record<Route, Route>> = {
   project: "projects",
-  // Reachable from Overview and a project page as well as from Prompts, but
-  // Prompts is the file list a file belongs to — and a nav with nothing lit
-  // is worse than one lit a level up from where the reader came in.
-  detail: "prompts",
+  // Reachable from Overview and a project page as well as from Setup, but
+  // Setup is the graded-file list a file belongs to now — and a nav with
+  // nothing lit is worse than one lit a level up from where the reader came in.
+  detail: "setup",
 };

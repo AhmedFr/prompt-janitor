@@ -26,9 +26,9 @@ describe("Sidebar", () => {
     expect(getByRole("button", { current: "page" })).toHaveTextContent("Settings");
   });
 
-  it("shows badge counts and the recent-projects list when data is present", () => {
+  it("shows the recent-projects list when data is present", () => {
     mockSidebar.mockReturnValue({
-      counts: { prompts: 42 },
+      counts: {},
       projects: [
         { id: "/web-app", name: "web-app", grade: "A", logo: null },
         { id: "/scripts", name: "scripts", grade: "F", logo: null },
@@ -38,18 +38,24 @@ describe("Sidebar", () => {
       <Sidebar active="overview" onNavigate={() => {}} />,
     );
 
-    expect(getByRole("button", { name: /Prompts.*42/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
     // Qualified by class: "Projects" is now both a nav destination and the
     // heading of the recents list underneath it.
     expect(getByText("Projects", { selector: ".sidebar__section-label" })).toBeInTheDocument();
   });
 
-  it("lists Projects as a destination of its own, right after Setup", () => {
+  it("leads with Setup and no longer lists Prompts", () => {
+    const { getAllByRole } = render(<Sidebar active="setup" onNavigate={vi.fn()} />);
+    const labels = getAllByRole("button").map((b) => b.textContent);
+    expect(labels[0]).toBe("Setup");
+    expect(labels).not.toContain("Prompts");
+  });
+
+  it("lists Projects as a destination of its own, right after Overview", () => {
     const { getAllByRole } = render(<Sidebar active="overview" onNavigate={() => {}} />);
     const labels = getAllByRole("button").map((b) => b.textContent);
     expect(labels).toContain("Projects");
-    expect(labels.indexOf("Projects")).toBe(labels.indexOf("Setup") + 1);
+    expect(labels.indexOf("Projects")).toBe(labels.indexOf("Overview") + 1);
   });
 
   it("routes the Projects nav item to the projects table", () => {
@@ -66,11 +72,11 @@ describe("Sidebar", () => {
     expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
   });
 
-  it("keeps Prompts lit while one file's detail page is open", () => {
-    // `detail` is not a destination of its own either; it is opened from a
-    // file list, and Prompts is the list it belongs to.
+  it("keeps Setup lit while one file's detail page is open", () => {
+    // `detail` is not a destination of its own either; it is opened from
+    // Setup's file rows now, so Setup is the destination it belongs to.
     const { getByRole } = render(<Sidebar active="detail" onNavigate={() => {}} />);
-    expect(getByRole("button", { current: "page" })).toHaveTextContent("Prompts");
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Setup");
   });
 
   it("routes a recent project to its own page", () => {
@@ -88,7 +94,7 @@ describe("Sidebar", () => {
 
   it("has no accessibility violations", async () => {
     mockSidebar.mockReturnValue({
-      counts: { prompts: 42 },
+      counts: {},
       projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
     const { container } = render(

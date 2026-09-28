@@ -23,7 +23,7 @@ import { parseSetupTarget } from "./setupTarget";
 const ONBOARDED_KEY = "pj-onboarded";
 
 export function App() {
-  const [route, setRoute] = useState<Route>("overview");
+  const [route, setRoute] = useState<Route>("setup");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string | undefined>(undefined);
   // The raw deep link, parsed below: it arrives as a plain string (the panel's
@@ -96,7 +96,7 @@ export function App() {
   const finishOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, "done");
     setShowOnboarding(false);
-    setRoute("overview");
+    setRoute("setup");
   };
 
   return (

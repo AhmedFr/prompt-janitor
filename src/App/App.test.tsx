@@ -79,9 +79,9 @@ describe("App", () => {
 
   afterEach(cleanup);
 
-  it("starts on the overview", () => {
+  it("opens on Setup", () => {
     render(<App />);
-    expect(screen.getByTestId("overview")).toBeInTheDocument();
+    expect(screen.getByTestId("setup")).toBeInTheDocument();
   });
 
   it("opens Settings → Checks for the old Rules routes, on the table they named", async () => {
@@ -178,7 +178,7 @@ describe("App", () => {
   it("ignores a `navigate` event naming a route that does not exist", async () => {
     render(<App />);
     await emitNavigate({ route: "not-a-route", target: null });
-    expect(screen.getByTestId("overview")).toBeInTheDocument();
+    expect(screen.getByTestId("setup")).toBeInTheDocument();
   });
 
   it("says nothing about updates while the app is current", () => {
@@ -191,7 +191,7 @@ describe("App", () => {
     render(<App />);
     expect(screen.getByText(/Prompt Janitor 0\.1\.1 is available/)).toBeInTheDocument();
     // News, not an interruption: the screen underneath stays put.
-    expect(screen.getByTestId("overview")).toBeInTheDocument();
+    expect(screen.getByTestId("setup")).toBeInTheDocument();
   });
 
   it("sends the banner's action to the Settings App tab", () => {
