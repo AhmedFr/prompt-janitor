@@ -32,7 +32,7 @@ const sharedSources = import.meta.glob(
 ) as Record<string, string>;
 
 /**
- * `screens/Rules/Rules.tsx` but not its tests, stories or sub-components:
+ * `screens/Setup/Setup.tsx` but not its tests, stories or sub-components:
  * the screen file is the one whose basename matches its folder.
  */
 const screens = Object.entries(screenSources)
@@ -63,8 +63,6 @@ describe("window drag regions", () => {
       "Project",
       "Projects",
       "Prompts",
-      "Rules",
-      "RulesNew",
       "Scans",
       "Settings",
       "Setup",

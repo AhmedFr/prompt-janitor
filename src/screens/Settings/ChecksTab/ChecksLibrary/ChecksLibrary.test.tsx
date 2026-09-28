@@ -3,8 +3,8 @@ import { act, render, cleanup, screen, fireEvent, waitFor, within } from "@testi
 import { axe } from "vitest-axe";
 import { pickFilter } from "@/test/filters";
 import type { RuleInfo } from "@/lib/ipc";
-import { Rules } from "./Rules";
-import { HIGHLIGHT_KEY, STATUS_MSG_MS, TAB_STATE_KEY } from "./Rules.constants";
+import { ChecksLibrary } from "./ChecksLibrary";
+import { HIGHLIGHT_KEY, STATUS_MSG_MS, TAB_STATE_KEY } from "./ChecksLibrary.constants";
 
 const listRules = vi.hoisted(() => vi.fn());
 const setRule = vi.hoisted(() => vi.fn());
@@ -119,11 +119,11 @@ function rowTitles(): string[] {
     .map((tr) => tr.querySelectorAll("td")[1]?.textContent ?? "");
 }
 
-const renderScreen = async (props: Partial<Parameters<typeof Rules>[0]> = {}) => {
-  const navigate = props.navigate ?? vi.fn();
-  const view = render(<Rules navigate={navigate} {...props} />);
+const renderScreen = async (props: Partial<Parameters<typeof ChecksLibrary>[0]> = {}) => {
+  const onAdd = props.onAdd ?? vi.fn();
+  const view = render(<ChecksLibrary onAdd={onAdd} {...props} />);
   await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
-  return { ...view, navigate };
+  return { ...view, onAdd };
 };
 
 const clickTab = (name: RegExp) => fireEvent.click(screen.getByRole("tab", { name }));
@@ -133,7 +133,7 @@ const rowsSettle = (n: number) => waitFor(() => expect(rowTitles()).toHaveLength
 
 const statusLine = () => screen.getByRole("status").textContent;
 
-describe("Rules", () => {
+describe("ChecksLibrary", () => {
   beforeEach(() => {
     runtime.tauri = true;
     sessionStorage.clear();
@@ -155,7 +155,7 @@ describe("Rules", () => {
     await renderScreen();
     await waitFor(() => expect(screen.getByRole("tab", { name: /Built-in/ })).toHaveTextContent("1/2"));
     expect(screen.getByRole("tab", { name: /Custom/ })).toHaveTextContent("2/2");
-    expect(screen.getByRole("tab", { name: /AI standards/ })).toHaveTextContent("1/2");
+    expect(screen.getByRole("tab", { name: /AI checks/ })).toHaveTextContent("1/2");
   });
 
   it("opens on the built-in rules and shows only those", async () => {
@@ -174,9 +174,9 @@ describe("Rules", () => {
     expect(rowTitles().join(" ")).toContain("No internal hostnames");
   });
 
-  it("shows every natural-language rule on the AI standards tab, whoever wrote it", async () => {
+  it("shows every natural-language rule on the AI checks tab, whoever wrote it", async () => {
     await renderScreen();
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await rowsSettle(2);
     expect(rowTitles().join(" ")).toContain("Defines an output format");
     expect(rowTitles().join(" ")).toContain("Names its escape hatch");
@@ -185,8 +185,8 @@ describe("Rules", () => {
   it("names each table after the tab it belongs to", async () => {
     await renderScreen();
     expect(screen.getByRole("table", { name: "Built-in rules" })).toBeInTheDocument();
-    clickTab(/AI standards/);
-    await waitFor(() => expect(screen.getByRole("table", { name: "AI standards rules" })).toBeInTheDocument());
+    clickTab(/AI checks/);
+    await waitFor(() => expect(screen.getByRole("table", { name: "AI checks rules" })).toBeInTheDocument());
   });
 
   it("toggles a rule from its switch and persists it", async () => {
@@ -286,7 +286,7 @@ describe("Rules", () => {
 
   it("deletes a natural-language standard the user wrote, from the AI tab", async () => {
     await renderScreen();
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await rowsSettle(2);
 
     // The built-in standard beside it cannot be removed, and says so by
@@ -420,17 +420,17 @@ describe("Rules", () => {
     expect(rowTitles()[0]).toContain("No internal hostnames");
   });
 
-  it("sends Add rule to the new-rule flow, carrying the tab it was pressed on", async () => {
-    const { navigate } = await renderScreen();
+  it("sends Add check to the add-check form, carrying the tab it was pressed on", async () => {
+    const { onAdd } = await renderScreen();
     await rowsSettle(2);
 
-    fireEvent.click(screen.getByRole("button", { name: /Add rule/ }));
-    expect(navigate).toHaveBeenCalledWith("rules-new", "builtin");
+    fireEvent.click(screen.getByRole("button", { name: /Add check/ }));
+    expect(onAdd).toHaveBeenCalledWith("builtin");
 
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await rowsSettle(2);
-    fireEvent.click(screen.getByRole("button", { name: /Add rule/ }));
-    expect(navigate).toHaveBeenCalledWith("rules-new", "ai");
+    fireEvent.click(screen.getByRole("button", { name: /Add check/ }));
+    expect(onAdd).toHaveBeenCalledWith("ai");
   });
 
   it("offers pack import on the built-in tab only", async () => {
@@ -470,23 +470,23 @@ describe("Rules", () => {
     expect(statusLine()).toBe("");
   });
 
-  it("notes what evaluates the AI standards once a provider is connected", async () => {
+  it("notes what evaluates the AI checks once a provider is connected", async () => {
     await renderScreen();
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await waitFor(() => expect(screen.getByText(/Evaluated by your AI provider/)).toBeInTheDocument());
   });
 
   it("says a provider is still missing rather than pretending the standards run", async () => {
     getAiConfig.mockResolvedValue({ status: "ok", data: { provider: "none", has_key: false } });
     await renderScreen();
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await waitFor(() => expect(screen.getByText(/Settings → AI/)).toBeInTheDocument());
     expect(screen.queryByText(/Evaluated by your AI provider/)).not.toBeInTheDocument();
   });
 
   it("never asks about a licence — monetisation is paused", async () => {
     await renderScreen();
-    clickTab(/AI standards/);
+    clickTab(/AI checks/);
     await rowsSettle(2);
     expect(screen.queryByText(/licen[cs]e/i)).not.toBeInTheDocument();
   });
@@ -495,7 +495,7 @@ describe("Rules", () => {
     sessionStorage.setItem(`pj.tabs.${TAB_STATE_KEY}`, "custom");
     await renderScreen({ initialTab: "ai" });
     await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /AI standards/ })).toHaveAttribute("aria-selected", "true"),
+      expect(screen.getByRole("tab", { name: /AI checks/ })).toHaveAttribute("aria-selected", "true"),
     );
     expect(rowTitles().join(" ")).toContain("Defines an output format");
   });
@@ -519,7 +519,7 @@ describe("Rules", () => {
 
   it("says the query failed rather than claiming there are no rules", async () => {
     listRules.mockRejectedValue(new Error("database is locked"));
-    render(<Rules navigate={vi.fn()} />);
+    render(<ChecksLibrary onAdd={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText(/rule list query failed/i)).toBeInTheDocument());
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
@@ -532,7 +532,7 @@ describe("Rules", () => {
    */
   it("says which app owns the rules when there is no Tauri behind the window", async () => {
     runtime.tauri = false;
-    render(<Rules navigate={vi.fn()} />);
+    render(<ChecksLibrary onAdd={vi.fn()} />);
 
     await waitFor(() =>
       expect(screen.getByText(/Open the desktop app to manage rules/)).toBeInTheDocument(),
@@ -544,7 +544,7 @@ describe("Rules", () => {
 
   it("still tables a fixture in the browser, so Storybook is not the empty state", async () => {
     runtime.tauri = false;
-    render(<Rules navigate={vi.fn()} rules={populated} />);
+    render(<ChecksLibrary onAdd={vi.fn()} rules={populated} />);
 
     await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
     expect(screen.queryByText(/Open the desktop app/)).not.toBeInTheDocument();
@@ -552,7 +552,7 @@ describe("Rules", () => {
 
   it("retries the query from the failure panel", async () => {
     listRules.mockRejectedValue(new Error("database is locked"));
-    render(<Rules navigate={vi.fn()} />);
+    render(<ChecksLibrary onAdd={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/rule list query failed/i)).toBeInTheDocument());
 
     listRules.mockResolvedValue({ status: "ok", data: populated });

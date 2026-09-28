@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { commands, isTauri, type RuleInfo } from "@/lib/ipc";
-import { DELETE_FAILED, IMPORT_FAILED, TOGGLE_FAILED } from "./Rules.constants";
-import type { RulesState } from "./Rules.types";
+import { DELETE_FAILED, IMPORT_FAILED, TOGGLE_FAILED } from "./ChecksLibrary.constants";
+import type { RulesState } from "./ChecksLibrary.types";
 
 /**
  * The rule set the screen tables: fetches it, toggles rules, deletes custom
@@ -14,9 +14,9 @@ import type { RulesState } from "./Rules.types";
  * failed toggle stays on screen for the rest of the session and outranks
  * everything said after it.
  *
- * Creating rules deliberately isn't here — that lives on `/rules/new` (spec
- * §4.3), so this hook stays the read/maintain surface and the composer state
- * doesn't leak into a screen that no longer composes anything.
+ * Creating rules deliberately isn't here — that lives in the add-check form
+ * (`AddCheck`), so this hook stays the read/maintain surface and the composer
+ * state doesn't leak into a screen that no longer composes anything.
  *
  * **None of the actions below reject.** Each one owns its failure: it puts the
  * optimistic change back and says what happened. That is what lets the screen
@@ -26,7 +26,7 @@ import type { RulesState } from "./Rules.types";
  *
  * @param say Puts one sentence in the screen's live region, until it expires.
  */
-export function useRules(say: (message: string) => void): RulesState {
+export function useChecksLibrary(say: (message: string) => void): RulesState {
   const [rules, setRules] = useState<RuleInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);

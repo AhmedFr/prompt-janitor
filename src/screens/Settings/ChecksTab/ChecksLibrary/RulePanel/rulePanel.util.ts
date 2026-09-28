@@ -1,6 +1,6 @@
 import { SOURCES } from "@/components/SourceBadge";
 import type { RuleInfo } from "@/lib/ipc";
-import { SEVERITY_LABELS } from "../rules.columns";
+import { SEVERITY_LABELS } from "../checksLibrary.columns";
 import { RULE_TYPE } from "./RulePanel.constants";
 import type { RuleFact } from "./RulePanel.types";
 

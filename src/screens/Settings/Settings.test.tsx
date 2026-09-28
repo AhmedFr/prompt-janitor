@@ -6,7 +6,9 @@ vi.mock("./useSettings", () => ({
     ai: null, setSchedule: vi.fn(), setDigest: vi.fn(), setRegressions: vi.fn(), saveAi: vi.fn(), testAi: vi.fn() }),
 }));
 vi.mock("./FoldersTab", () => ({ FoldersTab: () => <div data-testid="folders" /> }));
-vi.mock("./ChecksTab", () => ({ ChecksTab: () => <div data-testid="checks" /> }));
+vi.mock("./ChecksTab", () => ({
+  ChecksTab: ({ initialTab }: { initialTab?: string }) => <div data-testid="checks">{initialTab ?? "none"}</div>,
+}));
 vi.mock("./AboutTab", () => ({ AboutTab: () => <div data-testid="about" /> }));
 import { Settings } from "./Settings";
 
@@ -29,5 +31,10 @@ describe("Settings", () => {
   it("shows the folder list under the Folders tab", () => {
     render(<Settings navigate={vi.fn()} initialTab="harnesses" />);
     expect(screen.getByTestId("folders")).toBeInTheDocument();
+  });
+
+  it("passes the rule table through to the Checks tab", () => {
+    render(<Settings navigate={vi.fn()} initialTab="checks" checksTab="custom" />);
+    expect(screen.getByTestId("checks")).toHaveTextContent("custom");
   });
 });

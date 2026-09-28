@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tableStorageKey } from "@/components/DataTable";
 import { commands, isTauri } from "@/lib/ipc";
-import { HIGHLIGHT_KEY, TABLE_STATE_PREFIX } from "@/screens/Rules/Rules.constants";
-import type { Navigate } from "@/App/App.types";
-import { DEFAULT_TAB, EMPTY_DRAFT, SAVE_FAILED } from "./RulesNew.constants";
-import type { RuleDraft, RuleKind, RulesNewState } from "./RulesNew.types";
-import { canSave, newRuleId } from "./rulesNew.util";
+import { isRuleTab } from "../ChecksLibrary/checksLibrary.columns";
+import { HIGHLIGHT_KEY, TABLE_STATE_PREFIX } from "../ChecksLibrary/ChecksLibrary.constants";
+import type { RuleTabId } from "../ChecksLibrary/ChecksLibrary.types";
+import { DEFAULT_TAB, EMPTY_DRAFT, SAVE_FAILED } from "./AddCheck.constants";
+import type { RuleDraft, RuleKind, RulesNewState } from "./AddCheck.types";
+import { canSave, newRuleId } from "./addCheck.util";
 
 /**
- * Where {@link Rules} lands after a save: a pattern rule is the user's own, a
- * natural-language standard is judged by the model, and those are two
- * different tables.
+ * Where {@link ChecksLibrary} lands after a save: a pattern rule is the
+ * user's own, a natural-language standard is judged by the model, and those
+ * are two different tables.
  */
-const TAB_FOR: Record<RuleKind, string> = { pattern: "custom", nl: "ai" };
+const TAB_FOR: Record<RuleKind, RuleTabId> = { pattern: "custom", nl: "ai" };
 
-/** Leave the new rule's id for the Rules screen to land on. Best-effort. */
+/** Leave the new rule's id for the check library to land on. Best-effort. */
 function rememberHighlight(id: string | undefined): void {
   if (!id) return;
   try {
@@ -55,25 +56,25 @@ async function findNewRuleId(title: string, nl: boolean): Promise<string | undef
 }
 
 /**
- * The add-rule flow: which kind, what it says, and the one write at the end
- * of it. Reading and maintaining rules stays in `useRules` — this hook only
- * ever creates.
+ * The add-check flow: which kind, what it says, and the one write at the end
+ * of it. Reading and maintaining rules stays in `useChecksLibrary` — this
+ * hook only ever creates.
  *
- * `save` does not reject. It owns its failure the way `useRules`' actions do:
- * the form stays exactly as typed and a sentence lands in `error`.
+ * `save` does not reject. It owns its failure the way `useChecksLibrary`'s
+ * actions do: the form stays exactly as typed and a sentence lands in `error`.
  */
-export function useRulesNew({
+export function useAddCheck({
   initialType,
-  navigate,
+  onDone,
   aiReady: aiOverride,
 }: {
   initialType?: string;
-  navigate: Navigate;
+  onDone: (tab: RuleTabId) => void;
   aiReady?: boolean | null;
 }): RulesNewState {
   // Coming from the AI tab, the user has already answered the type question —
-  // pressing "Add rule" there *is* the answer. Any other tab still gets asked,
-  // because "Custom" holds pattern rules and standards alike.
+  // pressing "Add check" there *is* the answer. Any other tab still gets
+  // asked, because "Custom" holds pattern rules and standards alike.
   const [kind, setKind] = useState<RuleKind | null>(initialType === "ai" ? "nl" : null);
   const [draft, setDraft] = useState<RuleDraft>(EMPTY_DRAFT);
   const [fetched, setFetched] = useState<boolean | null>(null);
@@ -86,10 +87,10 @@ export function useRulesNew({
 
   const aiReady = aiOverride !== undefined ? aiOverride : fetched;
 
-  // Same check `useRules` makes, and for the same reason: a standard with no
-  // provider behind it is stored but never evaluated, which is worse than not
-  // being offered. Entitlement is deliberately not read — monetisation is
-  // paused, so a licence must not decide what this flow offers.
+  // Same check `useChecksLibrary` makes, and for the same reason: a standard
+  // with no provider behind it is stored but never evaluated, which is worse
+  // than not being offered. Entitlement is deliberately not read —
+  // monetisation is paused, so a licence must not decide what this flow offers.
   useEffect(() => {
     if (!isTauri || aiOverride !== undefined) return;
     void (async () => {
@@ -105,8 +106,8 @@ export function useRulesNew({
   }, [aiOverride]);
 
   const cancel = useCallback(() => {
-    navigate("rules", initialType ?? DEFAULT_TAB);
-  }, [navigate, initialType]);
+    onDone(isRuleTab(initialType) ? initialType : DEFAULT_TAB);
+  }, [onDone, initialType]);
 
   // Escape abandons the flow from either step — the same key that dismisses
   // every other modal surface in the app. Three things it must not abandon:
@@ -114,7 +115,7 @@ export function useRulesNew({
   // candidate window and never reaches the user's intent), a key something
   // closer to the user already handled (`defaultPrevented`), and a write
   // already in flight — by then the rule may exist, and leaving would strand
-  // the user on Rules with no idea whether it landed.
+  // the user with no idea whether it landed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
@@ -149,13 +150,13 @@ export function useRulesNew({
       clearTableFilters(TAB_FOR[kind]);
       // No `setSaving(false)`: the screen is leaving, and the button must not
       // flicker back to enabled on the way out.
-      navigate("rules", TAB_FOR[kind]);
+      onDone(TAB_FOR[kind]);
     } catch {
       setError(SAVE_FAILED);
       savingRef.current = false;
       setSaving(false);
     }
-  }, [kind, draft, aiReady, navigate]);
+  }, [kind, draft, aiReady, onDone]);
 
   return { kind, draft, aiReady, saving, error, choose, back, update, cancel, save };
 }

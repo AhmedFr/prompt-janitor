@@ -1,5 +1,5 @@
 import type { Severity } from "@/lib/ipc";
-import type { Navigate } from "@/App/App.types";
+import type { RuleTabId } from "../ChecksLibrary/ChecksLibrary.types";
 
 /**
  * Which kind of rule is being written. Deliberately not `RuleTabId`: the AI
@@ -8,10 +8,9 @@ import type { Navigate } from "@/App/App.types";
  */
 export type RuleKind = "pattern" | "nl";
 
-export interface RulesNewProps {
-  navigate: Navigate;
+export interface AddCheckProps {
   /**
-   * The Rules tab the user pressed **Add rule** on (`builtin` | `custom` |
+   * The rule table the user pressed **Add check** on (`builtin` | `custom` |
    * `ai`). Cancelling returns there, and `ai` opens straight into the
    * natural-language form — the user already said which kind they wanted.
    */
@@ -21,6 +20,8 @@ export interface RulesNewProps {
    * `get_ai_config` in the app. `null` means "not known yet".
    */
   aiReady?: boolean | null;
+  /** Leave the form, landing on the rule table it should reopen on. */
+  onDone: (tab: RuleTabId) => void;
 }
 
 /**
@@ -34,7 +35,7 @@ export interface RuleDraft {
   severity: Severity;
 }
 
-/** What {@link useRulesNew} hands the screen. */
+/** What {@link useAddCheck} hands the screen. */
 export interface RulesNewState {
   /** `null` while the type step is still asking. */
   kind: RuleKind | null;

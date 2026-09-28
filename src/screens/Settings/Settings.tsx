@@ -3,6 +3,7 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { isTauri } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
+import type { RuleTabId } from "./ChecksTab/ChecksLibrary/ChecksLibrary.types";
 import { useSettings } from "./useSettings";
 import { FoldersTab } from "./FoldersTab";
 import { ScanningTab } from "./ScanningTab";
@@ -18,9 +19,11 @@ export interface SettingsProps {
   navigate: Navigate;
   /** Tab to open on (e.g. "ai" from the Overview coverage line, or a legacy id). */
   initialTab?: string;
+  /** The rule table Settings → Checks opens on (from an old `rules` deep link). */
+  checksTab?: RuleTabId;
 }
 
-export function Settings({ navigate: _navigate, initialTab }: SettingsProps) {
+export function Settings({ navigate: _navigate, initialTab, checksTab }: SettingsProps) {
   const s = useSettings();
   // Default to the first tab in the strip: a screen that opens on its second
   // tab reads as a lost selection rather than a starting point.
@@ -79,7 +82,7 @@ export function Settings({ navigate: _navigate, initialTab }: SettingsProps) {
                 />
               )}
 
-              {tab === "checks" && <ChecksTab />}
+              {tab === "checks" && <ChecksTab initialTab={checksTab} />}
 
               {tab === "ai" && <AiTab ai={s.ai} onSave={s.saveAi} onTest={s.testAi} />}
 

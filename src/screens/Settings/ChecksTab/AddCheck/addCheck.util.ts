@@ -1,5 +1,5 @@
 import type { RuleInfo } from "@/lib/ipc";
-import type { RuleDraft, RuleKind } from "./RulesNew.types";
+import type { RuleDraft, RuleKind } from "./AddCheck.types";
 
 /**
  * Custom rule ids are minted as `custom-{nanos}` / `custom-nl-{nanos}`

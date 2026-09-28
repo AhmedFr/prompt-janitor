@@ -29,8 +29,6 @@ vi.mock("@/screens/Prompts", () => ({ Prompts: makeStub("prompts") }));
 vi.mock("@/screens/Detail", () => ({ Detail: makeStub("detail") }));
 vi.mock("@/screens/Scans", () => ({ Scans: makeStub("scans") }));
 vi.mock("@/screens/Analytics", () => ({ Analytics: makeStub("analytics") }));
-vi.mock("@/screens/Rules", () => ({ Rules: makeStub("rules") }));
-vi.mock("@/screens/RulesNew", () => ({ RulesNew: makeStub("rules-new") }));
 vi.mock("@/screens/Settings", () => ({ Settings: makeStub("settings") }));
 
 vi.mock("@/lib/ipc", async () => {
@@ -86,18 +84,19 @@ describe("App", () => {
     expect(screen.getByTestId("overview")).toBeInTheDocument();
   });
 
-  it("routes to the add-rule flow with the tab the user came from", () => {
-    render(<App />);
-    go("rules-new", "ai");
-    expect(screen.getByTestId("rules-new")).toBeInTheDocument();
-    expect(propsOf("rules-new").initialType).toBe("ai");
-    expect(screen.queryByTestId("rules")).not.toBeInTheDocument();
-  });
-
-  it("sends the new rule's tab back to the Rules screen", () => {
+  it("opens Settings → Checks for the old Rules routes, on the table they named", async () => {
     render(<App />);
     go("rules", "custom");
-    expect(propsOf("rules").initialTab).toBe("custom");
+    expect(screen.getByTestId("settings")).toBeInTheDocument();
+    expect(propsOf("settings").initialTab).toBe("checks");
+    expect(propsOf("settings").checksTab).toBe("custom");
+  });
+
+  it("drops a rule table that does not exist", async () => {
+    render(<App />);
+    go("rules-new", "nope");
+    expect(propsOf("settings").initialTab).toBe("checks");
+    expect(propsOf("settings").checksTab).toBeUndefined();
   });
 
   /**

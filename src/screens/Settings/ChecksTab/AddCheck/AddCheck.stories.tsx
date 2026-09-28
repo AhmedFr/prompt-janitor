@@ -1,18 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { RulesNew } from "./RulesNew";
+import { AddCheck } from "./AddCheck";
 import "@/styles/shell.css";
-import "@/screens/Detail/Detail.css";
 
 /**
- * Writing a rule, as its own screen: choose the kind, fill three fields, and
- * land back on the Rules tab the new rule belongs to. Storybook has no Tauri
- * to ask about a provider, so `aiReady` is passed explicitly — in the app it
- * comes from `get_ai_config`.
+ * Writing a check, as its own form: choose the kind, fill three fields, and
+ * land back on the rule table the new check belongs to. Storybook has no
+ * Tauri to ask about a provider, so `aiReady` is passed explicitly — in the
+ * app it comes from `get_ai_config`.
  */
 const meta = {
-  title: "Screens/RulesNew",
-  component: RulesNew,
-  args: { navigate: () => {}, aiReady: true },
+  title: "Settings/AddCheck",
+  component: AddCheck,
+  args: { onDone: () => {}, aiReady: true },
   parameters: { layout: "fullscreen" },
   decorators: [
     (Story) => (
@@ -21,7 +20,7 @@ const meta = {
       </div>
     ),
   ],
-} satisfies Meta<typeof RulesNew>;
+} satisfies Meta<typeof AddCheck>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

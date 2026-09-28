@@ -18,16 +18,11 @@ export function useSidebar() {
 
   const refetch = useCallback(async () => {
     if (!isTauri) return;
-    const [projectsRes, files, rules] = await Promise.all([
-      commands.listProjects(),
-      commands.listFiles(),
-      commands.listRules(),
-    ]);
+    const [projectsRes, files] = await Promise.all([commands.listProjects(), commands.listFiles()]);
     if (projectsRes.status === "ok") {
       setProjects(recentProjects(projectsRes.data, RECENT_PROJECTS_LIMIT));
     }
     if (files.status === "ok") setCounts((prev) => ({ ...prev, prompts: files.data.length }));
-    if (rules.status === "ok") setCounts((prev) => ({ ...prev, rules: rules.data.length }));
   }, []);
 
   useEffect(() => {

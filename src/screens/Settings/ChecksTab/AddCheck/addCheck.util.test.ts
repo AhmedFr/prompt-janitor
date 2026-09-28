@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { RuleInfo } from "@/lib/ipc";
-import { canSave, newRuleId, ruleStamp } from "./rulesNew.util";
+import { canSave, newRuleId, ruleStamp } from "./addCheck.util";
 
 const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
   id: "r1",

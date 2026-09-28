@@ -1,5 +1,4 @@
 import type { RuleInfo } from "@/lib/ipc";
-import type { Navigate } from "@/App/App.types";
 
 /**
  * Which table a rule belongs to. Disjoint and exhaustive over `RuleInfo`
@@ -8,18 +7,19 @@ import type { Navigate } from "@/App/App.types";
  */
 export type RuleTabId = "builtin" | "custom" | "ai";
 
-export interface RulesProps {
-  navigate: Navigate;
+export interface ChecksLibraryProps {
   /**
-   * The tab to open on — `/rules/new` sends the user back to the tab their
-   * new rule landed in. Beats whatever tab was last remembered.
+   * The tab to open on — the add-check form sends the user back to the tab
+   * their new check landed in. Beats whatever tab was last remembered.
    */
   initialTab?: string;
   /** Override the live rule set (Storybook only); the hook supplies it in the app. */
   rules?: RuleInfo[];
+  /** Opens the add-check form, carrying the tab it was pressed on. */
+  onAdd: (tab: RuleTabId) => void;
 }
 
-/** What {@link useRules} hands the screen. */
+/** What {@link useChecksLibrary} hands the screen. */
 export interface RulesState {
   rules: RuleInfo[];
   loading: boolean;

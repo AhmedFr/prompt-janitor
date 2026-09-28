@@ -11,7 +11,6 @@ export const NAV_ITEMS: NavItem[] = [
   { route: "prompts", label: "Prompts", icon: "prompts" },
   { route: "scans", label: "Scans", icon: "scans" },
   { route: "analytics", label: "Analytics", icon: "barChart" },
-  { route: "rules", label: "Rules", icon: "rules" },
   { route: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -31,5 +30,4 @@ export const NAV_OWNER: Partial<Record<Route, Route>> = {
   // Prompts is the file list a file belongs to — and a nav with nothing lit
   // is worse than one lit a level up from where the reader came in.
   detail: "prompts",
-  "rules-new": "rules",
 };

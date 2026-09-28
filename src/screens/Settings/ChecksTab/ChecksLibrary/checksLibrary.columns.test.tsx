@@ -6,12 +6,13 @@ import {
   buildPills,
   columnsFor,
   DEFAULT_SORT,
+  isRuleTab,
   rowsByTab,
   severityRank,
   tabItems,
   tabOf,
   type RuleColumnsCtx,
-} from "./rules.columns";
+} from "./checksLibrary.columns";
 
 afterEach(cleanup);
 
@@ -115,7 +116,7 @@ describe("tabItems", () => {
     expect(tabItems(rowsByTab(rows))).toEqual([
       { id: "builtin", label: "Built-in", countLabel: "1/2" },
       { id: "custom", label: "Custom", countLabel: "1/1" },
-      { id: "ai", label: "AI standards", countLabel: "0/1" },
+      { id: "ai", label: "AI checks", countLabel: "0/1" },
     ]);
   });
 
@@ -297,5 +298,13 @@ describe("buildPills", () => {
     const hits = buildPills(rows).find((g) => g.id === "hits");
     expect(hits?.options.map((o) => o.label)).toEqual(["Has hits"]);
     expect(rows.filter(hits!.options[0].predicate).map((r) => r.id)).toEqual(["noisy"]);
+  });
+});
+
+describe("isRuleTab", () => {
+  it("accepts the three rule tables and nothing else", () => {
+    expect(["builtin", "custom", "ai"].every((t) => isRuleTab(t))).toBe(true);
+    expect(isRuleTab(undefined)).toBe(false);
+    expect(isRuleTab("checks")).toBe(false);
   });
 });

@@ -20,15 +20,15 @@ describe("Sidebar", () => {
 
   it("marks the active route with aria-current", () => {
     const { getByRole } = render(
-      <Sidebar active="rules" onNavigate={() => {}} onReplay={() => {}} />,
+      <Sidebar active="settings" onNavigate={() => {}} onReplay={() => {}} />,
     );
-    // The Rules nav item should be the one flagged as the current page.
-    expect(getByRole("button", { current: "page" })).toHaveTextContent("Rules");
+    // The Settings nav item should be the one flagged as the current page.
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Settings");
   });
 
   it("shows badge counts and the recent-projects list when data is present", () => {
     mockSidebar.mockReturnValue({
-      counts: { prompts: 42, rules: 27 },
+      counts: { prompts: 42 },
       projects: [
         { id: "/web-app", name: "web-app", grade: "A", logo: null },
         { id: "/scripts", name: "scripts", grade: "F", logo: null },
@@ -39,7 +39,6 @@ describe("Sidebar", () => {
     );
 
     expect(getByRole("button", { name: /Prompts.*42/ })).toBeInTheDocument();
-    expect(getByRole("button", { name: /Rules.*27/ })).toBeInTheDocument();
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
     // Qualified by class: "Projects" is now both a nav destination and the
     // heading of the recents list underneath it.
@@ -89,7 +88,7 @@ describe("Sidebar", () => {
 
   it("has no accessibility violations", async () => {
     mockSidebar.mockReturnValue({
-      counts: { prompts: 42, rules: 27 },
+      counts: { prompts: 42 },
       projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
     const { container } = render(

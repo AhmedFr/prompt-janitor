@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { RuleInfo } from "@/lib/ipc";
-import { Rules } from "./Rules";
+import { ChecksLibrary } from "./ChecksLibrary";
 import "@/styles/shell.css";
 
 const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
@@ -131,12 +131,12 @@ const clearRememberedState = () => {
 /**
  * Every rule the app enforces, as three tables: what shipped, what you wrote,
  * and what your AI provider judges. Storybook feeds the screen a fixture
- * through the `rules` prop — in the app it comes from `useRules`.
+ * through the `rules` prop — in the app it comes from `useChecksLibrary`.
  */
 const meta = {
-  title: "Screens/Rules",
-  component: Rules,
-  args: { navigate: () => {}, rules: populated },
+  title: "Settings/ChecksLibrary",
+  component: ChecksLibrary,
+  args: { onAdd: () => {}, rules: populated },
   parameters: { layout: "fullscreen" },
   decorators: [
     (Story) => {
@@ -148,7 +148,7 @@ const meta = {
       );
     },
   ],
-} satisfies Meta<typeof Rules>;
+} satisfies Meta<typeof ChecksLibrary>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

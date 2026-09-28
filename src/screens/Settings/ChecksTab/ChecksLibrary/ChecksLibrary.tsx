@@ -5,7 +5,14 @@ import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import { Tabs, useTabState } from "@/components/Tabs";
 import type { RuleInfo } from "@/lib/ipc";
-import { buildPills, columnsFor, DEFAULT_SORT, rowsByTab, tabItems, type RuleColumnsCtx } from "./rules.columns";
+import {
+  buildPills,
+  columnsFor,
+  DEFAULT_SORT,
+  rowsByTab,
+  tabItems,
+  type RuleColumnsCtx,
+} from "./checksLibrary.columns";
 import {
   ADD_RULE_LABEL,
   AI_NOTE_NO_PROVIDER,
@@ -26,11 +33,11 @@ import {
   TAB_LABELS,
   TAB_STATE_KEY,
   TABLE_STATE_PREFIX,
-} from "./Rules.constants";
+} from "./ChecksLibrary.constants";
 import { RulePanel } from "./RulePanel";
-import type { RulesProps, RuleTabId } from "./Rules.types";
-import { useRules } from "./useRules";
-import "./Rules.css";
+import type { ChecksLibraryProps, RuleTabId } from "./ChecksLibrary.types";
+import { useChecksLibrary } from "./useChecksLibrary";
+import "./ChecksLibrary.css";
 
 /**
  * Shared by every render that has no rules yet, and frozen because of it: a
@@ -53,7 +60,7 @@ const SEARCH: DataTableSearch<RuleInfo> = {
   keys: ["title", "description", (r) => r.pattern ?? ""],
 };
 
-/** The one row `/rules/new` asked us to land on, consumed on the way past. */
+/** The one row the add-check form asked us to land on, consumed on the way past. */
 function takeHighlight(): string | undefined {
   try {
     return window.sessionStorage.getItem(HIGHLIGHT_KEY) ?? undefined;
@@ -79,16 +86,17 @@ function asTab(id: string): RuleTabId {
 /**
  * Every rule the app enforces, as three comparable tables: what shipped, what
  * you wrote, and what your AI provider judges. Creating a rule is not here —
- * it is its own flow at `/rules/new`, so this screen stays about reading and
- * maintaining the set.
+ * it opens the add-check form in its place (see `ChecksTab`), so this screen
+ * stays about reading and maintaining the set.
  */
-export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
-  // The status line is built first because `useRules` writes into it: a failed
-  // mutation and a finished copy are the same channel, so a failure expires
-  // like everything else instead of sitting there for the rest of the session.
+export function ChecksLibrary({ initialTab, rules: override, onAdd }: ChecksLibraryProps) {
+  // The status line is built first because `useChecksLibrary` writes into it:
+  // a failed mutation and a finished copy are the same channel, so a failure
+  // expires like everything else instead of sitting there for the rest of the
+  // session.
   const status = useStatusLine();
   const { say } = status;
-  const state = useRules(say);
+  const state = useChecksLibrary(say);
   const rules = override ?? state.rules;
   const loading = state.loading && !override;
   const failed = state.failed && !override;
@@ -106,7 +114,7 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   }, [initialTab, setActive]);
 
   // Read once, on mount, and dropped from storage immediately: a highlight is
-  // about the trip the user just made, not about every later visit to Rules.
+  // about the trip the user just made, not about every later visit here.
   const [highlight] = useState(takeHighlight);
   useEffect(() => {
     if (highlight) forgetHighlight();
@@ -144,8 +152,8 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   // it closes over is stable, so this object is built once.
   const ctx = useMemo<RuleColumnsCtx>(
     () => ({
-      // `void` is honest here and only here: `useRules` documents that none of
-      // its actions reject — each reports its own failure through `say`.
+      // `void` is honest here and only here: `useChecksLibrary` documents that
+      // none of its actions reject — each reports its own failure through `say`.
       toggle: (id, enabled) => void toggle(id, enabled),
       onDelete: (id) => void deleteRule(id),
       onCopy: copy,
@@ -154,64 +162,56 @@ export function Rules({ navigate, initialTab, rules: override }: RulesProps) {
   );
 
   return (
-    <section className="screen">
-      <header className="screen__toolbar" data-tauri-drag-region>
-        <h1 className="screen__title">Rules &amp; standards</h1>
-      </header>
-
-      <div className="scroll-area">
-        <div className="page page--table rules-page">
-          {unavailable ? (
-            <NoDesktopApp />
-          ) : failed ? (
-            <UnreadableRules onRetry={() => void state.refetch()} />
-          ) : (
-            <Tabs items={tabs} active={active} onChange={setActive} ariaLabel="Rule kinds">
-              {(id) => {
-                const tab = asTab(id);
-                return (
-                  <>
-                    {tab === "ai" && (
-                      <p className="rules-note">{state.aiReady ? AI_NOTE_READY : AI_NOTE_NO_PROVIDER}</p>
-                    )}
-                    <RuleTable
-                      tab={tab}
-                      rows={byTab.get(tab) ?? NO_ROWS}
-                      ctx={ctx}
-                      loading={loading}
-                      highlight={highlight}
-                      onOpen={setOpenRuleId}
-                      toolbarRight={
-                        <>
-                          {/* Always present, empty or not: a live region that
-                              appears only once it has something to say has
-                              nothing for assistive tech to be watching. Copy
-                              results and failed writes share it, so the most
-                              recent thing that happened is what it reads. */}
-                          <span className="rules-status" role="status">
-                            {status.message ?? ""}
-                          </span>
-                          {tab === "builtin" && (
-                            <Button size="sm" onClick={() => void doImport()}>
-                              <Icon name="plus" /> {IMPORT_PACK_LABEL}
-                            </Button>
-                          )}
-                          <Button variant="primary" size="sm" onClick={() => navigate("rules-new", tab)}>
-                            <Icon name="plus" /> {ADD_RULE_LABEL}
-                          </Button>
-                        </>
-                      }
-                    />
-                  </>
-                );
-              }}
-            </Tabs>
-          )}
-        </div>
-      </div>
+    <>
+      {unavailable ? (
+        <NoDesktopApp />
+      ) : failed ? (
+        <UnreadableRules onRetry={() => void state.refetch()} />
+      ) : (
+        <Tabs items={tabs} active={active} onChange={setActive} ariaLabel="Rule kinds">
+          {(id) => {
+            const tab = asTab(id);
+            return (
+              <>
+                {tab === "ai" && (
+                  <p className="rules-note">{state.aiReady ? AI_NOTE_READY : AI_NOTE_NO_PROVIDER}</p>
+                )}
+                <RuleTable
+                  tab={tab}
+                  rows={byTab.get(tab) ?? NO_ROWS}
+                  ctx={ctx}
+                  loading={loading}
+                  highlight={highlight}
+                  onOpen={setOpenRuleId}
+                  toolbarRight={
+                    <>
+                      {/* Always present, empty or not: a live region that
+                          appears only once it has something to say has
+                          nothing for assistive tech to be watching. Copy
+                          results and failed writes share it, so the most
+                          recent thing that happened is what it reads. */}
+                      <span className="rules-status" role="status">
+                        {status.message ?? ""}
+                      </span>
+                      {tab === "builtin" && (
+                        <Button size="sm" onClick={() => void doImport()}>
+                          <Icon name="plus" /> {IMPORT_PACK_LABEL}
+                        </Button>
+                      )}
+                      <Button variant="primary" size="sm" onClick={() => onAdd(tab)}>
+                        <Icon name="plus" /> {ADD_RULE_LABEL}
+                      </Button>
+                    </>
+                  }
+                />
+              </>
+            );
+          }}
+        </Tabs>
+      )}
 
       {openRule && <RulePanel key={openRule.id} rule={openRule} onClose={() => setOpenRuleId(null)} />}
-    </section>
+    </>
   );
 }
 

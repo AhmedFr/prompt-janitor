@@ -1,4 +1,2 @@
-// Temporary stub until Task 1.6 builds the real Checks tab.
-export function ChecksTab() {
-  return null;
-}
+export { ChecksTab } from "./ChecksTab";
+export type { ChecksTabProps } from "./ChecksTab.types";

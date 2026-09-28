@@ -4,8 +4,8 @@ import { SeverityDot } from "@/components/SeverityDot";
 import { SOURCES, SourceBadge } from "@/components/SourceBadge";
 import type { RuleInfo, Severity, Source } from "@/lib/ipc";
 import type { TabItem } from "@/components/Tabs";
-import { RULE_TABS } from "./Rules.constants";
-import type { RuleTabId } from "./Rules.types";
+import { RULE_TABS, TAB_IDS } from "./ChecksLibrary.constants";
+import type { RuleTabId } from "./ChecksLibrary.types";
 
 /** What the rule columns close over — the three things a row can do. */
 export interface RuleColumnsCtx {
@@ -52,6 +52,11 @@ export function severityRank(severity: Severity): number {
 export function tabOf(rule: RuleInfo): RuleTabId {
   if (rule.nl) return "ai";
   return rule.custom ? "custom" : "builtin";
+}
+
+/** A bare string from a deep link or a form, narrowed to a rule table that exists. */
+export function isRuleTab(value: string | undefined): value is RuleTabId {
+  return TAB_IDS.some((id) => id === value);
 }
 
 /**

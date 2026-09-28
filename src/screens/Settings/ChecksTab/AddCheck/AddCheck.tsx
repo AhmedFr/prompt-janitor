@@ -3,7 +3,7 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import type { Severity } from "@/lib/ipc";
 import {
-  BACK_TO_RULES_LABEL,
+  BACK_TO_CHECKS_LABEL,
   BODY_HINT,
   BODY_HINT_ID,
   BODY_ID,
@@ -26,25 +26,25 @@ import {
   TITLE_ID,
   TITLE_LABEL,
   TITLE_PLACEHOLDER,
-} from "./RulesNew.constants";
-import type { RuleDraft, RuleKind, RulesNewProps } from "./RulesNew.types";
-import { canSave } from "./rulesNew.util";
-import { useRulesNew } from "./useRulesNew";
-import "./RulesNew.css";
+} from "./AddCheck.constants";
+import type { AddCheckProps, RuleDraft, RuleKind } from "./AddCheck.types";
+import { canSave } from "./addCheck.util";
+import { useAddCheck } from "./useAddCheck";
+import "./AddCheck.css";
 
 /**
- * Writing a rule, as its own screen (spec §4.3) rather than a composer parked
- * above the Rules tables: two steps, one write, and a return trip that lands
- * on the row it just created. Layout only — every decision lives in
- * {@link useRulesNew} and `rulesNew.util`.
+ * Writing a check, as its own form that takes the Checks tab's place while it
+ * is open (see `ChecksTab`): two steps, one write, and a return trip that
+ * lands on the row it just created. Layout only — every decision lives in
+ * {@link useAddCheck} and `addCheck.util`.
  */
-export function RulesNew({ navigate, initialType, aiReady: override }: RulesNewProps) {
-  const state = useRulesNew({ initialType, navigate, aiReady: override });
+export function AddCheck({ initialType, aiReady: override, onDone }: AddCheckProps) {
+  const state = useAddCheck({ initialType, onDone, aiReady: override });
 
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
-        <button type="button" className="d-back" onClick={state.cancel} aria-label={BACK_TO_RULES_LABEL}>
+        <button type="button" className="add-check__back" onClick={state.cancel} aria-label={BACK_TO_CHECKS_LABEL}>
           <Icon name="chevronRight" size={14} />
         </button>
         <h1 className="screen__title">{SCREEN_TITLE}</h1>

@@ -20,11 +20,10 @@ const emit = async (event: string) => {
 
 const listProjects = vi.hoisted(() => vi.fn());
 const listFiles = vi.hoisted(() => vi.fn());
-const listRules = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
-  return { ...actual, isTauri: true, commands: { listProjects, listFiles, listRules } };
+  return { ...actual, isTauri: true, commands: { listProjects, listFiles } };
 });
 
 const project = (o: Partial<ProjectRow>): ProjectRow => ({
@@ -56,7 +55,6 @@ describe("useSidebar", () => {
       data: [project({ id: "/a", name: "api" }), project({ id: "/b", name: "blog" })],
     });
     listFiles.mockResolvedValue({ status: "ok", data: [] });
-    listRules.mockResolvedValue({ status: "ok", data: [] });
   });
 
   it("loads the recent projects on mount", async () => {

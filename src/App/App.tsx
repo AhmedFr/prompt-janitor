@@ -11,14 +11,14 @@ import { Prompts } from "@/screens/Prompts";
 import { Detail } from "@/screens/Detail";
 import { Scans } from "@/screens/Scans";
 import { Analytics } from "@/screens/Analytics";
-import { Rules } from "@/screens/Rules";
-import { RulesNew } from "@/screens/RulesNew";
 import { Settings } from "@/screens/Settings";
 import { isTauri, type ArtifactKind, type NavigateEvent } from "@/lib/ipc";
 import { useUpdateCheck } from "@/lib/useUpdateCheck";
 // Deep import, not the screen barrel: this is the tab strip's own id list,
 // and the barrel would pull the whole Setup screen in behind it.
 import { KIND_TABS } from "@/screens/Setup/setup.columns";
+import { isRuleTab } from "@/screens/Settings/ChecksTab/ChecksLibrary/checksLibrary.columns";
+import type { RuleTabId } from "@/screens/Settings/ChecksTab/ChecksLibrary/ChecksLibrary.types";
 import { isRoute } from "./App.constants";
 import type { Route } from "./App.types";
 
@@ -35,8 +35,7 @@ export function App() {
   const [setupTab, setSetupTab] = useState<ArtifactKind | undefined>(undefined);
   const [promptsTarget, setPromptsTarget] = useState<string | undefined>(undefined);
   const [projectPath, setProjectPath] = useState<string | undefined>(undefined);
-  const [rulesTab, setRulesTab] = useState<string | undefined>(undefined);
-  const [rulesNewTarget, setRulesNewTarget] = useState<string | undefined>(undefined);
+  const [checksTab, setChecksTab] = useState<RuleTabId | undefined>(undefined);
   const [showOnboarding, setShowOnboarding] = useState(
     () => isTauri && localStorage.getItem(ONBOARDED_KEY) !== "done",
   );
@@ -48,9 +47,21 @@ export function App() {
   // own, and Setup's column cache keys on the identity of the context those
   // close over — a fresh function every render defeats it.
   const navigate = useCallback((next: Route, target?: string) => {
+    // The two old Rules routes are settings visits now — Rules moved into
+    // Settings → Checks (spec §8) — so this is decided before anything else
+    // sets `route` to something that no longer renders.
+    if (next === "rules" || next === "rules-new") {
+      setRoute("settings");
+      setSettingsTab("checks");
+      setChecksTab(isRuleTab(target) ? target : undefined);
+      return;
+    }
     setRoute(next);
     if (next === "detail" && target !== undefined) setDetailId(target);
     if (next === "settings") setSettingsTab(target);
+    // An ordinary settings visit forgets the rule table: only an old Rules
+    // deep link (above) means to open on one.
+    if (next === "settings") setChecksTab(undefined);
     // Which kind tab Setup opens on — a ranked usage row links to the tab
     // that holds it. Validated rather than cast: the target is a bare string
     // from anywhere in the app, and a typo stored as a tab id would open a
@@ -62,12 +73,6 @@ export function App() {
     // screen is addressed by path, and carrying the last one forward would
     // silently open the wrong project.
     if (next === "project") setProjectPath(target);
-    // Which of the three rule tables to open on — `/rules/new` sends the user
-    // back to the tab their new rule landed in.
-    if (next === "rules") setRulesTab(target);
-    // The tab `/rules/new` was opened from: where Cancel returns to, and
-    // which kind of rule the form starts on.
-    if (next === "rules-new") setRulesNewTarget(target);
   }, []);
 
   // The menu-bar panel is a window of its own with no router: a row clicked
@@ -121,13 +126,13 @@ export function App() {
         {route === "setup" && <Setup navigate={navigate} initialTab={setupTab} />}
         {route === "projects" && <Projects navigate={navigate} />}
         {route === "project" && <Project path={projectPath} navigate={navigate} />}
-        {route === "rules-new" && <RulesNew initialType={rulesNewTarget} navigate={navigate} />}
         {route === "prompts" && <Prompts navigate={navigate} target={promptsTarget} />}
         {route === "detail" && <Detail fileId={detailId} navigate={navigate} />}
         {route === "scans" && <Scans navigate={navigate} />}
         {route === "analytics" && <Analytics navigate={navigate} />}
-        {route === "rules" && <Rules navigate={navigate} initialTab={rulesTab} />}
-        {route === "settings" && <Settings navigate={navigate} initialTab={settingsTab} />}
+        {route === "settings" && (
+          <Settings navigate={navigate} initialTab={settingsTab} checksTab={checksTab} />
+        )}
       </main>
       {showOnboarding && <Onboarding onDone={finishOnboarding} />}
     </div>

@@ -164,3 +164,22 @@
 .rules-new-actions__spacer {
   flex: 1;
 }
+
+/* The form's back arrow (was Detail's `.d-back`, which Task 5.5 deletes). */
+.add-check__back {
+  display: flex;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-ctrl);
+  border: 0.5px solid rgba(0, 0, 0, 0.16);
+  background: #fff;
+  cursor: pointer;
+  color: var(--text-2);
+}
+
+.add-check__back svg {
+  transform: rotate(180deg);
+}

@@ -2,9 +2,10 @@ import type { ROUTES } from "./App.constants";
 
 /**
  * Top-level routes in the app shell. `detail` is reached from
- * `prompts`/`overview`/`projects`, `project` from the projects table, and
- * `rules-new` from the Rules screen — none of the three is a sidebar
- * destination.
+ * `prompts`/`overview`/`projects` and `project` from the projects table —
+ * neither is a sidebar destination. `rules` and `rules-new` are kept only so
+ * an old deep link still resolves: `navigate` sends both straight to
+ * Settings → Checks (spec §8) rather than rendering a screen of their own.
  *
  * Derived from {@link ROUTES} so the guard and the union cannot drift: a route
  * added to one is added to both.

@@ -1,10 +1,11 @@
-import type { RuleTabId } from "./Rules.types";
+import { LABEL } from "@/lib/vocabulary";
+import type { RuleTabId } from "./ChecksLibrary.types";
 
 /** The three tabs, in display order: what shipped, what you wrote, what the model judges. */
 export const RULE_TABS: { id: RuleTabId; label: string }[] = [
   { id: "builtin", label: "Built-in" },
   { id: "custom", label: "Custom" },
-  { id: "ai", label: "AI standards" },
+  { id: "ai", label: LABEL.aiChecks },
 ];
 
 /** Tab id -> the label the strip shows, so a table's accessible name reads the way its tab does. */
@@ -45,7 +46,7 @@ export const EMPTY_HINT: Record<RuleTabId, string> = {
   ai: "Add a natural-language standard and your AI provider will judge each file against it.",
 };
 
-export const ADD_RULE_LABEL = "Add rule";
+export const ADD_RULE_LABEL = "Add check";
 export const IMPORT_PACK_LABEL = "Import pack…";
 
 /** What the AI tab says once a provider is connected — carried over from the old composer. */

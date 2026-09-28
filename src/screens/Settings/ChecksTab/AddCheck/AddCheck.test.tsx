@@ -2,17 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { RuleInfo } from "@/lib/ipc";
-import { HIGHLIGHT_KEY } from "@/screens/Rules/Rules.constants";
-import { Rules } from "@/screens/Rules";
-import { RulesNew } from "./RulesNew";
+import { HIGHLIGHT_KEY } from "../ChecksLibrary/ChecksLibrary.constants";
+import { ChecksLibrary } from "../ChecksLibrary";
+import { AddCheck } from "./AddCheck";
 
 const listRules = vi.hoisted(() => vi.fn());
 const addCustomRule = vi.hoisted(() => vi.fn());
 const addNlRule = vi.hoisted(() => vi.fn());
 const getAiConfig = vi.hoisted(() => vi.fn());
 
-// Pulled in by `useRules` when the Rules screen renders at the end of the
-// round trip below; never called, and never allowed to reach a real dialog.
+// Pulled in by `useChecksLibrary` when the check library renders at the end
+// of the round trip below; never called, and never allowed to reach a real
+// dialog.
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 vi.mock("@/lib/ipc", async () => {
@@ -38,24 +39,24 @@ const rule = (o: Partial<RuleInfo> = {}): RuleInfo => ({
   ...o,
 });
 
-const renderScreen = (props: Partial<Parameters<typeof RulesNew>[0]> = {}) => {
-  const navigate = props.navigate ?? vi.fn();
-  const view = render(<RulesNew navigate={navigate} {...props} />);
-  return { ...view, navigate };
+const renderScreen = (props: Partial<Parameters<typeof AddCheck>[0]> = {}) => {
+  const onDone = props.onDone ?? vi.fn();
+  const view = render(<AddCheck onDone={onDone} {...props} />);
+  return { ...view, onDone };
 };
 
-const patternCard = () => screen.getByRole("button", { name: /Pattern rule/ });
-const nlCard = () => screen.getByRole("button", { name: /Natural-language standard/ });
-const saveButton = () => screen.getByRole("button", { name: /Save rule/ });
+const patternCard = () => screen.getByRole("button", { name: /Pattern check/ });
+const nlCard = () => screen.getByRole("button", { name: /AI check/ });
+const saveButton = () => screen.getByRole("button", { name: /Save check/ });
 const field = (name: RegExp) => screen.getByRole("textbox", { name });
 
 /** Fills both fields of whichever form is open. */
 const fill = (title: string, body: string, bodyLabel: RegExp) => {
-  fireEvent.change(field(/Rule name/), { target: { value: title } });
+  fireEvent.change(field(/Check name/), { target: { value: title } });
   fireEvent.change(field(bodyLabel), { target: { value: body } });
 };
 
-describe("RulesNew", () => {
+describe("AddCheck", () => {
   beforeEach(() => {
     sessionStorage.clear();
     listRules.mockReset().mockResolvedValue({ status: "ok", data: [rule({ id: "custom-900" })] });
@@ -68,17 +69,17 @@ describe("RulesNew", () => {
 
   afterEach(cleanup);
 
-  it("asks which kind of rule first, and shows no form until it is answered", () => {
+  it("asks which kind of check first, and shows no form until it is answered", () => {
     renderScreen();
     expect(patternCard()).toBeInTheDocument();
     expect(nlCard()).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /Rule name/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /Check name/ })).not.toBeInTheDocument();
   });
 
-  it("opens the pattern form once Pattern rule is chosen", () => {
+  it("opens the pattern form once Pattern check is chosen", () => {
     renderScreen();
     fireEvent.click(patternCard());
-    expect(field(/Rule name/)).toBeInTheDocument();
+    expect(field(/Check name/)).toBeInTheDocument();
     expect(field(/Forbidden text/)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Warning" })).toBeChecked();
   });
@@ -103,7 +104,7 @@ describe("RulesNew", () => {
     fireEvent.click(patternCard());
     expect(saveButton()).toBeDisabled();
 
-    fireEvent.change(field(/Rule name/), { target: { value: "Never say synergy" } });
+    fireEvent.change(field(/Check name/), { target: { value: "Never say synergy" } });
     expect(saveButton()).toBeDisabled();
 
     fireEvent.change(field(/Forbidden text/), { target: { value: "synergy" } });
@@ -128,17 +129,17 @@ describe("RulesNew", () => {
     expect(addNlRule).not.toHaveBeenCalled();
   });
 
-  it("hands the new rule's id to the Rules screen and lands on Custom", async () => {
+  it("hands the new check's id to the check library and lands on Custom", async () => {
     listRules.mockResolvedValue({
       status: "ok",
       data: [rule({ id: "custom-100" }), rule({ id: "custom-700" })],
     });
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("custom"));
     expect(sessionStorage.getItem(HIGHLIGHT_KEY)).toBe("custom-700");
   });
 
@@ -160,16 +161,16 @@ describe("RulesNew", () => {
       ],
     });
 
-    const { navigate, unmount } = renderScreen();
+    const { onDone, unmount } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("custom"));
     expect(sessionStorage.getItem("pj.table.rules.custom")).toBeNull();
     unmount();
 
-    render(<Rules navigate={vi.fn()} initialTab="custom" />);
+    render(<ChecksLibrary onAdd={vi.fn()} initialTab="custom" />);
     await waitFor(() => expect(screen.getByRole("table")).toBeInTheDocument());
     await waitFor(() => {
       const highlighted = screen.getByRole("table").querySelector(".dt__row--highlight");
@@ -177,18 +178,18 @@ describe("RulesNew", () => {
     });
   });
 
-  it("saves a natural-language standard and lands on AI standards", async () => {
+  it("saves an AI check and lands on AI checks", async () => {
     listRules.mockResolvedValue({
       status: "ok",
       data: [rule({ id: "custom-nl-800", nl: true, title: "Names its escape hatch" })],
     });
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     await waitFor(() => expect(nlCard()).toBeEnabled());
     fireEvent.click(nlCard());
     fill("Names its escape hatch", "Must say what to do when the answer is unknown", /Instruction/);
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "ai"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("ai"));
     expect(addNlRule).toHaveBeenCalledWith(
       "Names its escape hatch",
       "Must say what to do when the answer is unknown",
@@ -197,44 +198,44 @@ describe("RulesNew", () => {
     expect(sessionStorage.getItem(HIGHLIGHT_KEY)).toBe("custom-nl-800");
   });
 
-  it("still navigates when the new rule cannot be found again — the trip loses its highlight, not its destination", async () => {
+  it("still finishes when the new rule cannot be found again — the trip loses its highlight, not its destination", async () => {
     listRules.mockResolvedValue({ status: "ok", data: [] });
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("custom"));
     expect(sessionStorage.getItem(HIGHLIGHT_KEY)).toBeNull();
   });
 
   it("keeps the form on screen and says so when the save does not land", async () => {
     addCustomRule.mockResolvedValue({ status: "error", error: "database is locked" });
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Could not save/));
-    expect(navigate).not.toHaveBeenCalled();
-    expect(field(/Rule name/)).toHaveValue("Never say synergy");
+    expect(onDone).not.toHaveBeenCalled();
+    expect(field(/Check name/)).toHaveValue("Never say synergy");
   });
 
   it("says the same when the command rejects outright", async () => {
     addCustomRule.mockRejectedValue(new Error("boom"));
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Could not save/));
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it("opens straight into the natural-language form when the user came from the AI tab", () => {
     renderScreen({ initialType: "ai" });
     expect(field(/Instruction/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Pattern rule/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pattern check/ })).not.toBeInTheDocument();
   });
 
   it("blocks the natural-language save when the deep link outran the provider check", async () => {
@@ -253,45 +254,51 @@ describe("RulesNew", () => {
   });
 
   it("returns to the tab the user came from on Cancel", () => {
-    const { navigate } = renderScreen({ initialType: "custom" });
+    const { onDone } = renderScreen({ initialType: "custom" });
     fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
-    expect(navigate).toHaveBeenCalledWith("rules", "custom");
+    expect(onDone).toHaveBeenCalledWith("custom");
   });
 
   it("falls back to Built-in when it was reached without a tab", () => {
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
-    expect(navigate).toHaveBeenCalledWith("rules", "builtin");
+    expect(onDone).toHaveBeenCalledWith("builtin");
+  });
+
+  it("falls back to Built-in when the tab it was reached with does not exist", () => {
+    const { onDone } = renderScreen({ initialType: "not-a-tab" });
+    fireEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
+    expect(onDone).toHaveBeenCalledWith("builtin");
   });
 
   it("leaves an IME candidate list alone — that Escape is not meant for us", () => {
-    const { navigate } = renderScreen({ initialType: "ai" });
+    const { onDone } = renderScreen({ initialType: "ai" });
     fireEvent.keyDown(window, { key: "Escape", isComposing: true });
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it("leaves an Escape something closer to the user already handled", () => {
-    const { navigate } = renderScreen({ initialType: "ai" });
+    const { onDone } = renderScreen({ initialType: "ai" });
     const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     event.preventDefault();
     fireEvent(window, event);
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it("will not abandon a save that is already in flight", async () => {
     let land: (value: { status: "ok"; data: null }) => void = () => {};
     addCustomRule.mockReturnValue(new Promise((resolve) => (land = resolve)));
-    const { navigate } = renderScreen();
+    const { onDone } = renderScreen();
     fireEvent.click(patternCard());
     fill("Never say synergy", "synergy", /Forbidden text/);
     fireEvent.click(saveButton());
     await waitFor(() => expect(addCustomRule).toHaveBeenCalled());
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
 
     land({ status: "ok", data: null });
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("rules", "custom"));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("custom"));
   });
 
   it("writes once when Save is pressed twice in the same tick", async () => {
@@ -312,22 +319,22 @@ describe("RulesNew", () => {
   });
 
   it("cancels on Escape, from either step", () => {
-    const { navigate, unmount } = renderScreen({ initialType: "ai" });
+    const { onDone, unmount } = renderScreen({ initialType: "ai" });
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(navigate).toHaveBeenCalledWith("rules", "ai");
+    expect(onDone).toHaveBeenCalledWith("ai");
     unmount();
 
     const second = renderScreen({ initialType: "custom" });
     fireEvent.click(patternCard());
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(second.navigate).toHaveBeenCalledWith("rules", "custom");
+    expect(second.onDone).toHaveBeenCalledWith("custom");
   });
 
   it("stops listening for Escape once it is gone", () => {
-    const { navigate, unmount } = renderScreen();
+    const { onDone, unmount } = renderScreen();
     unmount();
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(navigate).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it("has no accessibility violations on the type step", async () => {
