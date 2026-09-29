@@ -9,9 +9,11 @@ import { FileActions } from "../FileActions";
 import { Findings } from "../Findings";
 import { ItemUsage } from "../ItemUsage";
 import { DiscardConfirm } from "./DiscardConfirm";
-import { DIRTY_LABEL, EDITOR_LABEL, EMPTY_BODY, NEXT_ITEM, PREVIOUS_ITEM } from "./ItemViewer.constants";
+import { DIRTY_LABEL, EDITOR_LABEL, EMPTY_BODY } from "./ItemViewer.constants";
 import type { ItemViewerViewProps, PanelMode } from "./ItemViewer.types";
 import { ItemViewerTabs } from "./ItemViewerTabs";
+import { StepButtons } from "./StepButtons";
+import { useStepKeys } from "./useStepKeys";
 import "./ItemViewer.css";
 
 /**
@@ -65,20 +67,9 @@ export function ItemViewerView({
   // A line link belongs to the item it was clicked on.
   useEffect(() => setFocusLine(null), [item.id]);
 
-  // ⌘↑/⌘↓ step through the rows on screen. Not while editing: the textarea
-  // keeps its own caret moves, and a step would throw the draft away. Nor from
-  // a text field (the find bar), where ⌘↑/⌘↓ move the caret too.
-  useEffect(() => {
-    if (!onStep || mode === "edit") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.metaKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      e.preventDefault();
-      onStep(e.key === "ArrowUp" ? -1 : 1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onStep, mode]);
+  // Not while editing: the textarea keeps its caret moves, and a step would
+  // throw the draft away.
+  useStepKeys(onStep, mode !== "edit");
 
   // A read that failed has no file to draw, so the viewer says why; a save that
   // failed sits over a file that is still there, so the sheet pins it.
@@ -124,6 +115,13 @@ export function ItemViewerView({
     onTab("content");
   };
 
+  // A fix rewrote the file: re-read it, so Content shows the fixed text and a
+  // later save carries the new stamp instead of being refused as a conflict.
+  const fixLanded = () => {
+    source.reload();
+    onSaved?.();
+  };
+
   const canEdit = mode === "read" && source.editable && source.content !== null && tab === "content";
   const target = item.origin === "graded" && item.file_id ? { fileId: item.file_id } : { artifactId: item.id };
 
@@ -152,28 +150,7 @@ export function ItemViewerView({
           actions={
             <>
               <FileActions target={target} content={source.content} onError={setActionError} />
-              {onStep && (
-                <span className="iv-step">
-                  <Button
-                    size="icon"
-                    aria-label={PREVIOUS_ITEM}
-                    title={PREVIOUS_ITEM}
-                    disabled={mode === "edit"}
-                    onClick={() => onStep(-1)}
-                  >
-                    <Icon name="chevronUp" size={13} />
-                  </Button>
-                  <Button
-                    size="icon"
-                    aria-label={NEXT_ITEM}
-                    title={NEXT_ITEM}
-                    disabled={mode === "edit"}
-                    onClick={() => onStep(1)}
-                  >
-                    <Icon name="chevronDown" size={13} />
-                  </Button>
-                </span>
-              )}
+              {onStep && <StepButtons onStep={onStep} disabled={mode === "edit"} />}
             </>
           }
         />
@@ -202,7 +179,7 @@ export function ItemViewerView({
         )
       }
     >
-      <ItemViewerTabs active={tab} onChange={onTab} findingsCount={item.issue_count} />
+      <ItemViewerTabs active={tab} onChange={onTab} findingsCount={item.issue_count} editing={mode === "edit"} />
       {tab === "content" && (
         <FileViewer
           name={item.name}
@@ -237,7 +214,7 @@ export function ItemViewerView({
       )}
       {tab === "findings" && (
         <div className="iv-panel">
-          <Findings fileId={item.kind === "rule" ? item.file_id : null} onJumpToLine={jumpToLine} onChanged={onSaved} findings={findings} />
+          <Findings fileId={item.kind === "rule" ? item.file_id : null} onJumpToLine={jumpToLine} onChanged={fixLanded} findings={findings} />
         </div>
       )}
       {tab === "usage" && (

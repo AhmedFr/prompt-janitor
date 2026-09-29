@@ -24,6 +24,16 @@ describe("ItemViewerTabs", () => {
     expect(screen.getByRole("tab", { name: /Findings/ })).toHaveTextContent(/^Findings$/);
   });
 
+  it("holds Findings and Usage while the Content tab has a draft open", () => {
+    const onChange = vi.fn();
+    render(<ItemViewerTabs active="content" onChange={onChange} findingsCount={2} editing />);
+    expect(screen.getByRole("tab", { name: "Content" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: /Findings/ })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Usage" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("tab", { name: "Usage" }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("reports a tab pick", () => {
     const onChange = vi.fn();
     render(<ItemViewerTabs active="content" onChange={onChange} findingsCount={null} />);

@@ -117,6 +117,16 @@ describe("FileViewer", () => {
     expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
   });
 
+  it("lets the reader go back to Rendered after a line jump", () => {
+    render(
+      <FileViewer name="CLAUDE.md" content={"# A\nB"} format="markdown" path="/x/CLAUDE.md" loading={false} error={null} focusLine={2} />,
+    );
+    expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rendered" }));
+    expect(screen.getByRole("heading", { name: "A" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
+  });
+
   it("has no accessibility violations, rendered or as source", async () => {
     const { container } = view();
     expect(await axe(container)).toHaveNoViolations();

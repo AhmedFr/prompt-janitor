@@ -20,22 +20,24 @@ export function useFileViewer(
   format: SourceFormat | null,
   searchable: boolean,
   initialMode?: ViewMode,
-  forceSource?: boolean,
+  focusLine?: number | null,
 ): FileViewerState {
   const [preferred, setMode] = useState<ViewMode | null>(initialMode ?? null);
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [findFocus, setFindFocus] = useState(0);
 
+  // A line to show is a one-shot request for Source: the preference flips
+  // when the line changes (adjusted during render, so the first paint is
+  // already Source), and the reader is free to pick Rendered afterwards.
+  const [shownLine, setShownLine] = useState<number | null>(null);
+  if (focusLine != null && focusLine !== shownLine) {
+    setShownLine(focusLine);
+    setMode("source");
+  }
+
   const available = format ? modesFor(format) : [];
-  const mode =
-    forceSource && available.includes("source")
-      ? "source"
-      : preferred && available.includes(preferred)
-        ? preferred
-        : format
-          ? defaultMode(format)
-          : "rendered";
+  const mode = preferred && available.includes(preferred) ? preferred : format ? defaultMode(format) : "rendered";
 
   const openFind = useCallback(() => {
     setFindOpen(true);

@@ -18,8 +18,11 @@ vi.mock("@/lib/ipc", async () => {
   };
 });
 vi.mock("../Findings", () => ({
-  Findings: ({ onJumpToLine }: { onJumpToLine: (l: number) => void }) => (
-    <button onClick={() => onJumpToLine(2)}>jump</button>
+  Findings: ({ onJumpToLine, onChanged }: { onJumpToLine: (l: number) => void; onChanged?: () => void }) => (
+    <>
+      <button onClick={() => onJumpToLine(2)}>jump</button>
+      <button onClick={() => onChanged?.()}>fix landed</button>
+    </>
   ),
 }));
 vi.mock("../ItemUsage", () => ({ ItemUsage: () => <div data-testid="item-usage" /> }));
@@ -609,9 +612,66 @@ describe("ItemViewerView — tabs, header and stepping", () => {
     }
   });
 
+  it("a line jump is one-shot: the reader can go back to Rendered", () => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      const onTab = vi.fn();
+      const rule = { ...props.item, kind: "rule" as const, file_id: "/x/CLAUDE.md" };
+      const { rerender } = render(<ItemViewerView {...props} tab="findings" onTab={onTab} item={rule} />);
+      fireEvent.click(screen.getByRole("button", { name: "jump" }));
+      rerender(<ItemViewerView {...props} tab="content" onTab={onTab} item={rule} />);
+      expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Rendered" }));
+      expect(screen.getByRole("heading", { name: "Adapt" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("holds the Findings and Usage tabs while a draft is open, so it cannot hide behind them", () => {
+    const onTab = vi.fn();
+    render(<ItemViewerView {...props} onTab={onTab} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByRole("tab", { name: /Findings/ })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Usage" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("tab", { name: "Usage" }));
+    expect(onTab).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("tab", { name: "Usage" })).toBeEnabled();
+  });
+
   it("has no accessibility violations with the step buttons and tabs", async () => {
     const { container } = render(<ItemViewerView {...props} onStep={vi.fn()} tab="findings" />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("ItemViewer — a fix landed from the Findings tab", () => {
+  it("re-reads the file, so Content shows the fixed text and a later save carries the new stamp", async () => {
+    const onSaved = vi.fn();
+    const rule = skill({ kind: "rule", name: "CLAUDE.md", path: "/code/web/CLAUDE.md", file_id: "/code/web/CLAUDE.md" });
+    const props = { item: rule, onSaved, onTab: vi.fn(), onClose: vi.fn(), loadedIn: [], onSelectProject: vi.fn(), scope: "web" };
+    getArtifactSource.mockReset().mockResolvedValueOnce(
+      ok({ path: rule.path, content: "# Before\n\nRun npm.", bytes: 20, modified: "111", format: "markdown", editable: true }),
+    );
+    const { rerender } = render(<ItemViewer {...props} tab="findings" />);
+    await waitFor(() => expect(getArtifactSource).toHaveBeenCalledTimes(1));
+
+    getArtifactSource.mockResolvedValueOnce(
+      ok({ path: rule.path, content: "# After\n\nRun pnpm.", bytes: 21, modified: "222", format: "markdown", editable: true }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "fix landed" }));
+    expect(onSaved).toHaveBeenCalledOnce();
+    await waitFor(() => expect(getArtifactSource).toHaveBeenCalledTimes(2));
+
+    rerender(<ItemViewer {...props} tab="content" />);
+    expect(await screen.findByRole("heading", { name: "After" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "# Mine" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(saveArtifactSource).toHaveBeenCalledWith(7, "# Mine", "222"));
   });
 });
 

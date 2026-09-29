@@ -37,7 +37,7 @@ export function FileViewer({
   const body = useRef<HTMLDivElement>(null);
   const hasText = content !== null && content.trim().length > 0;
   const searchable = !editor && !loading && error === null && hasText;
-  const viewer = useFileViewer(format, searchable, initialMode, focusLine != null);
+  const viewer = useFileViewer(format, searchable, initialMode, focusLine);
   const find = useFind(body, viewer.findOpen ? viewer.query : "", `${viewer.mode}\u0000${content ?? ""}`);
 
   const language = format ? languageFor(path, format) : null;

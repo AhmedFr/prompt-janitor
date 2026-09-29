@@ -20,3 +20,6 @@ export const FindingsWithCount: Story = { args: { active: "findings", findingsCo
 
 /** Usage picked; an item with no findings shows no count. */
 export const UsageActive: Story = { args: { active: "usage" } };
+
+/** A draft is open on Content: Findings and Usage wait until it is saved or dropped. */
+export const Editing: Story = { args: { findingsCount: 2, editing: true } };

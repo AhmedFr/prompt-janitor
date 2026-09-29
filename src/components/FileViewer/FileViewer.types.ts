@@ -29,7 +29,7 @@ export interface FileViewerProps {
   emptyBody?: string;
   /** Which mode to open in; stories only, the app goes by the format. */
   initialMode?: ViewMode;
-  /** 1-based line number to scroll into view and highlight; forces Source mode. */
+  /** 1-based line number to scroll into view and highlight; switches to Source when it changes. */
   focusLine?: number | null;
 }
 

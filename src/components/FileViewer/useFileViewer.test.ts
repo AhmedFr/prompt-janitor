@@ -33,6 +33,23 @@ describe("useFileViewer", () => {
     expect(result.current.mode).toBe("source");
   });
 
+  it("switches to Source once when asked to show a line, then lets the reader pick Rendered", () => {
+    const { result, rerender } = renderHook(({ line }) => useFileViewer("markdown", true, undefined, line), {
+      initialProps: { line: null as number | null },
+    });
+    expect(result.current.mode).toBe("rendered");
+    rerender({ line: 4 });
+    expect(result.current.mode).toBe("source");
+    act(() => result.current.setMode("rendered"));
+    expect(result.current.mode).toBe("rendered");
+    rerender({ line: 9 });
+    expect(result.current.mode).toBe("source");
+  });
+
+  it("opens on Source when it mounts with a line to show", () => {
+    expect(renderHook(() => useFileViewer("markdown", true, undefined, 2)).result.current.mode).toBe("source");
+  });
+
   it("honours an initial mode", () => {
     expect(renderHook(() => useFileViewer("markdown", true, "source")).result.current.mode).toBe("source");
   });
