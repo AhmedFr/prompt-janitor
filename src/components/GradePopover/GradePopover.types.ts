@@ -1,15 +1,15 @@
 import type { Grade, TrendPoint } from "@/lib/ipc";
 
-export interface FixResult {
-  files: number;
-  edits: number;
-}
+export type { AutoFixResult as FixResult } from "@/lib/autoFixAll";
+import type { AutoFixResult as FixResult } from "@/lib/autoFixAll";
 
 export interface GradePopoverState {
   trend: TrendPoint[];
   openFindings: number;
   fixable: number;
   loading: boolean;
+  /** The trend/counts could not be loaded. */
+  error?: boolean;
 }
 
 export interface GradePopoverProps {

@@ -12,12 +12,16 @@ export function GradePopoverView({ grade, state, onFix, onOpenChange }: GradePop
   const [open, setOpenState] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<FixResult | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const root = useRef<HTMLSpanElement>(null);
 
   const setOpen = (next: boolean) => {
     setOpenState(next);
     onOpenChange?.(next);
-    if (!next) setResult(null);
+    if (!next) {
+      setResult(null);
+      setFailure(null);
+    }
   };
 
   useEffect(() => {
@@ -40,13 +44,16 @@ export function GradePopoverView({ grade, state, onFix, onOpenChange }: GradePop
 
   if (grade === null) return null;
 
-  const { trend, openFindings, fixable, loading } = state;
+  const { trend, openFindings, fixable, loading, error } = state;
   const delta = trend.length > 1 ? trend[trend.length - 1].score - trend[0].score : 0;
 
   const fix = async () => {
     setBusy(true);
+    setFailure(null);
     try {
       setResult(await onFix());
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -73,14 +80,29 @@ export function GradePopoverView({ grade, state, onFix, onOpenChange }: GradePop
             </>
           )}
           <div className="grade-popover__findings">
-            {loading && trend.length === 0 ? "Loading…" : plural(openFindings, "open finding", "open findings")}
+            {loading && trend.length === 0
+              ? "Loading…"
+              : error
+                ? "Couldn't load the trend."
+                : plural(openFindings, "open finding", "open findings")}
           </div>
-          {fixable > 0 && !result && (
+          {fixable > 0 && (!result || result.failed > 0) && (
             <Button variant="primary" size="sm" disabled={busy} onClick={() => void fix()}>
               {busy ? "Fixing…" : `Fix ${plural(fixable, "issue", "issues")} automatically`}
             </Button>
           )}
-          {result && (
+          {failure && (
+            <div role="alert" className="grade-popover__result">
+              {`Couldn't fix: ${failure}`}
+            </div>
+          )}
+          {result && result.failed > 0 && (
+            <div role="alert" className="grade-popover__result">
+              {`Couldn't fix ${plural(result.failed, "file", "files")}${result.firstError ? `: ${result.firstError}` : ""}`}
+              {result.edits > 0 && `. Fixed ${plural(result.edits, "issue", "issues")} in ${plural(result.files, "file", "files")}.`}
+            </div>
+          )}
+          {result && result.failed === 0 && (
             <div role="status" className="grade-popover__result">
               {result.edits === 0
                 ? "Nothing to fix"

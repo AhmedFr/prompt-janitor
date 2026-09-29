@@ -18,7 +18,7 @@ function LiveGradePopover({ grade }: { grade: Grade | null }) {
  */
 export function GradePopover({ grade, state, onFix }: GradePopoverProps) {
   if (state) {
-    return <GradePopoverView grade={grade} state={state} onFix={onFix ?? (async () => ({ files: 0, edits: 0 }))} />;
+    return <GradePopoverView grade={grade} state={state} onFix={onFix ?? (async () => ({ files: 0, edits: 0, failed: 0 }))} />;
   }
   return <LiveGradePopover grade={grade} />;
 }

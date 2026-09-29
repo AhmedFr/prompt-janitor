@@ -11,7 +11,7 @@ const meta = {
   title: "Components/GradePopover",
   component: GradePopover,
   parameters: { layout: "padded" },
-  args: { grade: "C", onFix: async () => ({ files: 2, edits: 5 }) },
+  args: { grade: "C", onFix: async () => ({ files: 2, edits: 5, failed: 0 }) },
 } satisfies Meta<typeof GradePopover>;
 
 export default meta;

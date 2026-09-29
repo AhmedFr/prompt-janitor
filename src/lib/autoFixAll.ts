@@ -1,6 +1,14 @@
 import { commands, type FixEdit } from "@/lib/ipc";
 import { fixableEdits } from "@/lib/fixableEdits";
 
+export interface AutoFixResult {
+  files: number;
+  edits: number;
+  /** Files whose fix was refused or failed. */
+  failed: number;
+  firstError?: string;
+}
+
 /** Every graded file with findings and the deterministic fixes it carries. Applies nothing. */
 export async function collectFixes(): Promise<{ fileId: string; edits: FixEdit[] }[]> {
   const list = await commands.listFiles();
@@ -20,16 +28,21 @@ export async function collectFixes(): Promise<{ fileId: string; edits: FixEdit[]
  * scan. The cross-file Auto-fix that lived on Overview (spec §4.2). Files
  * are fixed one at a time: `apply_fix` snapshots each for Undo.
  */
-export async function autoFixAll(): Promise<{ files: number; edits: number }> {
+export async function autoFixAll(): Promise<AutoFixResult> {
   let files = 0;
   let edits = 0;
+  let failed = 0;
+  let firstError: string | undefined;
   for (const { fileId, edits: e } of await collectFixes()) {
     const r = await commands.applyFix(fileId, e, false, "auto");
     if (r.status === "ok") {
       files += 1;
       edits += e.length;
+    } else {
+      failed += 1;
+      firstError ??= String(r.error);
     }
   }
   await commands.scanNow();
-  return { files, edits };
+  return { files, edits, failed, ...(firstError ? { firstError } : {}) };
 }
