@@ -88,3 +88,9 @@
   color: var(--blue);
   text-decoration: underline;
 }
+
+.findings__failed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

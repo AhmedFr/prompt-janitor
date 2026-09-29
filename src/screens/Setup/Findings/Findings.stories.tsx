@@ -84,3 +84,8 @@ export const NotGraded: Story = {
 export const Loading: Story = {
   args: { findings: findings({ detail: null, loading: true }) },
 };
+
+/** A graded file whose findings could not be read: the error line and Retry. */
+export const LoadFailed: Story = {
+  args: { findings: findings({ detail: null }) },
+};

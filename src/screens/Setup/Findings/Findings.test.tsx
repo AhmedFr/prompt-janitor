@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // IPC is mocked the way Detail.test.tsx mocks it: the real IssueActions calls
 // `commands.hasBackup` on mount, and an unmocked call rejects unhandled.
@@ -94,6 +94,65 @@ describe("Findings", () => {
     render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
     await screen.findByText("C · 70");
     fireEvent.click(screen.getByRole("button", { name: /Wrong package manager/ }));
-    expect(screen.queryByText(/\$69|Get Pro|License/)).toBeNull();
+    expect(screen.queryByText(/\$69|Get Pro|License|paid feature/i)).toBeNull();
+  });
+
+  it("fixes every finding at once, then tells the table", async () => {
+    const onChanged = vi.fn();
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} onChanged={onChanged} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fix all automatically (1)" }));
+    await waitFor(() => expect(applyFix).toHaveBeenCalledWith("/x/CLAUDE.md", [{ from: "npm", to: "pnpm" }], false, "auto"));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it("says why Fix all failed", async () => {
+    applyFix.mockResolvedValue({ status: "error", error: "The file changed on disk" });
+    const onChanged = vi.fn();
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} onChanged={onChanged} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fix all automatically (1)" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The file changed on disk");
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it("offers AI checks only when a provider is set up", async () => {
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
+    await screen.findByText("C · 70");
+    expect(screen.queryByRole("button", { name: "Run AI checks" })).toBeNull();
+    cleanup();
+    getAiConfig.mockResolvedValue({ status: "ok", data: { provider: "anthropic", has_key: true } });
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: "Run AI checks" })).toBeInTheDocument();
+  });
+
+  it("does not open the next finding, or carry over its panel, once a fix removes the open one", async () => {
+    getFileDetail
+      .mockResolvedValueOnce({ status: "ok", data: detail })
+      .mockResolvedValueOnce({ status: "ok", data: { ...detail, issues: [detail.issues[1]] } });
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wrong package manager/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Apply fix/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Wrong package manager/ })).toBeNull());
+    expect(screen.getByRole("button", { name: /No examples/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Applied")).toBeNull();
+    expect(screen.queryByText("Add one")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Apply fix/ })).toBeNull();
+  });
+
+  it("closes the open finding when another file is shown", () => {
+    const state = { detail: detail as never, loading: false, aiReady: false, entitled: true, reload: async () => {} };
+    const { rerender } = render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} findings={state} />);
+    fireEvent.click(screen.getByRole("button", { name: /Wrong package manager/ }));
+    rerender(<Findings fileId="/y/CLAUDE.md" onJumpToLine={vi.fn()} findings={state} />);
+    expect(screen.getByRole("button", { name: /Wrong package manager/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("says a graded file failed to load, rather than that it is not graded, and retries", async () => {
+    getFileDetail.mockResolvedValue({ status: "error", error: "database is locked" });
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
+    expect(await screen.findByText("Couldn't load this file's findings.")).toBeInTheDocument();
+    expect(screen.queryByText(/Not graded/)).toBeNull();
+    getFileDetail.mockResolvedValue({ status: "ok", data: detail });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("C · 70")).toBeInTheDocument();
   });
 });
