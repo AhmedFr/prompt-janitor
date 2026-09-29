@@ -4,7 +4,8 @@ import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ProjectRow } from "@/lib/ipc";
-import { buildPills, DEFAULT_SORT, PROJECT_COLUMNS } from "./projects.columns";
+import { formatSetupTarget } from "@/App/setupTarget";
+import { buildPills, DEFAULT_SORT, projectColumns, type ProjectsColumnsCtx } from "./projects.columns";
 import {
   EMPTY_HINT,
   EMPTY_TITLE,
@@ -43,10 +44,13 @@ const SEARCH: DataTableSearch<ProjectRow> = {
  * Every project the scanner knows, as one comparable table: which are graded
  * worst, which carry the most open issues, which have configured things
  * nothing ever invokes, and which folders are gone from disk. A row opens
- * that project's page.
+ * Setup as Claude Code sees that project.
  */
-export function Projects({ navigate, data: override }: ProjectsProps) {
+export function Projects({ navigate, data: override, setup: setupOverride, sessions90: sessionsOverride }: ProjectsProps) {
   const state = useProjects();
+  const setup = setupOverride !== undefined ? setupOverride : state.setup;
+  const sessions90 = sessionsOverride !== undefined ? sessionsOverride : state.sessions90;
+  const ctx = useMemo<ProjectsColumnsCtx>(() => ({ setup, sessions90 }), [setup, sessions90]);
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const rows = data ?? NO_ROWS;
@@ -73,13 +77,13 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
             <DataTable
               ariaLabel="Projects"
               stateKey={TABLE_STATE_KEY}
-              columns={PROJECT_COLUMNS}
+              columns={projectColumns(ctx)}
               rows={rows}
               rowId={rowId}
               search={SEARCH}
               pills={pills}
               defaultSort={DEFAULT_SORT}
-              onRowClick={(row) => navigate("project", row.id)}
+              onRowClick={(row) => navigate("setup", formatSetupTarget({ lens: row.id.replace(/\/+$/, "") }))}
               loading={loading}
               density="compact"
               empty={{ title: EMPTY_TITLE, hint: EMPTY_HINT }}

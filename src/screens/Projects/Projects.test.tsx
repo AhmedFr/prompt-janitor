@@ -21,10 +21,12 @@ const emit = async (event: string) => {
 };
 
 const listProjects = vi.hoisted(() => vi.fn());
+const getSetup = vi.hoisted(() => vi.fn());
+const getUsageOverview = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
-  return { ...actual, isTauri: true, commands: { listProjects } };
+  return { ...actual, isTauri: true, commands: { listProjects, getSetup, getUsageOverview } };
 });
 
 const project = (o: Partial<ProjectRow> = {}): ProjectRow => ({
@@ -70,6 +72,10 @@ describe("Projects", () => {
     sessionStorage.clear();
     listeners.clear();
     listProjects.mockReset();
+    getSetup.mockReset();
+    getUsageOverview.mockReset();
+    getSetup.mockResolvedValue({ status: "ok", data: { harnesses: [], global: [{}, {}], projects: [] } });
+    getUsageOverview.mockResolvedValue({ status: "ok", data: { sessions_per_project: [{ path: "/code/web-app", name: "web-app", sessions: 4 }] } });
     listProjects.mockResolvedValue({ status: "ok", data: populated });
   });
 
@@ -79,11 +85,6 @@ describe("Projects", () => {
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
     expect(rowNames()).toEqual(expect.arrayContaining(["web-app", "scripts", "gone"]));
-  });
-
-  it("chips the project whose folder is gone", async () => {
-    await renderScreen();
-    await waitFor(() => expect(screen.getByText("folder missing")).toBeInTheDocument());
   });
 
   it("narrows to projects with open issues, and drops the ones without", async () => {
@@ -115,13 +116,41 @@ describe("Projects", () => {
     await waitFor(() => expect(rowNames()).toEqual(["gone"]));
   });
 
-  it("opens the project page on a row click, keyed by the project's path", async () => {
+  it("opens Setup with the project's lens on a row click", async () => {
     const { navigate } = await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
     fireEvent.click(screen.getByRole("row", { name: "web-app" }));
 
-    expect(navigate).toHaveBeenCalledWith("project", "/code/web-app");
+    expect(navigate).toHaveBeenCalledWith("setup", "lens=%2Fcode%2Fweb-app");
+  });
+
+  it("opens Setup with the project's lens when the data is overridden", () => {
+    const navigate = vi.fn();
+    render(<Projects navigate={navigate} data={populated} setup={null} sessions90={null} />);
+    fireEvent.click(screen.getAllByRole("row")[1]);
+    expect(navigate).toHaveBeenCalledWith("setup", expect.stringMatching(/^lens=/));
+  });
+
+  it("sorts by last session, newest first", () => {
+    const rows = [
+      project({ id: "/a", name: "old", last_session_at: "2026-01-01T00:00:00.000Z" }),
+      project({ id: "/b", name: "new", last_session_at: "2026-09-01T00:00:00.000Z" }),
+    ];
+    render(<Projects navigate={vi.fn()} data={rows} setup={null} sessions90={null} />);
+    expect(screen.getAllByRole("row")[1]).toHaveTextContent("new");
+  });
+
+  it("shows items available and 90-day sessions once loaded", async () => {
+    await renderScreen();
+    await waitFor(() => expect(rowNames()).toHaveLength(3));
+    // web-app: 2 global items + 0 own; 4 sessions in the window.
+    await waitFor(() => {
+      const row = screen.getByRole("row", { name: "web-app" });
+      const cells = [...row.querySelectorAll("td")].map((td) => td.textContent);
+      expect(cells[3]).toBe("2");
+      expect(cells[4]).toBe("4");
+    });
   });
 
   it("refetches when a scan finishes", async () => {

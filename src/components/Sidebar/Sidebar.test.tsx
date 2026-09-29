@@ -39,9 +39,7 @@ describe("Sidebar", () => {
     );
 
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
-    // Qualified by class: "Projects" is now both a nav destination and the
-    // heading of the recents list underneath it.
-    expect(getByText("Projects", { selector: ".sidebar__section-label" })).toBeInTheDocument();
+    expect(getByText("Recent", { selector: ".sidebar__section-label" })).toBeInTheDocument();
   });
 
   it("lists exactly Setup, Projects, Settings (spec §3.1)", () => {
@@ -77,17 +75,15 @@ describe("Sidebar", () => {
     expect(getByRole("button", { current: "page" })).toHaveTextContent("Setup");
   });
 
-  it("routes a recent project to its own page", () => {
-    // The Projects table is the canonical list and each project has a page of
-    // its own now; a recent used to land on Prompts filtered to that project.
+  it("opens a recent project as a lens on Setup", () => {
     const onNavigate = vi.fn();
     mockSidebar.mockReturnValue({
       counts: {},
-      projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
+      projects: [{ id: "/code/web", name: "web", grade: "B", logo: null }],
     });
     const { getByRole } = render(<Sidebar active="setup" onNavigate={onNavigate} />);
-    getByRole("button", { name: /web-app/ }).click();
-    expect(onNavigate).toHaveBeenCalledWith("project", "/web-app");
+    getByRole("button", { name: /web/ }).click();
+    expect(onNavigate).toHaveBeenCalledWith("setup", "lens=%2Fcode%2Fweb");
   });
 
   it("has no accessibility violations", async () => {

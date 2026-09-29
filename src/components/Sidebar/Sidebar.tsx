@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
+import { formatSetupTarget } from "@/App/setupTarget";
 import type { SidebarProps } from "./Sidebar.types";
 import { NAV_ITEMS, NAV_OWNER } from "./Sidebar.constants";
 import { useSidebar } from "./useSidebar";
@@ -42,17 +43,14 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
 
         {projects.length > 0 && (
           <div className="sidebar__section">
-            <p className="sidebar__section-label">Projects</p>
+            <p className="sidebar__section-label">Recent</p>
             {projects.map((project) => (
               <button
                 key={project.id}
                 type="button"
                 className="sidebar__item sidebar__item--project"
-                // The project's own page, not the files table filtered to it:
-                // the page answers the questions a recent project is opened
-                // for (grade, load order, what ran here), and its Rules tab
-                // holds the files anyway.
-                onClick={() => onNavigate("project", project.id)}
+                // Setup as Claude Code sees this project (spec §7).
+                onClick={() => onNavigate("setup", formatSetupTarget({ lens: project.id.replace(/\/+$/, "") }))}
               >
                 <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>
