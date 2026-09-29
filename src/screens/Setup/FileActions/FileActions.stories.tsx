@@ -5,7 +5,7 @@ const meta = {
   title: "Screens/Setup/FileActions",
   component: FileActions,
   parameters: { layout: "padded" },
-  args: { artifactId: 7, content: "# Adapt\n", onError: () => {} },
+  args: { target: { artifactId: 7 }, content: "# Adapt\n", onError: () => {} },
   decorators: [
     (Story) => (
       <div style={{ display: "flex", gap: 2 }}>
@@ -23,3 +23,6 @@ export const Ready: Story = {};
 
 /** Before the read lands there is nothing to copy. */
 export const NotReadYet: Story = { args: { content: null } };
+
+/** A graded-only file, which has no inventory row: the actions go by its file id. */
+export const GradedFile: Story = { args: { target: { fileId: "/code/web/AGENTS.md" } } };

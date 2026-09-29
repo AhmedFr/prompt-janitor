@@ -31,7 +31,7 @@ export function ArtifactPanelView({ artifact, scope, source, onClose }: Artifact
       toolbar={
         <SheetPath
           path={source.path ?? artifact.path}
-          actions={<FileActions artifactId={artifact.id} content={source.content} onError={setActionError} />}
+          actions={<FileActions target={{ artifactId: artifact.id }} content={source.content} onError={setActionError} />}
         />
       }
       error={actionError}

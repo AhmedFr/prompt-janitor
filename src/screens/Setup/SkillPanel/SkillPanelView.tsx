@@ -103,7 +103,7 @@ export function SkillPanelView({ skill, scope, source, onClose, onSaved, initial
         source.path ? (
           <SheetPath
             path={source.path}
-            actions={<FileActions artifactId={skill.id} content={source.content} onError={setActionError} />}
+            actions={<FileActions target={{ artifactId: skill.id }} content={source.content} onError={setActionError} />}
           />
         ) : undefined
       }
