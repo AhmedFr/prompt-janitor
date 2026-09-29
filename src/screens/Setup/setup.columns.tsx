@@ -7,7 +7,6 @@ import {
   lastUsedAt,
   NameCell,
   PercentCell,
-  TokensCell,
 } from "@/components/DataTable";
 import { projectNameFor } from "./setup.util";
 import { ERROR_RATE_BANDS } from "./Setup.constants";
@@ -16,7 +15,7 @@ import { ERROR_RATE_BANDS } from "./Setup.constants";
  * What the Setup columns close over: the shape the Setup screen supplies.
  */
 export interface ColumnsCtx {
-  /** Opens a graded file (rule rows only — the only kind with a `file_id`): Setup's viewer on Findings, or Detail from the Project screen. */
+  /** Opens a graded file (rule rows only — the only kind with a `file_id`): Setup's viewer on Findings. */
   onOpen: (fileId: string) => void;
   /** Project root path -> display name, for resolving a project-layer row's Scope cell. */
   projectNames: Map<string, string>;
@@ -35,7 +34,6 @@ export interface ColumnsCtx {
 export const COLUMN_WIDTH = {
   kind: "100px",
   scope: "104px",
-  grade: "78px",
   uses: "68px",
   lastUsed: "96px",
   errorRate: "82px",
@@ -171,15 +169,5 @@ export function errorRateColumn(): ColumnDef<ArtifactView, unknown> {
     accessorFn: (r) => r.usage?.error_rate ?? -1,
     meta: { align: "right", width: COLUMN_WIDTH.errorRate },
     cell: (c) => <PercentCell value={c.row.original.usage?.error_rate} thresholds={ERROR_RATE_BANDS} />,
-  };
-}
-
-export function avgTokensColumn(): ColumnDef<ArtifactView, unknown> {
-  return {
-    id: "avgTokens",
-    header: "Avg tokens",
-    accessorFn: (r) => r.usage?.avg_turn_tokens ?? -1,
-    meta: { align: "right", width: COLUMN_WIDTH.avgTokens },
-    cell: (c) => <TokensCell value={c.row.original.usage?.avg_turn_tokens} />,
   };
 }

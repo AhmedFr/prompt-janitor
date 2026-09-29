@@ -4,7 +4,7 @@ import { AA_CONTRAST, contrastRatio } from "@/lib/contrast";
 /**
  * The Setup header's quiet text on its two backgrounds, mirrored from `Setup.css`.
  *
- * Composited by hand here for the same reason `usageBadge.contrast.test.ts`
+ * Composited by hand here for the same reason `tokens.contrast.test.ts`
  * does it: jsdom resolves no custom properties and composites no alpha, so a
  * test against computed styles would prove nothing. Change one and this test
  * fails until the CSS comment (and the CSS itself) follows.

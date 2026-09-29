@@ -1,15 +1,12 @@
 import type {
-  ArtifactKind,
   ArtifactView,
   HarnessInfo,
   ProjectSetup,
-  SetupView,
 } from "@/lib/ipc";
 import type { SetupFilter } from "@/lib/setupFilter";
 import {
   COST_MEDIAN_MULTIPLIER,
   ERROR_RATE_THRESHOLD,
-  KIND_ORDER,
   MIN_COST_SAMPLES,
 } from "./Setup.constants";
 
@@ -62,23 +59,6 @@ export function applyFilter(
     const cost = a.usage?.avg_turn_tokens;
     return cost != null && cost >= bar;
   });
-}
-
-/**
- * The size of every filter's slice, so the chips can say what they would
- * narrow to before the user commits a click. Pass the whole inventory —
- * global plus every project's artifacts — and the shared cost bar.
- */
-export function filterCounts(
-  artifacts: ArtifactView[],
-  costBar: number | null,
-): Record<SetupFilter, number> {
-  return {
-    all: artifacts.length,
-    never: applyFilter(artifacts, "never", costBar).length,
-    errors: applyFilter(artifacts, "errors", costBar).length,
-    cost: applyFilter(artifacts, "cost", costBar).length,
-  };
 }
 
 /**
@@ -172,37 +152,6 @@ export function matchProject(
 /** Convenience wrapper over {@link matchProject} for callers that only need the name (`ScopeCell`). */
 export function projectNameFor(path: string, projectNames: Map<string, string>): string | null {
   return matchProject(path, projectNames)?.name ?? null;
-}
-
-/**
- * The whole inventory as one list: the global layer (which is where
- * plugin-installed artifacts land too — they have no project of their own)
- * followed by every project's artifacts. This is the set every Setup table
- * is a kind-filtered slice of, and the set the shared cost bar is measured
- * over.
- */
-export function allArtifacts(view: SetupView): ArtifactView[] {
-  return [...view.global, ...view.projects.flatMap((p) => p.artifacts)];
-}
-
-/**
- * The inventory bucketed per kind, in one pass, with an entry for *every*
- * kind — a tab whose kind nothing landed in still has to render (with a
- * count of zero), unlike the old screen's sections which were dropped when
- * empty. Order within a bucket is the order the inventory arrived in, which
- * the backend already sorts by kind then name.
- */
-export function rowsByKind(artifacts: ArtifactView[]): Map<ArtifactKind, ArtifactView[]> {
-  const out = new Map<ArtifactKind, ArtifactView[]>(KIND_ORDER.map((kind) => [kind, []]));
-  for (const artifact of artifacts) {
-    // A kind outside `KIND_ORDER` cannot exist in the generated bindings, but
-    // a stale database row could still carry one; give it a bucket rather
-    // than dropping it on the floor.
-    const bucket = out.get(artifact.kind);
-    if (bucket) bucket.push(artifact);
-    else out.set(artifact.kind, [artifact]);
-  }
-  return out;
 }
 
 /** Project root path -> display name, the lookup `ScopeCell` and the Scope pills resolve against. */

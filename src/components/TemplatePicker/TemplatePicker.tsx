@@ -18,7 +18,7 @@ import "./TemplatePicker.css";
  * "Start from a template" — an A-grade `CLAUDE.md`/`AGENTS.md` per stack for
  * developers who have no instruction file at all. Free users can browse and
  * read every template in full (an honest teaser); writing one to disk is the
- * paid one-click action, gated the same way Auto-fix is on VerdictHero.
+ * paid one-click action, gated the same way Auto-fix is in the Findings view.
  *
  * Purely presentational — data loading and the actual apply/rescan IO live in
  * `useTemplatePicker`, wired in by whichever screen renders this.

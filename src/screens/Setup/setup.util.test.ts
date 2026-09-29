@@ -1,17 +1,14 @@
 import { describe, it, expect } from "vitest";
 import type { ArtifactView, ProjectSetup, UsageStat } from "@/lib/ipc";
 import {
-  allArtifacts,
   applyFilter,
   costThreshold,
-  filterCounts,
   harnessSummary,
   lastScanAt,
   matchProject,
   projectNameFor,
   projectNameMap,
   relativeSession,
-  rowsByKind,
   sessionLabel,
   sortProjects,
   topRuleGrade,
@@ -129,29 +126,6 @@ describe("costThreshold", () => {
   it("has no opinion with fewer than two measured artifacts", () => {
     expect(costThreshold([artifact({ usage: usage({ avg_turn_tokens: 900 }) })])).toBeNull();
     expect(costThreshold([])).toBeNull();
-  });
-});
-
-describe("filterCounts", () => {
-  it("counts every chip's slice over the artifacts it is handed", () => {
-    const all = [
-      artifact({ id: 1, usage: null }),
-      artifact({ id: 2, usage: null }),
-      artifact({ id: 3, usage: usage({ error_rate: 0.4, avg_turn_tokens: 400 }) }),
-      artifact({ id: 4, usage: usage({ avg_turn_tokens: 500 }) }),
-      artifact({ id: 5, usage: usage({ avg_turn_tokens: 4000 }) }),
-    ];
-    // Measured costs 400/500/4000 → median 500 → bar 1000.
-    expect(filterCounts(all, costThreshold(all))).toEqual({
-      all: 5,
-      never: 2,
-      errors: 1,
-      cost: 1,
-    });
-  });
-
-  it("reports zeroes rather than blanks for an empty inventory", () => {
-    expect(filterCounts([], null)).toEqual({ all: 0, never: 0, errors: 0, cost: 0 });
   });
 });
 
@@ -295,38 +269,6 @@ describe("projectNameFor", () => {
 
   it("is null outside every known project", () => {
     expect(projectNameFor("/Users/ada/.claude/rules/web.md", projectNames)).toBeNull();
-  });
-});
-
-describe("allArtifacts", () => {
-  it("flattens the global layer and every project into one list", () => {
-    const view = {
-      harnesses: [],
-      global: [artifact({ id: 1 }), artifact({ id: 2 })],
-      projects: [
-        project({ artifacts: [artifact({ id: 3, layer: "project" })] }),
-        project({ artifacts: [] }),
-      ],
-    };
-    expect(allArtifacts(view).map((a) => a.id)).toEqual([1, 2, 3]);
-  });
-});
-
-describe("rowsByKind", () => {
-  it("buckets by kind, keeping input order inside a bucket", () => {
-    const rows = rowsByKind([
-      artifact({ id: 1, kind: "skill", name: "a" }),
-      artifact({ id: 2, kind: "rule", name: "b" }),
-      artifact({ id: 3, kind: "skill", name: "c" }),
-    ]);
-    expect(rows.get("skill")?.map((a) => a.name)).toEqual(["a", "c"]);
-    expect(rows.get("rule")?.map((a) => a.name)).toEqual(["b"]);
-  });
-
-  it("gives every kind an entry, so an empty tab still counts zero", () => {
-    const rows = rowsByKind([]);
-    expect(rows.get("agent")).toEqual([]);
-    expect(rows.get("plugin")).toEqual([]);
   });
 });
 

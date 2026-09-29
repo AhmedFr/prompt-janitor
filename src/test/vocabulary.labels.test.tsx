@@ -6,7 +6,6 @@ import { EMPTY_HINT } from "@/screens/Projects/Projects.constants";
 import { Settings } from "@/screens/Settings";
 import { SETTINGS_TABS } from "@/screens/Settings/Settings.constants";
 import { FoldersTabBody } from "@/screens/Settings/FoldersTab";
-import { KIND_LABEL as USAGE_KIND_LABEL } from "@/lib/usage";
 import { LABEL, KIND_CHIP_ORDER, KIND_LABEL } from "@/lib/vocabulary";
 import { KindChips } from "@/components/KindChips";
 
@@ -80,11 +79,6 @@ describe("glossary in the UI (spec §3.3)", () => {
     renderSidebar();
     renderSettingsTabs();
     for (const retired of RETIRED) expect(document.body.textContent).not.toContain(retired);
-  });
-
-  it("names the harness's own tools Harness tools in usage, never Built-in", () => {
-    expect(USAGE_KIND_LABEL.builtin).toBe(LABEL.harnessTools);
-    expect(Object.values(USAGE_KIND_LABEL)).not.toContain("Built-in");
   });
 
   it("points empty Projects at the Folders tab, not at Setup", () => {

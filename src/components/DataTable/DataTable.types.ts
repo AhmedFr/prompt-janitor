@@ -41,7 +41,7 @@ export interface DataTableSearch<Row> {
 /**
  * `columns`, `pills` and `search` must be **identity-stable** — `useMemo`d in
  * the caller, or (better) built once at module level and looked up per kind
- * (see `columnsFor`/`pillsFor` in the Setup screen). They feed memoised
+ * (see `unifiedColumns`/`scopePillsFor` in the Setup screen). They feed memoised
  * filtering, counting and TanStack's own column model; an inline literal
  * rebuilt every render rebuilds all three on every keystroke.
  *

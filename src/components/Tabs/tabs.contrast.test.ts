@@ -6,7 +6,7 @@ import { AA_CONTRAST, contrastRatio } from "@/lib/contrast";
  *
  * Composited by hand — jsdom resolves no custom properties and composites no
  * alpha, so a test against computed styles would prove nothing (the same
- * reason `rankedList.contrast.test.ts` gives).
+ * reason `tokens.contrast.test.ts` gives).
  *
  * An inactive badge is `--sep` (`rgba(0, 0, 0, 0.09)`) over the strip's
  * `--group` (#f5f5f7), which composites to #dfdfe1. `--text-2` (#6e6e73) on

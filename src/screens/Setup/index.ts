@@ -1,14 +1,11 @@
 export { Setup } from "./Setup";
 export { useSetup } from "./useSetup";
 export {
-  allArtifacts,
   applyFilter,
   costThreshold,
-  filterCounts,
   harnessSummary,
   lastScanAt,
   projectNameMap,
-  rowsByKind,
   sortProjects,
   topRuleGrade,
 } from "./setup.util";

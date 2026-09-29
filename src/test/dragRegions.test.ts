@@ -10,7 +10,7 @@
  * crowded toolbar would quietly lose its grab area.
  *
  * jsdom cannot exercise a native drag, and rendering every screen here
- * would mean re-mocking eleven IPC surfaces, so this reads the sources (via
+ * would mean re-mocking every screen's IPC surface, so this reads the sources (via
  * Vite's `?raw` glob — the project has no `@types/node`): a structural guard
  * that also fails for a *new* screen that forgets the attribute, which
  * per-screen render assertions would not.
