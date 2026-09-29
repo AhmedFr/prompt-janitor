@@ -211,29 +211,6 @@ export function projectNameMap(projects: ProjectSetup[]): Map<string, string> {
 }
 
 /**
- * Plugin name -> how many artifacts that install bundled: the skills, agents
- * and commands the harness scanned out of the plugin's own subtrees. The
- * plugin's manifest row carries its own `plugin_name` too (the scanner gives
- * every artifact under an install the same context), so `kind === "plugin"`
- * is excluded — otherwise every plugin would report one more than it ships.
- * `layer === "plugin"` is required as well: a project file that merely names
- * a plugin was not installed by it.
- *
- * Computed over the whole inventory rather than over the Plugins tab's rows,
- * which by definition hold nothing but plugin manifests — see `ColumnsCtx`.
- */
-export function pluginBundleCounts(artifacts: ArtifactView[]): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const artifact of artifacts) {
-    if (artifact.kind === "plugin" || artifact.layer !== "plugin") continue;
-    const plugin = artifact.plugin_name;
-    if (!plugin) continue;
-    out.set(plugin, (out.get(plugin) ?? 0) + 1);
-  }
-  return out;
-}
-
-/**
  * The most recent scan across the detected harnesses — the one number the
  * header can honestly show when more than one harness is installed. `null`
  * when nothing has been scanned yet, which {@link relativeSession} reads as

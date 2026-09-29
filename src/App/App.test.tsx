@@ -24,14 +24,8 @@ const makeStub = vi.hoisted(
     },
 );
 
-vi.mock("@/screens/Overview", () => ({ Overview: makeStub("overview") }));
 vi.mock("@/screens/Setup", () => ({ Setup: makeStub("setup") }));
 vi.mock("@/screens/Projects", () => ({ Projects: makeStub("projects") }));
-vi.mock("@/screens/Project", () => ({ Project: makeStub("project") }));
-vi.mock("@/screens/Prompts", () => ({ Prompts: makeStub("prompts") }));
-vi.mock("@/screens/Detail", () => ({ Detail: makeStub("detail") }));
-vi.mock("@/screens/Scans", () => ({ Scans: makeStub("scans") }));
-vi.mock("@/screens/Analytics", () => ({ Analytics: makeStub("analytics") }));
 vi.mock("@/screens/Settings", () => ({ Settings: makeStub("settings") }));
 
 vi.mock("@/lib/ipc", async () => {

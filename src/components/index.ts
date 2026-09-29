@@ -7,8 +7,6 @@ export { ScoreRing } from "./ScoreRing";
 export { Icon } from "./Icon";
 export { Button } from "./Button";
 export { Card } from "./Card";
-export { UsageBadge } from "./UsageBadge";
-export { ArtifactCard } from "./ArtifactCard";
 export {
   DataTable,
   useTableState,
@@ -24,7 +22,6 @@ export {
 } from "./DataTable";
 export { FilterSelect } from "./FilterSelect";
 export { Tabs, useTabState } from "./Tabs";
-export { RankedList, rankRows } from "./RankedList";
 export { ScanBar } from "./ScanBar";
 export { TrendChart } from "./TrendChart";
 
@@ -36,16 +33,8 @@ export type { ScoreRingProps } from "./ScoreRing";
 export type { IconName, IconProps } from "./Icon";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export type { CardProps } from "./Card";
-export type { UsageBadgeProps } from "./UsageBadge";
-export type { ArtifactCardProps } from "./ArtifactCard";
 export type { DataTableProps, DataTableSearch, PillGroup, PillOption, TableState, RowAction } from "./DataTable";
 export type { FilterSelectOption, FilterSelectProps } from "./FilterSelect";
 export type { TabItem, TabsProps } from "./Tabs";
-export type {
-  RankedRow,
-  RankedListProps,
-  RankedListSelector,
-  RankedListDetails,
-} from "./RankedList";
 export type { ScanBarProps } from "./ScanBar";
 export type { TrendChartProps, TrendDomainBound } from "./TrendChart";

@@ -1,1 +1,0 @@
-export { Scans } from "./Scans";

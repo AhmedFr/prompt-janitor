@@ -9,7 +9,7 @@
  * inner `<span>` it would only drag from that span, and a screen that grew a
  * crowded toolbar would quietly lose its grab area.
  *
- * jsdom cannot exercise a native drag, and rendering all eleven screens here
+ * jsdom cannot exercise a native drag, and rendering every screen here
  * would mean re-mocking eleven IPC surfaces, so this reads the sources (via
  * Vite's `?raw` glob — the project has no `@types/node`): a structural guard
  * that also fails for a *new* screen that forgets the attribute, which
@@ -26,10 +26,11 @@ const screenSources = import.meta.glob("../screens/*/*.tsx", {
   eager: true,
 }) as Record<string, string>;
 
-const sharedSources = import.meta.glob(
-  ["../components/Sidebar/Sidebar.tsx", "../components/ScreenPlaceholder/ScreenPlaceholder.tsx"],
-  { query: "?raw", import: "default", eager: true },
-) as Record<string, string>;
+const sharedSources = import.meta.glob(["../components/Sidebar/Sidebar.tsx"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 /**
  * `screens/Setup/Setup.tsx` but not its tests, stories or sub-components:
@@ -56,17 +57,7 @@ function shared(name: string): string {
 describe("window drag regions", () => {
   it("finds every screen", () => {
     // Guards the glob itself: an empty list would make the suite below vacuous.
-    expect(screens.map((s) => s.dir).sort()).toEqual([
-      "Analytics",
-      "Detail",
-      "Overview",
-      "Project",
-      "Projects",
-      "Prompts",
-      "Scans",
-      "Settings",
-      "Setup",
-    ]);
+    expect(screens.map((s) => s.dir).sort()).toEqual(["Projects", "Settings", "Setup"]);
   });
 
   for (const { dir, source } of screens) {
@@ -76,10 +67,6 @@ describe("window drag regions", () => {
       expect(tag).toContain("data-tauri-drag-region");
     });
   }
-
-  it("the shared placeholder screen's toolbar is a drag region", () => {
-    expect(toolbarTag(shared("ScreenPlaceholder"))).toContain("data-tauri-drag-region");
-  });
 
   it("the sidebar keeps its titlebar strip", () => {
     // The strip that clears the macOS traffic lights: the one drag handle

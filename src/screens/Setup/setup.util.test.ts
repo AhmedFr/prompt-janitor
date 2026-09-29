@@ -8,7 +8,6 @@ import {
   harnessSummary,
   lastScanAt,
   matchProject,
-  pluginBundleCounts,
   projectNameFor,
   projectNameMap,
   relativeSession,
@@ -341,25 +340,6 @@ describe("projectNameMap", () => {
       ["/code/web", "web"],
       ["/code/api", "api"],
     ]);
-  });
-});
-
-describe("pluginBundleCounts", () => {
-  it("counts what each plugin bundled, never the plugin's own manifest row", () => {
-    const counts = pluginBundleCounts([
-      artifact({ id: 1, kind: "plugin", layer: "plugin", name: "sp", plugin_name: "sp" }),
-      artifact({ id: 2, kind: "skill", layer: "plugin", name: "brainstorm", plugin_name: "sp" }),
-      artifact({ id: 3, kind: "agent", layer: "plugin", name: "reviewer", plugin_name: "sp" }),
-      artifact({ id: 4, kind: "skill", layer: "global", name: "adapt" }),
-    ]);
-    expect(counts.get("sp")).toBe(2);
-  });
-
-  it("ignores an artifact that names a plugin without being installed by one", () => {
-    const counts = pluginBundleCounts([
-      artifact({ id: 1, kind: "skill", layer: "project", name: "copy", plugin_name: "sp" }),
-    ]);
-    expect(counts.get("sp")).toBeUndefined();
   });
 });
 
