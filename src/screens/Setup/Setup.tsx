@@ -8,13 +8,17 @@ import { KindChips } from "@/components/KindChips";
 import { ScanBar } from "@/components/ScanBar";
 import { SummaryLine } from "@/components/SummaryLine";
 import { TemplatePicker, useTemplatePicker } from "@/components/TemplatePicker";
-import { isTauri, type HarnessInfo } from "@/lib/ipc";
+import { ViewingSwitcher } from "@/components/ViewingSwitcher";
+import { commands, isTauri, type HarnessInfo } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { SetupFilter } from "@/lib/setupFilter";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import { LABEL, type KindFilter } from "@/lib/vocabulary";
-import { formatSetupTarget, type ItemRef, type ViewerTab } from "@/App/setupTarget";
+import type { ItemRef, ViewerTab } from "@/App/setupTarget";
 import { ItemViewer, stepTarget } from "./ItemViewer";
+import { lensRows } from "./lens.util";
+import { lensChoices } from "./lensChoices.util";
+import { ProjectStrip } from "./ProjectStrip";
 import { scopeLabel, type ColumnsCtx } from "./setup.columns";
 import { scopePillsFor } from "./setup.pills";
 import { unifiedColumns, visibleColumnIds } from "./setup.unified";
@@ -24,6 +28,7 @@ import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "./setupRo
 import {
   EMPTY_FILTERED,
   EMPTY_HINT,
+  LENS_TABLE_STATE_KEY,
   NEW_FROM_TEMPLATE,
   NO_HARNESS_TITLE,
   NO_ITEMS_TITLE,
@@ -31,6 +36,7 @@ import {
   TABLE_STATE_KEY,
 } from "./Setup.constants";
 import type { InventoryProps, SetupProps } from "./Setup.types";
+import { useLens } from "./useLens";
 import { useOverallGrade } from "./useOverallGrade";
 import { useSetup } from "./useSetup";
 import "./Setup.css";
@@ -47,6 +53,17 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
   const refreshing = loadingOverride ?? (state.loading && !override);
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
+  // The lens has one owner: this screen renders the Viewing control, so the table only reads it.
+  const [lens, setLens] = useState<string | null>(target?.lens ?? null);
+  useEffect(() => {
+    if (target?.lens !== undefined) setLens(target.lens ?? null);
+  }, [target?.lens]);
+  // `null` for a path only the grader knows: no strip, but the lens still narrows the rows.
+  const lensProject = useMemo(
+    () => (lens && data ? (data.projects.find((p) => p.path === lens) ?? null) : null),
+    [lens, data],
+  );
+  const lensData = useLens(lensProject);
 
   // A scan refreshes the inventory through the `scan-done` listener in
   // `useSetup`, so nothing here needs to refetch on its own.
@@ -65,6 +82,7 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Setup</h1>
+        {data && <ViewingSwitcher projects={lensChoices(data.projects, files, lens)} lens={lens} onChange={setLens} />}
         <span className="toolbar-spacer" />
         {/* The one place the main window says when the last scan ran (spec §4.1). */}
         {detected.length > 0 && (
@@ -104,15 +122,30 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
           ) : detected.length === 0 ? (
             <NoHarness busy={busy} onAddFolder={() => void run(addFolderAndScan)} />
           ) : (
-            <Inventory
-              data={data}
-              files={files}
-              detected={detected}
-              navigate={navigate}
-              target={target}
-              loading={refreshing}
-              onRefetch={state.refetch}
-            />
+            <>
+              {lensProject && (
+                <ProjectStrip
+                  project={lensProject}
+                  sessionsPerDay={lensData.usage?.sessions_per_day ?? null}
+                  onReveal={() => {
+                    if (lensProject) void commands.revealProject(lensProject.path);
+                  }}
+                />
+              )}
+              <Inventory
+                data={data}
+                files={files}
+                detected={detected}
+                navigate={navigate}
+                target={target}
+                loading={refreshing}
+                onRefetch={state.refetch}
+                lens={lens}
+                lensProject={lensProject}
+                lensData={lensData}
+                onLens={setLens}
+              />
+            </>
           )}
         </div>
       </div>
@@ -169,9 +202,29 @@ const rowId = (row: SetupRow) => String(row.id);
  * line a status filter; both start from a deep link's `target` when there is
  * one. Rows arrive Kind then Name, so every slice starts in that order.
  */
-function Inventory({ data, files, detected, navigate, target, loading, onRefetch }: InventoryProps) {
+function Inventory({
+  data,
+  files,
+  detected,
+  navigate,
+  target,
+  loading,
+  onRefetch,
+  lens,
+  lensProject,
+  lensData,
+  onLens,
+}: InventoryProps) {
   const projectNames = useMemo(() => projectNameMap(data.projects), [data]);
-  const rows = useMemo(() => byKindThenName(setupRows(data, files)), [data, files]);
+  const base = useMemo(() => setupRows(data, files), [data, files]);
+  // A graded-only lens has no project to name a harness: it reads as the harness the scan found.
+  const lensHarness = lensProject?.harness ?? detected[0]?.id ?? "";
+  const rows = useMemo(() => {
+    if (lens === null) return byKindThenName(base);
+    // A lensed project that is gone from disk shows an empty table under the missing-folder banner.
+    if (lensProject !== null && !lensProject.exists) return [];
+    return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
+  }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
   // Over the whole setup, not the slice: "costly" means the same on every chip.
   const costBar = useMemo(() => costThreshold(rows), [rows]);
   const [kind, setKind] = useState<KindFilter>(target?.kind ?? "all");
@@ -192,7 +245,8 @@ function Inventory({ data, files, detected, navigate, target, loading, onRefetch
   const ofKind = useMemo(() => (kind === "all" ? rows : rows.filter((r) => r.kind === kind)), [rows, kind]);
   const counts = useMemo(() => setupFilterCounts(ofKind, costBar), [ofKind, costBar]);
   const visible = useMemo(() => applySetupFilter(ofKind, filter, costBar), [ofKind, filter, costBar]);
-  const pills = useMemo(() => scopePillsFor(ofKind, projectNames), [ofKind, projectNames]);
+  // No Scope under the lens (spec §5): every row already applies to the one project.
+  const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
   // `scopeLabel` is the Scope column's own label rule (a graded-only row's
   // project label included), so searching a project or plugin name finds
   // exactly the rows whose Scope cell reads that way.
@@ -248,7 +302,7 @@ function Inventory({ data, files, detected, navigate, target, loading, onRefetch
   // Resolved through `pending` so this stays stable — `unifiedColumns`' per-`ctx` cache can hit.
   const openFindings = useCallback((fileId: string) => setPending({ ref: { fileId }, tab: "findings" }), []);
   const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
-  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, false), ctx);
+  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null), ctx);
 
   // An empty table is either a setup with nothing in it, or a slice the
   // filters emptied — then one Clear filters resets the chip and the summary
@@ -283,13 +337,14 @@ function Inventory({ data, files, detected, navigate, target, loading, onRefetch
       <SummaryLine badge={<GradePopover grade={grade} />} grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
       <DataTable
         ariaLabel="Setup"
-        stateKey={TABLE_STATE_KEY}
+        // Its own key under the lens: the rows arrive in load order, with no Scope to remember.
+        stateKey={lens === null ? TABLE_STATE_KEY : LENS_TABLE_STATE_KEY}
         columns={columns}
         rows={visible}
         rowId={rowId}
         search={search}
         pills={pills}
-        // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), in every slice.
+        // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), or in load order under the lens.
         onRowClick={onRowClick}
         // A state setter: identity-stable, as the table's ids-keyed effect expects.
         onVisibleRowsChange={setVisibleIds}
@@ -334,7 +389,7 @@ function Inventory({ data, files, detected, navigate, target, loading, onRefetch
           // into the table without waiting for a rescan.
           onSaved={() => void onRefetch()}
           loadedIn={loadedInFor(open, data.projects)}
-          onSelectProject={(path) => navigate("setup", formatSetupTarget({ lens: path }))}
+          onSelectProject={onLens}
         />
       )}
     </>

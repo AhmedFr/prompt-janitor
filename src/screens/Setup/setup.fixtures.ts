@@ -186,3 +186,28 @@ export const noHarness: SetupView = {
   global: [],
   projects: [],
 };
+
+/** `populated` plus a second live project whose agent loads nowhere else — what a lens on web must leave out. */
+export const withOtherProject: SetupView = {
+  ...populated,
+  projects: [
+    ...populated.projects,
+    {
+      harness: "claude_code",
+      path: "/repo/api",
+      name: "api",
+      exists: true,
+      session_count: 3,
+      last_session_at: "2026-08-10T08:00:00.000Z",
+      artifacts: [
+        artifact({
+          id: 18,
+          layer: "project",
+          kind: "agent",
+          name: "api-reviewer",
+          path: "/repo/api/.claude/agents/api-reviewer.md",
+        }),
+      ],
+    },
+  ],
+};

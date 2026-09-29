@@ -5,7 +5,7 @@ import { pickFilter } from "@/test/filters";
 import { Setup } from "./Setup";
 import type { FileRow } from "@/lib/ipc";
 import { KIND_CHIP_ORDER, KIND_SINGULAR, LABEL } from "@/lib/vocabulary";
-import { artifact, noHarness, populated } from "./setup.fixtures";
+import { artifact, noHarness, populated, withOtherProject } from "./setup.fixtures";
 import { NO_ITEMS_TITLE } from "./Setup.constants";
 import type { ArtifactSourceState } from "./Setup.types";
 
@@ -30,7 +30,32 @@ const loadedSource = vi.hoisted(
 vi.mock("./useArtifactSource", () => ({ useArtifactSource: loadedSource }));
 vi.mock("./ItemViewer/useGradedSource", () => ({ useGradedSource: loadedSource }));
 vi.mock("./Findings", () => ({ Findings: () => <div data-testid="findings" /> }));
-vi.mock("./ItemUsage", () => ({ ItemUsage: () => <div data-testid="item-usage" /> }));
+// The stub keeps the Usage tab's one way out: a project link, which turns the lens on.
+vi.mock("./ItemUsage", () => ({
+  ItemUsage: ({ onSelectProject }: { onSelectProject: (path: string) => void }) => (
+    <div data-testid="item-usage">
+      <button type="button" onClick={() => onSelectProject("/repo/web")}>
+        web
+      </button>
+    </div>
+  ),
+}));
+// The lens's backend reads (load order and project usage), from the fixture's paths.
+const lensPaths = vi.hoisted(() => ({ global: "", app: "" }));
+vi.mock("./useLens", () => ({
+  useLens: (project: { path: string } | null) =>
+    project
+      ? {
+          effective: [
+            { layer: "global", path: lensPaths.global, name: "CLAUDE.md", grade: "B", file_id: null },
+            { layer: "project", path: lensPaths.app, name: "CLAUDE.md", grade: "C", file_id: null },
+          ],
+          usage: { ranked: [], sessions_per_day: [] },
+          loading: false,
+          failed: false,
+        }
+      : { effective: null, usage: null, loading: false, failed: false },
+}));
 // One handler registry per test so a case can emit `scan-done` like the core does.
 const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
 vi.mock("@tauri-apps/api/event", () => ({
@@ -80,6 +105,15 @@ const fixture = populated;
 /** The global skill "adapt", and the web project's graded rule. */
 const SKILL_ID = 2;
 const RULE_FILE_ID = "f-web";
+/** The lens cases: web is live, gone is missing from disk, api's agent loads only there. */
+const APP_PATH = "/repo/web";
+const APP_NAME = "web";
+const MISSING_PROJECT_PATH = "/repo/gone";
+const OTHER_PROJECT_ONLY_ITEM = "api-reviewer";
+const GLOBAL_RULE_PATH = "/home/u/.claude/CLAUDE.md";
+const GLOBAL_RULE_NAME = "global-style";
+const APP_RULE_PATH = "/repo/web/CLAUDE.md";
+const APP_RULE_NAME = "web-rules";
 const withoutSkill = { ...fixture, global: fixture.global.filter((a) => a.id !== SKILL_ID) };
 
 const renderSetup = async (navigate = vi.fn()) => {
@@ -123,6 +157,8 @@ beforeEach(() => {
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "error", error: "no" });
   open.mockResolvedValue(null);
+  lensPaths.global = GLOBAL_RULE_PATH;
+  lensPaths.app = APP_RULE_PATH;
 });
 
 afterEach(cleanup);
@@ -469,5 +505,128 @@ describe("Setup", () => {
     const { container } = await renderSetup();
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("Setup under the project lens", () => {
+  /** The Viewing control, whatever it currently reads. */
+  const viewing = () => screen.getByRole("combobox", { name: /^Viewing/ });
+  const pickLens = (option: string | RegExp) => {
+    fireEvent.click(viewing());
+    fireEvent.click(screen.getByRole("option", { name: option }));
+  };
+  /** The table toolbar's Scope filter trigger — not the Scope column's sort button. */
+  const scopeFilter = () =>
+    within(document.querySelector(".dt__toolbar") as HTMLElement).queryByLabelText(/^Scope/, {
+      selector: ".fs__trigger",
+    });
+  const graded = (path: string, project: string, projectId: string): FileRow =>
+    ({
+      id: path,
+      name: path.split("/").pop(),
+      path,
+      project,
+      project_id: projectId,
+      kind: "AGENTS.md",
+      grade: "C",
+      score: 70,
+      issue_count: 1,
+      modified: null,
+      worst_severity: "lo",
+    }) as FileRow;
+
+  it("shows only what loads in the lensed project, instructions numbered first", () => {
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ lens: APP_PATH }} />);
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+    const body = bodyRows();
+    // The "#" column comes first; the two effective instructions lead, in load order.
+    expect(body.slice(0, 2).map((r) => r.querySelector("td")?.textContent)).toEqual(["1", "2"]);
+    expect(body[0]).toHaveTextContent(GLOBAL_RULE_NAME);
+    expect(body[1]).toHaveTextContent(APP_RULE_NAME);
+    expect(screen.queryByText(OTHER_PROJECT_ONLY_ITEM)).toBeNull();
+    // Global and this project's items are still there.
+    expect(screen.getByText("deploy")).toBeInTheDocument();
+    expect(screen.getByText("adapt")).toBeInTheDocument();
+  });
+
+  it("lists every project's items without the lens", () => {
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} />);
+    expect(screen.getByText(OTHER_PROJECT_ONLY_ITEM)).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "#" })).toBeNull();
+  });
+
+  it("keeps this project's graded-only instruction file under the lens", () => {
+    const files = [graded(`${APP_PATH}/AGENTS.md`, APP_NAME, APP_PATH), graded("/repo/api/AGENTS.md", "api", "/repo/api")];
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={files} target={{ lens: APP_PATH }} />);
+    const names = bodyRows().map((r) => r.textContent ?? "");
+    // After the two numbered instructions, unnumbered; the api project's file is left out.
+    expect(names.filter((t) => t.includes("AGENTS.md"))).toHaveLength(1);
+    expect(bodyRows()[2]).toHaveTextContent("AGENTS.md");
+    expect(bodyRows()[2].querySelector("td")?.textContent).toBe("");
+  });
+
+  it("hides the Scope filter under the lens and shows the project strip", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(scopeFilter()).toBeNull();
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+  });
+
+  it("switches lens from the Viewing control", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    expect(scopeFilter()).not.toBeNull();
+    pickLens(new RegExp(APP_NAME));
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+  });
+
+  it("shows the missing-folder message and an empty table for a project that is gone", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: MISSING_PROJECT_PATH }} />);
+    expect(screen.getByRole("status")).toHaveTextContent(/folder/i);
+    expect(bodyRows()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+  });
+
+  it("keeps one lens: the Viewing control and the table always agree", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    pickLens("All setup");
+    expect(viewing()).toHaveAccessibleName(/All setup/);
+    expect(screen.queryByRole("columnheader", { name: "#" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    expect(scopeFilter()).not.toBeNull();
+  });
+
+  it("follows a deep link's lens while Setup is already mounted", () => {
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+  });
+
+  it("turns the lens on from the viewer's Usage tab", () => {
+    const navigate = vi.fn();
+    render(<Setup navigate={navigate} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID }, tab: "usage" }} />);
+    fireEvent.click(within(screen.getByTestId("item-usage")).getByRole("button", { name: APP_NAME }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations with the lens on", async () => {
+    const { container } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("lenses a graded-only project path with no strip and no crash", () => {
+    const path = "/not/in/the/inventory";
+    const files = [graded(`${path}/AGENTS.md`, "side", path)];
+    render(<Setup navigate={vi.fn()} data={fixture} files={files} target={{ lens: path }} />);
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Kinds" })).toBeInTheDocument();
+    // The control names the lens rather than claiming "All setup", and the table is that project's.
+    expect(viewing()).toHaveAccessibleName(/as Claude Code sees side/);
+    expect(screen.getByText("AGENTS.md")).toBeInTheDocument();
+    expect(screen.queryByText(APP_RULE_NAME)).toBeNull();
   });
 });

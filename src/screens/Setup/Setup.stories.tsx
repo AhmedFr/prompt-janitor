@@ -346,3 +346,26 @@ export const NoHarness: Story = {
 export const Unreadable: Story = {
   args: { data: null },
 };
+
+/**
+ * The lens on a live project: only what loads there, instructions first, with
+ * the project strip above the table and no Scope filter. Outside the desktop
+ * app the load order and the project's usage cannot be read, so the `#`
+ * column stays blank and the strip says there are no sessions yet.
+ */
+export const Lensed: Story = {
+  args: { target: { lens: "/Users/dev/code/prompt-janitor" } },
+};
+
+/** The lens on a project whose folder is gone: the strip's message, and an empty table under it. */
+export const LensedMissingFolder: Story = {
+  args: { target: { lens: "/Users/dev/code/old-experiment" } },
+};
+
+/**
+ * The lens on a folder no harness knows, only the grader: no strip, and
+ * the table holds the global setup plus that folder's graded files.
+ */
+export const LensedNoHarness: Story = {
+  args: { files: gradedOnly, target: { lens: "/code/side-project" } },
+};

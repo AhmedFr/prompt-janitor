@@ -41,6 +41,9 @@ export const MIN_COST_SAMPLES = 2;
 /** `sessionStorage` suffix Setup's one table remembers its search, pills and sort under (`pj.table.setup.unified`). */
 export const TABLE_STATE_KEY = "setup.unified";
 
+/** The lensed table's own state key: its rows arrive in load order, and it has no Scope to remember. */
+export const LENS_TABLE_STATE_KEY = "setup.lens";
+
 /** What an empty slice suggests doing about it — the only lever from this screen. */
 export const EMPTY_HINT = "Rescan to pick up anything added since the last scan.";
 

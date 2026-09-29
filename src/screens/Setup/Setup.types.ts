@@ -1,4 +1,4 @@
-import type { FileRow, HarnessInfo, SetupView, SourceFormat } from "@/lib/ipc";
+import type { EffectiveRule, FileRow, HarnessInfo, ProjectSetup, ProjectUsage, SetupView, SourceFormat } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
 import type { SetupTarget } from "@/App/setupTarget";
 
@@ -34,6 +34,14 @@ export interface InventoryProps {
   loading: boolean;
   /** Reloads the inventory — how a saved skill's new size reaches the table. */
   onRefetch: () => Promise<void>;
+  /** Path of the project the lens is on, or `null` for the whole setup. `Setup` owns it. */
+  lens: string | null;
+  /** The lensed project, or `null` without a lens or for a path only the grader knows. */
+  lensProject: ProjectSetup | null;
+  /** The lensed project's load order and usage; both `null` until read, or when it has none. */
+  lensData: { effective: EffectiveRule[] | null; usage: ProjectUsage | null };
+  /** Turns the lens on a project, or off with `null` (the viewer's Usage tab links here). */
+  onLens: (path: string | null) => void;
 }
 
 /** The load/save state of one artifact's source, as `useArtifactSource` maintains it. */

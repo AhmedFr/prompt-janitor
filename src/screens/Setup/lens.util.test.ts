@@ -77,6 +77,11 @@ describe("lensRows", () => {
     expect(lensRows([...rows, other], WEB, effective, usage, H).map((r) => r.id)).not.toContain(42);
   });
 
+  it("keeps this project's graded-only file, which no harness claims (setupRows gives it harness \"\")", () => {
+    const orphan = row({ id: -8, harness: "", kind: "rule", layer: "project", origin: "graded", name: "GEMINI.md", path: `${WEB}/GEMINI.md`, project_path: WEB });
+    expect(lensRows([...rows, orphan], WEB, effective, usage, H).map((r) => r.id)).toContain(-8);
+  });
+
   it("gives kinds without per-project usage no usage at all", () => {
     const hook = row({ id: 43, kind: "hook", name: "h", usage: { total: 5, sessions: 1, last_used: null, error_rate: 0, avg_turn_tokens: 0, count_30d: 0, count_prev_30d: 0 } });
     expect(lensRows([...rows, hook], WEB, effective, usage, H).find((r) => r.id === 43)?.usage).toBeNull();

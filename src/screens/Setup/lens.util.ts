@@ -11,7 +11,7 @@ export const INSTALLED_PLUGIN = "installed plugin";
 /**
  * Setup "as Claude Code sees <project>" (spec §5): what applies there, instructions
  * first in the harness's load order, then every other kind; usage counted from
- * that project's sessions only. Only `harness`'s own rows are considered. The backend knows no overrides, so nothing is
+ * that project's sessions only. Only `harness`'s own rows (and graded-only files) are considered. The backend knows no overrides, so nothing is
  * muted — the lens only claims what `effective_rules` actually computes.
  */
 export function lensRows(
@@ -23,8 +23,9 @@ export function lensRows(
 ): SetupRow[] {
   const here = trim(projectPath);
   // The load order is per harness: another harness's rows would sit unnumbered beside it.
+  // A graded-only file belongs to no harness (`harness: ""`) and is kept by its project alone.
   const applies = rows
-    .filter((r) => r.harness === harness)
+    .filter((r) => r.origin === "graded" || r.harness === harness)
     .filter((r) => r.layer !== "project" || (r.project_path !== null && trim(r.project_path) === here));
   const order = new Map((effective ?? []).map((e, i) => [e.path, i + 1]));
   const ranked = new Map(
