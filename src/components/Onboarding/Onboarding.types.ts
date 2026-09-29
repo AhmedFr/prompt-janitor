@@ -1,4 +1,4 @@
-import type { HarnessInfo, ScanSummary } from "@/lib/ipc";
+import type { HarnessInfo } from "@/lib/ipc";
 import type { ScanPhase, ScanProgress } from "@/lib/useScanProgress";
 
 /**
@@ -22,7 +22,8 @@ export interface OnboardingState {
   /** What the progress screen says right now. */
   status: string;
   progress: ScanProgress | null;
-  summary: ScanSummary | null;
+  /** The reveal's one-line summary of the scanned setup; set once the scan is done. */
+  setupLine: string | null;
   /** Set when the scan failed; the caller hands control back to the app. */
   failed: boolean;
   /** Scan everything the detected harnesses already cover. */

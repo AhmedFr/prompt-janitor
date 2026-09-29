@@ -25,13 +25,15 @@ const listHarnesses = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
+const getSetup = vi.hoisted(() => vi.fn());
+const listFiles = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
   return {
     ...actual,
     isTauri: true,
-    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow },
+    commands: { listHarnesses, getExtraScanFolders, setExtraScanFolders, scanNow, getSetup, listFiles },
   };
 });
 
@@ -188,6 +190,33 @@ describe("Onboarding", () => {
     await act(async () => {
       finish({ status: "error", error: "no" });
     });
+  });
+
+  it("ends on a Setup summary and an Open my setup button, not a grade", async () => {
+    scanNow.mockResolvedValue({
+      status: "ok",
+      data: { files_scanned: 5, projects: 2, overall_score: 90, overall_grade: "A" },
+    });
+    getSetup.mockResolvedValue({
+      status: "ok",
+      data: {
+        harnesses: [],
+        global: [{ name: "s", kind: "skill", usage: null }],
+        projects: [{ path: "/a", artifacts: [{ name: "r", kind: "rule", usage: null }] }],
+      },
+    });
+    listFiles.mockResolvedValue({ status: "ok", data: [] });
+    const onDone = vi.fn();
+    render(<Onboarding onDone={onDone} />);
+    await waitFor(() => expect(scanButton()).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(scanButton());
+    });
+
+    expect(await screen.findByText("2 items across 1 project · 1 never used")).toBeInTheDocument();
+    expect(screen.queryByText(/See what to fix/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open my setup" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("hands back to the app when the scan fails", async () => {
