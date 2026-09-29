@@ -469,6 +469,7 @@
     }
   ],
   "recent": [
+    "2026-09-29 — v0.1.6 published from a local build (Release run cancelled): universal DMG + signed updater archive (signature verified against the app's pubkey; the Phase 13 command grants confirmed in the binary) + latest.json; the feed serves 0.1.6. Owner's on-device check of Phase 13 now happens on the updated app.",
     "2026-09-29 — v0.1.6 tagged: Phase 13 Setup-first navigation (#205) — Setup is home, Projects opens a project lens, Settings in 6 tabs, one item viewer (Content/Findings/Usage), Back with ⌘[, old screens removed, everything free",
     "2026-09-29 — Phase 13 Setup-first navigation implemented on one branch (issues #200–#204): Setup is home with kind chips, summary filters and a project lens; Projects and Settings (Folders, Scanning, Notifications, Checks, AI, About); the item viewer has Content / Findings / Usage with editing for markdown kinds; one navigation state with Back (⌘[); Overview, Prompts, Detail, Scans, Analytics, Rules and Project screens removed; all paywall UI hidden, everything free. Awaiting owner review + real-build check.",
     "2026-09-27 — Phase 13 implementation plan written (docs/superpowers/plans/2026-09-27-setup-first-navigation.md): 5 parts / 43 tasks on one branch + one PR, test-first, `pnpm check` green at the end of every part; awaiting owner review before execution.",
