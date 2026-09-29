@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup, screen, within } from "@testing-library/react";
 import type { Grade, ProjectRow } from "@/lib/ipc";
 import { DataTable } from "@/components/DataTable";
-import { DEFAULT_SORT, PROJECT_COLUMNS, buildPills, gradeKey, harnessLabel } from "./projects.columns";
+import { DEFAULT_SORT, projectColumns, type ProjectsColumnsCtx, buildPills, gradeKey, harnessLabel } from "./projects.columns";
 
 afterEach(cleanup);
 
@@ -24,6 +24,8 @@ const project = (o: Partial<ProjectRow> = {}): ProjectRow => ({
   ...o,
 });
 
+const ctx: ProjectsColumnsCtx = { rows: null, usage: null, fallbackHarness: "", sessions90: new Map([["/code/web", 7]]) };
+
 let mountCount = 0;
 
 /**
@@ -32,11 +34,11 @@ let mountCount = 0;
  * each render gets its own `sessionStorage` slot; `DataTable` persists sort
  * and search state under `pj.table.<key>`.
  */
-function mount(rows: ProjectRow[], sort = DEFAULT_SORT) {
+function mount(rows: ProjectRow[], sort: { id: string; desc: boolean } = DEFAULT_SORT) {
   mountCount += 1;
   return render(
     <DataTable
-      columns={PROJECT_COLUMNS}
+      columns={projectColumns(ctx)}
       rows={rows}
       rowId={(r) => r.id}
       empty={{ title: "Nothing here" }}
@@ -57,33 +59,23 @@ function bodyRows(): string[][] {
 
 const names = () => bodyRows().map((cells) => cells[0]);
 
-describe("PROJECT_COLUMNS", () => {
-  it("lists the project columns in spec order", () => {
-    expect(PROJECT_COLUMNS.map((c) => c.id)).toEqual([
-      "name",
-      "grade",
-      "files",
-      "issues",
-      "sessions",
-      "lastSession",
-      "neverUsed",
-      "errors",
-      "status",
+describe("projectColumns", () => {
+  it("has exactly the spec's columns, in order (§7), and no Findings column", () => {
+    expect(projectColumns(ctx).map((c) => c.header)).toEqual([
+      "Name", "Grade", "Instructions", "Items available", "Sessions (90 days)", "Last session", "Never used", "Erroring",
     ]);
+    expect(projectColumns(ctx).map((c) => c.id)).not.toContain("issues");
+    expect(projectColumns(ctx).map((c) => c.id)).not.toContain("status");
   });
 
-  it("headers the columns the way the spec names them", () => {
-    expect(PROJECT_COLUMNS.map((c) => c.header)).toEqual([
-      "Name",
-      "Grade",
-      "Rule files",
-      "Open issues",
-      "Sessions",
-      "Last session",
-      "Never used",
-      "Errors",
-      "Status",
-    ]);
+  it("counts sessions in the 90-day window, 0 where none started", () => {
+    const col = projectColumns(ctx).find((c) => c.id === "sessions") as unknown as { accessorFn: (r: ProjectRow) => number };
+    expect(col.accessorFn({ id: "/code/web" } as ProjectRow)).toBe(7);
+    expect(col.accessorFn({ id: "/code/api" } as ProjectRow)).toBe(0);
+  });
+
+  it("is identity-stable per ctx", () => {
+    expect(projectColumns(ctx)).toBe(projectColumns(ctx));
   });
 
   it("renders the project name beside its glyph", () => {
@@ -98,16 +90,14 @@ describe("PROJECT_COLUMNS", () => {
     expect(screen.getByLabelText("Grade D")).toHaveTextContent("D");
   });
 
-  it("renders the rollup counts in their own cells", () => {
-    mount([
-      project({ file_count: 7, issue_count: 4, session_count: 31, never_used_count: 2, error_count: 5 }),
-    ]);
+  it("renders the instruction count, and a dash for counts not known yet", () => {
+    mount([project({ id: "/code/web", file_count: 7 })]);
     const cells = bodyRows()[0];
     expect(cells[2]).toBe("7");
-    expect(cells[3]).toBe("4");
-    expect(cells[4]).toBe("31");
-    expect(cells[6]).toBe("2");
-    expect(cells[7]).toBe("5");
+    expect(cells[3]).toBe("—");
+    expect(cells[4]).toBe("7");
+    expect(cells[6]).toBe("—");
+    expect(cells[7]).toBe("—");
   });
 
   it("renders the last session as a relative age, and 'never' when there is none", () => {
@@ -119,38 +109,43 @@ describe("PROJECT_COLUMNS", () => {
     expect(byName.get("a")).toBe("never");
     expect(byName.get("b")).toBe("just now");
   });
-
-  it("chips a project whose folder is gone, and leaves a present one blank", () => {
-    mount([
-      project({ id: "/gone", name: "gone", exists: false }),
-      project({ id: "/here", name: "here", exists: true }),
-    ]);
-    const byName = new Map(bodyRows().map((cells) => [cells[0], cells[8]]));
-    expect(byName.get("gone")).toBe("folder missing");
-    expect(byName.get("here")).toBe("");
-  });
 });
 
 describe("DEFAULT_SORT", () => {
-  it("opens on grade, ascending — best grade first", () => {
-    expect(DEFAULT_SORT).toEqual({ id: "grade", desc: false });
+  it("opens on last session, newest first", () => {
+    expect(DEFAULT_SORT).toEqual({ id: "lastSession", desc: true });
   });
 
-  it("orders by grade ascending", () => {
+  it("orders by last session, newest first, never-used-at-all last", () => {
     mount([
-      project({ id: "/c", name: "c", grade: "F", issue_count: 0 }),
-      project({ id: "/a", name: "a", grade: "A", issue_count: 0 }),
-      project({ id: "/b", name: "b", grade: "C", issue_count: 0 }),
+      project({ id: "/n", name: "never", last_session_at: null }),
+      project({ id: "/o", name: "old", last_session_at: "2026-01-01T00:00:00.000Z" }),
+      project({ id: "/w", name: "new", last_session_at: "2026-09-01T00:00:00.000Z" }),
     ]);
+    expect(names()).toEqual(["new", "old", "never"]);
+  });
+
+  it("orders by grade ascending when the grade header is chosen", () => {
+    mount(
+      [
+        project({ id: "/c", name: "c", grade: "F", issue_count: 0 }),
+        project({ id: "/a", name: "a", grade: "A", issue_count: 0 }),
+        project({ id: "/b", name: "b", grade: "C", issue_count: 0 }),
+      ],
+      { id: "grade", desc: false },
+    );
     expect(names()).toEqual(["a", "b", "c"]);
   });
 
   it("breaks a grade tie with the most open issues first", () => {
-    mount([
-      project({ id: "/few", name: "few", grade: "B", issue_count: 1 }),
-      project({ id: "/many", name: "many", grade: "B", issue_count: 9 }),
-      project({ id: "/none", name: "none", grade: "B", issue_count: 0 }),
-    ]);
+    mount(
+      [
+        project({ id: "/few", name: "few", grade: "B", issue_count: 1 }),
+        project({ id: "/many", name: "many", grade: "B", issue_count: 9 }),
+        project({ id: "/none", name: "none", grade: "B", issue_count: 0 }),
+      ],
+      { id: "grade", desc: false },
+    );
     expect(names()).toEqual(["many", "few", "none"]);
   });
 
@@ -179,7 +174,7 @@ describe("buildPills", () => {
       project({ id: "/gone", issue_count: 0, exists: false }),
     ];
     const status = buildPills(rows).find((g) => g.id === "status");
-    expect(status?.options.map((o) => o.label)).toEqual(["Has issues", "Missing folder"]);
+    expect(status?.options.map((o) => o.label)).toEqual(["Has findings", "Missing folder"]);
     const [issues, missing] = status!.options;
     expect(rows.filter(issues.predicate).map((r) => r.id)).toEqual(["/noisy"]);
     expect(rows.filter(missing.predicate).map((r) => r.id)).toEqual(["/gone"]);

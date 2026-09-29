@@ -1,10 +1,14 @@
 import { useMemo } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ProjectRow } from "@/lib/ipc";
-import { buildPills, DEFAULT_SORT, PROJECT_COLUMNS } from "./projects.columns";
+import { formatSetupTarget } from "@/App/setupTarget";
+import { setupRows } from "@/lib/setupRows";
+import { buildPills, DEFAULT_SORT, projectColumns } from "./projects.columns";
+import { trim } from "@/lib/projectPath";
 import {
   EMPTY_HINT,
   EMPTY_TITLE,
@@ -14,7 +18,7 @@ import {
   SEARCH_PLACEHOLDER,
   TABLE_STATE_KEY,
 } from "./Projects.constants";
-import type { ProjectsProps } from "./Projects.types";
+import type { ProjectsColumnsCtx, ProjectsProps } from "./Projects.types";
 import { useProjects } from "./useProjects";
 import "./Projects.css";
 
@@ -43,10 +47,28 @@ const SEARCH: DataTableSearch<ProjectRow> = {
  * Every project the scanner knows, as one comparable table: which are graded
  * worst, which carry the most open issues, which have configured things
  * nothing ever invokes, and which folders are gone from disk. A row opens
- * that project's page.
+ * Setup as Claude Code sees that project.
  */
-export function Projects({ navigate, data: override }: ProjectsProps) {
+export function Projects({
+  navigate,
+  data: override,
+  setup: setupOverride,
+  usage: usageOverride,
+  sessions90: sessionsOverride,
+}: ProjectsProps) {
   const state = useProjects();
+  const setup = setupOverride !== undefined ? setupOverride : state.setup;
+  const sessions90 = sessionsOverride !== undefined ? sessionsOverride : state.sessions90;
+  const usage = usageOverride !== undefined ? usageOverride : state.usage;
+  const ctx = useMemo<ProjectsColumnsCtx>(
+    () => ({
+      rows: setup ? setupRows(setup, state.files) : null,
+      usage,
+      sessions90,
+      fallbackHarness: setup?.harnesses.find((h) => h.detected)?.id ?? "",
+    }),
+    [setup, state.files, usage, sessions90],
+  );
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const rows = data ?? NO_ROWS;
@@ -62,6 +84,7 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Projects</h1>
       </header>
 
@@ -73,13 +96,13 @@ export function Projects({ navigate, data: override }: ProjectsProps) {
             <DataTable
               ariaLabel="Projects"
               stateKey={TABLE_STATE_KEY}
-              columns={PROJECT_COLUMNS}
+              columns={projectColumns(ctx)}
               rows={rows}
               rowId={rowId}
               search={SEARCH}
               pills={pills}
               defaultSort={DEFAULT_SORT}
-              onRowClick={(row) => navigate("project", row.id)}
+              onRowClick={(row) => navigate("setup", formatSetupTarget({ lens: trim(row.id) }))}
               loading={loading}
               density="compact"
               empty={{ title: EMPTY_TITLE, hint: EMPTY_HINT }}

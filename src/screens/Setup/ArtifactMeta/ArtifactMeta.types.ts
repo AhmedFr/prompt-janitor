@@ -17,4 +17,6 @@ export interface ArtifactMetaProps {
    * carries its description.
    */
   showDescription?: boolean;
+  /** How many projects load this file every session; shown when more than one. */
+  loadedIn?: number;
 }

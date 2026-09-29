@@ -113,3 +113,22 @@ export const FiveThousandLines: Story = {
     content: Array.from({ length: 5000 }, (_, i) => `key_${i}: "value ${i}"  # line ${i + 1}`).join("\n"),
   },
 };
+
+/** A line is highlighted and scrolled into view when focusLine is set. */
+export const FocusedLine: Story = {
+  args: {
+    language: "json",
+    ariaLabel: "config.json source",
+    content: JSON.stringify(
+      {
+        name: "example",
+        description: "An example config",
+        settings: { theme: "dark", notifications: true },
+        version: "1.0.0",
+      },
+      null,
+      2,
+    ),
+    focusLine: 4,
+  },
+};

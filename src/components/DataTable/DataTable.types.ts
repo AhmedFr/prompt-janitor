@@ -41,7 +41,7 @@ export interface DataTableSearch<Row> {
 /**
  * `columns`, `pills` and `search` must be **identity-stable** — `useMemo`d in
  * the caller, or (better) built once at module level and looked up per kind
- * (see `columnsFor`/`pillsFor` in the Setup screen). They feed memoised
+ * (see `unifiedColumns`/`scopePillsFor` in the Setup screen). They feed memoised
  * filtering, counting and TanStack's own column model; an inline literal
  * rebuilt every render rebuilds all three on every keystroke.
  *
@@ -105,7 +105,15 @@ export interface DataTableProps<Row> {
    * answer has arrived.
    */
   loading?: boolean;
-  empty: { title: string; hint?: string };
+  /**
+   * What an empty table says. `title`/`hint` for a table with nothing to
+   * list at all. `clear` is for a caller that narrows `rows` itself before
+   * handing them over (Setup's kind chips and summary filters): whenever the
+   * table is empty but that is down to filtering — the caller's or its own —
+   * it says `clear.title`, and its Clear filters button resets the table's
+   * search and pills and calls `clear.onClear` for the rest.
+   */
+  empty: { title: string; hint?: string; clear?: { title: string; onClear: () => void } };
   density?: "compact" | "regular";
   /**
    * Defaults to `true` and costs nothing below `VIRTUAL_THRESHOLD` rows —
@@ -122,6 +130,12 @@ export interface DataTableProps<Row> {
    */
   stateKey: string;
   ariaLabel: string;
+  /**
+   * Called with the sorted, filtered row ids whenever that list changes.
+   * Allows consumers to track which rows are visible on screen for
+   * operations like stepping through visible items.
+   */
+  onVisibleRowsChange?: (ids: string[]) => void;
 }
 
 /**

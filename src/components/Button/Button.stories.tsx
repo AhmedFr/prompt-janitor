@@ -5,7 +5,7 @@ import { Icon } from "@/components/Icon";
 const meta = {
   title: "Components/Button",
   component: Button,
-  args: { children: "Scan now", variant: "default", size: "md" },
+  args: { children: "Scan", variant: "default", size: "md" },
   argTypes: {
     variant: { control: "inline-radio", options: ["default", "primary"] },
     size: { control: "inline-radio", options: ["md", "sm", "icon"] },

@@ -24,6 +24,13 @@ export const commands = {
 	setExtraScanFolders: (folders: string[]) => typedError<null, string>(__TAURI_INVOKE("set_extra_scan_folders", { folders })),
 	/**  The extra folders currently configured (empty when none). */
 	getExtraScanFolders: () => typedError<string[], string>(__TAURI_INVOKE("get_extra_scan_folders")),
+	/**
+	 *  The project ids that setting the extra scan folders to `folders` would
+	 *  delete right now — the same rule `set_extra_scan_folders` applies, without
+	 *  applying it. Lets Settings ask "how many projects?" before the owner
+	 *  confirms a removal.
+	 */
+	previewFolderRemoval: (folders: string[]) => typedError<string[], string>(__TAURI_INVOKE("preview_folder_removal", { folders })),
 	/**  Persist the scan schedule ("1h", "6h", "1d", "save", or "manual"). */
 	setSchedule: (value: string) => typedError<null, string>(__TAURI_INVOKE("set_schedule", { value })),
 	/**  The current scan schedule (defaults to "6h"). */
@@ -116,8 +123,6 @@ export const commands = {
 	 *  `range_days`.
 	 */
 	getAnalytics: (rangeDays: number) => typedError<Analytics, string>(__TAURI_INVOKE("get_analytics", { rangeDays })),
-	/**  The weekly Scans digest. */
-	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
 	/**
 	 *  Every starter template pack (#75): free to browse and preview — the
 	 *  one-click write is the paid action, gated in `apply_template`.
@@ -152,12 +157,14 @@ export const commands = {
 	/**
 	 *  Reveal an artifact's file in Finder, or open it in its default app.
 	 * 
-	 *  Rust-side rather than the opener plugin's JS API: that one takes a path, so
-	 *  granting it would let the webview open anything on disk. This takes an
-	 *  artifact id and opens only the file the scan found for it — see
-	 *  `artifact_source::file_to_open`.
+	 *  This takes an artifact id and opens only the file the scan found for it —
+	 *  see `artifact_source::file_to_open`.
 	 */
 	openArtifact: (artifactId: number, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_artifact", { artifactId, action })),
+	/**  Reveal or open a graded file that has no inventory row. */
+	openFile: (fileId: string, action: OpenAction) => typedError<null, string>(__TAURI_INVOKE("open_file", { fileId, action })),
+	/**  Select a scanned project's folder in Finder. */
+	revealProject: (projectPath: string) => typedError<null, string>(__TAURI_INVOKE("reveal_project", { projectPath })),
 	/**  The rule files `harness` loads inside `project_path`, in load order. */
 	getEffectiveRules: (harness: string, projectPath: string) => typedError<EffectiveRule[], string>(__TAURI_INVOKE("get_effective_rules", { harness, projectPath })),
 	/**
@@ -171,6 +178,8 @@ export const commands = {
 	 *  `window_days` is capped at a year — the daily series has a point per day.
 	 */
 	getProjectUsage: (harness: string, projectPath: string, windowDays: number) => typedError<ProjectUsage, string>(__TAURI_INVOKE("get_project_usage", { harness, projectPath, windowDays })),
+	/**  One item's usage over `window_days`, for the viewer's Usage tab. */
+	getArtifactUsage: (artifactId: number, windowDays: number) => typedError<ArtifactUsage, string>(__TAURI_INVOKE("get_artifact_usage", { artifactId, windowDays })),
 	/**  Every harness we know of, detected or not. */
 	listHarnesses: () => typedError<HarnessInfo[], string>(__TAURI_INVOKE("list_harnesses")),
 	/**
@@ -311,6 +320,15 @@ export type ArtifactSource = {
 	modified: string,
 };
 
+export type ArtifactUsage = {
+	window_days: number,
+	/**  Oldest day first, zero-filled. */
+	per_day: UsageDay[],
+	/**  Busiest project first. */
+	by_project: ProjectUses[],
+	avg_turn_tokens: number | null,
+};
+
 /**
  *  An inventoried artifact, with its grade (when the file grader saw it) and
  *  its usage (when anything ever invoked it).
@@ -328,6 +346,10 @@ export type ArtifactView = {
 	grade: string | null,
 	score: number | null,
 	file_id: string | null,
+	/**  Open findings on the graded file, when the grader saw one. */
+	issue_count: number | null,
+	/**  The worst of them; `None` when there are none or nothing was graded. */
+	worst_severity: Severity | null,
 	usage: UsageStat | null,
 };
 
@@ -344,15 +366,6 @@ export type CommonIssue = {
 export type DayCount = {
 	day: string,
 	count: number,
-};
-
-/**  An item in the digest's "needs your eyes" list. */
-export type DigestItem = {
-	/**  "regressed" | "improved" | "new". */
-	kind: string,
-	file_id: string,
-	title: string,
-	detail: string,
 };
 
 /**  One dimension's rolled-up score for a file (drives the radar chart, #88). */
@@ -416,6 +429,8 @@ export type FileRow = {
 	grade: Grade,
 	score: number,
 	issue_count: number,
+	/**  The worst open finding on this file; `None` when it has none. */
+	worst_severity: Severity | null,
 	modified: string | null,
 };
 
@@ -587,10 +602,9 @@ export type PanelSnapshot = {
 	 */
 	top_fixes: PanelFix[],
 	/**
-	 *  Skills the user authored — any layer but `plugin` — that no
-	 *  invocation has ever resolved to. Plugin-bundled skills are excluded
-	 *  on purpose: installing a plugin ships dozens the user never chose,
-	 *  and counting them buries the handful they wrote and forgot.
+	 *  Skills, of every layer, that no invocation has ever resolved to.
+	 *  Plugin-bundled skills count too (R66): the chip opens Setup's Skills +
+	 *  Never used slice, which lists them, so its number is the rows it opens.
 	 */
 	never_used_skills: number,
 	/**  MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`]. */
@@ -669,6 +683,13 @@ export type ProjectUsage = {
 	sessions_per_day: DayCount[],
 };
 
+export type ProjectUses = {
+	path: string,
+	name: string,
+	uses: number,
+	sessions: number,
+};
+
 /**
  *  One invoked target over the reporting window — the row the ranked usage
  *  lists render.
@@ -688,6 +709,8 @@ export type RankedTarget = {
 	error_rate: number | null,
 	/**  Mean context tokens per turn, over the turns that recorded any. */
 	avg_turn_tokens: number | null,
+	/**  The latest invocation of the target in the window, RFC3339. */
+	last_used: string | null,
 };
 
 /**  A rule (built-in or custom) with its current enabled state. */
@@ -720,24 +743,6 @@ export type ScanSummary = {
 	nits: number,
 	overall_score: number,
 	overall_grade: Grade,
-};
-
-/**  The weekly Scans digest. */
-export type ScansDigest = {
-	has_data: boolean,
-	overall_grade: Grade,
-	net_health: number,
-	improved: number,
-	regressed: number,
-	scan_count: number,
-	trend: number[],
-	needs_attention: DigestItem[],
-	/**
-	 *  Log lines the latest scan's harness pass could not parse, summed over
-	 *  every harness that reported. Zero is the normal case; a non-zero count
-	 *  is the honest caveat on the usage numbers.
-	 */
-	skipped_lines: number,
 };
 
 /**  Everything the Setup screen renders in one round trip. */
@@ -790,6 +795,13 @@ export type TrendPoint = {
 	/**  Epoch-seconds string (matches `grade_history.recorded_at`). */
 	t: string,
 	score: number,
+};
+
+export type UsageDay = {
+	/**  `YYYY-MM-DD`, UTC. */
+	day: string,
+	uses: number,
+	errors: number,
 };
 
 /**

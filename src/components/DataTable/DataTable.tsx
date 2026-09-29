@@ -78,6 +78,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     rowClassName,
     loading = false,
     stateKey,
+    onVisibleRowsChange,
   } = props;
 
   const {
@@ -104,6 +105,13 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     estimateSize: () => ROW_HEIGHT[density],
     overscan: VIRTUAL_OVERSCAN,
   });
+
+  const visibleKey = modelRows.map((r) => r.id).join("\u0000");
+  useEffect(() => {
+    onVisibleRowsChange?.(visibleKey.length > 0 ? visibleKey.split("\u0000") : []);
+    // Keyed on the ids, not the array: a new array of the same rows is not a change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey]);
 
   // Row heights are pinned per density in CSS; when that changes, every cached
   // measurement describes the old rhythm and the scroll offsets drift.
@@ -355,15 +363,22 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
             {!loading && modelRows.length === 0 && (
               <tr className="dt__empty-row">
                 <td colSpan={columnCount}>
-                  {total === 0 ? (
+                  {total === 0 && !empty.clear ? (
                     <div className="dt__empty">
                       <p className="dt__empty-title">{empty.title}</p>
                       {empty.hint && <p className="dt__empty-hint">{empty.hint}</p>}
                     </div>
                   ) : (
                     <div className="dt__empty">
-                      <p className="dt__empty-title">{NO_MATCH_TITLE}</p>
-                      <button type="button" className="dt__clear" onClick={clearFilters}>
+                      <p className="dt__empty-title">{empty.clear?.title ?? NO_MATCH_TITLE}</p>
+                      <button
+                        type="button"
+                        className="dt__clear"
+                        onClick={() => {
+                          clearFilters();
+                          empty.clear?.onClear();
+                        }}
+                      >
                         {CLEAR_FILTERS_LABEL}
                       </button>
                     </div>

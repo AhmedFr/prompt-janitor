@@ -32,11 +32,12 @@ export function FileViewer({
   editor,
   emptyBody,
   initialMode,
+  focusLine,
 }: FileViewerProps) {
   const body = useRef<HTMLDivElement>(null);
   const hasText = content !== null && content.trim().length > 0;
   const searchable = !editor && !loading && error === null && hasText;
-  const viewer = useFileViewer(format, searchable, initialMode);
+  const viewer = useFileViewer(format, searchable, initialMode, focusLine);
   const find = useFind(body, viewer.findOpen ? viewer.query : "", `${viewer.mode}\u0000${content ?? ""}`);
 
   const language = format ? languageFor(path, format) : null;
@@ -54,7 +55,7 @@ export function FileViewer({
         <SourceViewer content={content} format="markdown" emptyBody={emptyBody} />
       </div>
     );
-  else main = <CodeView content={content} language={language} ariaLabel={sourceLabel(name)} />;
+  else main = <CodeView content={content} language={language} ariaLabel={sourceLabel(name)} focusLine={focusLine} />;
 
   // A failed read has no format, no size and nothing to find; an empty strip
   // above the error would be chrome for its own sake.

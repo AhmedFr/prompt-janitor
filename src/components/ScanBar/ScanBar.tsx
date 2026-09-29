@@ -9,7 +9,7 @@ import "./ScanBar.css";
  * long scan indistinguishable from a hang, and every screen drawing its own
  * bar would drift apart.
  *
- * Used by Setup's Rescan and a project page's Rescan. Onboarding and the
+ * Used by Setup's Scan and a project page's Scan. Onboarding and the
  * Settings harness tab still draw their own bars inline — they predate this
  * component and sit in different chrome (neither is inside a `Card`), so
  * folding them in is a separate change, not something this doc should claim

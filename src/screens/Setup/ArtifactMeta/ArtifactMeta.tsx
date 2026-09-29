@@ -15,10 +15,10 @@ import "./ArtifactMeta.css";
  * A bad error rate is a word, a colour *and* an icon — colour never stands
  * alone (see `.impeccable.md`).
  */
-export function ArtifactMeta({ artifact, scope, showDescription = true }: ArtifactMetaProps) {
+export function ArtifactMeta({ artifact, scope, showDescription = true, loadedIn }: ArtifactMetaProps) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
-  const segments = metaSegments(artifact, scope);
+  const segments = metaSegments(artifact, scope, loadedIn);
 
   return (
     <div className="am">

@@ -199,6 +199,20 @@ pub fn get_extra_scan_folders(db: tauri::State<'_, AppDb>) -> Result<Vec<String>
     Ok(query::extra_scan_folders(&conn))
 }
 
+/// The project ids that setting the extra scan folders to `folders` would
+/// delete right now — the same rule `set_extra_scan_folders` applies, without
+/// applying it. Lets Settings ask "how many projects?" before the owner
+/// confirms a removal.
+#[tauri::command]
+#[specta::specta]
+pub fn preview_folder_removal(
+    db: tauri::State<'_, AppDb>,
+    folders: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    crate::scan_folders::projects_dropped_by(&conn, &folders).map_err(|e| e.to_string())
+}
+
 /// Persist the scan schedule ("1h", "6h", "1d", "save", or "manual").
 #[tauri::command]
 #[specta::specta]
@@ -714,13 +728,8 @@ pub fn get_analytics(
     query::get_analytics(&conn, range_days).map_err(|e| e.to_string())
 }
 
-/// The weekly Scans digest.
-#[tauri::command]
-#[specta::specta]
-pub fn get_scans_digest(db: tauri::State<'_, AppDb>) -> Result<query::ScansDigest, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::get_scans_digest(&conn).map_err(|e| e.to_string())
-}
+// No `get_scans_digest` command: no screen shows the digest any more. The
+// weekly digest notification still calls `query::get_scans_digest` directly.
 
 /// Every starter template pack (#75): free to browse and preview — the
 /// one-click write is the paid action, gated in `apply_template`.
@@ -877,12 +886,35 @@ pub fn save_artifact_source(
     crate::artifact_source::write_source(&conn, artifact_id, &content, expected_modified.as_deref())
 }
 
+/// Reveals or opens `path`, the one place `open_artifact` and `open_file`
+/// hand a resolved, DB-checked path to LaunchServices.
+///
+/// Rust-side rather than the opener plugin's JS API: that one takes a path
+/// straight from its caller, so granting it would let the webview open
+/// anything on disk. Both commands instead resolve `path` from a row the scan
+/// wrote, then run it through `artifact_source::check_openable` here — the
+/// single security gate deciding what "Open" may hand to LaunchServices, so
+/// it exists in one place with one set of tests rather than one copy per
+/// command that could drift.
+fn open_or_reveal(
+    app: &tauri::AppHandle,
+    path: &str,
+    action: crate::artifact_source::OpenAction,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    crate::artifact_source::check_openable(path, action)?;
+    let opener = app.opener();
+    match action {
+        crate::artifact_source::OpenAction::Reveal => opener.reveal_item_in_dir(path),
+        crate::artifact_source::OpenAction::Open => opener.open_path(path, None::<&str>),
+    }
+    .map_err(|e| format!("Couldn't open {path}: {e}"))
+}
+
 /// Reveal an artifact's file in Finder, or open it in its default app.
 ///
-/// Rust-side rather than the opener plugin's JS API: that one takes a path, so
-/// granting it would let the webview open anything on disk. This takes an
-/// artifact id and opens only the file the scan found for it — see
-/// `artifact_source::file_to_open`.
+/// This takes an artifact id and opens only the file the scan found for it —
+/// see `artifact_source::file_to_open`.
 #[tauri::command]
 #[specta::specta]
 pub fn open_artifact(
@@ -891,25 +923,45 @@ pub fn open_artifact(
     artifact_id: i32,
     action: crate::artifact_source::OpenAction,
 ) -> Result<(), String> {
-    use tauri_plugin_opener::OpenerExt;
     let path = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         crate::artifact_source::file_to_open(&conn, artifact_id)?
     };
-    let opener = app.opener();
-    match action {
-        crate::artifact_source::OpenAction::Reveal => opener.reveal_item_in_dir(&path),
-        crate::artifact_source::OpenAction::Open => {
-            if !crate::artifact_source::opens_as_text(&path) {
-                return Err(
-                    "Only text files open from here — use Reveal to find this one in Finder."
-                        .to_string(),
-                );
-            }
-            opener.open_path(&path, None::<&str>)
-        }
-    }
-    .map_err(|e| format!("Couldn't open {path}: {e}"))
+    open_or_reveal(&app, &path, action)
+}
+
+/// Reveal or open a graded file that has no inventory row.
+#[tauri::command]
+#[specta::specta]
+pub fn open_file(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    file_id: String,
+    action: crate::artifact_source::OpenAction,
+) -> Result<(), String> {
+    let path = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::file_open::graded_file_path(&conn, &file_id)?
+    };
+    open_or_reveal(&app, &path, action)
+}
+
+/// Select a scanned project's folder in Finder.
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_project(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, AppDb>,
+    project_path: String,
+) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        crate::file_open::project_folder(&conn, &project_path)?
+    };
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| format!("Couldn't reveal {path}: {e}"))
 }
 
 /// The rule files `harness` loads inside `project_path`, in load order.
@@ -951,6 +1003,20 @@ pub fn get_project_usage(
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
     let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
     crate::harness_query::project_usage(&conn, &harness, &project_path, now, window_days)
+        .map_err(|e| e.to_string())
+}
+
+/// One item's usage over `window_days`, for the viewer's Usage tab.
+#[tauri::command]
+#[specta::specta]
+pub fn get_artifact_usage(
+    db: tauri::State<'_, AppDb>,
+    artifact_id: i32,
+    window_days: u32,
+) -> Result<crate::item_usage::ArtifactUsage, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let now = crate::scan::now_epoch().parse::<i64>().unwrap_or(0);
+    crate::item_usage::artifact_usage(&conn, artifact_id, now, window_days)
         .map_err(|e| e.to_string())
 }
 

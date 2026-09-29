@@ -20,7 +20,7 @@ export interface PanelProps {
 export interface PanelState {
   data: PanelSnapshot | null;
   loading: boolean;
-  /** True between "Scan now" and the `scan-done` event. */
+  /** True between "Scan" and the `scan-done` event. */
   scanning: boolean;
   /** The running scan's phase and counter, for the bar under the button. */
   scan: ScanProgressState;

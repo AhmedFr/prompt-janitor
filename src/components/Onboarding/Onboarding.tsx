@@ -1,25 +1,23 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import { ScoreRing } from "@/components/ScoreRing";
-import { useVerdictHero, verdictSentence } from "@/components/VerdictHero";
-import type { ScanSummary } from "@/lib/ipc";
 import { detectedSummary } from "./onboarding.util";
 import { scanPercent } from "@/lib/useScanProgress";
 import { useOnboarding } from "./useOnboarding";
 import type { OnboardingProps } from "./Onboarding.types";
+import { LABEL } from "@/lib/vocabulary";
 import "./Onboarding.css";
 
-const STEPS = ["Detect", "Scan", "Verdict"] as const;
+const STEPS = ["Detect", "Scan", "Setup"] as const;
 
 /**
  * First-run flow, tuned for time-to-verdict: show what is installed, scan it,
- * and land on the grade. All the detection and scan plumbing lives in
+ * and open the setup. All the detection and scan plumbing lives in
  * {@link useOnboarding}; this is the layout.
  */
 export function Onboarding({ onDone, state }: OnboardingProps) {
   const live = useOnboarding();
-  const { detected, step, status, progress, summary, failed, start, addFolder } = state ?? live;
+  const { detected, step, status, progress, setupLine, failed, start, addFolder } = state ?? live;
 
   useEffect(() => {
     if (failed) onDone();
@@ -70,8 +68,8 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
     );
   }
 
-  if (step === "reveal" && summary) {
-    return <Reveal summary={summary} onDone={onDone} />;
+  if (step === "reveal" && setupLine) {
+    return <Reveal line={setupLine} onDone={onDone} />;
   }
 
   const found = detected.length > 0;
@@ -94,13 +92,13 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
         </p>
         {found && (
           <p className="faint ob-note">
-            Prompt Janitor grades the rules, skills and agents your coding agent already loads. Add
-            a folder only if you keep prompts somewhere it never opens.
+            Prompt Janitor grades the instructions, skills and agents your coding agent already
+            loads. Point it at another folder only if you keep prompts somewhere it never opens.
           </p>
         )}
         {found && (
           <Button onClick={() => void addFolder()}>
-            <Icon name="folder" /> Add a folder…
+            <Icon name="folder" /> {LABEL.addFolder}
           </Button>
         )}
       </div>
@@ -111,11 +109,11 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
         </Button>
         {found ? (
           <Button variant="primary" size="sm" onClick={() => void start()}>
-            <Icon name="sparkles" /> Scan everything
+            <Icon name="sparkles" /> {LABEL.scan}
           </Button>
         ) : (
           <Button variant="primary" size="sm" onClick={() => void addFolder()}>
-            <Icon name="folder" /> Add a folder
+            <Icon name="folder" /> {LABEL.addFolder}
           </Button>
         )}
       </div>
@@ -180,30 +178,22 @@ function Shell({
   );
 }
 
-/** The reveal: the just-computed grade, its verdict sentence, and one way forward. */
-function Reveal({ summary, onDone }: { summary: ScanSummary; onDone: () => void }) {
-  // The hero hook supplies the computed "n fixes from an A" for the B verdict.
-  const { verdict } = useVerdictHero();
-  const grade = summary.overall_grade;
-  const sentence =
-    grade === "B" && verdict.loading ? null : verdictSentence(grade, verdict.fixesToA);
-
+/** The reveal: a one-line summary of the setup just scanned, and the way into it. */
+function Reveal({ line, onDone }: { line: string; onDone: () => void }) {
   return (
     <Shell step={2} stepKey="reveal" labelledBy="ob-verdict">
       <div className="ob-body ob-reveal">
-        <ScoreRing score={summary.overall_score} grade={grade} size={132} />
         <h2 className="ob-verdict" id="ob-verdict">
-          {sentence ?? `Grade ${grade}`}
+          Your setup
         </h2>
         <div className="muted" style={{ fontSize: 13 }}>
-          {summary.files_scanned} prompt file{summary.files_scanned === 1 ? "" : "s"} graded across{" "}
-          {summary.projects} project{summary.projects === 1 ? "" : "s"}.
+          {line}
         </div>
       </div>
 
       <div className="ob-footer" style={{ justifyContent: "flex-end" }}>
         <Button variant="primary" size="sm" onClick={onDone}>
-          See what to fix →
+          Open my setup
         </Button>
       </div>
     </Shell>

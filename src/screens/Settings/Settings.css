@@ -88,6 +88,23 @@
   background: var(--blue);
 }
 
+/* The removal confirmation, shown inline under the folder row it guards. */
+.set-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--red-tint, rgba(255, 59, 48, 0.08));
+  border-bottom: 0.5px solid var(--sep);
+}
+
+.set-confirm p {
+  margin: 0;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 /* The same bar Setup draws for a scan, for the same events. */
 .set-scan {
   display: flex;

@@ -1,74 +1,55 @@
 import { useEffect, useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { Icon, type IconName } from "@/components/Icon";
+import { Icon } from "@/components/Icon";
 import { isTauri } from "@/lib/ipc";
 import type { Navigate } from "@/App/App.types";
+import type { RuleTabId } from "./ChecksTab/ChecksLibrary/ChecksLibrary.types";
 import { useSettings } from "./useSettings";
-import { HarnessTab } from "./HarnessTab";
+import { FoldersTab } from "./FoldersTab";
+import { ScanningTab } from "./ScanningTab";
+import { NotificationsTab } from "./NotificationsTab";
+import { ChecksTab } from "./ChecksTab";
 import { AiTab } from "./AiTab";
-import { AppTab } from "./AppTab";
-import { LicenseTab } from "./LicenseTab";
+import { AboutTab } from "./AboutTab";
+import { SETTINGS_TABS, type SettingsTabId } from "./Settings.constants";
+import { resolveSettingsTab } from "./settingsTab.util";
 import "./Settings.css";
-
-type Tab = "harnesses" | "schedule" | "alerts" | "rules" | "ai" | "license" | "general" | "app";
-
-const TABS: [Tab, string, IconName][] = [
-  ["harnesses", "Harnesses", "layers"],
-  ["schedule", "Schedule", "clock"],
-  ["alerts", "Alerts", "bell"],
-  ["rules", "Rules", "rules"],
-  ["ai", "AI", "sparkles"],
-  ["license", "License", "check"],
-  ["general", "General", "settings"],
-  // Last: version, updates and the destructive actions are the things a user
-  // reaches for least often, and the ones that should not sit next to a
-  // toggle they click every week.
-  ["app", "App", "refresh"],
-];
-
-const FREQS: [string, string, string][] = [
-  ["1h", "Hourly", "Most up-to-date · uses more CPU"],
-  ["6h", "Every 6 hours", "Recommended balance"],
-  ["1d", "Once a day", "Light touch"],
-  ["save", "On file save", "Watch mode · instant"],
-  ["manual", "Manual only", "Scan when you click"],
-];
 
 export interface SettingsProps {
   navigate: Navigate;
-  /** Tab to open on (e.g. "ai" from the Overview coverage line). */
+  /** Tab to open on (e.g. "ai" from the Overview coverage line, or a legacy id). */
   initialTab?: string;
+  /** The rule table Settings → Checks opens on (from an old `rules` deep link). */
+  checksTab?: RuleTabId;
 }
 
-const isTab = (value: string | undefined): value is Tab =>
-  TABS.some(([key]) => key === value);
-
-export function Settings({ navigate, initialTab }: SettingsProps) {
+export function Settings({ navigate: _navigate, initialTab, checksTab }: SettingsProps) {
   const s = useSettings();
   // Default to the first tab in the strip: a screen that opens on its second
   // tab reads as a lost selection rather than a starting point.
-  const [tab, setTab] = useState<Tab>(isTab(initialTab) ? initialTab : "harnesses");
+  const [tab, setTab] = useState<SettingsTabId>(() => resolveSettingsTab(initialTab));
 
   // Follow later in-app deep links (e.g. Overview → Settings → AI) even if
   // the screen happens to stay mounted.
   useEffect(() => {
-    if (isTab(initialTab)) setTab(initialTab);
+    if (initialTab) setTab(resolveSettingsTab(initialTab));
   }, [initialTab]);
 
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Settings</h1>
       </header>
       <div className="scroll-area">
         <div className="page" style={{ maxWidth: 720 }}>
           <div className="set-tabs">
-            {TABS.map(([key, label, icon]) => (
+            {SETTINGS_TABS.map(({ id, label, icon }) => (
               <button
-                key={key}
-                className={"set-tab" + (tab === key ? " set-tab--on" : "")}
-                onClick={() => setTab(key)}
+                key={id}
+                className={"set-tab" + (tab === id ? " set-tab--on" : "")}
+                onClick={() => setTab(id)}
               >
                 <span className="set-tab-ico">
                   <Icon name={icon} size={18} />
@@ -88,141 +69,30 @@ export function Settings({ navigate, initialTab }: SettingsProps) {
             </Card>
           ) : (
             <>
-              {tab === "harnesses" && <HarnessTab />}
+              {tab === "folders" && <FoldersTab />}
 
-              {tab === "schedule" && (
-                <>
-                  <h2 className="set-sec">Scan frequency</h2>
-                  <Card>
-                    {FREQS.map(([key, label, desc]) => (
-                      <button
-                        key={key}
-                        className="set-row set-row--btn"
-                        onClick={() => void s.setSchedule(key)}
-                      >
-                        <span className={"set-radio" + (s.schedule === key ? " set-radio--on" : "")}>
-                          {s.schedule === key && <span className="set-radio-dot" />}
-                        </span>
-                        <div className="grow">
-                          <div style={{ fontWeight: 500 }}>{label}</div>
-                          <div className="faint" style={{ fontSize: 12 }}>
-                            {desc}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </Card>
-                </>
+              {tab === "scanning" && (
+                <ScanningTab schedule={s.schedule} onChange={(k) => void s.setSchedule(k)} />
               )}
 
-              {tab === "alerts" && (
-                <>
-                  <h2 className="set-sec">Notifications</h2>
-                  <Card>
-                    <AlertRow
-                      label="Weekly digest"
-                      detail="A summary of the week's changes"
-                      on={s.digest}
-                      onToggle={() => void s.setDigest(!s.digest)}
-                    />
-                    <AlertRow
-                      label="Alert when a file regresses a grade"
-                      detail="Notify when a grade drops"
-                      on={s.regressions}
-                      onToggle={() => void s.setRegressions(!s.regressions)}
-                    />
-                  </Card>
-                  <p className="faint" style={{ fontSize: 12, marginTop: 12, maxWidth: 560 }}>
-                    A calm cadence — periodic summaries with regression alerts, no constant pinging.
-                  </p>
-                </>
-              )}
-
-              {tab === "rules" && (
-                <Card padded>
-                  <div className="muted" style={{ marginBottom: 12 }}>
-                    Manage the rule library — built-in packs and your custom rules — on the Rules tab.
-                  </div>
-                  <Button size="sm" onClick={() => navigate("rules")}>
-                    <Icon name="rules" /> Open Rules →
-                  </Button>
-                </Card>
-              )}
-
-              {tab === "ai" && <AiTab ai={s.ai} onSave={s.saveAi} onTest={s.testAi} />}
-
-              {tab === "license" && (
-                <LicenseTab
-                  entitlement={s.entitlement}
-                  onActivate={s.activateLicense}
-                  onRemove={s.removeLicense}
+              {tab === "notifications" && (
+                <NotificationsTab
+                  digest={s.digest}
+                  regressions={s.regressions}
+                  onDigest={(on) => void s.setDigest(on)}
+                  onRegressions={(on) => void s.setRegressions(on)}
                 />
               )}
 
-              {tab === "app" && <AppTab />}
+              {tab === "checks" && <ChecksTab initialTab={checksTab} />}
 
-              {tab === "general" && (
-                <>
-                  {/* The version moved to the App tab, where it sits next to
-                      the button that changes it — and where it is read from
-                      the running bundle instead of being retyped by hand. */}
-                  <h2 className="set-sec">About</h2>
-                  <Card>
-                    <div className="set-row">
-                      <span className="grow">Files tracked</span>
-                      <span className="faint tnum">{s.status?.file_count ?? "—"}</span>
-                    </div>
-                    <div className="set-row">
-                      <span className="grow">Storage</span>
-                      <span
-                        className="path faint"
-                        style={{
-                          maxWidth: 320,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {s.status?.db_path ?? "—"}
-                      </span>
-                    </div>
-                  </Card>
-                </>
-              )}
+              {tab === "ai" && <AiTab ai={s.ai} onSave={s.saveAi} onTest={s.testAi} />}
+
+              {tab === "about" && <AboutTab status={s.status} />}
             </>
           )}
         </div>
       </div>
     </section>
-  );
-}
-
-function AlertRow({
-  label,
-  detail,
-  on,
-  onToggle,
-}: {
-  label: string;
-  detail: string;
-  on: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="set-row">
-      <div className="grow">
-        <div style={{ fontWeight: 500 }}>{label}</div>
-        <div className="faint" style={{ fontSize: 12 }}>
-          {detail}
-        </div>
-      </div>
-      <button
-        className={"switch" + (on ? " on" : "")}
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        onClick={onToggle}
-      />
-    </div>
   );
 }

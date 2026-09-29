@@ -11,6 +11,19 @@ export function TrendTooltip({ active, payload, xKey, dataKey, valueDetail }: Tr
   const row = payload?.[0]?.payload as Record<string, unknown> | undefined;
   if (!active || !row) return null;
 
+  // A null value is a day with nothing to measure (no uses, so no error rate): a dash, never a false 0.
+  if (row[dataKey] === null) {
+    const nx = row[xKey];
+    return (
+      <div className="trend-tip">
+        <div className="trend-tip__value">—</div>
+        {nx !== undefined && (
+          <div className="trend-tip__label">{formatTrendX(nx as string | number, "tooltip")}</div>
+        )}
+      </div>
+    );
+  }
+
   const value = Number(row[dataKey]);
   if (!Number.isFinite(value)) return null;
   const x = row[xKey];

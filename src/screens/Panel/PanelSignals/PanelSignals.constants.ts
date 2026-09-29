@@ -1,3 +1,4 @@
+import { formatSetupTarget } from "@/App/setupTarget";
 import { plural } from "@/screens/Setup/setup.util";
 import type { SignalSpec } from "./PanelSignals.types";
 
@@ -12,7 +13,7 @@ export const SIGNALS: SignalSpec[] = [
     count: (counts) => counts.neverUsedSkills,
     text: (count) => plural(count, "never-used skill"),
     route: "setup",
-    target: "skill",
+    target: formatSetupTarget({ kind: "skill", filter: "never" }) ?? null,
     destination: "Setup",
     toned: true,
   },
@@ -21,7 +22,7 @@ export const SIGNALS: SignalSpec[] = [
     count: (counts) => counts.mcpErroring,
     text: (count) => `${plural(count, "MCP server")} erroring`,
     route: "setup",
-    target: "mcp_server",
+    target: formatSetupTarget({ kind: "mcp_server", filter: "errors" }) ?? null,
     destination: "Setup",
     toned: true,
   },
@@ -29,9 +30,9 @@ export const SIGNALS: SignalSpec[] = [
     id: "sessions-today",
     count: (counts) => counts.sessionsToday,
     text: (count) => `${plural(count, "session")} today`,
-    route: "analytics",
+    route: "projects",
     target: null,
-    destination: "Analytics",
+    destination: "Projects",
     toned: false,
   },
 ];

@@ -1,0 +1,53 @@
+/* Nine chips need ~850px; below that they wrap rather than scroll sideways
+   (the Setup content area is ~750px in a 1024px window). */
+.kind-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--sep-strong);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.kind-chip:hover:not(:disabled) {
+  border-color: var(--sep);
+}
+
+.kind-chip:active:not(:disabled) {
+  background: var(--group);
+}
+
+.kind-chip--on {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+  color: var(--blue-press);
+}
+
+.kind-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kind-chip__count {
+  font-family: var(--mono);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.kind-chip--on .kind-chip__count {
+  color: var(--blue-press);
+}

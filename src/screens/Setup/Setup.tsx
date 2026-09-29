@@ -1,42 +1,83 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { GradePopover } from "@/components/GradePopover";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
+import { KindChips } from "@/components/KindChips";
 import { ScanBar } from "@/components/ScanBar";
-import { Tabs, useTabState, type TabItem } from "@/components/Tabs";
-import { isTauri, type ArtifactKind, type ArtifactView, type HarnessInfo, type SetupView } from "@/lib/ipc";
+import { SummaryLine } from "@/components/SummaryLine";
+import { TemplatePicker, useTemplatePicker } from "@/components/TemplatePicker";
+import { ViewingSwitcher } from "@/components/ViewingSwitcher";
+import { isTauri, type HarnessInfo } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
-import type { Navigate } from "@/App/App.types";
-import { columnsFor, defaultSortFor, KIND_TABS, scopeLabel } from "./setup.columns";
-import { ArtifactPanel } from "./ArtifactPanel";
-import { SkillPanel } from "./SkillPanel";
-import { pillsFor } from "./setup.pills";
+import { LABEL } from "@/lib/vocabulary";
+import { ItemViewer } from "./ItemViewer";
+import { lensRows, lensTarget, lensUsageState } from "./lens.util";
+import { ProjectStrip } from "./ProjectStrip";
+import { scopeLabel, type ColumnsCtx } from "./setup.columns";
+import { scopePillsFor } from "./setup.pills";
+import { unifiedColumns, visibleColumnIds } from "./setup.unified";
+import { harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
+import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "@/lib/setupRows";
 import {
+  EMPTY_FILTERED,
   EMPTY_HINT,
-  EMPTY_TITLE,
+  LENS_TABLE_STATE_KEY,
+  LENS_USAGE_FAILED,
+  LENS_USAGE_LOADING,
+  MISSING_FOLDER_EMPTY,
+  NEW_FROM_TEMPLATE,
+  NO_HARNESS_TITLE,
+  NO_ITEMS_TITLE,
+  REVEAL_FAILED,
   SEARCH_PLACEHOLDER,
-  TAB_STATE_KEY,
-  TABLE_STATE_PREFIX,
+  TABLE_STATE_KEY,
 } from "./Setup.constants";
-import type { SetupProps } from "./Setup.types";
-import { harnessSummary, lastScanAt, relativeSession } from "./setup.util";
+import type { InventoryProps, SetupProps } from "./Setup.types";
+import { useLens } from "./useLens";
+import { rowId, useOpenItem } from "./useOpenItem";
+import { useOverallGrade } from "./useOverallGrade";
+import { useRevealProject } from "./useRevealProject";
 import { useSetup } from "./useSetup";
-import { useSetupTables, type SetupTables } from "./useSetupTables";
+import { useSetupLens } from "./useSetupLens";
+import { useSetupSlice } from "./useSetupSlice";
+import { useSetupTarget } from "./useSetupTarget";
 import "./Setup.css";
 
 /**
- * The whole Claude Code setup in one place: one table per artifact kind,
- * sortable and searchable, annotated with whether anything ever actually used
- * what is installed.
+ * The whole Claude Code setup in one place: one table over every kind,
+ * narrowed by kind chips and the summary line's filters, annotated with
+ * whether anything ever actually used what is installed.
  */
-export function Setup({ navigate, data: override, initialTab }: SetupProps) {
+export function Setup({
+  navigate,
+  data: override,
+  files: filesOverride,
+  target,
+  onTargetChange,
+  onCloseItem,
+  loading: loadingOverride,
+  lensData: lensOverride,
+}: SetupProps) {
   const state = useSetup();
   const data = override ?? state.data;
-  const loading = state.loading && !override;
+  const files = filesOverride ?? (override ? [] : state.files);
+  const refreshing = loadingOverride ?? (state.loading && !override);
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
+  // Setup's whole place — kind, filter, lens, open item, tab — held by the
+  // shell's navigation when it is controlled, else here (stories, tests).
+  const control = useSetupTarget(target, onTargetChange);
+  // The lens has one owner: this screen renders the Viewing control, so the table only reads it.
+  const { lens, lensProject, choices, onLens } = useSetupLens(control, data, files);
+  const detected = data?.harnesses.filter((h) => h.detected) ?? [];
+  // A graded-only lens reads as the harness the scan found, the same one its rows are decided with.
+  const liveLens = useLens(lensTarget(lens, lensProject, detected[0]?.id ?? null));
+  const lensData = lensOverride ?? liveLens;
+  const reveal = useRevealProject(lensProject?.path ?? null);
 
   // A scan refreshes the inventory through the `scan-done` listener in
   // `useSetup`, so nothing here needs to refetch on its own.
@@ -49,13 +90,17 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
     }
   };
 
-  const detected = data?.harnesses.filter((h) => h.detected) ?? [];
-
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Setup</h1>
+        {data && <ViewingSwitcher projects={choices} lens={lens} onChange={onLens} />}
         <span className="toolbar-spacer" />
+        {/* The one place the main window says when the last scan ran (spec §4.1). */}
+        {detected.length > 0 && (
+          <span className="muted setup-scanned">scanned {relativeSession(lastScanAt(detected))}</span>
+        )}
         {detected.length > 0 && (
           <Button
             size="sm"
@@ -65,7 +110,7 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
               void run(rescan);
             }}
           >
-            <Icon name="refresh" /> {busy ? "Scanning…" : "Rescan"}
+            <Icon name="refresh" /> {busy ? LABEL.scanning : LABEL.scan}
           </Button>
         )}
       </header>
@@ -78,7 +123,8 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
               status={scanStatusLine(scan.phase, scan.progress, harnessName(detected))}
             />
           )}
-          {loading ? (
+          {/* Loading only while there is nothing to show: a refresh renders over the data it replaces. */}
+          {refreshing && !data ? (
             <Card padded>
               <div className="muted">
                 {isTauri ? "Loading…" : "Open the Prompt Janitor desktop app to see your setup."}
@@ -89,13 +135,34 @@ export function Setup({ navigate, data: override, initialTab }: SetupProps) {
           ) : detected.length === 0 ? (
             <NoHarness busy={busy} onAddFolder={() => void run(addFolderAndScan)} />
           ) : (
-            <Inventory
-              data={data}
-              detected={detected}
-              navigate={navigate}
-              initialTab={initialTab}
-              onRefetch={state.refetch}
-            />
+            <>
+              {lensProject && (
+                <ProjectStrip
+                  project={lensProject}
+                  sessionsPerDay={lensData.usage?.sessions_per_day ?? null}
+                  onReveal={() => void reveal.reveal()}
+                />
+              )}
+              {lensProject && reveal.error && (
+                <p className="setup-reveal-error" role="alert">
+                  {REVEAL_FAILED}: {reveal.error}
+                </p>
+              )}
+              <Inventory
+                data={data}
+                files={files}
+                detected={detected}
+                navigate={navigate}
+                control={control}
+                onCloseItem={onCloseItem}
+                loading={refreshing}
+                onRefetch={state.refetch}
+                lens={lens}
+                lensProject={lensProject}
+                lensData={lensData}
+                onLens={onLens}
+              />
+            </>
           )}
         </div>
       </div>
@@ -131,85 +198,95 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
   return (
     <Card padded>
       <div className="setup-empty">
-        <h2 className="setup-empty__title">No supported agent harness found</h2>
+        <h2 className="setup-empty__title">{NO_HARNESS_TITLE}</h2>
         <p className="muted setup-empty__body">
           Prompt Janitor reads the setup Claude Code already keeps on disk. Nothing was detected
           here, so point it at a folder and it will grade the prompt files inside.
         </p>
         <Button variant="primary" disabled={busy} onClick={onAddFolder}>
-          <Icon name="folder" /> Add a folder
+          <Icon name="folder" /> {LABEL.addFolder}
         </Button>
       </div>
     </Card>
   );
 }
 
-/** Every tab id, for `useTabState` to resolve a remembered (or passed-in) one against. */
-const TAB_IDS = KIND_TABS.map((tab) => tab.id);
-
-/** A row is its artifact: one database id, unique across the whole inventory. */
-const rowId = (row: ArtifactView) => String(row.id);
-
-/** The row with this artifact id on whichever kind's tab holds it. */
-function findRow(tables: SetupTables, id: number): ArtifactView | null {
-  for (const { id: kind } of KIND_TABS) {
-    const row = tables.rowsFor(kind).find((r) => r.id === id);
-    if (row) return row;
-  }
-  return null;
-}
-
+/**
+ * The one table over every kind (spec §4). The chips pick a kind, the summary
+ * line a status filter, a row opens the viewer — all read from `control` and
+ * reported through it; Inventory holds none of it. Rows arrive Kind
+ * then Name, so every slice starts in that order.
+ */
 function Inventory({
   data,
+  files,
   detected,
   navigate,
-  initialTab,
+  control,
+  onCloseItem,
+  loading,
   onRefetch,
-}: {
-  data: SetupView;
-  detected: HarnessInfo[];
-  navigate: Navigate;
-  initialTab?: ArtifactKind;
-  /** Reloads the inventory — how a saved skill's new size reaches the table. */
-  onRefetch: () => Promise<void>;
-}) {
-  // Stable so `columnsFor`'s per-`ctx` cache can hit; see `useSetupTables`.
-  const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
-  const tables = useSetupTables(data, openDetail);
-  const [active, setActive] = useTabState(TAB_STATE_KEY, initialTab ?? TAB_IDS[0], TAB_IDS);
-  // The *id* of the artifact whose sheet is open, not the row itself. Held
-  // here rather than in `KindTable` so it survives that component's prop
-  // changes, and so the drawer renders over the whole inventory rather than
-  // inside a tab panel.
-  //
-  // An id rather than a snapshot because the row is re-derived below: saving
-  // an edited `name:` changes what a skill is called, and a header pinned to
-  // the row as it was at click time would keep announcing the old name until
-  // the sheet was closed and reopened.
-  const [openId, setOpenId] = useState<number | null>(null);
-  const openArtifact = useMemo(
-    () => (openId === null ? null : findRow(tables, openId)),
-    [openId, tables],
-  );
-
-  // A deep link names the tab it means; the remembered one only decides where
-  // an unqualified visit lands. `useTabState` reads storage first, so without
-  // this the link would lose to wherever the user last was.
-  useEffect(() => {
-    if (initialTab) setActive(initialTab);
-  }, [initialTab, setActive]);
-
-  // Identity-stable per project set, which is all `DataTable`'s memoised
-  // filtering asks of it. `scopeLabel` is the column's own label rule, so
-  // searching "posthog" or a project name finds exactly the rows whose Scope
-  // cell reads that way; `plugin_name` is searched directly as well, for a
-  // row that names a plugin without being scanned out of one.
-  const search = useMemo<DataTableSearch<ArtifactView>>(
+  lens,
+  lensProject,
+  lensData,
+  onLens,
+}: InventoryProps) {
+  const projectNames = useMemo(() => projectNameMap(data.projects), [data]);
+  const base = useMemo(() => setupRows(data, files), [data, files]);
+  // A graded-only lens has no project to name a harness: it reads as the harness the scan found.
+  const lensHarness = lensProject?.harness ?? detected[0]?.id ?? "";
+  const rows = useMemo(() => {
+    if (lens === null) return byKindThenName(base);
+    // A lensed project that is gone from disk shows an empty table under the missing-folder banner.
+    if (lensProject !== null && !lensProject.exists) return [];
+    return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
+  }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
+  // Until the lens has read the project's usage, every usage row is null — which is unknown, not unused.
+  const usageState = lensUsageState(lens !== null, lensData);
+  const usageKnown = usageState === "known";
+  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, control, usageKnown);
+  // No Scope under the lens (spec §5): every row already applies to the one project.
+  const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
+  // `scopeLabel` is the Scope column's own label rule (a graded-only row's
+  // project label included), so searching a project or plugin name finds
+  // exactly the rows whose Scope cell reads that way.
+  const search = useMemo<DataTableSearch<SetupRow>>(
     () => ({
       placeholder: SEARCH_PLACEHOLDER,
-      keys: ["name", "description", "plugin_name", (row) => scopeLabel(row, tables.projectNames)],
+      keys: ["name", "description", "path", "plugin_name", (row) => scopeLabel(row, projectNames)],
     }),
-    [tables.projectNames],
+    [projectNames],
+  );
+  const { grade } = useOverallGrade();
+  const templates = useTemplatePicker();
+  const [picking, setPicking] = useState(false);
+  const { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close } = useOpenItem(rows, control, loading, onCloseItem);
+  const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
+  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null, usageKnown), ctx);
+  const usageNote =
+    usageState === "loading" ? (
+      <span className="muted">{LENS_USAGE_LOADING}</span>
+    ) : usageState === "failed" ? (
+      <span className="setup-usage-error" role="alert">
+        {LENS_USAGE_FAILED}
+        <Button size="sm" onClick={() => lensData.retry?.()}>
+          Retry
+        </Button>
+      </span>
+    ) : undefined;
+
+  // An empty table is a gone folder, a setup with nothing in it, or a slice the
+  // filters emptied — then one Clear filters resets the chip and the summary
+  // filter, and the table's own search and Scope with them (spec §4.5).
+  const missingFolder = lensProject !== null && !lensProject.exists;
+  const empty = useMemo(
+    () =>
+      missingFolder
+        ? { title: MISSING_FOLDER_EMPTY }
+        : rows.length === 0
+          ? { title: NO_ITEMS_TITLE, hint: EMPTY_HINT }
+          : { title: EMPTY_FILTERED, clear: { title: EMPTY_FILTERED, onClear: clearSlice } },
+    [missingFolder, rows.length, clearSlice],
   );
 
   return (
@@ -220,95 +297,65 @@ function Inventory({
             {harnessSummary(h)}
           </span>
         ))}
-        <span className="setup-harness setup-harness--scan">
-          Last scan {relativeSession(lastScanAt(detected))}
-        </span>
       </p>
-
-      <Tabs items={tables.tabs} active={active} onChange={setActive} ariaLabel="Setup kinds">
-        {(id) => {
-          // `Tabs` only ever calls back with an id from `items`, but resolving
-          // it against `KIND_TABS` keeps the kind typed without a cast.
-          const tab = KIND_TABS.find((candidate) => candidate.id === id) ?? KIND_TABS[0];
-          return (
-            <KindTable
-              tab={tab}
-              tables={tables}
-              search={search}
-              onOpenArtifact={(row) => setOpenId(row.id)}
-            />
-          );
-        }}
-      </Tabs>
-
-      {/* A rescan can remove the artifact outright, in which case
-          `openArtifact` resolves to nothing and the sheet goes with it —
-          better than a drawer describing a file that is no longer there.
-          Both sheets are keyed on the artifact so switching rows remounts
-          them rather than leaving the previous row's draft or read behind. */}
-      {openArtifact?.kind === "skill" ? (
-        <SkillPanel
-          key={openArtifact.id}
-          skill={openArtifact}
-          scope={scopeLabel(openArtifact, tables.projectNames)}
-          onClose={() => setOpenId(null)}
-          // The save already updated `artifacts.bytes`; refetching is what
-          // carries that into the Size column without waiting for a rescan.
+      <SummaryLine badge={<GradePopover grade={grade} />} grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} usageNote={usageNote} />
+      <DataTable
+        ariaLabel="Setup"
+        // Its own key under the lens: the rows arrive in load order, with no Scope to remember.
+        stateKey={lens === null ? TABLE_STATE_KEY : LENS_TABLE_STATE_KEY}
+        columns={columns}
+        rows={visible}
+        rowId={rowId}
+        search={search}
+        pills={pills}
+        // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), or in load order under the lens.
+        onRowClick={openRow}
+        // A state setter: identity-stable, as the table's ids-keyed effect expects.
+        onVisibleRowsChange={setVisibleIds}
+        density="compact"
+        virtualize
+        empty={empty}
+        // Next to the search and Scope (spec §4.3); the toolbar wraps, so the
+        // chips drop to their own line in a narrow window.
+        toolbarRight={
+          <>
+            <KindChips counts={kindCounts} active={kind} onChange={setKind} />
+            {kind === "rule" && (
+              <Button size="sm" onClick={() => setPicking(true)}>
+                <Icon name="plus" /> {NEW_FROM_TEMPLATE}
+              </Button>
+            )}
+          </>
+        }
+      />
+      {picking && (
+        <TemplatePicker
+          templates={templates.templates}
+          entitled={templates.entitled}
+          loading={templates.loading}
+          onApply={templates.applyTemplate}
+          onClose={() => setPicking(false)}
+          navigate={navigate}
+        />
+      )}
+      {/* Keyed on the row, so stepping or a new link remounts the viewer
+          rather than leaving the previous row's mode, draft or read behind. */}
+      {open && (
+        <ItemViewer
+          key={open.id}
+          item={open}
+          scope={scopeLabel(open, projectNames)}
+          tab={tab}
+          onTab={setTab}
+          onClose={close}
+          onStep={step}
+          // A save or fix already updated the index; refetching carries that
+          // into the table without waiting for a rescan.
           onSaved={() => void onRefetch()}
+          loadedIn={loadedInFor(open, data.projects)}
+          onSelectProject={onLens}
         />
-      ) : openArtifact ? (
-        <ArtifactPanel
-          key={openArtifact.id}
-          artifact={openArtifact}
-          scope={scopeLabel(openArtifact, tables.projectNames)}
-          onClose={() => setOpenId(null)}
-        />
-      ) : null}
+      )}
     </>
-  );
-}
-
-/**
- * One kind's table. Rendered by the tab panel, so a tab switch changes this
- * component's props rather than remounting it — which is exactly what
- * `DataTable`'s `stateKey` handling expects: each kind keeps its own search,
- * pills and sort under `pj.table.setup.<kind>`.
- */
-function KindTable({
-  tab,
-  tables,
-  search,
-  onOpenArtifact,
-}: {
-  tab: TabItem & { id: ArtifactKind };
-  tables: SetupTables;
-  search: DataTableSearch<ArtifactView>;
-  /** Opens a row's detail sheet. */
-  onOpenArtifact: (artifact: ArtifactView) => void;
-}) {
-  const { rowsFor, ctx, projectNames, costBar } = tables;
-  const rows = rowsFor(tab.id);
-  // A graded rule opens its Detail screen, which says far more than a sheet
-  // could; every other row — an ungraded rule included — opens its sheet.
-  const onRowClick = (row: ArtifactView) => {
-    if (row.kind === "rule" && row.file_id) ctx.onOpen(row.file_id);
-    else onOpenArtifact(row);
-  };
-
-  return (
-    <DataTable
-      ariaLabel={tab.label}
-      stateKey={TABLE_STATE_PREFIX + tab.id}
-      columns={columnsFor(tab.id, ctx)}
-      rows={rows}
-      rowId={rowId}
-      search={search}
-      pills={pillsFor(tab.id, rows, costBar, projectNames)}
-      defaultSort={defaultSortFor(tab.id)}
-      onRowClick={onRowClick}
-      density="compact"
-      virtualize
-      empty={{ title: EMPTY_TITLE[tab.id], hint: EMPTY_HINT }}
-    />
   );
 }

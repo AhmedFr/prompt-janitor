@@ -436,4 +436,18 @@ describe("FilterSelect: accessibility", () => {
     expect(box).toHaveAttribute("aria-activedescendant");
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it("hides counts when showCounts is false", () => {
+    setup({ showCounts: false });
+    open();
+    expect(screen.getByRole("option", { name: "orca" })).toBeInTheDocument();
+    expect(screen.queryByText("41")).not.toBeInTheDocument();
+  });
+
+  it("keeps the trigger and Clear quiet about the selection when showValue is false", () => {
+    setup({ selected: ["orca"], showValue: false });
+    expect(trigger()).toHaveAccessibleName("Scope");
+    open();
+    expect(screen.queryByText(CLEAR_LABEL)).not.toBeInTheDocument();
+  });
 });

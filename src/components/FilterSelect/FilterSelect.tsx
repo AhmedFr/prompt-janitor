@@ -33,7 +33,7 @@ import "./FilterSelect.css";
  * into the filter box, which becomes the combobox owning the list, and the
  * trigger drops back to a disclosure button.
  */
-export function FilterSelect({ label, options, selected, multi, onToggle, onClear }: FilterSelectProps) {
+export function FilterSelect({ label, options, selected, multi, onToggle, onClear, showCounts = true, showValue = true }: FilterSelectProps) {
   const uid = useId();
   const [query, setQuery] = useState("");
   const [alignRight, setAlignRight] = useState(false);
@@ -142,11 +142,11 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-activedescendant={searchable ? undefined : activeId}
-        aria-label={spokenValue ? `${label}, ${spokenValue}` : label}
+        aria-label={showValue && spokenValue ? `${label}, ${spokenValue}` : label}
         onClick={toggleOpen}
       >
         {label}
-        {value !== null && <span className="fs__value">{`${VALUE_SEPARATOR}${value}`}</span>}
+        {showValue && value !== null && <span className="fs__value">{`${VALUE_SEPARATOR}${value}`}</span>}
         <Icon name="chevronDown" size={13} className="fs__caret" aria-hidden="true" />
       </button>
 
@@ -193,7 +193,7 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
                   aria-selected={on}
                   // Spelled apart for the same reason the trigger is: without
                   // it the row announces as "Global41".
-                  aria-label={`${option.label}, ${option.count}`}
+                  aria-label={showCounts ? `${option.label}, ${option.count}` : option.label}
                   onMouseEnter={() => setActive(index)}
                   onClick={() => pick(index)}
                 >
@@ -201,9 +201,11 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
                     {on && <Icon name="check" size={12} />}
                   </span>
                   <span className="fs__label">{option.label}</span>
-                  <span className="fs__count" aria-hidden="true">
-                    {option.count}
-                  </span>
+                  {showCounts && (
+                    <span className="fs__count" aria-hidden="true">
+                      {option.count}
+                    </span>
+                  )}
                 </li>
               );
             })}
@@ -217,7 +219,7 @@ export function FilterSelect({ label, options, selected, multi, onToggle, onClea
             </p>
           )}
 
-          {chosen.length > 0 && (
+          {showValue && chosen.length > 0 && (
             <button
               type="button"
               className="fs__clear"

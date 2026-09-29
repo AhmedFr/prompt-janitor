@@ -1,0 +1,15 @@
+.d-diff-line {
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.d-diff-from {
+  background: rgba(255, 59, 48, 0.1);
+}
+.d-diff-to {
+  background: rgba(47, 180, 87, 0.12);
+  margin-top: 4px;
+}

@@ -23,4 +23,11 @@ export interface FilterSelectProps {
   onToggle: (optionId: string) => void;
   /** Turns every option in this group off. */
   onClear: () => void;
+  /** Show each option's faceted count. Off for a picker whose options are not slices. Default `true`. */
+  showCounts?: boolean;
+  /**
+   * Echo the selection on the trigger and offer "Clear". Off when `label`
+   * already names the current choice, as a picker's does. Default `true`.
+   */
+  showValue?: boolean;
 }

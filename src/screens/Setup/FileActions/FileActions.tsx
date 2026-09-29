@@ -9,13 +9,14 @@ import type { FileActionsProps } from "./FileActions.types";
  * What a reader does with a file once they have read it: copy it, find it,
  * edit it somewhere real.
  *
- * Reveal and Open go through `open_artifact` with the artifact's *id*, so the
- * backend picks the path from what the scan found — the webview never holds
+ * Reveal and Open go through `open_artifact` with the artifact's *id* (or
+ * `open_file` with a graded file's id), so the backend picks the path from
+ * what the scan found — the webview never holds
  * a permission to open arbitrary paths. Copy takes the text on screen, which
  * for a config-derived kind is the redacted excerpt: a copied secret would
  * leak exactly what the viewer hid.
  */
-export function FileActions({ artifactId, content, onError }: FileActionsProps) {
+export function FileActions({ target, content, onError }: FileActionsProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -32,7 +33,10 @@ export function FileActions({ artifactId, content, onError }: FileActionsProps) 
 
   const open = async (action: OpenAction) => {
     if (!isTauri) return;
-    const result = await commands.openArtifact(artifactId, action);
+    const result =
+      "artifactId" in target
+        ? await commands.openArtifact(target.artifactId, action)
+        : await commands.openFile(target.fileId, action);
     if (result.status === "error") onError(result.error);
   };
 

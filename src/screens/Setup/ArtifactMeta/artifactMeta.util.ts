@@ -9,8 +9,11 @@ import type { MetaSegment } from "./ArtifactMeta.types";
  * · used 2h ago". Everything the facts table says that a reader needs before
  * the file, in the order they ask it — what is this, whose, is it used, does
  * it work. The rest (sessions, tokens per turn) waits behind Details.
+ *
+ * `loadedIn` is how many projects load the file every session; it closes the
+ * line when more than one does, since one is what its scope already says.
  */
-export function metaSegments(artifact: ArtifactView, scope: string): MetaSegment[] {
+export function metaSegments(artifact: ArtifactView, scope: string, loadedIn?: number): MetaSegment[] {
   const segments: MetaSegment[] = [{ text: KIND_NAME[artifact.kind] }, { text: scope }];
 
   if (artifact.grade) {
@@ -29,5 +32,6 @@ export function metaSegments(artifact: ArtifactView, scope: string): MetaSegment
     const last = lastUsedLabel(usage?.last_used);
     segments.push({ text: last === NEVER_MARK ? "never used" : `used ${last}` });
   }
+  if (loadedIn !== undefined && loadedIn > 1) segments.push({ text: `loaded in ${loadedIn} projects` });
   return segments;
 }

@@ -22,7 +22,7 @@
  * A folder the harness remembers and the disk has lost: the one row state on
  * this table that is a problem rather than a measurement, so it is the only
  * one that takes the error tone — the same opaque, contrast-measured pair
- * `UsageBadge` uses (see `tokens.css`).
+ * the `--tone-*` tokens define (see `tokens.css`).
  */
 .projects-chip--missing {
   border-color: transparent;

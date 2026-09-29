@@ -1,33 +1,96 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { filterOption, filterTrigger, openFilterGroup, pickFilter } from "@/test/filters";
+import { pickFilter } from "@/test/filters";
 import { Setup } from "./Setup";
-import type { ArtifactView, SetupView, UsageStat } from "@/lib/ipc";
+import type { FileRow } from "@/lib/ipc";
+import { KIND_CHIP_ORDER, KIND_SINGULAR, LABEL } from "@/lib/vocabulary";
+import { artifact, noHarness, populated, withOtherProject } from "./setup.fixtures";
+import { MISSING_FOLDER_EMPTY, NO_ITEMS_TITLE } from "./Setup.constants";
+import type { ArtifactSourceState } from "./Setup.types";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
+// The viewer's reads and its Findings/Usage tabs are stubbed, so these cases
+// exercise Setup's wiring only; `ItemViewer.test.tsx` mounts the real ones.
+const loadedSource = vi.hoisted(
+  () => (): ArtifactSourceState => ({
+    content: "# Item",
+    path: "/item.md",
+    format: "markdown",
+    editable: false,
+    modified: "1",
+    loading: false,
+    saving: false,
+    error: null,
+    save: async () => null,
+    reload: () => {},
+  }),
+);
+vi.mock("./useArtifactSource", () => ({ useArtifactSource: loadedSource }));
+vi.mock("./ItemViewer/useGradedSource", () => ({ useGradedSource: loadedSource }));
+vi.mock("./Findings", () => ({ Findings: () => <div data-testid="findings" /> }));
+// The stub keeps the Usage tab's one way out: a project link, which turns the lens on.
+vi.mock("./ItemUsage", () => ({
+  ItemUsage: ({ onSelectProject }: { onSelectProject: (path: string) => void }) => (
+    <div data-testid="item-usage">
+      <button type="button" onClick={() => onSelectProject("/repo/web")}>
+        web
+      </button>
+    </div>
+  ),
+}));
+// The lens's backend reads (load order and project usage), from the fixture's paths.
+const lensPaths = vi.hoisted(() => ({ global: "", app: "" }));
+// A case can take over the lens's reads (`impl`) and see what the lens asked for (`calls`).
+const lensMock = vi.hoisted(() => ({
+  impl: null as null | ((target: { harness: string; path: string } | null) => unknown),
+  calls: [] as Array<{ harness: string; path: string } | null>,
+}));
+vi.mock("./useLens", () => ({
+  useLens: (project: { harness: string; path: string } | null) => {
+    lensMock.calls.push(project ? { harness: project.harness, path: project.path } : null);
+    if (lensMock.impl) return lensMock.impl(project);
+    return project
+      ? {
+          effective: [
+            { layer: "global", path: lensPaths.global, name: "CLAUDE.md", grade: "B", file_id: null },
+            { layer: "project", path: lensPaths.app, name: "CLAUDE.md", grade: "C", file_id: null },
+          ],
+          usage: { ranked: [], sessions_per_day: [] },
+          loading: false,
+          failed: false,
+        }
+      : { effective: null, usage: null, loading: false, failed: false };
+  },
+}));
 // One handler registry per test so a case can emit `scan-done` like the core does.
-const listeners = vi.hoisted(() => new Map<string, () => void>());
+const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn((event: string, handler: () => void) => {
-    listeners.set(event, handler);
-    return Promise.resolve(() => listeners.delete(event));
+    // A set per event: the inventory and the grade badge both listen for `scan-done`.
+    const handlers = listeners.get(event) ?? new Set();
+    handlers.add(handler);
+    listeners.set(event, handlers);
+    return Promise.resolve(() => handlers.delete(handler));
   }),
 }));
 
 const emit = async (event: string) => {
   await act(async () => {
-    listeners.get(event)?.();
+    listeners.get(event)?.forEach((handler) => handler());
   });
 };
 
 const getSetup = vi.hoisted(() => vi.fn());
+const listFiles = vi.hoisted(() => vi.fn());
+const getOverview = vi.hoisted(() => vi.fn());
+const listTemplates = vi.hoisted(() => vi.fn());
+const getEntitlement = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
-const getArtifactSource = vi.hoisted(() => vi.fn());
-const saveArtifactSource = vi.hoisted(() => vi.fn());
+const revealProject = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
@@ -36,319 +99,192 @@ vi.mock("@/lib/ipc", async () => {
     isTauri: true,
     commands: {
       getSetup,
+      listFiles,
+      getOverview,
+      listTemplates,
+      getEntitlement,
       getExtraScanFolders,
       setExtraScanFolders,
       scanNow,
-      getArtifactSource,
-      saveArtifactSource,
+      revealProject,
     },
   };
 });
 
-const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
-  total: 9,
-  sessions: 4,
-  last_used: "2026-08-19T10:00:00.000Z",
-  error_rate: 0,
-  avg_turn_tokens: null,
-  count_30d: 2,
-  count_prev_30d: 1,
-  ...o,
-});
-
-const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
-  id: 1,
-  harness: "claude_code",
-  layer: "global",
-  kind: "rule",
-  name: "a",
-  path: "/a.md",
-  plugin_name: null,
-  description: null,
-  bytes: 10,
-  grade: null,
-  score: null,
-  file_id: null,
-  usage: null,
-  ...o,
-});
-
-const populated: SetupView = {
-  harnesses: [
-    {
-      id: "claude_code",
-      display_name: "Claude Code",
-      detected: true,
-      last_scan_at: "2026-08-20T09:00:00.000Z",
-      project_count: 2,
-      session_count: 177,
-    },
-  ],
-  global: [
-    artifact({
-      id: 1,
-      kind: "rule",
-      name: "global-style",
-      path: "/home/u/.claude/CLAUDE.md",
-      grade: "B",
-      file_id: "f-global",
-    }),
-    artifact({
-      id: 2,
-      kind: "skill",
-      name: "adapt",
-      description: "Adapts designs across screen sizes",
-      path: "/home/u/.claude/skills/adapt/SKILL.md",
-      usage: usage({ total: 20, avg_turn_tokens: 300 }),
-    }),
-    artifact({
-      id: 3,
-      kind: "skill",
-      name: "sunset",
-      path: "/home/u/.claude/skills/sunset/SKILL.md",
-      usage: null,
-    }),
-    artifact({
-      id: 4,
-      kind: "skill",
-      name: "brainstorming",
-      layer: "plugin",
-      plugin_name: "superpowers",
-      path: "/home/u/.claude/plugins/superpowers/skills/brainstorming/SKILL.md",
-      usage: null,
-    }),
-    artifact({
-      id: 5,
-      kind: "agent",
-      name: "code-reviewer",
-      layer: "plugin",
-      plugin_name: "superpowers",
-      path: "/home/u/.claude/plugins/superpowers/agents/code-reviewer.md",
-      usage: null,
-    }),
-    artifact({
-      id: 6,
-      kind: "mcp_server",
-      name: "linear",
-      path: "/home/u/.claude/mcp/linear",
-      usage: usage({ error_rate: 0.5, avg_turn_tokens: 9000 }),
-    }),
-    artifact({ id: 7, kind: "hook", name: "PreToolUse: fmt", path: "/home/u/.claude/settings.json" }),
-    artifact({
-      id: 8,
-      kind: "plugin",
-      name: "superpowers",
-      layer: "plugin",
-      plugin_name: "superpowers",
-      description: "v6.3.0 · claude-plugins-official",
-      path: "/home/u/.claude/plugins/superpowers",
-    }),
-    artifact({
-      id: 15,
-      kind: "plugin",
-      name: "posthog",
-      layer: "plugin",
-      plugin_name: "posthog",
-      description: "v2.1.0 · posthog-marketplace",
-      path: "/home/u/.claude/plugins/posthog",
-    }),
-    // Same skill name as superpowers' — only the plugin it came from tells
-    // the two rows apart.
-    artifact({
-      id: 16,
-      kind: "skill",
-      name: "brainstorming",
-      layer: "plugin",
-      plugin_name: "posthog",
-      path: "/home/u/.claude/plugins/posthog/skills/brainstorming/SKILL.md",
-      usage: null,
-    }),
-    artifact({
-      id: 17,
-      kind: "settings",
-      name: "settings.json",
-      path: "/home/u/.claude/settings.json",
-      bytes: 512,
-    }),
-  ],
-  projects: [
-    {
-      harness: "claude_code",
-      path: "/repo/web",
-      name: "web",
-      exists: true,
-      session_count: 12,
-      last_session_at: "2026-08-19T08:00:00.000Z",
-      artifacts: [
-        artifact({
-          id: 9,
-          layer: "project",
-          kind: "rule",
-          name: "web-rules",
-          path: "/repo/web/CLAUDE.md",
-          grade: "C",
-          file_id: "f-web",
-        }),
-        artifact({
-          id: 10,
-          layer: "project",
-          kind: "skill",
-          name: "deploy",
-          path: "/repo/web/.claude/skills/deploy/SKILL.md",
-          usage: usage({ total: 30, avg_turn_tokens: 300 }),
-        }),
-      ],
-    },
-    {
-      harness: "claude_code",
-      path: "/repo/gone",
-      name: "gone",
-      exists: false,
-      session_count: 1,
-      last_session_at: "2026-07-01T08:00:00.000Z",
-      artifacts: [],
-    },
-  ],
-};
-
-const noHarness: SetupView = {
-  harnesses: [
-    {
-      id: "claude_code",
-      display_name: "Claude Code",
-      detected: false,
-      last_scan_at: null,
-      project_count: 0,
-      session_count: 0,
-    },
-  ],
-  global: [],
-  projects: [],
-};
+const fixture = populated;
+/** The global skill "adapt", and the web project's graded rule. */
+const SKILL_ID = 2;
+const RULE_FILE_ID = "f-web";
+/** The lens cases: web is live, gone is missing from disk, api's agent loads only there. */
+const APP_PATH = "/repo/web";
+const APP_NAME = "web";
+const MISSING_PROJECT_PATH = "/repo/gone";
+const OTHER_PROJECT_ONLY_ITEM = "api-reviewer";
+const GLOBAL_RULE_PATH = "/home/u/.claude/CLAUDE.md";
+const GLOBAL_RULE_NAME = "global-style";
+const APP_RULE_PATH = "/repo/web/CLAUDE.md";
+const APP_RULE_NAME = "web-rules";
+const withoutSkill = { ...fixture, global: fixture.global.filter((a) => a.id !== SKILL_ID) };
 
 const renderSetup = async (navigate = vi.fn()) => {
   const view = render(<Setup navigate={navigate} />);
   await screen.findByRole("heading", { name: "Setup", level: 1 });
+  await screen.findByRole("radiogroup", { name: "Kinds" });
   return { ...view, navigate };
 };
 
-/** Body rows of whichever tab's table is mounted, in render order. */
+/** Body rows of the table, in render order. */
 const bodyRows = () => [...document.querySelectorAll<HTMLElement>("tbody tr.dt__row")];
 
-/** The name cell's own text, with the muted description suffix stripped. */
-const rowNames = () =>
-  bodyRows().map((row) => row.querySelector("td")?.textContent?.split("·")[0].trim() ?? "");
+/** The name cell's own text. */
+const rowNames = () => bodyRows().map((row) => row.querySelector("td")?.textContent?.trim() ?? "");
 
 const rowFor = (name: string) =>
   bodyRows().find((row) => (row.querySelector("td")?.textContent ?? "").startsWith(name)) as HTMLElement;
 
-const openTab = (label: RegExp) => fireEvent.click(screen.getByRole("tab", { name: label }));
+const pickKind = (label: RegExp) => fireEvent.click(screen.getByRole("radio", { name: label }));
+
+/** The count a kind chip shows. */
+const chipCount = (label: RegExp) =>
+  screen.getByRole("radio", { name: label }).querySelector(".kind-chip__count")?.textContent;
+
+/** The Kind cell of every body row (the Kind column shows on the All chip). */
+function kindCells(): string[] {
+  const col = screen.getAllByRole("columnheader").findIndex((h) => /Kind/.test(h.textContent ?? ""));
+  return screen.getAllByRole("row").slice(1).map((r) => r.querySelectorAll("td")[col]?.textContent ?? "");
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  lensMock.impl = null;
+  lensMock.calls = [];
   listeners.clear();
   window.sessionStorage.clear();
   getSetup.mockResolvedValue({ status: "ok", data: populated });
+  listFiles.mockResolvedValue({ status: "ok", data: [] });
+  getOverview.mockResolvedValue({ status: "ok", data: { has_data: true, overall_grade: "C" } });
+  listTemplates.mockResolvedValue([]);
+  getEntitlement.mockResolvedValue({ status: "ok", data: { paid: false } });
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "error", error: "no" });
-  getArtifactSource.mockResolvedValue({
-    status: "ok",
-    data: {
-      path: "/s/SKILL.md",
-      content: "# From disk\n",
-      bytes: 12,
-      modified: "111",
-      format: "markdown",
-      editable: true,
-    },
-  });
-  saveArtifactSource.mockResolvedValue({ status: "ok", data: { bytes: 20 } });
+  revealProject.mockResolvedValue({ status: "ok", data: null });
   open.mockResolvedValue(null);
+  lensPaths.global = GLOBAL_RULE_PATH;
+  lensPaths.app = APP_RULE_PATH;
 });
 
 afterEach(cleanup);
 
 describe("Setup", () => {
-  it("renders one tab per artifact kind, counted across global and every project", async () => {
-    await renderSetup();
-
-    const tabs = await screen.findByRole("tablist", { name: /setup/i });
-    // Accessible names, not text content: the badge is hidden from the name
-    // and spelled out, so a tab reads as "Rules, 2" rather than "Rules2".
-    expect(
-      within(tabs)
-        .getAllByRole("tab")
-        .map((tab) => tab.getAttribute("aria-label")),
-    ).toEqual([
-      "Rules, 2",
-      "Skills, 5",
-      "Agents, 1",
-      "Commands, 0",
-      "Hooks, 1",
-      "MCP, 1",
-      "Plugins, 2",
-      "Settings, 1",
-    ]);
-    expect(within(tabs).getByRole("tab", { name: "Rules, 2" })).toBeInTheDocument();
+  it("shows one table with kind chips instead of tabs", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Kinds" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
   });
 
-  it("summarises the detected harness and when it was last scanned", async () => {
+  it("counts every kind on its chip, across global and every project", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    expect(chipCount(/^All/)).toBe("13");
+    expect(chipCount(/^Instructions/)).toBe("2");
+    expect(chipCount(/^Skills/)).toBe("5");
+    expect(chipCount(/^Agents/)).toBe("1");
+    expect(chipCount(/^Commands/)).toBe("0");
+    expect(chipCount(/^MCP servers/)).toBe("1");
+    expect(chipCount(/^Hooks/)).toBe("1");
+    expect(chipCount(/^Plugins/)).toBe("2");
+    expect(chipCount(/^Config/)).toBe("1");
+  });
+
+  it("summarises the detected harness, and says when it was last scanned in the header only", async () => {
     await renderSetup();
 
     expect(screen.getByText(/Claude Code · 2 projects · 177 sessions/)).toBeInTheDocument();
-    expect(screen.getByText(/last scan/i)).toBeInTheDocument();
+    const header = document.querySelector("header.screen__toolbar") as HTMLElement;
+    expect(within(header).getByText(/^scanned /)).toBeInTheDocument();
+    expect(screen.getAllByText(/scan(ned)? .*ago|last scan/i)).toHaveLength(1);
   });
 
-  it("opens on Rules, ordered best grade first", async () => {
+  it("shows the overall grade and the slice's item count on the summary line", async () => {
     await renderSetup();
-    await screen.findByRole("tab", { name: /^Rules/ });
 
-    expect(screen.getByRole("tab", { name: /^Rules/ })).toHaveAttribute("aria-selected", "true");
-    expect(rowNames()).toEqual(["global-style", "web-rules"]);
+    expect(await screen.findByText("C", { selector: ".summary-grade" })).toBeInTheDocument();
+    expect(screen.getByText("13 items")).toBeInTheDocument();
+    pickKind(/^Skills/);
+    expect(screen.getByText("5 items")).toBeInTheDocument();
+  });
+
+  it("narrows to one kind from a chip and from a deep link", () => {
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Skills/ }));
+    expect(screen.queryByRole("columnheader", { name: /Kind/ })).toBeNull();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "mcp_server" }} />);
+    expect(screen.getByRole("radio", { name: /MCP servers/ })).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("lands on the status filter a deep link names", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill", filter: "never" }} />);
+
+    expect(screen.getByRole("button", { name: /never used/ })).toHaveAttribute("aria-pressed", "true");
+    expect(rowNames()).toEqual(["brainstorming", "brainstorming", "sunset"]);
+  });
+
+  it("filters to never-used items from the summary line, usage kinds only", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: /never used/ }));
+    const kinds = kindCells();
+    expect(kinds.length).toBeGreaterThan(0);
+    const usage = ["Skill", "Agent", "Command", "MCP server"];
+    for (const k of kinds) expect(usage).toContain(k);
+    for (const row of screen.getAllByRole("row").slice(1)) expect(row).not.toHaveTextContent(/^adapt/);
+  });
+
+  it("orders the All slice by kind in chip order (then name, pinned in src/lib/setupRows.test.ts)", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    const kinds = kindCells();
+    const rank = (k: string) => KIND_CHIP_ORDER.findIndex((c) => c !== "all" && KIND_SINGULAR[c] === k);
+    const ranks = kinds.map(rank);
+    expect(new Set(kinds).size).toBeGreaterThan(1);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+  });
+
+  it("orders a single kind by name too", async () => {
+    await renderSetup();
+    pickKind(/^Skills/);
+
+    expect(rowNames()).toEqual(["adapt", "brainstorming", "brainstorming", "deploy", "sunset"]);
   });
 
   it("scopes each Skills row to the global layer or to its project", async () => {
     await renderSetup();
-    openTab(/^Skills/);
+    pickKind(/^Skills/);
 
     expect(within(rowFor("adapt")).getByText("Global")).toBeInTheDocument();
     expect(within(rowFor("deploy")).getByText("web")).toBeInTheDocument();
   });
 
-  it("sorts every non-rule tab by uses, most-used first", async () => {
+  it("narrows every kind to one project with the Scope filter", async () => {
     await renderSetup();
-    openTab(/^Skills/);
-
-    // 30, 20, then the never-used rows in inventory order.
-    expect(rowNames()).toEqual(["deploy", "adapt", "sunset", "brainstorming", "brainstorming"]);
-    expect(screen.getByRole("columnheader", { name: /Uses/ })).toHaveAttribute(
-      "aria-sort",
-      "descending",
-    );
-  });
-
-  it("narrows a tab to one project with the Scope filter", async () => {
-    await renderSetup();
-    openTab(/^Skills/);
 
     pickFilter("Scope", "web");
 
-    expect(rowNames()).toEqual(["deploy"]);
+    expect(rowNames()).toEqual(["web-rules", "deploy"]);
   });
 
-  it("narrows a tab to what has never been used", async () => {
+  it("narrows a kind to one plugin with the Scope filter", async () => {
     await renderSetup();
-    openTab(/^Skills/);
+    pickKind(/^Skills/);
 
-    pickFilter("Status", "Never used");
+    pickFilter("Scope", "posthog");
 
-    expect(rowNames()).toEqual(["sunset", "brainstorming", "brainstorming"]);
+    expect(rowNames()).toEqual(["brainstorming"]);
+    expect(within(rowFor("brainstorming")).getByText("posthog")).toBeInTheDocument();
   });
 
-  it("searches a tab by name, description and scope", async () => {
+  it("searches by name, description and scope", async () => {
     await renderSetup();
-    openTab(/^Skills/);
+    pickKind(/^Skills/);
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "screen sizes" } });
     await waitFor(() => expect(rowNames()).toEqual(["adapt"]));
@@ -357,113 +293,157 @@ describe("Setup", () => {
     await waitFor(() => expect(rowNames()).toEqual(["deploy"]));
   });
 
-  it("counts what a plugin install bundled on its Plugins row", async () => {
+  it("searches by path, finding a row whose name and scope say nothing of it", async () => {
     await renderSetup();
-    openTab(/^Plugins/);
 
-    // The bundled skill and agent — not the plugin's own manifest row.
-    expect(within(rowFor("superpowers")).getByText("2")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "web/.claude/skills" } });
+
+    await waitFor(() => expect(rowNames()).toEqual(["deploy"]));
   });
 
   it("names the plugin a bundled row came from, telling same-named skills apart", async () => {
     await renderSetup();
-    openTab(/^Skills/);
+    pickKind(/^Skills/);
 
-    const bundled = bodyRows().filter((row) =>
-      (row.querySelector("td")?.textContent ?? "").startsWith("brainstorming"),
-    );
+    const bundled = bodyRows().filter((row) => (row.querySelector("td")?.textContent ?? "").startsWith("brainstorming"));
     expect(bundled).toHaveLength(2);
-    expect(
-      bundled.map((row) => within(row).getByText(/^(superpowers|posthog)$/).textContent).sort(),
-    ).toEqual(["posthog", "superpowers"]);
+    expect(bundled.map((row) => within(row).getByText(/^(superpowers|posthog)$/).textContent).sort()).toEqual([
+      "posthog",
+      "superpowers",
+    ]);
   });
 
   it("finds a bundled row by the plugin that installed it", async () => {
     await renderSetup();
-    openTab(/^Skills/);
+    pickKind(/^Skills/);
 
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "posthog" } });
 
     await waitFor(() => expect(rowNames()).toEqual(["brainstorming"]));
   });
 
-  it("narrows a tab to one plugin with the Scope filter", async () => {
+  it("lists settings files under Config", async () => {
     await renderSetup();
-    openTab(/^Skills/);
-
-    pickFilter("Scope", "posthog");
-
-    expect(rowNames()).toEqual(["brainstorming"]);
-    expect(within(rowFor("brainstorming")).getByText("posthog")).toBeInTheDocument();
-  });
-
-  it("gives settings files a tab of their own", async () => {
-    await renderSetup();
-    openTab(/^Settings/);
+    pickKind(/^Config/);
 
     expect(rowNames()).toEqual(["settings.json"]);
     expect(within(rowFor("settings.json")).getByText("Global")).toBeInTheDocument();
   });
 
-  it("lets a deep link win over the remembered tab", async () => {
-    // The user last left Setup on Skills; arriving from a "show me the MCP
-    // servers" link has to override that, not lose to it.
-    window.sessionStorage.setItem("pj.tabs.setup", "skill");
-    render(<Setup navigate={vi.fn()} initialTab="mcp_server" />);
-    await screen.findByRole("heading", { name: "Setup", level: 1 });
-
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: /^MCP/ })).toHaveAttribute("aria-selected", "true"),
-    );
-    expect(rowNames()).toEqual(["linear"]);
+  it("opens a graded instruction in the viewer instead of Detail", () => {
+    const navigate = vi.fn();
+    render(<Setup navigate={navigate} data={fixture} files={[]} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Instructions/ }));
+    fireEvent.click(screen.getAllByRole("row")[1]);
+    expect(navigate).not.toHaveBeenCalledWith("detail", expect.anything());
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
   });
 
-  it("opens a rule's detail when its row is clicked", async () => {
-    const { navigate } = await renderSetup();
-    await screen.findByRole("tab", { name: /^Rules/ });
-
-    fireEvent.click(rowFor("web-rules"));
-
-    expect(navigate).toHaveBeenCalledWith("detail", "f-web");
+  it("opens the item a deep link names, on the tab it names", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID }, tab: "usage" }} />);
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("keeps each tab's filters to itself, even between tabs with the same pill groups", async () => {
+  it("opens a file by its file id (the panel's Fix these next link)", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { fileId: RULE_FILE_ID }, tab: "findings" }} />);
+    expect(screen.getByRole("tab", { name: /Findings/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps a deep link pending until its item's rows arrive, then opens it", () => {
+    const target = { open: { artifactId: SKILL_ID }, tab: "content" as const };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} loading />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+  });
+
+  it("drops a deep link whose item is still missing once the load is done", () => {
+    const target = { open: { artifactId: SKILL_ID } };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} />);
+    // the load had already completed without the item: a later refresh that brings it back must not pop a sheet
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("closes the viewer when a rescan removes the open item", () => {
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID } }} />);
+    rerender(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={{ open: { artifactId: SKILL_ID } }} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("stays closed when the removed item comes back on a later rescan", () => {
+    const target = { open: { artifactId: SKILL_ID } };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    rerender(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} />);
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("steps through the rows on screen, in their order, and stops at the last", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} />);
+    fireEvent.click(rowFor("deploy"));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^deploy/);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+    fireEvent.click(screen.getByRole("button", { name: "Previous item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^deploy/);
+  });
+
+  it("steps over what the filters hide", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill", filter: "never" }} />);
+    // never used: brainstorming, brainstorming, sunset — adapt and deploy are filtered out.
+    fireEvent.click(bodyRows()[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+  });
+
+  it("opens a stepped-to item on the tab the viewer was on, with the editor state of a fresh open", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} />);
+    fireEvent.click(rowFor("adapt"));
+    fireEvent.click(screen.getByRole("tab", { name: "Usage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^brainstorming/);
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("lists a graded file the inventory never saw under Instructions", () => {
+    const orphan = { id: "/x/AGENTS.md", name: "AGENTS.md", path: "/x/AGENTS.md", project: "x", project_id: "/x",
+      kind: "AGENTS.md", grade: "D", score: 55, issue_count: 4, modified: null, worst_severity: "hi" } as FileRow;
+    render(<Setup navigate={vi.fn()} data={fixture} files={[orphan]} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Instructions/ }));
+    expect(screen.getByText("AGENTS.md")).toBeInTheDocument();
+    expect(screen.getByLabelText("4 findings, worst critical")).toBeInTheDocument();
+  });
+
+  it("loads the graded files alongside the inventory", async () => {
+    listFiles.mockResolvedValue({
+      status: "ok",
+      data: [{ id: "/x/AGENTS.md", name: "AGENTS.md", path: "/x/AGENTS.md", project: "x", project_id: "/x",
+        kind: "AGENTS.md", grade: "D", score: 55, issue_count: 4, modified: null, worst_severity: "hi" }],
+    });
     await renderSetup();
-    openTab(/^Skills/);
-    pickFilter("Status", "Never used");
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "sunset" } });
-    await waitFor(() => expect(rowNames()).toEqual(["sunset"]));
+    pickKind(/^Instructions/);
 
-    // Agents carries the very same pill group ids ("scope", "status",
-    // "bundled") and the same search config, so a table keyed on anything
-    // coarser than its own `stateKey` would arrive here already filtered.
-    openTab(/^Agents/);
-
-    expect(rowNames()).toEqual(["code-reviewer"]);
-    expect(screen.getByRole("searchbox")).toHaveValue("");
-    expect(filterTrigger("Status")).toHaveAccessibleName("Status");
-    // Nothing was typed or pressed on this tab, so it has nothing to remember.
-    expect(window.sessionStorage.getItem("pj.table.setup.agent")).toBeNull();
-
-    openTab(/^Skills/);
-
-    expect(rowNames()).toEqual(["sunset"]);
-    expect(screen.getByRole("searchbox")).toHaveValue("sunset");
-    expect(filterTrigger("Status")).toHaveAccessibleName("Status, Never used");
+    expect(rowNames()).toEqual(["AGENTS.md", "global-style", "web-rules"]);
   });
 
-  it("rebuilds the tabs, rows and pill counts from the inventory a scan produced", async () => {
-    await renderSetup();
-    openTab(/^Skills/);
-    openFilterGroup("Status");
-    expect(filterOption("Never used")).toHaveAccessibleName("Never used, 3");
-    fireEvent.click(filterTrigger("Status"));
+  it("offers New from template… on the Instructions chip only", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    expect(screen.queryByRole("button", { name: "New from template…" })).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /Instructions/ }));
+    expect(screen.getByRole("button", { name: "New from template…" })).toBeInTheDocument();
+  });
 
-    // The rescan finds one more, never-used skill. Every derived value here
-    // is cached on the identity of what it was built from — the row arrays,
-    // the column context, the pill definitions — so a screen that updated
-    // the inventory in place instead of replacing it would keep showing the
-    // counts, tabs and rows below from before the scan.
+  it("rebuilds the chips, rows and summary counts from the inventory a scan produced", async () => {
+    await renderSetup();
+    pickKind(/^Skills/);
+    expect(screen.getByRole("button", { name: /never used/ })).toHaveTextContent("3 never used");
+
+    // The rescan finds one more, never-used skill. Every derived value is
+    // cached on the identity of what it was built from, so a screen that
+    // updated the inventory in place would keep showing the old counts.
     getSetup.mockResolvedValue({
       status: "ok",
       data: {
@@ -478,168 +458,364 @@ describe("Setup", () => {
     await emit("scan-done");
 
     await waitFor(() => expect(getSetup).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(screen.getByRole("tab", { name: "Skills, 6" })).toHaveTextContent("Skills6"),
-    );
+    await waitFor(() => expect(chipCount(/^Skills/)).toBe("6"));
     expect(rowNames()).toContain("zzz-new");
-    openFilterGroup("Status");
-    expect(filterOption("Never used")).toHaveAccessibleName("Never used, 4");
+    expect(screen.getByRole("button", { name: /never used/ })).toHaveTextContent("4 never used");
   });
 
-  it("offers a folder picker when no harness was detected", async () => {
-    getSetup.mockResolvedValue({ status: "ok", data: noHarness });
+  it("says no items match when the chips and summary leave nothing, and one Clear filters resets them", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "rule", filter: "never" }} />);
+
+    expect(screen.getByText("No items match")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("button", { name: /never used/ })).toHaveAttribute("aria-pressed", "false");
+    expect(bodyRows()).toHaveLength(13);
+  });
+
+  it("says no items match when the search leaves nothing, and Clear filters resets the search and the chips", async () => {
     await renderSetup();
+    pickKind(/^Skills/);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zzz-nothing" } });
 
-    expect(await screen.findByText("No supported agent harness found")).toBeInTheDocument();
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(await screen.findByText("No items match")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
 
-    fireEvent.click(screen.getByRole("button", { name: /Add a folder/ }));
+    expect(screen.getByRole("searchbox")).toHaveValue("");
+    expect(screen.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+    await waitFor(() => expect(bodyRows()).toHaveLength(13));
+  });
+
+  it("says the setup has no items, not that nothing matches, when a detected harness has none", () => {
+    render(<Setup navigate={vi.fn()} data={{ ...fixture, global: [], projects: [] }} files={[]} />);
+
+    expect(screen.getByText(NO_ITEMS_TITLE)).toBeInTheDocument();
+    expect(screen.queryByText("No items match")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
+  it("says no Claude Code setup was found, and offers Add folder…, when no harness was detected", async () => {
+    getSetup.mockResolvedValue({ status: "ok", data: noHarness });
+    render(<Setup navigate={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "No Claude Code setup found" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: LABEL.addFolder }));
     await waitFor(() => expect(open).toHaveBeenCalled());
   });
 
   it("stops loading when the setup query fails", async () => {
     getSetup.mockRejectedValue(new Error("no database"));
-    await renderSetup();
+    render(<Setup navigate={vi.fn()} />);
 
     expect(await screen.findByText(/setup could not be read/i)).toBeInTheDocument();
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
   });
 
-  describe("the skill panel", () => {
-    /** Open the Skills tab and click the `adapt` row. */
-    const openAdapt = async () => {
-      await renderSetup();
-      await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^Skills/);
-      fireEvent.click(rowFor("adapt"));
-      return await screen.findByRole("dialog");
-    };
-
-    it("opens when a skill row is clicked, showing that skill's file", async () => {
-      const panel = await openAdapt();
-
-      expect(panel).toHaveAccessibleName(/adapt/);
-      // Keyed on the row's artifact id, which is what the command takes.
-      await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(2));
-      expect(await within(panel).findByRole("heading", { name: "From disk" })).toBeInTheDocument();
-    });
-
-    it("closes again, and stops asking for the file", async () => {
-      const panel = await openAdapt();
-      fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
-
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    });
-
-    it("refreshes the inventory after a save, so Size stops showing the old count", async () => {
-      const panel = await openAdapt();
-      await within(panel).findByRole("heading", { name: "From disk" });
-      const before = getSetup.mock.calls.length;
-
-      fireEvent.click(within(panel).getByRole("button", { name: "Edit" }));
-      fireEvent.change(within(panel).getByRole("textbox", { name: /markdown/i }), {
-        target: { value: "# Edited" },
-      });
-      fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
-
-      await waitFor(() => expect(saveArtifactSource).toHaveBeenCalledWith(2, "# Edited", "111"));
-      await waitFor(() => expect(getSetup.mock.calls.length).toBeGreaterThan(before));
-    });
-
-    /**
-     * Editing a skill's `name:` frontmatter changes what the row is called.
-     * The panel header has to follow the refreshed inventory rather than the
-     * snapshot it was opened with, or it keeps announcing the old name until
-     * the user closes and reopens it.
-     */
-    it("follows the refreshed row after a save, rather than the row it opened with", async () => {
-      const panel = await openAdapt();
-      await within(panel).findByRole("heading", { name: "From disk" });
-
-      // The rescan-shaped refetch that follows a save returns a renamed skill.
-      const renamed = {
-        ...populated,
-        global: populated.global.map((a) => (a.id === 2 ? { ...a, name: "adapts" } : a)),
-      };
-      getSetup.mockResolvedValue({ status: "ok", data: renamed });
-
-      fireEvent.click(within(panel).getByRole("button", { name: "Edit" }));
-      fireEvent.change(within(panel).getByRole("textbox", { name: /markdown/i }), {
-        target: { value: "# Edited" },
-      });
-      fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
-
-      await waitFor(() =>
-        expect(screen.getByRole("dialog")).toHaveAccessibleName(/adapts/),
-      );
-    });
-
-    it("closes itself if the skill is gone from the inventory after a rescan", async () => {
-      await openAdapt();
-
-      getSetup.mockResolvedValue({
-        status: "ok",
-        data: { ...populated, global: populated.global.filter((a) => a.id !== 2) },
-      });
-      await emit("scan-done");
-
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    });
-
-  });
-
-  describe("the detail sheet", () => {
-    it.each([
-      [/^MCP/, "linear", 6, "linear — MCP server"],
-      [/^Hooks/, "PreToolUse: fmt", 7, "PreToolUse: fmt — Hook"],
-      [/^Agents/, "code-reviewer", 5, "code-reviewer — Agent"],
-      [/^Plugins/, "superpowers", 8, "superpowers — Plugin"],
-    ])("opens read-only for a row on the %s tab", async (tab, name, id, label) => {
-      getArtifactSource.mockResolvedValue({
-        status: "ok",
-        data: { path: "/x", content: '{ "command": "npx" }', bytes: 20, modified: "1", format: "json", editable: false },
-      });
-      await renderSetup();
-      await screen.findByRole("tablist", { name: /setup/i });
-      openTab(tab);
-      fireEvent.click(rowFor(name));
-
-      const sheet = await screen.findByRole("dialog");
-      expect(sheet).toHaveAccessibleName(label);
-      await waitFor(() => expect(getArtifactSource).toHaveBeenCalledWith(id));
-      expect(within(sheet).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
-    });
-
-    it("shows what the inventory knows about the row, usage included", async () => {
-      await renderSetup();
-      await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^MCP/);
-      fireEvent.click(rowFor("linear"));
-
-      const sheet = await screen.findByRole("dialog");
-      // At a glance on the meta line; the labelled facts wait behind Details.
-      expect(within(sheet).getByText("50% errors")).toBeInTheDocument();
-      fireEvent.click(within(sheet).getByRole("button", { name: "Details" }));
-      expect(within(sheet).getByText("Error rate")).toBeInTheDocument();
-      expect(within(sheet).getByText("50%")).toBeInTheDocument();
-    });
-
-    it("closes on Escape", async () => {
-      await renderSetup();
-      await screen.findByRole("tablist", { name: /setup/i });
-      openTab(/^MCP/);
-      fireEvent.click(rowFor("linear"));
-
-      fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    });
-  });
-
   it("has no accessibility violations", async () => {
     const { container } = await renderSetup();
-    await screen.findByRole("tablist", { name: /setup/i });
-    openTab(/^Skills/);
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("Setup under the project lens", () => {
+  /** The Viewing control, whatever it currently reads. */
+  const viewing = () => screen.getByRole("combobox", { name: /^Viewing/ });
+  const pickLens = (option: string | RegExp) => {
+    fireEvent.click(viewing());
+    fireEvent.click(screen.getByRole("option", { name: option }));
+  };
+  /** The table toolbar's Scope filter trigger — not the Scope column's sort button. */
+  const scopeFilter = () =>
+    within(document.querySelector(".dt__toolbar") as HTMLElement).queryByLabelText(/^Scope/, {
+      selector: ".fs__trigger",
+    });
+  const graded = (path: string, project: string, projectId: string): FileRow =>
+    ({
+      id: path,
+      name: path.split("/").pop(),
+      path,
+      project,
+      project_id: projectId,
+      kind: "AGENTS.md",
+      grade: "C",
+      score: 70,
+      issue_count: 1,
+      modified: null,
+      worst_severity: "lo",
+    }) as FileRow;
+
+  it("shows only what loads in the lensed project, instructions numbered first", () => {
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ lens: APP_PATH }} />);
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+    const body = bodyRows();
+    // The "#" column comes first; the two effective instructions lead, in load order.
+    expect(body.slice(0, 2).map((r) => r.querySelector("td")?.textContent)).toEqual(["1", "2"]);
+    expect(body[0]).toHaveTextContent(GLOBAL_RULE_NAME);
+    expect(body[1]).toHaveTextContent(APP_RULE_NAME);
+    expect(screen.queryByText(OTHER_PROJECT_ONLY_ITEM)).toBeNull();
+    // Global and this project's items are still there.
+    expect(screen.getByText("deploy")).toBeInTheDocument();
+    expect(screen.getByText("adapt")).toBeInTheDocument();
+  });
+
+  it("lists every project's items without the lens", () => {
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} />);
+    expect(screen.getByText(OTHER_PROJECT_ONLY_ITEM)).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "#" })).toBeNull();
+  });
+
+  it("keeps this project's graded-only instruction file under the lens", () => {
+    const files = [graded(`${APP_PATH}/AGENTS.md`, APP_NAME, APP_PATH), graded("/repo/api/AGENTS.md", "api", "/repo/api")];
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={files} target={{ lens: APP_PATH }} />);
+    const names = bodyRows().map((r) => r.textContent ?? "");
+    // After the two numbered instructions, unnumbered; the api project's file is left out.
+    expect(names.filter((t) => t.includes("AGENTS.md"))).toHaveLength(1);
+    expect(bodyRows()[2]).toHaveTextContent("AGENTS.md");
+    expect(bodyRows()[2].querySelector("td")?.textContent).toBe("");
+  });
+
+  it("hides the Scope filter under the lens and shows the project strip", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(scopeFilter()).toBeNull();
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+  });
+
+  it("switches lens from the Viewing control", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    expect(scopeFilter()).not.toBeNull();
+    pickLens(new RegExp(APP_NAME));
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+  });
+
+  it("shows the missing-folder message and an empty table for a project that is gone", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: MISSING_PROJECT_PATH }} />);
+    expect(screen.getByRole("status")).toHaveTextContent(/folder/i);
+    expect(bodyRows()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    // The table says why it is empty, not that the setup has nothing in it.
+    expect(screen.getByText(MISSING_FOLDER_EMPTY)).toBeInTheDocument();
+    expect(screen.queryByText(NO_ITEMS_TITLE)).toBeNull();
+  });
+
+  it("finds the project, its strip and its load order from a deep link with a trailing slash", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: `${APP_PATH}/` }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+    expect(bodyRows().slice(0, 2).map((r) => r.querySelector("td")?.textContent)).toEqual(["1", "2"]);
+    fireEvent.click(viewing());
+    // One option for web, not a second one for the slashed spelling.
+    expect(screen.getAllByRole("option", { name: new RegExp(APP_NAME) })).toHaveLength(1);
+  });
+
+  it("takes the lens's reads from the lensData override (Storybook) over the live ones", () => {
+    const lensData = {
+      effective: [
+        { layer: "project" as const, path: APP_RULE_PATH, name: "CLAUDE.md", grade: "C", file_id: null },
+        { layer: "global" as const, path: GLOBAL_RULE_PATH, name: "CLAUDE.md", grade: "B", file_id: null },
+      ],
+      usage: null,
+    };
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} lensData={lensData} />);
+    expect(bodyRows()[0]).toHaveTextContent(APP_RULE_NAME);
+    expect(bodyRows()[1]).toHaveTextContent(GLOBAL_RULE_NAME);
+  });
+
+  it("reveals the lensed project's folder", async () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal in Finder" }));
+    await waitFor(() => expect(revealProject).toHaveBeenCalledWith(APP_PATH));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says so when revealing the folder fails", async () => {
+    revealProject.mockResolvedValue({ status: "error", error: "Finder is not available" });
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal in Finder" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Could not reveal the folder: Finder is not available/);
+  });
+
+  it("keeps the viewer open when the lens still shows its item, and closes it when the lens leaves it out", () => {
+    const { unmount } = render(
+      <Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ open: { artifactId: SKILL_ID } }} />,
+    );
+    pickLens(new RegExp(APP_NAME));
+    // The global skill loads in web too.
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    unmount();
+
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ open: { artifactId: 18 } }} />);
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    pickLens(new RegExp(APP_NAME));
+    // The api project's agent does not.
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("keeps one lens: the Viewing control and the table always agree", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    pickLens("All setup");
+    expect(viewing()).toHaveAccessibleName(/All setup/);
+    expect(screen.queryByRole("columnheader", { name: "#" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    expect(scopeFilter()).not.toBeNull();
+  });
+
+  it("follows a deep link's lens while Setup is already mounted", () => {
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+  });
+
+  it("turns the lens on from the viewer's Usage tab", () => {
+    const navigate = vi.fn();
+    render(<Setup navigate={navigate} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID }, tab: "usage" }} />);
+    fireEvent.click(within(screen.getByTestId("item-usage")).getByRole("button", { name: APP_NAME }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations with the lens on", async () => {
+    const { container } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("lenses a graded-only project path with no strip and no crash", () => {
+    const path = "/not/in/the/inventory";
+    const files = [graded(`${path}/AGENTS.md`, "side", path)];
+    render(<Setup navigate={vi.fn()} data={fixture} files={files} target={{ lens: path }} />);
+    expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Kinds" })).toBeInTheDocument();
+    // The control names the lens rather than claiming "All setup", and the table is that project's.
+    expect(viewing()).toHaveAccessibleName(/as Claude Code sees side/);
+    expect(screen.getByText("AGENTS.md")).toBeInTheDocument();
+    expect(screen.queryByText(APP_RULE_NAME)).toBeNull();
+  });
+
+  // R54: a graded-only lens decides its rows with the scan's harness, so it
+  // must read that harness's load order for the path too, or its
+  // instructions are never numbered.
+  it("numbers a graded-only project's instructions from the scan's harness load order", () => {
+    const path = "/not/in/the/inventory";
+    const file = `${path}/AGENTS.md`;
+    lensMock.impl = (target) => ({
+      effective: target ? [{ layer: "project", path: file, name: "AGENTS.md", grade: "C", file_id: null }] : null,
+      usage: target ? { ranked: [], sessions_per_day: [] } : null,
+      loading: false,
+      failed: false,
+    });
+    render(<Setup navigate={vi.fn()} data={fixture} files={[graded(file, "side", path)]} target={{ lens: path }} />);
+    expect(lensMock.calls[lensMock.calls.length - 1]).toEqual({ harness: "claude_code", path });
+    const row = bodyRows().find((r) => r.textContent?.includes("AGENTS.md"));
+    // The "#" column leads under the lens.
+    expect(row?.querySelector("td")?.textContent).toBe("1");
+  });
+
+  describe("while the project's usage is unknown", () => {
+    const neverUsed = () => screen.queryByRole("button", { name: /never used/ });
+
+    it("counts never used from the project's usage once it is read", () => {
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).not.toBeNull();
+    });
+
+    it("claims nothing about usage while it loads, and says it is loading", () => {
+      lensMock.impl = () => ({ effective: null, usage: null, loading: true, failed: false, retry: vi.fn() });
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).toBeNull();
+      expect(screen.queryByRole("button", { name: /erroring|costly/ })).toBeNull();
+      expect(screen.queryByRole("columnheader", { name: /Uses|Last used/ })).toBeNull();
+      expect(screen.getByText(/Reading this project's usage/)).toBeInTheDocument();
+    });
+
+    it("says the usage read failed, offers Retry, and claims nothing about usage", () => {
+      const retry = vi.fn();
+      lensMock.impl = () => ({ effective: null, usage: null, loading: false, failed: true, retry });
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).toBeNull();
+      expect(screen.queryByRole("columnheader", { name: /Uses|Last used/ })).toBeNull();
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(/could not be read/);
+      fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("Setup controlled by the shell", () => {
+  it("reports changes instead of holding them when it is controlled", () => {
+    const onTargetChange = vi.fn();
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={onTargetChange} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Skills/ }));
+    expect(onTargetChange).toHaveBeenCalledWith({ kind: "skill" }, "push");
+    fireEvent.click(screen.getAllByRole("row")[1]);
+    expect(onTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({ open: expect.anything() }), "push");
+  });
+
+  it("closes the viewer when the target loses its open item (Back)", () => {
+    const { rerender } = render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID } }} onTargetChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={vi.fn()} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("closes through onCloseItem alone when the shell provides it", () => {
+    const onTargetChange = vi.fn();
+    const onCloseItem = vi.fn();
+    render(
+      <Setup
+        navigate={vi.fn()}
+        data={fixture}
+        files={[]}
+        target={{ open: { artifactId: SKILL_ID } }}
+        onTargetChange={onTargetChange}
+        onCloseItem={onCloseItem}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onCloseItem).toHaveBeenCalledTimes(1);
+    expect(onTargetChange).not.toHaveBeenCalled();
+  });
+
+  it("closes through onTargetChange when there is no onCloseItem", () => {
+    const onTargetChange = vi.fn();
+    render(
+      <Setup
+        navigate={vi.fn()}
+        data={fixture}
+        files={[]}
+        target={{ open: { artifactId: SKILL_ID }, tab: "usage" }}
+        onTargetChange={onTargetChange}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onTargetChange).toHaveBeenCalledTimes(1);
+    expect(onTargetChange).toHaveBeenCalledWith({ open: undefined, tab: undefined }, "push");
+  });
+
+  it("shows the slice the target names, and follows it back", () => {
+    const { rerender } = render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} onTargetChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("radio", { name: /Skills/ })).toBeChecked();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /All/ })).toBeChecked();
+  });
+
+  it("drops a linked item that is not there, as a replace", () => {
+    const onTargetChange = vi.fn();
+    render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill", open: { artifactId: 9999 } }} onTargetChange={onTargetChange} />,
+    );
+    expect(onTargetChange).toHaveBeenCalledWith({ kind: "skill", open: undefined, tab: undefined }, "replace");
   });
 });

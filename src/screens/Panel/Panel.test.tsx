@@ -95,7 +95,7 @@ const snapshot = (o: Partial<PanelSnapshot> = {}): PanelSnapshot => ({
 const show = async () => {
   render(<Panel />);
   await waitFor(() => expect(getPanelSnapshot).toHaveBeenCalled());
-  await screen.findByRole("button", { name: "Scan now" });
+  await screen.findByRole("button", { name: "Scan" });
 };
 
 /** A promise a test resolves by hand, to land two reads in a chosen order. */
@@ -147,7 +147,7 @@ describe("Panel", () => {
   it("opens the main window on a fix's detail page", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api — grade F, 6 issues" }));
-    expect(openMain).toHaveBeenCalledWith("detail", "/code/acme-api/CLAUDE.md");
+    expect(openMain).toHaveBeenCalledWith("setup", "open=f%3A%2Fcode%2Facme-api%2FCLAUDE.md&tab=findings");
   });
 
   it("says there is nothing to fix rather than showing an empty list", async () => {
@@ -159,13 +159,13 @@ describe("Panel", () => {
   it("counts the usage signals and routes each chip to where it is fixed", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "3 never-used skills — open Setup" }));
-    expect(openMain).toHaveBeenCalledWith("setup", "skill");
+    expect(openMain).toHaveBeenCalledWith("setup", "kind=skill&filter=never");
 
     fireEvent.click(screen.getByRole("button", { name: "1 MCP server erroring — open Setup" }));
-    expect(openMain).toHaveBeenCalledWith("setup", "mcp_server");
+    expect(openMain).toHaveBeenCalledWith("setup", "kind=mcp_server&filter=errors");
 
-    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Analytics" }));
-    expect(openMain).toHaveBeenCalledWith("analytics", null);
+    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Projects" }));
+    expect(openMain).toHaveBeenCalledWith("projects", null);
   });
 
   it("runs a scan, narrates it, and refetches when it finishes", async () => {
@@ -175,7 +175,7 @@ describe("Panel", () => {
     const running = deferred<unknown>();
     scanNow.mockReturnValue(running.promise);
 
-    fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan" }));
     expect(scanNow).toHaveBeenCalled();
 
     const scanning = await screen.findByRole("button", { name: "Scanning…" });
@@ -184,7 +184,7 @@ describe("Panel", () => {
 
     await emit("scan-done");
     await waitFor(() => expect(getPanelSnapshot).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Scan" })).toBeEnabled();
 
     await act(async () => {
       running.resolve({ status: "ok", data: {} });
@@ -203,7 +203,7 @@ describe("Panel", () => {
     expect(screen.getByRole("progressbar", { name: "Scan progress" })).toBeInTheDocument();
 
     await emit("scan-done");
-    expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Scan" })).toBeEnabled();
   });
 
   /** Insurance: if `scan-done` is ever dropped, the command returning still frees the button. */
@@ -212,19 +212,19 @@ describe("Panel", () => {
     const running = deferred<unknown>();
     scanNow.mockReturnValue(running.promise);
 
-    fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan" }));
     await screen.findByRole("button", { name: "Scanning…" });
 
     await act(async () => {
       running.resolve({ status: "ok", data: {} });
     });
-    expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Scan" })).toBeEnabled();
   });
 
-  it("opens the app on the overview", async () => {
+  it("opens the app on Setup", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "Open app" }));
-    expect(openMain).toHaveBeenCalledWith("overview", null);
+    expect(openMain).toHaveBeenCalledWith("setup", null);
   });
 
   it("quits for real", async () => {
@@ -294,7 +294,7 @@ describe("Panel", () => {
     await show();
     expect(screen.getByText("No scan yet")).toBeInTheDocument();
     expect(screen.queryByText("Needs work")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Scan now" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan" })).toBeInTheDocument();
   });
 
   it("says the snapshot could not be read rather than showing a blank card", async () => {
@@ -317,7 +317,7 @@ describe("Panel", () => {
 
   it("has no accessibility violations", async () => {
     const { container } = render(<Panel />);
-    await screen.findByRole("button", { name: "Scan now" });
+    await screen.findByRole("button", { name: "Scan" });
     expect(await axe(container)).toHaveNoViolations();
   });
 });

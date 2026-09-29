@@ -8,6 +8,7 @@ import {
   FOUNDER_PRICE,
   PASTE_KEY_HINT_PREFIX,
   PASTE_KEY_HINT_LOCATION,
+  isUnlocked,
 } from "@/lib/monetization";
 import { STACKS, stackLabel } from "./TemplatePicker.constants";
 import type { TemplatePickerProps } from "./TemplatePicker.types";
@@ -17,7 +18,7 @@ import "./TemplatePicker.css";
  * "Start from a template" — an A-grade `CLAUDE.md`/`AGENTS.md` per stack for
  * developers who have no instruction file at all. Free users can browse and
  * read every template in full (an honest teaser); writing one to disk is the
- * paid one-click action, gated the same way Auto-fix is on VerdictHero.
+ * paid one-click action, gated the same way Auto-fix is in the Findings view.
  *
  * Purely presentational — data loading and the actual apply/rescan IO live in
  * `useTemplatePicker`, wired in by whichever screen renders this.
@@ -29,10 +30,11 @@ export function TemplatePicker({ templates, entitled, loading, onApply, onClose,
   const [done, setDone] = useState<{ path: string; fileId: string | null } | null>(null);
 
   const selected = templates.find((t) => t.id === selectedId) ?? templates[0] ?? null;
+  const unlocked = isUnlocked(entitled);
 
   const handleUse = async () => {
     if (!selected) return;
-    if (!entitled) {
+    if (!unlocked) {
       void openExternal(POLAR_CHECKOUT_URL);
       return;
     }
@@ -128,15 +130,15 @@ export function TemplatePicker({ templates, entitled, loading, onApply, onClose,
                     onClick={() => void handleUse()}
                     disabled={busy}
                     title={
-                      entitled
+                      unlocked
                         ? "Write this file into a folder you choose"
                         : `Get Pro to apply templates — ${FOUNDER_PRICE}`
                     }
                   >
-                    <Icon name={entitled ? "wand" : "lock"} />{" "}
-                    {busy ? "Applying…" : entitled ? "Use this template" : GET_PRO_LABEL}
+                    <Icon name={unlocked ? "wand" : "lock"} />{" "}
+                    {busy ? "Applying…" : unlocked ? "Use this template" : GET_PRO_LABEL}
                   </Button>
-                  {!entitled && (
+                  {!unlocked && (
                     <span className="faint" style={{ fontSize: 12 }}>
                       {PASTE_KEY_HINT_PREFIX}{" "}
                       <button

@@ -1,10 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { FileViewer } from "./index";
 import type { FileViewerProps } from "./FileViewer.types";
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  const scrollIntoViewMock = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoViewMock;
+});
 
 const SKILL = ["---", "name: adapt", "description: Adapts designs", "---", "# Adapt", "", "Resize the grid."].join("\n");
 const MCP = '{\n  "command": "npx",\n  "env": { "KEY": "••••••" }\n}';
@@ -99,6 +104,27 @@ describe("FileViewer", () => {
     expect(screen.getByRole("textbox", { name: "Skill markdown" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rendered" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Find in file" })).toBeNull();
+  });
+
+  it("switches a rendered markdown file to Source when asked to show a line", () => {
+    const { rerender } = render(
+      <FileViewer name="CLAUDE.md" content={"# A\nB"} format="markdown" path="/x/CLAUDE.md" loading={false} error={null} />,
+    );
+    expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
+    rerender(
+      <FileViewer name="CLAUDE.md" content={"# A\nB"} format="markdown" path="/x/CLAUDE.md" loading={false} error={null} focusLine={2} />,
+    );
+    expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
+  });
+
+  it("lets the reader go back to Rendered after a line jump", () => {
+    render(
+      <FileViewer name="CLAUDE.md" content={"# A\nB"} format="markdown" path="/x/CLAUDE.md" loading={false} error={null} focusLine={2} />,
+    );
+    expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Rendered" }));
+    expect(screen.getByRole("heading", { name: "A" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
   });
 
   it("has no accessibility violations, rendered or as source", async () => {

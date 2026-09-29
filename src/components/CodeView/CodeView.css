@@ -25,6 +25,10 @@
   background: color-mix(in srgb, var(--group) 70%, transparent);
 }
 
+.cv__line--focus {
+  background: var(--blue-tint);
+}
+
 .cv__num {
   padding: 0 16px 0 20px;
   text-align: right;

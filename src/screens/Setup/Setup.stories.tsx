@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Setup } from "./Setup";
-import type { TableState } from "@/components/DataTable";
-import type { ArtifactView, SetupView, UsageStat } from "@/lib/ipc";
+import type { ArtifactView, FileRow, SetupView, UsageStat } from "@/lib/ipc";
+import type { LensData } from "./Setup.types";
 import "@/styles/shell.css";
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
@@ -28,6 +28,8 @@ const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   grade: null,
   score: null,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: null,
   ...o,
 });
@@ -241,79 +243,162 @@ const noHarness: SetupView = {
   projects: [],
 };
 
+/** Graded files no inventory row points at — an extra scan folder's instruction files. */
+const gradedOnly: FileRow[] = [
+  {
+    id: "/code/side-project/AGENTS.md",
+    name: "AGENTS.md",
+    path: "/code/side-project/AGENTS.md",
+    project: "side-project",
+    project_id: "/code/side-project",
+    kind: "AGENTS.md",
+    grade: "D",
+    score: 58,
+    issue_count: 4,
+    modified: null,
+    worst_severity: "hi",
+  },
+  {
+    id: "/code/side-project/.cursorrules",
+    name: ".cursorrules",
+    path: "/code/side-project/.cursorrules",
+    project: "side-project",
+    project_id: "/code/side-project",
+    kind: ".cursorrules",
+    grade: "B",
+    score: 84,
+    issue_count: 1,
+    modified: null,
+    worst_severity: "lo",
+  },
+];
+
 /**
- * Tab strips and tables remember themselves in `sessionStorage`, which
- * outlives a story swap — so every story starts from a clean slate and the
- * filtered one seeds exactly the view it means to show. Written during the
- * decorator's render, before the table below it mounts and reads.
+ * The table remembers its search, pills and sort in `sessionStorage`, which
+ * outlives a story swap — so every story starts from a clean slate. Run
+ * during the decorator's render, before the table below it mounts and reads.
  */
-const seedState = (entries: Record<string, TableState> = {}) => {
+const clearState = () => {
   for (const key of Object.keys(window.sessionStorage)) {
-    if (key.startsWith("pj.table.") || key.startsWith("pj.tabs.")) {
-      window.sessionStorage.removeItem(key);
-    }
-  }
-  for (const [key, state] of Object.entries(entries)) {
-    window.sessionStorage.setItem(`pj.table.${key}`, JSON.stringify(state));
+    if (key.startsWith("pj.table.")) window.sessionStorage.removeItem(key);
   }
 };
 
 /**
- * The setup inventory: one table per artifact kind, sortable, searchable and
- * annotated with whether anything ever used what is installed. Storybook feeds
- * the screen a fixture through the `data` prop — in the app it comes from
- * `useSetup`.
+ * The Setup home: one table over every kind, narrowed by the kind chips and
+ * the summary line's filters. Storybook feeds the screen a fixture through
+ * `data` and `files` — in the app they come from `useSetup`.
  */
 const meta = {
   title: "Screens/Setup",
   component: Setup,
-  args: { navigate: () => {}, data: populated },
+  args: { navigate: () => {}, data: populated, files: [] },
   parameters: { layout: "fullscreen" },
   decorators: [
-    (Story) => (
-      <div style={{ height: "100vh", background: "var(--bg)" }}>
-        <Story />
-      </div>
-    ),
+    (Story) => {
+      clearState();
+      return (
+        <div style={{ height: "100vh", background: "var(--bg)" }}>
+          <Story />
+        </div>
+      );
+    },
   ],
 } satisfies Meta<typeof Setup>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A detected harness with a full global layer, a plugin and two projects. */
-export const Populated: Story = {
-  decorators: [
-    (Story) => {
-      seedState();
-      return <Story />;
-    },
-  ],
+/** The All chip: every kind in one table, Kind then Name, with the Kind column. */
+export const AllItems: Story = {};
+
+/** One kind (Skills): the Kind column drops away and the usage columns stay. */
+export const OneKind: Story = {
+  args: { target: { kind: "skill" } },
 };
 
 /**
- * The Skills tab pinned to "Never used": what is installed but has never
- * fired, which is the whole reason the annotation is there.
+ * "never used" pressed on the summary line: what is installed but has never
+ * fired, across every kind the usage index counts.
  */
-export const FilteredToNeverUsed: Story = {
-  args: { initialTab: "skill" },
-  decorators: [
-    (Story) => {
-      seedState({
-        "setup.skill": { search: "", pills: { status: ["never"] }, sort: { id: "uses", desc: true } },
-      });
-      return <Story />;
-    },
-  ],
+export const NeverUsedFilter: Story = {
+  args: { target: { filter: "never" } },
 };
 
-/** Nothing installed — the only way forward is to name a folder. */
-export const NoHarnessDetected: Story = {
+/** Graded files the inventory never saw join as Instructions, with their findings. */
+export const WithGradedOnlyFiles: Story = {
+  args: { files: gradedOnly, target: { kind: "rule" } },
+};
+
+/**
+ * A deep link that opens an item on a tab: the viewer over the table. Outside
+ * the desktop app the file itself cannot be read, so Content says so.
+ */
+export const ItemOpen: Story = {
+  args: { target: { kind: "skill", open: { artifactId: 2 }, tab: "usage" } },
+};
+
+/** Nothing installed — the only way forward is to add a folder. */
+export const NoHarness: Story = {
   args: { data: noHarness },
-  decorators: [
-    (Story) => {
-      seedState();
-      return <Story />;
-    },
+};
+
+/** The inventory query failed: say so, and offer the retry. */
+export const Unreadable: Story = {
+  args: { data: null },
+};
+
+/** What the desktop app would read for prompt-janitor: its load order, and 14 days of its sessions. */
+const pjLens: LensData = {
+  effective: [
+    { layer: "global", path: "/home/u/.claude/artifact.md", name: "CLAUDE.md", grade: "B", file_id: "f-global" },
+    { layer: "project", path: "/Users/dev/code/prompt-janitor/CLAUDE.md", name: "CLAUDE.md", grade: "C", file_id: "f-pj" },
   ],
+  usage: {
+    ranked: [
+      { kind: "skill", target: "systematic-debugging", artifact_id: 2, uses: 9, sessions: 6, error_rate: 0, avg_turn_tokens: 1300, last_used: "2026-08-19T10:00:00.000Z" },
+    ],
+    sessions_per_day: [3, 1, 0, 4, 2, 5, 0, 1, 3, 2, 6, 1, 0, 2].map((count, i) => ({
+      day: `2026-08-${String(6 + i).padStart(2, "0")}`,
+      count,
+    })),
+  },
+};
+
+/**
+ * The lens on a live project: only what loads there, instructions first in
+ * load order under `#`, usage from this project's sessions only, the project
+ * strip above the table and no Scope filter.
+ */
+export const Lensed: Story = {
+  args: { target: { lens: "/Users/dev/code/prompt-janitor" }, lensData: pjLens },
+};
+
+/** The lens while the project's usage is still being read: a note instead of any usage count. */
+export const LensedUsageLoading: Story = {
+  args: {
+    target: { lens: "/Users/dev/code/prompt-janitor" },
+    lensData: { effective: pjLens.effective, usage: null, loading: true },
+  },
+};
+
+/** The lens after the project's usage read failed: an alert with Retry, and no usage claims. */
+export const LensedUsageFailed: Story = {
+  args: {
+    target: { lens: "/Users/dev/code/prompt-janitor" },
+    lensData: { effective: pjLens.effective, usage: null, failed: true, retry: () => {} },
+  },
+};
+
+/** The lens on a project whose folder is gone: the strip's message, and an empty table under it. */
+export const LensedMissingFolder: Story = {
+  args: { target: { lens: "/Users/dev/code/old-experiment" } },
+};
+
+/**
+ * The lens on a folder no harness knows, only the grader: no strip, and
+ * the table holds the global setup plus that folder's graded files.
+ */
+export const LensedNoHarness: Story = {
+  args: { files: gradedOnly, target: { lens: "/code/side-project" } },
 };

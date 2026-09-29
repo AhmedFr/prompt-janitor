@@ -1,0 +1,138 @@
+/* Flush with the viewer: the editor takes the body the source view had, on
+   the same metrics (SF Mono 12px on a 20px row) and the header's 20px edge,
+   so Edit reads as the Source view without its gutter. */
+.sp__editor {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 320px;
+  resize: none;
+  padding: 8px 20px 24px;
+  border: 0;
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 20px;
+  font-variant-ligatures: none;
+  /* Markdown is written as wrapped prose; a horizontal scrollbar in the
+     editor would hide the ends of the very lines being edited. */
+  white-space: pre-wrap;
+  tab-size: 2;
+}
+
+.sp__editor:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.sp__dirty {
+  font-size: 11px;
+  color: var(--tone-stale-fg);
+  background: var(--tone-stale-tint);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+}
+
+/* Confined to the panel rather than the window: the thing at risk is the
+   draft in this drawer, so the question belongs over the drawer. */
+.sp__confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(233, 233, 235, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.sp__confirm-card {
+  background: var(--card);
+  border: 0.5px solid var(--sep);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+  padding: 18px 20px;
+  max-width: 380px;
+}
+
+.sp__confirm-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.sp__confirm-body {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sp__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* The viewer's own tabs sit flush under the path bar, underlined rather than
+   pill-tracked, so they read as part of the sheet and never as the page's
+   Setup tabs. */
+.iv-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  height: 32px;
+  padding: 0 20px;
+  border-bottom: 0.5px solid var(--sep);
+  flex: 0 0 auto;
+}
+
+.iv-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.iv-tab--on {
+  color: var(--text);
+  border-bottom-color: var(--blue);
+}
+
+.iv-tab:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.iv-tab__count {
+  min-width: 1.4em;
+  text-align: center;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--tone-error-tint);
+  color: var(--tone-error-fg);
+  font-size: 11px;
+}
+
+.iv-step {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* Findings and Usage bring no frame of their own: the panel pads them to the
+   header's 20px edge and scrolls them, where the file viewer scrolls itself. */
+.iv-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+}

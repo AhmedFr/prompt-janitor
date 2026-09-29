@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { CodeView } from "./index";
@@ -49,6 +49,21 @@ describe("CodeView", () => {
   it("names the region", () => {
     render(<CodeView content="x" language={null} ariaLabel="SKILL.md source" />);
     expect(screen.getByRole("region", { name: "SKILL.md source" })).toBeInTheDocument();
+  });
+
+  it("marks and scrolls to the focused line", () => {
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const { container } = render(<CodeView content={"a\nb\nc"} language={null} ariaLabel="x" focusLine={2} />);
+      const lines = container.querySelectorAll(".cv__line");
+      expect(lines[1]).toHaveClass("cv__line--focus");
+      expect(lines[0]).not.toHaveClass("cv__line--focus");
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("has no accessibility violations", async () => {

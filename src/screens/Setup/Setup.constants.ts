@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "@/lib/ipc";
+import { ERROR_RATE_THRESHOLD } from "@/lib/setupFilter";
 
 /**
  * The order artifact kinds are presented in — configuration first (rules), then
@@ -16,8 +17,6 @@ export const KIND_ORDER: readonly ArtifactKind[] = [
   "settings",
 ] as const;
 
-/** An artifact whose invocations fail this often is worth a second look. */
-export const ERROR_RATE_THRESHOLD = 0.25;
 
 /**
  * Where the Error % column turns amber: failing one call in ten is not yet a
@@ -29,40 +28,39 @@ export const ERROR_RATE_WATCH = 0.1;
 /** The Error % column's green / amber / red lines. Red is exactly what the "Errors" filter keeps. */
 export const ERROR_RATE_BANDS = { watch: ERROR_RATE_WATCH, bad: ERROR_RATE_THRESHOLD } as const;
 
-/**
- * "High cost" is relative, not absolute: an artifact costs a lot when its
- * average turn burns at least twice what the typical measured artifact burns.
- */
-export const COST_MEDIAN_MULTIPLIER = 2;
 
-/** Fewest measured artifacts a median needs before "high cost" means anything. */
-export const MIN_COST_SAMPLES = 2;
+/** `sessionStorage` suffix Setup's one table remembers its search, pills and sort under (`pj.table.setup.unified`). */
+export const TABLE_STATE_KEY = "setup.unified";
 
-/** `sessionStorage` suffix the kind tab strip remembers itself under (`pj.tabs.setup`). */
-export const TAB_STATE_KEY = "setup";
+/** The lensed table's own state key: its rows arrive in load order, and it has no Scope to remember. */
+export const LENS_TABLE_STATE_KEY = "setup.lens";
 
-/** Prefix of each kind table's own `pj.table.setup.<kind>` entry. */
-export const TABLE_STATE_PREFIX = "setup.";
+/** What an empty slice suggests doing about it — the only lever from this screen. */
+export const EMPTY_HINT = "Scan to pick up anything added since the last scan.";
 
-/** What an empty tab suggests doing about it — the only lever from this screen. */
-export const EMPTY_HINT = "Rescan to pick up anything added since the last scan.";
+/** What the table says when the chips, filters or search leave nothing (spec §4.5). */
+export const EMPTY_FILTERED = "No items match";
 
-/**
- * What an empty tab says. Spelled per kind rather than derived from the tab
- * label: "No mcp found" is what lower-casing "MCP" gets you, and a screen
- * that only ever shows this line when there is nothing at all to show is the
- * wrong place to be clever.
- */
-export const EMPTY_TITLE: Record<ArtifactKind, string> = {
-  rule: "No rule files found",
-  skill: "No skills installed",
-  agent: "No agents installed",
-  command: "No commands installed",
-  hook: "No hooks configured",
-  mcp_server: "No MCP servers configured",
-  plugin: "No plugins installed",
-  settings: "No settings files found",
-};
+/** What the table says when the scan found a harness but no items at all. */
+export const NO_ITEMS_TITLE = "No items in this setup yet";
+
+/** The Instructions chip's one action: write a starter instruction file from a template. */
+export const NEW_FROM_TEMPLATE = "New from template…";
+
+/** What Setup says when the scan found no harness at all (spec §4.5). */
+export const NO_HARNESS_TITLE = "No Claude Code setup found";
 
 /** One box searches every column that holds words, so it says so once. */
-export const SEARCH_PLACEHOLDER = "Search name, description or scope";
+export const SEARCH_PLACEHOLDER = "Search name, description, path or scope";
+
+/** The lensed table under the missing-folder banner: nothing loads from a folder that is gone. */
+export const MISSING_FOLDER_EMPTY = "Nothing to show while the folder is missing.";
+
+/** What a failed Reveal in Finder says before the reason. */
+export const REVEAL_FAILED = "Could not reveal the folder";
+
+/** In place of the lens's usage counts while the project's usage is being read. */
+export const LENS_USAGE_LOADING = "Reading this project's usage…";
+
+/** In place of the lens's usage counts when the project's usage could not be read. */
+export const LENS_USAGE_FAILED = "This project's usage could not be read.";

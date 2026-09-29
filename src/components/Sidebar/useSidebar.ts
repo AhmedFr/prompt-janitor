@@ -14,20 +14,17 @@ import { recentProjects } from "./sidebar.util";
  */
 export function useSidebar() {
   const [projects, setProjects] = useState<SidebarProject[]>([]);
-  const [counts, setCounts] = useState<NavCounts>({});
+  // No nav item carries a badge count today (Prompts was the last one, and it
+  // left the sidebar); kept as a stable empty value so `NavCounts` and
+  // `Sidebar`'s badge rendering stay ready for whichever destination needs one next.
+  const [counts] = useState<NavCounts>({});
 
   const refetch = useCallback(async () => {
     if (!isTauri) return;
-    const [projectsRes, files, rules] = await Promise.all([
-      commands.listProjects(),
-      commands.listFiles(),
-      commands.listRules(),
-    ]);
+    const projectsRes = await commands.listProjects();
     if (projectsRes.status === "ok") {
       setProjects(recentProjects(projectsRes.data, RECENT_PROJECTS_LIMIT));
     }
-    if (files.status === "ok") setCounts((prev) => ({ ...prev, prompts: files.data.length }));
-    if (rules.status === "ok") setCounts((prev) => ({ ...prev, rules: rules.data.length }));
   }, []);
 
   useEffect(() => {

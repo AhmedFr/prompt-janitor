@@ -77,3 +77,10 @@ export const Editing: Story = {
     editor: <textarea className="sp__editor" aria-label="Skill markdown" defaultValue={SKILL} />,
   },
 };
+
+/** A specific line is highlighted and focused; source mode is forced even for markdown. */
+export const FocusedLine: Story = {
+  args: {
+    focusLine: 10,
+  },
+};

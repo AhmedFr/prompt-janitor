@@ -9,44 +9,55 @@ use std::path::Path;
 
 use rusqlite::{params, Connection};
 
-/// Persist `folders` as the extra scan folders, then delete every project that
-/// sat inside a folder no longer listed and that nothing else still scans.
-/// Returns how many projects were dropped.
+/// Which project roots would be dropped if `folders` became the extra scan
+/// folder list — the projects that sit inside a folder no longer listed and
+/// that nothing else would still scan. Read-only: makes no changes, so both
+/// `replace_extra_folders` and a preview command can call it.
 ///
 /// "Nothing else" is every remaining extra folder and every harness project on
 /// disk, related in either direction: a harness session in `mono/apps/web`
-/// resolves to the repo root `mono`, so `mono` stays. Being conservative here
-/// is cheap — anything kept by mistake goes at the next scan, which rebuilds
-/// the table from scratch anyway.
-pub fn replace_extra_folders(conn: &Connection, folders: &[String]) -> rusqlite::Result<u32> {
+/// resolves to the repo root `mono`, so `mono` stays.
+pub fn projects_dropped_by(conn: &Connection, folders: &[String]) -> rusqlite::Result<Vec<String>> {
     let removed: Vec<String> = crate::query::extra_scan_folders(conn)
         .into_iter()
         .filter(|old| !folders.contains(old))
         .collect();
-
-    let json = serde_json::to_string(folders).unwrap_or_else(|_| "[]".into());
-    crate::query::set_setting(conn, "extra_scan_folders", &json)?;
     if removed.is_empty() {
-        return Ok(0);
+        return Ok(Vec::new());
     }
 
     let mut covering: Vec<String> = harness_paths(conn)?;
     covering.extend(folders.iter().cloned());
 
-    let mut dropped = 0;
+    let mut dropped = Vec::new();
     for root in project_roots(conn)? {
         let orphaned = removed.iter().any(|folder| inside(&root, folder))
             && !covering
                 .iter()
                 .any(|c| inside(&root, c) || inside(c, &root));
         if orphaned {
-            // Files cascade to their issues; grade history is kept, as a scan keeps it.
-            conn.execute("DELETE FROM files WHERE project_id = ?1", params![root])?;
-            conn.execute("DELETE FROM projects WHERE id = ?1", params![root])?;
-            dropped += 1;
+            dropped.push(root);
         }
     }
     Ok(dropped)
+}
+
+/// Persist `folders` as the extra scan folders, then delete every project
+/// `projects_dropped_by` says is now orphaned. Returns how many projects were
+/// dropped. Being conservative here is cheap — anything kept by mistake goes
+/// at the next scan, which rebuilds the table from scratch anyway.
+pub fn replace_extra_folders(conn: &Connection, folders: &[String]) -> rusqlite::Result<u32> {
+    let dropped = projects_dropped_by(conn, folders)?;
+
+    let json = serde_json::to_string(folders).unwrap_or_else(|_| "[]".into());
+    crate::query::set_setting(conn, "extra_scan_folders", &json)?;
+
+    for root in &dropped {
+        // Files cascade to their issues; grade history is kept, as a scan keeps it.
+        conn.execute("DELETE FROM files WHERE project_id = ?1", params![root])?;
+        conn.execute("DELETE FROM projects WHERE id = ?1", params![root])?;
+    }
+    Ok(dropped.len() as u32)
 }
 
 /// Whether `path` is `dir` or below it, component-wise (`/sidecar` is not in `/side`).
@@ -190,5 +201,84 @@ mod tests {
         project(&conn, "/work/api");
         assert_eq!(set(&conn, &["/side"]), 0);
         assert_eq!(roots(&conn), vec!["/work/api"]);
+    }
+
+    // `projects_dropped_by` is the read-only half `replace_extra_folders` calls
+    // before it mutates anything, and what the `preview_folder_removal`
+    // command calls directly — same cases, so the preview and the actual
+    // removal can never disagree.
+    mod dry_run {
+        use super::*;
+
+        #[test]
+        fn removing_a_folder_drops_the_projects_only_it_covered() {
+            let conn = conn();
+            set(&conn, &["/work", "/side"]);
+            project(&conn, "/work/api");
+            project(&conn, "/side/blog");
+
+            let dropped = projects_dropped_by(&conn, &["/work".to_string()]).unwrap();
+
+            assert_eq!(dropped, vec!["/side/blog".to_string()]);
+        }
+
+        #[test]
+        fn keeps_a_project_a_harness_still_works_in() {
+            let conn = conn();
+            set(&conn, &["/side"]);
+            project(&conn, "/side/blog");
+            harness_project(&conn, "/side/blog");
+
+            assert_eq!(
+                projects_dropped_by(&conn, &[]).unwrap(),
+                Vec::<String>::new()
+            );
+        }
+
+        #[test]
+        fn keeps_a_repo_root_a_harness_works_somewhere_inside() {
+            // A harness session in `/side/mono/apps/web` resolves to the repo
+            // root `/side/mono`, so that project is still scanned.
+            let conn = conn();
+            set(&conn, &["/side"]);
+            project(&conn, "/side/mono");
+            harness_project(&conn, "/side/mono/apps/web");
+
+            assert_eq!(
+                projects_dropped_by(&conn, &[]).unwrap(),
+                Vec::<String>::new()
+            );
+        }
+
+        #[test]
+        fn the_dry_run_deletes_nothing() {
+            let conn = conn();
+            set(&conn, &["/work", "/side"]);
+            project(&conn, "/work/api");
+            project(&conn, "/side/blog");
+
+            let dropped = projects_dropped_by(&conn, &["/work".to_string()]).unwrap();
+            assert_eq!(
+                dropped,
+                vec!["/side/blog".to_string()],
+                "it does report the drop"
+            );
+
+            // ... but the projects, their files, and the persisted folder list
+            // are exactly as `set` left them — nothing here writes.
+            assert_eq!(roots(&conn), vec!["/side/blog", "/work/api"]);
+            let files: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM files WHERE project_id = '/side/blog'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(files, 1);
+            assert_eq!(
+                crate::query::extra_scan_folders(&conn),
+                vec!["/work", "/side"]
+            );
+        }
     }
 }

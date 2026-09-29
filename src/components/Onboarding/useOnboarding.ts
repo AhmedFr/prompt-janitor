@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { commands, type HarnessInfo, type ScanSummary } from "@/lib/ipc";
+import { commands, type HarnessInfo } from "@/lib/ipc";
 import { addExtraFolder } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
+import { scanTotalsLine, setupRevealLine } from "./reveal.util";
 import type { OnboardingState, OnboardingStep } from "./Onboarding.types";
 
 /**
@@ -16,7 +17,7 @@ import type { OnboardingState, OnboardingStep } from "./Onboarding.types";
 export function useOnboarding(): OnboardingState {
   const [detected, setDetected] = useState<HarnessInfo[]>([]);
   const [step, setStep] = useState<OnboardingStep>("detecting");
-  const [summary, setSummary] = useState<ScanSummary | null>(null);
+  const [setupLine, setSetupLine] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const { phase, progress } = useScanProgress();
 
@@ -46,7 +47,18 @@ export function useOnboarding(): OnboardingState {
     setStep("scanning");
     const res = await commands.scanNow();
     if (res.status === "ok") {
-      setSummary(res.data);
+      const { files_scanned, projects } = res.data;
+      // Counted like Setup's own summary line; if the setup cannot be read the
+      // scan's own totals still say something true.
+      const [setup, files] = await Promise.all([
+        Promise.resolve(commands.getSetup()).catch(() => null),
+        Promise.resolve(commands.listFiles()).catch(() => null),
+      ]);
+      setSetupLine(
+        setup?.status === "ok"
+          ? setupRevealLine(setup.data, files?.status === "ok" ? files.data : [])
+          : scanTotalsLine(files_scanned, projects),
+      );
       setStep("reveal");
       return;
     }
@@ -69,7 +81,7 @@ export function useOnboarding(): OnboardingState {
     step,
     status: scanStatusLine(phase, progress, harnessName),
     progress,
-    summary,
+    setupLine,
     failed,
     start: scan,
     addFolder,

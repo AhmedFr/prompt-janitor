@@ -6,7 +6,12 @@ import type { ProjectRow } from "@/lib/ipc";
 // Deep import rather than the Setup barrel: this is one pure formatter, and
 // the barrel would pull the whole Setup screen in behind it.
 import { relativeSession } from "@/screens/Setup/setup.util";
-import { GLYPH_SIZE, MISSING_FOLDER_CHIP } from "./Projects.constants";
+import { GLYPH_SIZE } from "./Projects.constants";
+import { trim } from "@/lib/projectPath";
+import { projectCounts } from "./projects.util";
+import type { ProjectsColumnsCtx } from "./Projects.types";
+
+export type { ProjectsColumnsCtx };
 
 /**
  * The grade a project sorts under. `ProjectRow.grade` is non-null today (the
@@ -29,83 +34,85 @@ const byGradeThenIssues: SortingFn<ProjectRow> = (a, b) => {
   return b.original.issue_count - a.original.issue_count;
 };
 
+/** Shown where a count is not known (not loaded yet, or its query failed) — never a false 0. */
+const UNKNOWN = "—";
+
 /** A right-aligned count cell — every rollup number in this table renders the same way. */
-function countColumn(id: string, header: string, value: (r: ProjectRow) => number): ColumnDef<ProjectRow, unknown> {
+function countColumn(id: string, header: string, value: (r: ProjectRow) => number | null): ColumnDef<ProjectRow, unknown> {
   return {
     id,
     header,
-    accessorFn: value,
+    // Unknown sorts below every real count.
+    accessorFn: (r) => value(r) ?? -1,
     meta: { align: "right" },
-    cell: (c) => <span className="dt-num">{value(c.row.original)}</span>,
+    cell: (c) => <span className="dt-num">{value(c.row.original) ?? UNKNOWN}</span>,
   };
 }
 
-/**
- * The projects table, defined once at module level: `DataTable` memoises its
- * filtering, faceting and column model on this array's identity (see
- * `DataTableProps`), and nothing here closes over screen state, so there is
- * nothing to rebuild per render.
- */
-export const PROJECT_COLUMNS: ColumnDef<ProjectRow, unknown>[] = [
-  {
-    id: "name",
-    header: "Name",
-    accessorKey: "name",
-    // Inline rather than a named component: this module exports column
-    // *definitions*, and a capitalized helper here would trip Fast Refresh's
-    // one-component-per-file check for no benefit.
-    cell: (c) => (
-      <span className="projects-name">
-        <ProjectGlyph
-          name={c.row.original.name}
-          grade={c.row.original.grade}
-          logo={c.row.original.logo}
-          size={GLYPH_SIZE}
-        />
-        {c.row.original.name}
-      </span>
-    ),
-  },
-  {
-    id: "grade",
-    header: "Grade",
-    accessorFn: gradeKey,
-    sortingFn: byGradeThenIssues,
-    // Reads the raw grade, not the "Z"-substituted sort key above.
-    cell: (c) => <GradeCell grade={c.row.original.grade} />,
-  },
-  countColumn("files", "Rule files", (r) => r.file_count),
-  countColumn("issues", "Open issues", (r) => r.issue_count),
-  countColumn("sessions", "Sessions", (r) => r.session_count),
-  {
-    id: "lastSession",
-    header: "Last session",
-    // ISO-8601 timestamps sort lexicographically; a project that never had a
-    // session sorts under "" — first ascending, last descending, which is
-    // where "newest first" wants it.
-    accessorFn: (r) => r.last_session_at ?? "",
-    cell: (c) => <span className="muted">{relativeSession(c.row.original.last_session_at)}</span>,
-  },
-  countColumn("neverUsed", "Never used", (r) => r.never_used_count),
-  countColumn("errors", "Errors", (r) => r.error_count),
-  {
-    id: "status",
-    header: "Status",
-    // Nothing to order by: the column is blank for every project still on
-    // disk, so a sort control on it would be furniture.
-    enableSorting: false,
-    cell: (c) =>
-      c.row.original.exists ? null : (
-        <span className="projects-chip projects-chip--missing">{MISSING_FOLDER_CHIP}</span>
-      ),
-  },
-];
+const NAME_COLUMN: ColumnDef<ProjectRow, unknown> = {
+  id: "name",
+  header: "Name",
+  accessorKey: "name",
+  // Inline rather than a named component: this module exports column
+  // *definitions*, and a capitalized helper here would trip Fast Refresh's
+  // one-component-per-file check for no benefit.
+  cell: (c) => (
+    <span className="projects-name">
+      <ProjectGlyph
+        name={c.row.original.name}
+        grade={c.row.original.grade}
+        logo={c.row.original.logo}
+        size={GLYPH_SIZE}
+      />
+      {c.row.original.name}
+    </span>
+  ),
+};
+
+const GRADE_COLUMN: ColumnDef<ProjectRow, unknown> = {
+  id: "grade",
+  header: "Grade",
+  accessorFn: gradeKey,
+  sortingFn: byGradeThenIssues,
+  // Reads the raw grade, not the "Z"-substituted sort key above.
+  cell: (c) => <GradeCell grade={c.row.original.grade} />,
+};
+
+const LAST_SESSION_COLUMN: ColumnDef<ProjectRow, unknown> = {
+  id: "lastSession",
+  header: "Last session",
+  // ISO-8601 timestamps sort lexicographically; a project that never had a
+  // session sorts under "" — first ascending, last descending, which is
+  // where "newest first" wants it.
+  accessorFn: (r) => r.last_session_at ?? "",
+  cell: (c) => <span className="muted">{relativeSession(c.row.original.last_session_at)}</span>,
+};
+
+const cache = new WeakMap<ProjectsColumnsCtx, ColumnDef<ProjectRow, unknown>[]>();
 
 /**
- * Best grade first, and within a grade the project with the most open issues
- * first — the two questions the table exists to answer, in that order.
+ * The Projects table (spec §7): exactly these columns, in this order.
+ * Cached per `ctx` because `DataTable` memoises on the array's identity.
  */
-export const DEFAULT_SORT = { id: "grade", desc: false } as const;
+export function projectColumns(ctx: ProjectsColumnsCtx): ColumnDef<ProjectRow, unknown>[] {
+  const hit = cache.get(ctx);
+  if (hit) return hit;
+  const defs = [
+    NAME_COLUMN,
+    GRADE_COLUMN,
+    countColumn("files", "Instructions", (r) => r.file_count),
+    countColumn("items", "Items available", (r) => projectCounts(r, ctx)?.items ?? null),
+    countColumn("sessions", "Sessions (90 days)", (r) => (ctx.sessions90 ? (ctx.sessions90.get(trim(r.id)) ?? 0) : null)),
+    LAST_SESSION_COLUMN,
+    countColumn("neverUsed", "Never used", (r) => projectCounts(r, ctx)?.neverUsed ?? null),
+    countColumn("errors", "Erroring", (r) => projectCounts(r, ctx)?.erroring ?? null),
+  ];
+  cache.set(ctx, defs);
+  return defs;
+}
+
+/** Newest activity first: the project worked in most recently leads. */
+export const DEFAULT_SORT = { id: "lastSession", desc: true } as const;
 
 /** A harness id (`claude_code`) as the product spells it (`Claude Code`). */
 export function harnessLabel(id: string): string {
@@ -139,7 +146,7 @@ export function buildPills(rows: ProjectRow[]): PillGroup<ProjectRow>[] {
       label: "Status",
       multi: true,
       options: [
-        { id: "issues", label: "Has issues", predicate: (r: ProjectRow) => r.issue_count > 0 },
+        { id: "issues", label: "Has findings", predicate: (r: ProjectRow) => r.issue_count > 0 },
         { id: "missing", label: "Missing folder", predicate: (r: ProjectRow) => !r.exists },
       ],
     },

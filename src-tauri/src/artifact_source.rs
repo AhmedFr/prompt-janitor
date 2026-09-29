@@ -79,10 +79,15 @@ pub const MAX_CONFIG_BYTES: usize = 64 * 1024 * 1024;
 
 /// The artifact kinds this module will write.
 ///
-/// Only skills for now. Agents and commands are the same shape and would slot
-/// in here unchanged, but each one added is a new file the app can overwrite,
-/// so the list grows when a screen actually needs it and not before.
-const EDITABLE_KINDS: &[&str] = &["skill"];
+/// `rule` only when the file is markdown: a `.cursorrules` or other
+/// plain-text rule file has no edit view worth offering, and every kind
+/// added is a new file the app can overwrite.
+const EDITABLE_KINDS: &[&str] = &["skill", "agent", "command", "rule"];
+
+/// Whether this row's file may be written from the viewer.
+fn is_editable(kind: &str, path: &str) -> bool {
+    EDITABLE_KINDS.contains(&kind) && (kind != "rule" || format_of(path) == SourceFormat::Markdown)
+}
 
 /// The kinds that are an entry inside a shared JSON file rather than a file of
 /// their own. They read back as the harness's redacted excerpt, never raw.
@@ -130,7 +135,7 @@ fn row(conn: &Connection, artifact_id: i32) -> Result<Row, String> {
 /// row — from being written through the panel.
 fn editable_path(conn: &Connection, artifact_id: i32) -> Result<String, String> {
     let Row { kind, path, .. } = row(conn, artifact_id)?;
-    if !EDITABLE_KINDS.contains(&kind.as_str()) {
+    if !is_editable(kind.as_str(), &path) {
         return Err(format!("A {kind} can't be edited here."));
     }
     Ok(path)
@@ -195,7 +200,7 @@ pub fn read_source(conn: &Connection, artifact_id: i32) -> Result<ArtifactSource
     let (content, meta) = read_capped(&path, MAX_BYTES)?;
     Ok(ArtifactSource {
         format: format_of(&path),
-        editable: EDITABLE_KINDS.contains(&row.kind.as_str()),
+        editable: is_editable(row.kind.as_str(), &path),
         bytes: content.len() as i32,
         content,
         path,
@@ -255,6 +260,21 @@ pub fn opens_as_text(path: &str) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| OPENABLE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// The security gate every "reveal or open" command runs before touching
+/// LaunchServices: Reveal is always fine (Finder just selects the file), but
+/// Open refuses anything [`opens_as_text`] would not — the one place that
+/// rule is enforced, so `open_artifact` and `open_file` share it rather than
+/// each re-deciding what is safe to hand to LaunchServices.
+pub fn check_openable(path: &str, action: OpenAction) -> Result<(), String> {
+    match action {
+        OpenAction::Reveal => Ok(()),
+        OpenAction::Open if opens_as_text(path) => Ok(()),
+        OpenAction::Open => Err(
+            "Only text files open from here — use Reveal to find this one in Finder.".to_string(),
+        ),
+    }
 }
 
 /// An opaque equality token for a file's modification time.
@@ -422,17 +442,46 @@ mod tests {
     }
 
     #[test]
-    fn an_agent_reads_as_markdown_but_is_not_editable() {
+    fn an_agent_reads_as_editable_markdown() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("reviewer.md");
         std::fs::write(&path, "---\nname: reviewer\n---\nReview.").unwrap();
         let conn = test_conn();
         let id = insert_artifact(&conn, "agent", path.to_str().unwrap());
-
         let source = read_source(&conn, id).unwrap();
-        assert_eq!(source.content, "---\nname: reviewer\n---\nReview.");
         assert_eq!(source.format, SourceFormat::Markdown);
-        assert!(!source.editable);
+        assert!(source.editable);
+    }
+
+    #[test]
+    fn a_markdown_instruction_file_is_editable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("CLAUDE.md");
+        std::fs::write(&path, "# Rules\n").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "rule", path.to_str().unwrap());
+        assert!(read_source(&conn, id).unwrap().editable);
+    }
+
+    #[test]
+    fn a_cursorrules_instruction_file_stays_read_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(".cursorrules");
+        std::fs::write(&path, "be nice").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "rule", path.to_str().unwrap());
+        assert!(!read_source(&conn, id).unwrap().editable);
+        assert!(editable_path(&conn, id).is_err());
+    }
+
+    #[test]
+    fn a_settings_file_is_never_editable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}").unwrap();
+        let conn = test_conn();
+        let id = insert_artifact(&conn, "settings", path.to_str().unwrap());
+        assert!(editable_path(&conn, id).is_err());
     }
 
     /// A plugin's row names its install directory; it reads as the manifest
@@ -593,6 +642,18 @@ mod tests {
         assert!(!opens_as_text("/a/evil.terminal"));
         assert!(!opens_as_text("/a/tool.app"));
         assert!(!opens_as_text("/a/no-extension"));
+    }
+
+    #[test]
+    fn opening_refuses_a_command_or_app_but_allows_a_text_file() {
+        assert!(check_openable("/a/notes.md", OpenAction::Open).is_ok());
+        assert!(check_openable("/a/run.command", OpenAction::Open).is_err());
+        assert!(check_openable("/a/tool.app", OpenAction::Open).is_err());
+    }
+
+    #[test]
+    fn revealing_allows_anything_open_would_refuse() {
+        assert!(check_openable("/a/run.command", OpenAction::Reveal).is_ok());
     }
 
     #[test]

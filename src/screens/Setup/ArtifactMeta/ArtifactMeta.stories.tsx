@@ -15,6 +15,8 @@ const agent: ArtifactView = {
   grade: null,
   score: null,
   file_id: null,
+  issue_count: null,
+  worst_severity: null,
   usage: {
     total: 312,
     sessions: 18,
@@ -62,4 +64,9 @@ export const NeverUsed: Story = { args: { artifact: { ...agent, kind: "skill", u
 /** A kind nothing invokes: just what and where. */
 export const Settings: Story = {
   args: { artifact: { ...agent, kind: "settings", name: "settings.json", description: null, usage: null }, scope: "Global" },
+};
+
+/** A global instruction file several projects load every session. */
+export const LoadedInProjects: Story = {
+  args: { artifact: { ...agent, kind: "rule", name: "CLAUDE.md", description: null, usage: null }, scope: "Global", loadedIn: 5 },
 };

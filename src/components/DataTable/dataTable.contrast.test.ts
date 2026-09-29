@@ -4,7 +4,7 @@ import { AA_CONTRAST, contrastRatio } from "@/lib/contrast";
 /**
  * The `DataTable` chrome pairs, mirrored from `tokens.css` / `DataTable.css`.
  *
- * Composited by hand for the same reason `rankedList.contrast.test.ts` does
+ * Composited by hand for the same reason `tokens.contrast.test.ts` does
  * it: jsdom resolves no custom properties and composites no alpha, so a test
  * against computed styles would prove nothing. Change a colour in the CSS and
  * this test fails until the numbers here (and the CSS comments quoting them)

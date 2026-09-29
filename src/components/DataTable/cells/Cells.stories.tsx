@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import {
   ActionsCell,
   CountCell,
+  FindingsCell,
   GradeCell,
   LastUsedCell,
   NameCell,
@@ -93,6 +94,14 @@ export const AllCells: Story = {
         </Row>
         <Row label="TokensCell">
           <TokensCell value={1234567} /> · <TokensCell value={840} /> · <TokensCell value={null} />
+        </Row>
+        <Row label="FindingsCell">
+          <span style={{ display: "inline-flex", gap: 6 }}>
+            <FindingsCell count={3} severity="hi" />
+            <FindingsCell count={1} severity="mid" />
+            <FindingsCell count={5} severity="lo" />
+            <FindingsCell count={null} severity={null} />
+          </span>
         </Row>
         <Row label="ScopeCell">
           <span style={{ display: "inline-flex", gap: 6 }}>
@@ -186,6 +195,28 @@ export const UnknownValues: Story = {
         </Row>
         <Row label="PercentCell">
           <PercentCell value={null} /> vs <PercentCell value={0} />
+        </Row>
+      </tbody>
+    </table>
+  ),
+};
+
+/** Each finding severity level, and the ungraded state. */
+export const Findings: Story = {
+  render: () => (
+    <table>
+      <tbody>
+        <Row label="none">
+          <FindingsCell count={0} severity={null} />
+        </Row>
+        <Row label="critical · 3">
+          <FindingsCell count={3} severity="hi" />
+        </Row>
+        <Row label="warning · 1">
+          <FindingsCell count={1} severity="mid" />
+        </Row>
+        <Row label="nit · 5">
+          <FindingsCell count={5} severity="lo" />
         </Row>
       </tbody>
     </table>

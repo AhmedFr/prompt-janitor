@@ -4,6 +4,7 @@ export { CountCell } from "./CountCell";
 export { LastUsedCell } from "./LastUsedCell";
 export { PercentCell } from "./PercentCell";
 export { TokensCell } from "./TokensCell";
+export { FindingsCell } from "./FindingsCell";
 export { ScopeCell } from "./ScopeCell";
 export { PathCell } from "./PathCell";
 export { ActionsCell } from "./ActionsCell";
@@ -28,6 +29,7 @@ export type {
   RateThresholds,
   RateTone,
   TokensCellProps,
+  FindingsCellProps,
   ScopeCellProps,
   PathCellProps,
   ActionsCellProps,

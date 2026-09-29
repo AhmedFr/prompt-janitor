@@ -63,6 +63,10 @@ pub struct ArtifactView {
     pub grade: Option<String>,
     pub score: Option<u32>,
     pub file_id: Option<String>,
+    /// Open findings on the graded file, when the grader saw one.
+    pub issue_count: Option<u32>,
+    /// The worst of them; `None` when there are none or nothing was graded.
+    pub worst_severity: Option<crate::engine::Severity>,
     pub usage: Option<UsageStat>,
 }
 
@@ -114,6 +118,8 @@ pub struct RankedTarget {
     pub error_rate: f64,
     /// Mean context tokens per turn, over the turns that recorded any.
     pub avg_turn_tokens: Option<f64>,
+    /// The latest invocation of the target in the window, RFC3339.
+    pub last_used: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
@@ -263,9 +269,15 @@ fn usage_by_artifact(conn: &Connection) -> rusqlite::Result<HashMap<i64, UsageSt
     Ok(out)
 }
 
-const ARTIFACT_COLUMNS: &str = "SELECT a.id, a.harness, a.layer, a.kind, a.name, a.path,
-            a.plugin_name, a.description, a.bytes, f.grade, f.score, f.id, a.project_path
-       FROM artifacts a LEFT JOIN files f ON f.id = a.file_id";
+fn artifact_columns() -> String {
+    format!(
+        "SELECT a.id, a.harness, a.layer, a.kind, a.name, a.path,
+                a.plugin_name, a.description, a.bytes, f.grade, f.score, f.id, a.project_path,
+                f.issue_count, {}
+           FROM artifacts a LEFT JOIN files f ON f.id = a.file_id",
+        crate::severity_sql::worst_severity_sql("f.id")
+    )
+}
 
 /// Maps one `ARTIFACT_COLUMNS` row. Rows whose `layer`/`kind` are not in the
 /// model are dropped by the caller (`None`) rather than guessed at.
@@ -292,6 +304,8 @@ fn artifact_row(
         grade: r.get(9)?,
         score: r.get::<_, Option<i64>>(10)?.map(as_u32),
         file_id: r.get(11)?,
+        issue_count: r.get::<_, Option<i64>>(13)?.map(as_u32),
+        worst_severity: crate::severity_sql::parse_severity(r.get(14)?),
         usage: usage.get(&id).cloned(),
     }))
 }
@@ -303,7 +317,8 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
     let order = kind_order("a.kind");
 
     let mut global_stmt = conn.prepare(&format!(
-        "{ARTIFACT_COLUMNS} WHERE a.project_path IS NULL ORDER BY {order}, a.name"
+        "{} WHERE a.project_path IS NULL ORDER BY {order}, a.name",
+        artifact_columns()
     ))?;
     let mut global = Vec::new();
     for row in global_stmt.query_map([], |r| artifact_row(r, &usage))? {
@@ -316,7 +331,8 @@ pub fn setup_view(conn: &Connection) -> rusqlite::Result<SetupView> {
     // inventoried there.
     let mut per_project: HashMap<(String, String), Vec<ArtifactView>> = HashMap::new();
     let mut proj_stmt = conn.prepare(&format!(
-        "{ARTIFACT_COLUMNS} WHERE a.project_path IS NOT NULL ORDER BY {order}, a.name"
+        "{} WHERE a.project_path IS NOT NULL ORDER BY {order}, a.name",
+        artifact_columns()
     ))?;
     for row in proj_stmt.query_map([], |r| {
         Ok((
@@ -459,7 +475,7 @@ fn ranked_targets(
 ) -> rusqlite::Result<Vec<RankedTarget>> {
     const COLUMNS: &str = "SELECT kind, target,
                 CASE WHEN count(DISTINCT artifact_id) = 1 THEN max(artifact_id) END,
-                count(*), count(DISTINCT session_id), avg(is_error), avg(turn_tokens)
+                count(*), count(DISTINCT session_id), avg(is_error), avg(turn_tokens), max(ts)
            FROM invocations WHERE ts >= ?1";
     const GROUPING: &str = "GROUP BY kind, target ORDER BY count(*) DESC, target";
 
@@ -482,6 +498,7 @@ fn ranked_targets(
             r.get::<_, i64>(4)?,
             r.get::<_, Option<f64>>(5)?,
             r.get::<_, Option<f64>>(6)?,
+            r.get::<_, Option<String>>(7)?,
         ))
     };
     let rows = match scope {
@@ -493,7 +510,8 @@ fn ranked_targets(
 
     let mut ranked = Vec::new();
     for row in rows {
-        let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens) = row?;
+        let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens, last_used) =
+            row?;
         // A kind outside the model is dropped rather than guessed at.
         let Some(kind) = InvocationKind::parse(&kind) else {
             continue;
@@ -506,6 +524,7 @@ fn ranked_targets(
             sessions: as_u32(sessions),
             error_rate: error_rate.unwrap_or(0.0),
             avg_turn_tokens,
+            last_used,
         });
     }
     Ok(ranked)
@@ -717,6 +736,24 @@ mod tests {
     }
 
     #[test]
+    fn project_usage_reports_when_each_target_was_last_used() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        // 2026-08-02T00:00:00Z, the fixture's "now" (see `seeded`).
+        let u = project_usage(&conn, "claude_code", &app, 1_785_628_800, 30).unwrap();
+        let expected: Option<String> = conn
+            .query_row(
+                "SELECT max(ts) FROM invocations WHERE harness = 'claude_code' AND project_path = rtrim(?1, '/')
+                   AND kind = ?2 AND target = ?3",
+                rusqlite::params![app, u.ranked[0].kind.as_str(), u.ranked[0].target],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(u.ranked[0].last_used.is_some());
+        assert_eq!(u.ranked[0].last_used, expected);
+    }
+
+    #[test]
     fn setup_view_joins_grades_and_usage() {
         let (conn, home) = seeded();
         let v = setup_view(&conn).unwrap();
@@ -739,6 +776,37 @@ mod tests {
         assert_eq!(v.projects[0].name, "app");
         assert!(v.projects[0].exists);
         assert!(!v.projects[1].exists);
+    }
+
+    #[test]
+    fn setup_view_carries_each_graded_rows_finding_count_and_worst_severity() {
+        let (conn, _home) = seeded();
+        let v = setup_view(&conn).unwrap();
+        let rule = v
+            .global
+            .iter()
+            .find(|a| a.kind == ArtifactKind::Rule)
+            .unwrap();
+        let file_id = rule.file_id.clone().unwrap();
+        let expected: i64 = conn
+            .query_row(
+                "SELECT issue_count FROM files WHERE id = ?1",
+                [&file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rule.issue_count, Some(expected as u32));
+        let has_any: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM issues WHERE file_id = ?1",
+                [&file_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(rule.worst_severity.is_some(), has_any > 0);
+        // An ungraded item has neither.
+        let skill = v.global.iter().find(|a| a.name == "adapt").unwrap();
+        assert_eq!((skill.issue_count, skill.worst_severity), (None, None));
     }
 
     #[test]

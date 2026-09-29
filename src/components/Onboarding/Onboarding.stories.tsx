@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Onboarding } from "./Onboarding";
 import type { OnboardingState } from "./Onboarding.types";
-import type { HarnessInfo, ScanSummary } from "@/lib/ipc";
+import type { HarnessInfo } from "@/lib/ipc";
 import "@/styles/shell.css";
 
 const claudeCode: HarnessInfo = {
@@ -11,16 +11,6 @@ const claudeCode: HarnessInfo = {
   last_scan_at: null,
   project_count: 32,
   session_count: 177,
-};
-
-const summary: ScanSummary = {
-  files_scanned: 48,
-  projects: 32,
-  critical: 3,
-  warnings: 11,
-  nits: 24,
-  overall_score: 81,
-  overall_grade: "B",
 };
 
 /**
@@ -33,7 +23,7 @@ const state = (o: Partial<OnboardingState> = {}): OnboardingState => ({
   step: "detect",
   status: "Looking around…",
   progress: null,
-  summary: null,
+  setupLine: null,
   failed: false,
   start: async () => {},
   addFolder: async () => {},
@@ -76,9 +66,12 @@ export const Scanning: Story = {
   },
 };
 
-/** The payoff — the grade the scan just computed. */
+/** The payoff — what the scan found, and the way into Setup. */
 export const Reveal: Story = {
-  args: { state: state({ step: "reveal", summary }) },
+  args: { state: state({
+      step: "reveal",
+      setupLine: "84 items across 9 projects · 3 never used · 1 erroring",
+    }) },
 };
 
 /** Nothing on the machine looks like a supported harness. */

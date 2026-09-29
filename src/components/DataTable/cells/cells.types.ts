@@ -1,6 +1,6 @@
 import type { GradeLetter } from "@/components/Grade";
 import type { IconName } from "@/components/Icon";
-import type { Layer } from "@/lib/ipc";
+import type { Layer, Severity } from "@/lib/ipc";
 
 export interface GradeCellProps {
   /** Letter grade for the row's artifact; `null` renders the neutral ungraded chip. */
@@ -62,6 +62,15 @@ export interface PercentCellProps {
 export interface TokensCellProps {
   /** Token count; `null` renders "—" rather than a misleading zero. */
   value: number | null | undefined;
+  /** Renders a leading "≈" — a size-based estimate rather than a measured count. */
+  approx?: boolean;
+}
+
+export interface FindingsCellProps {
+  /** Number of open findings on the item; `null` renders "—". */
+  count: number | null;
+  /** The worst severity among the findings; tints the count. `null` renders "—". */
+  severity: Severity | null;
 }
 
 export interface ScopeCellProps {

@@ -1,7 +1,9 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
+import { trim } from "@/lib/projectPath";
+import { formatSetupTarget } from "@/App/setupTarget";
 import type { SidebarProps } from "./Sidebar.types";
-import { NAV_ITEMS, NAV_OWNER } from "./Sidebar.constants";
+import { NAV_ITEMS } from "./Sidebar.constants";
 import { useSidebar } from "./useSidebar";
 
 export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
@@ -21,7 +23,7 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
 
       <nav className="sidebar__nav" aria-label="Primary">
         {NAV_ITEMS.map((item) => {
-          const isActive = (NAV_OWNER[active] ?? active) === item.route;
+          const isActive = active === item.route;
           const count = counts[item.route];
           return (
             <button
@@ -42,17 +44,14 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
 
         {projects.length > 0 && (
           <div className="sidebar__section">
-            <p className="sidebar__section-label">Projects</p>
+            <p className="sidebar__section-label">Recent</p>
             {projects.map((project) => (
               <button
                 key={project.id}
                 type="button"
                 className="sidebar__item sidebar__item--project"
-                // The project's own page, not the files table filtered to it:
-                // the page answers the questions a recent project is opened
-                // for (grade, load order, what ran here), and its Rules tab
-                // holds the files anyway.
-                onClick={() => onNavigate("project", project.id)}
+                // Setup as Claude Code sees this project (spec §7).
+                onClick={() => onNavigate("setup", formatSetupTarget({ lens: trim(project.id) }))}
               >
                 <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>

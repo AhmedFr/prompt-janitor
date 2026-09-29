@@ -3,7 +3,7 @@ import { Icon } from "@/components/Icon";
 import { ScanBar } from "@/components/ScanBar";
 import { scanStatusLine } from "@/lib/useScanProgress";
 import { SCAN_HARNESS } from "../Panel.constants";
-import { OPEN_APP, QUIT, SCAN_NOW, SCANNING } from "./PanelFooter.constants";
+import { OPEN_APP, QUIT, SCAN, SCANNING } from "./PanelFooter.constants";
 import type { PanelFooterProps } from "./PanelFooter.types";
 import "./PanelFooter.css";
 
@@ -28,7 +28,7 @@ export function PanelFooter({ scanning, scan, onScan, onOpenApp, onQuit }: Panel
           of them measure ~278 px inside a 324 px row, so they still fit. */}
       <div className="panel-footer__actions">
         <Button variant="primary" disabled={scanning} onClick={onScan}>
-          <Icon name="refresh" /> {scanning ? SCANNING : SCAN_NOW}
+          <Icon name="refresh" /> {scanning ? SCANNING : SCAN}
         </Button>
         <span className="toolbar-spacer" />
         <Button onClick={onOpenApp}>{OPEN_APP}</Button>
