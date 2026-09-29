@@ -20,9 +20,10 @@ export function useSetupTarget(
   // writing `target={{ kind: "skill" }}` hands over a fresh object each render.
   const link = formatSetupTarget(target ?? NOTHING) ?? "";
   const [followed, setFollowed] = useState(link);
-  if (link !== followed) {
+  // (Controlled, `target` is read directly and there is nothing to follow.)
+  if (!onTargetChange && link !== followed) {
     setFollowed(link);
-    if (!onTargetChange) setLocal(target ?? NOTHING);
+    setLocal(target ?? NOTHING);
   }
   const change = useCallback(
     (next: SetupTarget, mode: SetupChangeMode) => {
