@@ -1,3 +1,4 @@
+import type { Navigate } from "../App.types";
 import type { SetupTarget } from "../setupTarget";
 import type { SettingsTabId } from "@/screens/Settings/Settings.constants";
 import type { RuleTabId } from "@/screens/Settings/ChecksTab/ChecksLibrary/ChecksLibrary.types";
@@ -19,3 +20,16 @@ export type NavAction =
   | { type: "replace"; state: NavState }
   | { type: "back" }
   | { type: "closeItem" };
+
+/** What {@link useNavigation} hands the shell, and what `NavigationContext` carries. */
+export interface Navigation {
+  state: NavState;
+  canGoBack: boolean;
+  /** A (route, target) pair of any vintage, resolved through `resolveExternal` and pushed. */
+  navigate: Navigate;
+  push: (state: NavState) => void;
+  replace: (state: NavState) => void;
+  back: () => void;
+  /** Closes the open item: Back when opening it pushed the entry, else a replace. */
+  closeItem: () => void;
+}
