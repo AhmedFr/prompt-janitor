@@ -155,4 +155,15 @@ describe("Findings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByText("C · 70")).toBeInTheDocument();
   });
+
+  it("keeps a finding open, with its outcome, when the fix leaves it in place", async () => {
+    render(<Findings fileId="/x/CLAUDE.md" onJumpToLine={vi.fn()} />);
+    const row = await screen.findByRole("button", { name: /Wrong package manager/ });
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole("button", { name: /Apply fix/ }));
+    await waitFor(() => expect(getFileDetail).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Applied")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Wrong package manager/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Undo/ })).toBeInTheDocument();
+  });
 });

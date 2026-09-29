@@ -20,9 +20,11 @@ import "./Findings.css";
  * its line link jumps to that line in Content → Source. Jumping leaves this
  * tab, so it is never what a row click does.
  *
- * The open finding is tracked by its key and the file it belongs to, so it
- * closes when another file is shown, and after any fix: the list reloads and
- * shifts, and nothing else may inherit the open panel.
+ * The open finding is tracked by its key and the file it belongs to, never by
+ * its place in the list: after a fix the list reloads and shifts. It stays open
+ * (with its Undo and outcome) while the reloaded list still holds it, and
+ * closes when it is gone or another file is shown, so no other finding can
+ * inherit its panel.
  */
 export function Findings({ fileId, onJumpToLine, onChanged, findings }: FindingsProps) {
   const { detail, loading, aiReady, entitled, reload } = useFindings(fileId, findings);
@@ -43,10 +45,9 @@ export function Findings({ fileId, onJumpToLine, onChanged, findings }: Findings
 
   const edits = fixableEdits(detail);
   const keys = findingKeys(detail.id, detail.issues);
-  const openKey = open?.fileId === fileId ? open.key : null;
+  const openKey = open?.fileId === fileId && keys.includes(open.key) ? open.key : null;
   const refresh = async () => {
     await reload();
-    setOpen(null);
     onChanged?.();
   };
   const fixAll = async () => {
