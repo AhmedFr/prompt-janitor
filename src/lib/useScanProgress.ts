@@ -17,7 +17,7 @@ export interface ScanProgressState {
   progress: ScanProgress | null;
   /**
    * Clears phase and progress back to "nothing known yet". A caller kicking
-   * off a fresh scan (the Setup Rescan button) calls this before firing it,
+   * off a fresh scan (the Setup Scan button) calls this before firing it,
    * so the bar doesn't flash the previous run's counter for a frame.
    */
   reset: () => void;
@@ -27,7 +27,7 @@ export interface ScanProgressState {
  * Follows a running scan by listening to the two events the core emits.
  *
  * Onboarding is not the only place a scan can start — the Setup screen has a
- * Rescan button — and a progress bar that only exists on the first run leaves
+ * Scan button — and a progress bar that only exists on the first run leaves
  * every later scan looking like a frozen screen. One hook, one bar, both
  * places.
  */

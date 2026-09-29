@@ -4,7 +4,7 @@ import { commands, isTauri, type TemplateInfo } from "@/lib/ipc";
 import { isUnlocked } from "@/lib/monetization";
 import type { ApplyOutcome } from "./TemplatePicker.types";
 
-/** Rescan everything so a freshly-written file gets graded. */
+/** Scan everything so a freshly-written file gets graded. */
 async function rescanConfigured(): Promise<void> {
   await commands.scanNow();
 }
