@@ -1,15 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { SetupTarget } from "@/App/setupTarget";
 import { populated } from "./setup.fixtures";
 import { setupRows } from "./setupRows.util";
 import { useSetupSlice } from "./useSetupSlice";
+import { useSetupTarget } from "./useSetupTarget";
 
 afterEach(cleanup);
 
 const rows = setupRows(populated, []);
 const render = (target?: SetupTarget) =>
-  renderHook(({ t }) => useSetupSlice(rows, t), { initialProps: { t: target } });
+  renderHook(({ t }) => useSetupSlice(rows, useSetupTarget(t)), { initialProps: { t: target } });
 
 describe("useSetupSlice", () => {
   it("starts on every row and counts each kind", () => {
@@ -31,5 +32,14 @@ describe("useSetupSlice", () => {
     const { result } = render({ kind: "skill", filter: "never" });
     act(() => result.current.clearSlice());
     expect(result.current).toMatchObject({ kind: "all", filter: "all" });
+  });
+
+  it("reports a chip or a filter as a push, and stores All as absent", () => {
+    const change = vi.fn();
+    const { result } = renderHook(() => useSetupSlice(rows, { value: { kind: "skill", lens: "/w" }, change }));
+    act(() => result.current.setFilter("never"));
+    expect(change).toHaveBeenLastCalledWith({ kind: "skill", lens: "/w", filter: "never" }, "push");
+    act(() => result.current.setKind("all"));
+    expect(change).toHaveBeenLastCalledWith({ kind: undefined, lens: "/w" }, "push");
   });
 });

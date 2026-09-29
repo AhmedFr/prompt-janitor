@@ -1,15 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { SetupTarget } from "@/App/setupTarget";
 import type { FileRow } from "@/lib/ipc";
 import { populated } from "./setup.fixtures";
 import { useSetupLens } from "./useSetupLens";
+import { useSetupTarget } from "./useSetupTarget";
 
 afterEach(cleanup);
 
 const graded = { id: "/side/AGENTS.md", path: "/side/AGENTS.md", project: "side", project_id: "/side" } as FileRow;
 const render = (target?: SetupTarget, files: FileRow[] = []) =>
-  renderHook(({ t }) => useSetupLens(t, populated, files), { initialProps: { t: target } });
+  renderHook(({ t }) => useSetupLens(useSetupTarget(t), populated, files), { initialProps: { t: target } });
 
 describe("useSetupLens", () => {
   it("starts off with no lens and every inventory project on offer", () => {
@@ -47,8 +48,16 @@ describe("useSetupLens", () => {
   });
 
   it("offers nothing without an inventory", () => {
-    const { result } = renderHook(() => useSetupLens({ lens: "/repo/web" }, null, []));
+    const { result } = renderHook(() => useSetupLens({ value: { lens: "/repo/web" }, change: vi.fn() }, null, []));
     expect(result.current.lensProject).toBeNull();
     expect(result.current.choices).toEqual([]);
+  });
+
+  it("turns the lens as a new place that keeps the slice and the open item", () => {
+    const change = vi.fn();
+    const value: SetupTarget = { kind: "skill", open: { artifactId: 1 }, tab: "usage" };
+    const { result } = renderHook(() => useSetupLens({ value, change }, populated, []));
+    act(() => result.current.onLens("/repo/web/"));
+    expect(change).toHaveBeenCalledWith({ kind: "skill", lens: "/repo/web", open: { artifactId: 1 }, tab: "usage" }, "push");
   });
 });

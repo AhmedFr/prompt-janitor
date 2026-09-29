@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { SetupTarget } from "@/App/setupTarget";
 import type { SetupRow } from "./setupRows.util";
 import { useOpenItem } from "./useOpenItem";
+import { useSetupTarget } from "./useSetupTarget";
 
 afterEach(cleanup);
 
@@ -15,7 +16,7 @@ const rows = [row(1), row(2, "f-2"), row(3)];
 
 type Props = { rows: SetupRow[]; target?: SetupTarget; loading: boolean };
 const render = (initialProps: Props) =>
-  renderHook(({ rows, target, loading }: Props) => useOpenItem(rows, target, loading), { initialProps });
+  renderHook(({ rows, target, loading }: Props) => useOpenItem(rows, useSetupTarget(target), loading), { initialProps });
 
 describe("useOpenItem", () => {
   it("opens a clicked row on Content and closes", () => {
@@ -38,7 +39,6 @@ describe("useOpenItem", () => {
     expect(result.current.open).toBeNull();
     rerender({ rows: [...rows, row(9)], loading: true, target });
     expect(result.current.open?.id).toBe(9);
-
   });
 
   it("drops a linked item still missing once the load is done, so a later refresh does not pop it open", () => {
@@ -72,5 +72,34 @@ describe("useOpenItem", () => {
     const { result } = render({ rows, loading: false });
     act(() => result.current.openFindings("f-2"));
     expect(result.current).toMatchObject({ open: { id: 2 }, tab: "findings" });
+  });
+
+  it("reports opening as a push, and the tab and a step as replaces, over the rest of the target", () => {
+    const change = vi.fn();
+    const value: SetupTarget = { kind: "skill", open: { artifactId: 1 } };
+    const { result } = renderHook(() => useOpenItem(rows, { value, change }, false));
+    act(() => result.current.setVisibleIds(["1", "2", "3"]));
+    act(() => result.current.openRow(rows[2]));
+    expect(change).toHaveBeenLastCalledWith({ kind: "skill", open: { artifactId: 3 }, tab: "content" }, "push");
+    act(() => result.current.setTab("usage"));
+    expect(change).toHaveBeenLastCalledWith({ kind: "skill", open: { artifactId: 1 }, tab: "usage" }, "replace");
+    act(() => result.current.step(1));
+    expect(change).toHaveBeenLastCalledWith({ kind: "skill", open: { artifactId: 2 } }, "replace");
+  });
+
+  it("closes through the shell alone when it has one", () => {
+    const change = vi.fn();
+    const onCloseItem = vi.fn();
+    const { result } = renderHook(() => useOpenItem(rows, { value: { open: { artifactId: 1 } }, change }, false, onCloseItem));
+    act(() => result.current.close());
+    expect(onCloseItem).toHaveBeenCalledTimes(1);
+    expect(change).not.toHaveBeenCalled();
+  });
+
+  it("keeps openFindings stable across target changes", () => {
+    const { result } = render({ rows, loading: false });
+    const first = result.current.openFindings;
+    act(() => result.current.openRow(rows[0]));
+    expect(result.current.openFindings).toBe(first);
   });
 });

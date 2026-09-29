@@ -689,3 +689,74 @@ describe("Setup under the project lens", () => {
     expect(screen.queryByText(APP_RULE_NAME)).toBeNull();
   });
 });
+
+describe("Setup controlled by the shell", () => {
+  it("reports changes instead of holding them when it is controlled", () => {
+    const onTargetChange = vi.fn();
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={onTargetChange} />);
+    fireEvent.click(screen.getByRole("radio", { name: /Skills/ }));
+    expect(onTargetChange).toHaveBeenCalledWith({ kind: "skill" }, "push");
+    fireEvent.click(screen.getAllByRole("row")[1]);
+    expect(onTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({ open: expect.anything() }), "push");
+  });
+
+  it("closes the viewer when the target loses its open item (Back)", () => {
+    const { rerender } = render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID } }} onTargetChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={vi.fn()} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("closes through onCloseItem alone when the shell provides it", () => {
+    const onTargetChange = vi.fn();
+    const onCloseItem = vi.fn();
+    render(
+      <Setup
+        navigate={vi.fn()}
+        data={fixture}
+        files={[]}
+        target={{ open: { artifactId: SKILL_ID } }}
+        onTargetChange={onTargetChange}
+        onCloseItem={onCloseItem}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onCloseItem).toHaveBeenCalledTimes(1);
+    expect(onTargetChange).not.toHaveBeenCalled();
+  });
+
+  it("closes through onTargetChange when there is no onCloseItem", () => {
+    const onTargetChange = vi.fn();
+    render(
+      <Setup
+        navigate={vi.fn()}
+        data={fixture}
+        files={[]}
+        target={{ open: { artifactId: SKILL_ID }, tab: "usage" }}
+        onTargetChange={onTargetChange}
+      />,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onTargetChange).toHaveBeenCalledTimes(1);
+    expect(onTargetChange).toHaveBeenCalledWith({ open: undefined, tab: undefined }, "push");
+  });
+
+  it("shows the slice the target names, and follows it back", () => {
+    const { rerender } = render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} onTargetChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("radio", { name: /Skills/ })).toBeChecked();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{}} onTargetChange={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /All/ })).toBeChecked();
+  });
+
+  it("drops a linked item that is not there, as a replace", () => {
+    const onTargetChange = vi.fn();
+    render(
+      <Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill", open: { artifactId: 9999 } }} onTargetChange={onTargetChange} />,
+    );
+    expect(onTargetChange).toHaveBeenCalledWith({ kind: "skill", open: undefined, tab: undefined }, "replace");
+  });
+});

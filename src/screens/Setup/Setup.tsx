@@ -41,6 +41,7 @@ import { useRevealProject } from "./useRevealProject";
 import { useSetup } from "./useSetup";
 import { useSetupLens } from "./useSetupLens";
 import { useSetupSlice } from "./useSetupSlice";
+import { useSetupTarget } from "./useSetupTarget";
 import "./Setup.css";
 
 /**
@@ -53,6 +54,8 @@ export function Setup({
   data: override,
   files: filesOverride,
   target,
+  onTargetChange,
+  onCloseItem,
   loading: loadingOverride,
   lensData: lensOverride,
 }: SetupProps) {
@@ -62,8 +65,11 @@ export function Setup({
   const refreshing = loadingOverride ?? (state.loading && !override);
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
+  // Setup's whole place — kind, filter, lens, open item, tab — held by the
+  // shell's navigation when it is controlled, else here (stories, tests).
+  const control = useSetupTarget(target, onTargetChange);
   // The lens has one owner: this screen renders the Viewing control, so the table only reads it.
-  const { lens, lensProject, choices, onLens } = useSetupLens(target, data, files);
+  const { lens, lensProject, choices, onLens } = useSetupLens(control, data, files);
   const liveLens = useLens(lensProject);
   const lensData = lensOverride ?? liveLens;
   const reveal = useRevealProject(lensProject?.path ?? null);
@@ -143,7 +149,9 @@ export function Setup({
                 files={files}
                 detected={detected}
                 navigate={navigate}
-                target={target}
+                target={control.value}
+                onChange={control.change}
+                onCloseItem={onCloseItem}
                 loading={refreshing}
                 onRefetch={state.refetch}
                 lens={lens}
@@ -202,8 +210,9 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
 
 /**
  * The one table over every kind (spec §4). The chips pick a kind, the summary
- * line a status filter; both start from a deep link's `target` when there is
- * one. Rows arrive Kind then Name, so every slice starts in that order.
+ * line a status filter, a row opens the viewer — all read from `target` and
+ * reported through `onChange`; Inventory holds none of it. Rows arrive Kind
+ * then Name, so every slice starts in that order.
  */
 function Inventory({
   data,
@@ -211,6 +220,8 @@ function Inventory({
   detected,
   navigate,
   target,
+  onChange,
+  onCloseItem,
   loading,
   onRefetch,
   lens,
@@ -228,7 +239,8 @@ function Inventory({
     if (lensProject !== null && !lensProject.exists) return [];
     return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
   }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
-  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, target);
+  const control = useMemo(() => ({ value: target, change: onChange }), [target, onChange]);
+  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, control);
   // No Scope under the lens (spec §5): every row already applies to the one project.
   const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
   // `scopeLabel` is the Scope column's own label rule (a graded-only row's
@@ -244,7 +256,7 @@ function Inventory({
   const { grade } = useOverallGrade();
   const templates = useTemplatePicker();
   const [picking, setPicking] = useState(false);
-  const { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close } = useOpenItem(rows, target, loading);
+  const { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close } = useOpenItem(rows, control, loading, onCloseItem);
   const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
   const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null), ctx);
 

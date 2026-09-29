@@ -1,27 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { SetupTarget } from "@/App/setupTarget";
+import { useCallback, useMemo } from "react";
 import type { SetupFilter } from "@/lib/setupFilter";
 import type { KindFilter } from "@/lib/vocabulary";
 import { costThreshold } from "./setup.util";
 import { applySetupFilter, setupFilterCounts } from "./setupFilter.util";
 import type { SetupRow } from "./setupRows.util";
+import type { SetupTargetControl } from "./Setup.types";
 
 /**
  * The slice of `rows` the table shows: a kind chip, then a summary-line
- * status filter. Both start from a deep link's `target` and follow a later
- * one while Setup is mounted.
+ * status filter. Both are read from Setup's target, and a change is a new
+ * place (a push), so Back restores the slice. "All" is stored as absent, so
+ * the same slice is always the same state.
  */
-export function useSetupSlice(rows: SetupRow[], target: SetupTarget | undefined) {
+export function useSetupSlice(rows: SetupRow[], { value, change }: SetupTargetControl) {
   // Over the whole setup, not the slice: "costly" means the same on every chip.
   const costBar = useMemo(() => costThreshold(rows), [rows]);
-  const [kind, setKind] = useState<KindFilter>(target?.kind ?? "all");
-  const [filter, setFilter] = useState<SetupFilter>(target?.filter ?? "all");
-  useEffect(() => {
-    if (target?.kind) setKind(target.kind);
-  }, [target?.kind]);
-  useEffect(() => {
-    if (target?.filter) setFilter(target.filter);
-  }, [target?.filter]);
+  const kind: KindFilter = value.kind ?? "all";
+  const filter: SetupFilter = value.filter ?? "all";
+  const setKind = useCallback(
+    (next: KindFilter) => change({ ...value, kind: next === "all" ? undefined : next }, "push"),
+    [value, change],
+  );
+  const setFilter = useCallback(
+    (next: SetupFilter) => change({ ...value, filter: next === "all" ? undefined : next }, "push"),
+    [value, change],
+  );
 
   const kindCounts = useMemo(() => {
     const out: Partial<Record<KindFilter, number>> = { all: rows.length };
@@ -32,10 +35,10 @@ export function useSetupSlice(rows: SetupRow[], target: SetupTarget | undefined)
   const counts = useMemo(() => setupFilterCounts(ofKind, costBar), [ofKind, costBar]);
   const visible = useMemo(() => applySetupFilter(ofKind, filter, costBar), [ofKind, filter, costBar]);
   // One Clear filters resets the chip and the summary filter (spec §4.5).
-  const clearSlice = useCallback(() => {
-    setKind("all");
-    setFilter("all");
-  }, []);
+  const clearSlice = useCallback(
+    () => change({ ...value, kind: undefined, filter: undefined }, "push"),
+    [value, change],
+  );
 
   return { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice };
 }

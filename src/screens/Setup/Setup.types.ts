@@ -8,12 +8,33 @@ export interface SetupProps {
   data?: SetupView | null;
   /** Override the graded files (Storybook and tests). */
   files?: FileRow[];
-  /** Where a deep link lands: kind, filter, lens, open item, tab. */
+  /**
+   * Where Setup is: kind, filter, lens, open item, tab. With `onTargetChange`
+   * it is the whole state (the shell's navigation holds it); without, it is
+   * where a deep link lands and Setup holds the rest itself (stories, tests).
+   */
   target?: SetupTarget;
+  /**
+   * Makes Setup controlled: every change is reported here and never held.
+   * `push` for a new place (kind, filter, lens, open item), `replace` for a
+   * refinement of this one (the viewer's tab).
+   */
+  onTargetChange?: (next: SetupTarget, mode: SetupChangeMode) => void;
+  /** Closes the viewer as a history step (the shell's `closeItem`); else closing reports a push. */
+  onCloseItem?: () => void;
   /** Override the load state (tests). */
   loading?: boolean;
   /** Override the lens's backend reads (Storybook), which only the desktop app can make. */
   lensData?: LensData;
+}
+
+/** Whether a Setup change is a new history entry or refines the current one. */
+export type SetupChangeMode = "push" | "replace";
+
+/** Setup's one piece of navigation state and the one way to change it ({@link useSetupTarget}). */
+export interface SetupTargetControl {
+  value: SetupTarget;
+  change: (next: SetupTarget, mode: SetupChangeMode) => void;
 }
 
 /** The lensed project's load order and usage; both `null` until read, or when it has none. */
@@ -37,7 +58,12 @@ export interface InventoryProps {
   /** The harnesses the scan found, for the header line. */
   detected: HarnessInfo[];
   navigate: Navigate;
-  target?: SetupTarget;
+  /** Setup's state: the chip, the status filter, the open item and its tab are read from it. */
+  target: SetupTarget;
+  /** Reports a change to `target`; Inventory holds none of it. */
+  onChange: SetupTargetControl["change"];
+  /** Closes the viewer through the shell, when there is one. */
+  onCloseItem?: () => void;
   /** A load or refresh is in flight: a deep link to an item not in the rows yet waits for it. */
   loading: boolean;
   /** Reloads the inventory — how a saved skill's new size reaches the table. */

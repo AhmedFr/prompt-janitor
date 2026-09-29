@@ -1,63 +1,68 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ItemRef, SetupTarget, ViewerTab } from "@/App/setupTarget";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ItemRef, ViewerTab } from "@/App/setupTarget";
 import { stepTarget } from "./ItemViewer";
 import type { SetupRow } from "./setupRows.util";
+import type { SetupTargetControl } from "./Setup.types";
 
 /** A row is its artifact (or its graded file's synthetic id): unique across the whole table. */
 export const rowId = (row: SetupRow) => String(row.id);
 
+/** The row an item reference names: by artifact id, or by file id (graded rows and the panel's fixes). */
+const findRow = (rows: SetupRow[], ref: ItemRef) =>
+  ("artifactId" in ref ? rows.find((r) => r.id === ref.artifactId) : rows.find((r) => r.file_id === ref.fileId)) ??
+  null;
+
 /**
- * Which row the viewer shows, on which tab. The open row is held by id and
- * re-derived from `rows`, so a rename or a rescan shows through, and a row
- * that leaves `rows` (a rescan removed it, or the lens left it out) closes
- * its viewer.
+ * Which row the viewer shows, on which tab — read from Setup's target, so a
+ * target without `open` is no viewer and Back reopens what was open. The row
+ * is re-derived from `rows`, so a rename or a rescan shows through.
+ *
+ * Opening is a push and a tab change a replace; stepping replaces too, so
+ * one viewer is one history entry however far it walks and closing it is a
+ * single step back to the table.
  */
-export function useOpenItem(rows: SetupRow[], target: SetupTarget | undefined, loading: boolean) {
-  const [openId, setOpenId] = useState<number | null>(null);
-  const open = useMemo(() => (openId === null ? null : (rows.find((r) => r.id === openId) ?? null)), [openId, rows]);
-  // A removed row closes its viewer for good: the id is dropped, so the row
-  // coming back on a later rescan does not pop the viewer open again.
+export function useOpenItem(
+  rows: SetupRow[],
+  { value, change }: SetupTargetControl,
+  loading: boolean,
+  onCloseItem?: () => void,
+) {
+  const ref = value.open;
+  const open = useMemo(() => (ref ? findRow(rows, ref) : null), [ref, rows]);
+  const tab: ViewerTab = value.tab ?? "content";
+  // A link to an item not in the rows waits while a load is in flight. Once
+  // it is done, a still-missing item — or a row a rescan or the lens removed —
+  // is dropped from the target, so it does not pop open on a later refresh.
   useEffect(() => {
-    if (openId !== null && !open) setOpenId(null);
-  }, [openId, open]);
-  const [tab, setTab] = useState<ViewerTab>(target?.tab ?? "content");
+    if (ref && !open && !loading) change({ ...value, open: undefined, tab: undefined }, "replace");
+  }, [ref, open, loading, value, change]);
   // The ids the table shows, in its current sort and filters: what stepping walks.
   const [visibleIds, setVisibleIds] = useState<string[]>([]);
-  // A deep link names an item by artifact id, or by file id (graded rows and the panel's fixes).
-  // It waits here until the rows hold its item; if the load is done and the item is
-  // still missing, it is dropped rather than left to pop open on a later refresh.
-  // The tab travels with it, so it is the tab of the link that asked.
-  const [pending, setPending] = useState<{ ref: ItemRef; tab: ViewerTab } | null>(null);
+  // The latest target, for `openFindings` to build on without changing identity.
+  const latest = useRef(value);
   useEffect(() => {
-    if (target?.open) setPending({ ref: target.open, tab: target.tab ?? "content" });
-  }, [target?.open, target?.tab]);
-  useEffect(() => {
-    if (!pending) return;
-    const { ref } = pending;
-    const row = "artifactId" in ref ? rows.find((r) => r.id === ref.artifactId) : rows.find((r) => r.file_id === ref.fileId);
-    if (row) {
-      setOpenId(row.id);
-      setTab(pending.tab);
-      setPending(null);
-    } else if (!loading) {
-      setPending(null);
-    }
-  }, [pending, rows, loading]);
+    latest.current = value;
+  });
 
+  const setTab = (next: ViewerTab) => change({ ...value, tab: next }, "replace");
   const step = (delta: -1 | 1) => {
     if (!open) return;
     const next = stepTarget(visibleIds, rowId(open), delta);
-    if (next) setOpenId(Number(next));
+    if (next && next !== rowId(open)) change({ ...value, open: { artifactId: Number(next) } }, "replace");
   };
   // A file link (the Actions column's Open) lands on that file's findings.
-  // Resolved through `pending` so this stays stable — `unifiedColumns`' per-`ctx` cache can hit.
-  const openFindings = useCallback((fileId: string) => setPending({ ref: { fileId }, tab: "findings" }), []);
+  // Identity-stable, so `unifiedColumns`' per-`ctx` cache can hit.
+  const openFindings = useCallback(
+    (fileId: string) => change({ ...latest.current, open: { fileId }, tab: "findings" }, "push"),
+    [change],
+  );
   // Every row, graded instructions included, opens in the viewer on Content.
-  const openRow = (row: SetupRow) => {
-    setOpenId(row.id);
-    setTab("content");
+  const openRow = (row: SetupRow) => change({ ...value, open: { artifactId: row.id }, tab: "content" }, "push");
+  // Closing navigates exactly once: through the shell's history when it has one.
+  const close = () => {
+    if (onCloseItem) onCloseItem();
+    else change({ ...value, open: undefined, tab: undefined }, "push");
   };
-  const close = () => setOpenId(null);
 
   // `setVisibleIds` is a state setter: identity-stable, as the table's ids-keyed effect expects.
   return { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close };
