@@ -30,6 +30,28 @@ describe("useFileDetail", () => {
     expect(result.current.entitled).toBe(true);
   });
 
+  it("stops loading when the file read rejects, leaving no file (the failed state)", async () => {
+    getFileDetail.mockRejectedValue(new Error("ipc down"));
+    const { result } = renderHook(() => useFileDetail("/x/CLAUDE.md"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.detail).toBeNull();
+  });
+
+  it("a reload that rejects settles without throwing and keeps the file shown", async () => {
+    const { result } = renderHook(() => useFileDetail("/x/CLAUDE.md"));
+    await waitFor(() => expect(result.current.detail?.id).toBe("/x/CLAUDE.md"));
+    getFileDetail.mockRejectedValueOnce(new Error("ipc down"));
+    await expect(result.current.reload()).resolves.toBeUndefined();
+    expect(result.current.detail?.id).toBe("/x/CLAUDE.md");
+  });
+
+  it("keeps the AI gate closed when its reads reject", async () => {
+    getAiConfig.mockRejectedValueOnce(new Error("ipc down"));
+    const { result } = renderHook(() => useFileDetail("/x/CLAUDE.md"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.aiReady).toBe(false);
+  });
+
   it("holds no file for a null id and never asks for one", async () => {
     const { result } = renderHook(() => useFileDetail(null));
     await waitFor(() => expect(result.current.loading).toBe(false));

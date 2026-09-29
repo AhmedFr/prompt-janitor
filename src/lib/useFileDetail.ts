@@ -4,6 +4,7 @@ import { isUnlocked } from "@/lib/monetization";
 
 /** What one graded file's view needs: the file, and whether AI rewrites may run. */
 export interface FileDetailState {
+  /** The file; `null` once loading is done means the read failed (an error, or a rejected invoke). */
   detail: FileDetail | null;
   loading: boolean;
   aiReady: boolean;
@@ -19,10 +20,15 @@ export function useFileDetail(fileId: string | null): FileDetailState {
   const [entitled, setEntitled] = useState(isUnlocked(undefined));
 
   /** Re-fetch the file from disk + DB (after an apply/undo, or a fresh scan). */
+  // A rejected re-read keeps what is shown: the file on screen is still the last good read.
   const reload = useCallback(async () => {
     if (!isTauri || !fileId) return;
-    const res = await commands.getFileDetail(fileId);
-    setDetail(res.status === "ok" ? res.data : null);
+    try {
+      const res = await commands.getFileDetail(fileId);
+      setDetail(res.status === "ok" ? res.data : null);
+    } catch {
+      // Nothing newer to show; the caller's view stays as it was.
+    }
   }, [fileId]);
 
   useEffect(() => {
@@ -34,9 +40,15 @@ export function useFileDetail(fileId: string | null): FileDetailState {
         return;
       }
       setLoading(true);
-      const res = await commands.getFileDetail(fileId);
-      if (!active) return;
-      setDetail(res.status === "ok" ? res.data : null);
+      try {
+        const res = await commands.getFileDetail(fileId);
+        if (!active) return;
+        setDetail(res.status === "ok" ? res.data : null);
+      } catch {
+        if (!active) return;
+        // No file to show: the view's failed state, with its Retry.
+        setDetail(null);
+      }
       setLoading(false);
     }
     void load();
@@ -52,8 +64,9 @@ export function useFileDetail(fileId: string | null): FileDetailState {
     let active = true;
     async function loadGates() {
       if (!isTauri) return;
-      const [cfg, ent] = await Promise.all([commands.getAiConfig(), commands.getEntitlement()]);
-      if (!active) return;
+      // A gate that cannot be read stays closed (AI) or at its default (entitlement).
+      const [cfg, ent] = await Promise.all([commands.getAiConfig(), commands.getEntitlement()]).catch(() => [null, null]);
+      if (!active || !cfg || !ent) return;
       if (cfg.status === "ok") setAiReady(cfg.data.provider !== "none" && cfg.data.has_key);
       setEntitled(isUnlocked(ent.status === "ok" ? ent.data.paid : undefined));
     }

@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { SetupRow } from "@/lib/setupRows";
 import { ItemUsage } from "./ItemUsage";
+import { USAGE_FAILED } from "./ItemUsage.constants";
+
+// The live read, for the cases that render without a `usage` override.
+const live = vi.hoisted(() => ({ usage: null, loading: false, failed: false }));
+vi.mock("./useItemUsage", () => ({ useItemUsage: () => live }));
 
 const skill = { id: 4, kind: "skill", name: "adapt", bytes: 900, origin: "inventory", usage: { total: 3, sessions: 2,
   last_used: "2026-09-26T09:00:00Z", error_rate: 0.33, avg_turn_tokens: 2000, count_30d: 3, count_prev_30d: 0 } } as SetupRow;
@@ -14,6 +19,17 @@ const usage = {
 
 describe("ItemUsage", () => {
   afterEach(cleanup);
+
+  it("says the usage could not be read rather than claiming none", () => {
+    live.failed = true;
+    try {
+      render(<ItemUsage item={skill} loadedIn={[]} onSelectProject={vi.fn()} />);
+      expect(screen.getByText(USAGE_FAILED)).toBeInTheDocument();
+      expect(screen.queryByText("No usage in this window.")).toBeNull();
+    } finally {
+      live.failed = false;
+    }
+  });
 
   it("shows the per-project split, each project switching the lens", () => {
     const onSelect = vi.fn();

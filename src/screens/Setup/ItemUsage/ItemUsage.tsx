@@ -5,7 +5,7 @@ import { formatTokens } from "@/components/DataTable/cells/cells.util";
 import { TrendChart } from "@/components/TrendChart";
 import { USAGE_KINDS } from "@/lib/setupFilter";
 import { BYTES_PER_TOKEN } from "../setup.unified";
-import { DEFAULT_WINDOW, NO_USAGE, WINDOWS } from "./ItemUsage.constants";
+import { DEFAULT_WINDOW, NO_USAGE, USAGE_FAILED, WINDOWS } from "./ItemUsage.constants";
 import type { ItemUsageProps } from "./ItemUsage.types";
 import { errorRatePerDay } from "./itemUsage.util";
 import { useItemUsage } from "./useItemUsage";
@@ -61,7 +61,9 @@ export function ItemUsage({ item, loadedIn, onSelectProject, usage: override }: 
             />
           </>
         ) : (
-          <p className="item-usage__muted">{loaded.loading ? "Loading…" : "No usage in this window."}</p>
+          <p className="item-usage__muted">
+            {loaded.loading ? "Loading…" : loaded.failed ? USAGE_FAILED : "No usage in this window."}
+          </p>
         )}
         <dl className="item-usage__facts">
           <div className="item-usage__fact">

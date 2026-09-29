@@ -29,6 +29,22 @@ describe("useItemUsage", () => {
     await waitFor(() => expect(getArtifactUsage).toHaveBeenLastCalledWith(4, 90));
   });
 
+  it("stops loading and says it failed when the read rejects", async () => {
+    getArtifactUsage.mockRejectedValue(new Error("ipc down"));
+    const { result } = renderHook(() => useItemUsage(4, 30));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current).toMatchObject({ usage: null, failed: true });
+  });
+
+  it("says it failed on an error status too, and clears it on the next good read", async () => {
+    getArtifactUsage.mockResolvedValueOnce({ status: "error", error: "db locked" });
+    const { result, rerender } = renderHook(({ days }) => useItemUsage(4, days), { initialProps: { days: 30 as 30 | 90 } });
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    rerender({ days: 90 });
+    await waitFor(() => expect(result.current.usage).toEqual(data));
+    expect(result.current.failed).toBe(false);
+  });
+
   it("never asks for a graded-only row (synthetic negative id) or no item", () => {
     renderHook(() => useItemUsage(-17, 30));
     renderHook(() => useItemUsage(null, 30));
