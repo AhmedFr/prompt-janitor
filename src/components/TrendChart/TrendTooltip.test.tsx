@@ -59,4 +59,11 @@ describe("TrendTooltip", () => {
     expect(getByText("9")).toBeInTheDocument();
     expect(getByText("Aug 1")).toBeInTheDocument();
   });
+
+  it("reads a null value as a dash, not 0", () => {
+    const { getByText } = render(
+      <TrendTooltip active payload={payloadFor({ day: "2026-09-25", rate: null }, "rate")} xKey="day" dataKey="rate" />,
+    );
+    expect(getByText("—")).toBeInTheDocument();
+  });
 });
