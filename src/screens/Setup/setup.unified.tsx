@@ -31,7 +31,7 @@ function tokensOf(r: SetupRow): number {
  * Which columns the current slice can fill (spec §4.4): every column, Tokens
  * included, is hidden when no row in `rows` could ever fill it.
  */
-export function visibleColumnIds(kind: KindFilter, rows: SetupRow[], lens: boolean): string[] {
+export function visibleColumnIds(kind: KindFilter, rows: SetupRow[], lens: boolean, usageKnown = true): string[] {
   const kinds = new Set(rows.map((r) => r.kind));
   const hasUsage = [...kinds].some((k) => USAGE_KINDS.has(k));
   const hasInstructions = kinds.has("rule");
@@ -39,7 +39,8 @@ export function visibleColumnIds(kind: KindFilter, rows: SetupRow[], lens: boole
   return ORDER.filter((id) => {
     if (id === "order") return lens && hasInstructions;
     if (id === "kind") return kind === "all";
-    if (id === "uses" || id === "errorRate" || id === "lastUsed") return hasUsage;
+    // Unknown usage (the lens still reading it, or failing to) is not "unused": no usage column at all.
+    if (id === "uses" || id === "errorRate" || id === "lastUsed") return hasUsage && usageKnown;
     if (id === "tokens") return hasTokens;
     if (id === "findings") return hasInstructions;
     return true;

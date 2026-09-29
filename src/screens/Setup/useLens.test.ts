@@ -56,6 +56,15 @@ describe("useLens", () => {
     await waitFor(() => expect(result.current.effective).toEqual([{ path: "/a" }]));
   });
 
+  it("reads again on retry, clearing the failure", async () => {
+    getProjectUsage.mockResolvedValueOnce({ status: "error", error: "x" } as never);
+    const { result } = renderHook(() => useLens(project));
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    await act(async () => result.current.retry());
+    await waitFor(() => expect(result.current.failed).toBe(false));
+    expect(result.current.usage).toEqual({ ranked: [], sessions_per_day: [] });
+  });
+
   it("asks nothing with no lens", () => {
     getEffectiveRules.mockClear();
     const { result } = renderHook(() => useLens(null));

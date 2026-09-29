@@ -1,5 +1,6 @@
-import type { EffectiveRule, ProjectUsage, UsageStat } from "@/lib/ipc";
+import type { EffectiveRule, ProjectSetup, ProjectUsage, UsageStat } from "@/lib/ipc";
 import { ERROR_RATE_THRESHOLD, KIND_ORDER } from "./Setup.constants";
+import type { LensData, LensTarget } from "./Setup.types";
 import type { SetupRow } from "./setupRows.util";
 import { USAGE_KINDS } from "./setup.unified";
 
@@ -105,4 +106,30 @@ export function lensRows(
     }
     return kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
+}
+
+/**
+ * What the lens reads for: the inventory's project, or — for a path only the
+ * grader knows — that path under `harness`, the one the scan found (R54). The
+ * rows are decided with that harness, so the load order must be too.
+ */
+export function lensTarget(
+  lens: string | null,
+  project: ProjectSetup | null,
+  harness: string | null,
+): LensTarget | null {
+  if (project) return { harness: project.harness, path: project.path };
+  return lens && harness ? { harness, path: lens } : null;
+}
+
+/**
+ * Whether the lens can speak about usage yet. Until the project's usage is read
+ * every usage row is `null`, which the summary line would count as never used:
+ * `loading` and `failed` mean it makes no usage claim at all.
+ */
+export function lensUsageState(lensOn: boolean, data: LensData): "known" | "loading" | "failed" {
+  if (!lensOn) return "known";
+  if (data.failed && !data.usage) return "failed";
+  if (data.loading && !data.usage) return "loading";
+  return "known";
 }

@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { commands, isTauri, type EffectiveRule, type ProjectSetup, type ProjectUsage } from "@/lib/ipc";
+import { commands, isTauri, type EffectiveRule, type ProjectUsage } from "@/lib/ipc";
 
 import { LENS_WINDOW_DAYS } from "./lens.constants";
+import type { LensTarget } from "./Setup.types";
 
 /**
  * What the lens needs beyond the inventory: the harness's load order for the
  * project, and its usage. A project no harness has worked in has neither —
- * that is a normal state, not an error.
+ * that is a normal state, not an error. `target` is the inventory's project,
+ * or — for a path only the grader knows — that path under the scan's harness.
  */
-export function useLens(project: ProjectSetup | null) {
+export function useLens(target: LensTarget | null) {
   const [effective, setEffective] = useState<EffectiveRule[] | null>(null);
   const [usage, setUsage] = useState<ProjectUsage | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const generation = useRef(0);
-  const harness = project?.harness ?? null;
-  const path = project?.path ?? null;
+  const harness = target?.harness ?? null;
+  const path = target?.path ?? null;
 
   // `reset` is for a different project; a rescan keeps what is shown until the new data lands.
   const load = useCallback(
@@ -54,5 +56,8 @@ export function useLens(project: ProjectSetup | null) {
     return () => void off.then((fn) => fn());
   }, [load]);
 
-  return { effective, usage, loading, failed };
+  // A retry keeps what is shown, like a rescan, until the new read lands.
+  const retry = useCallback(() => void load(false), [load]);
+
+  return { effective, usage, loading, failed, retry };
 }

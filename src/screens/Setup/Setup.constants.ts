@@ -67,3 +67,9 @@ export const MISSING_FOLDER_EMPTY = "Nothing to show while the folder is missing
 
 /** What a failed Reveal in Finder says before the reason. */
 export const REVEAL_FAILED = "Could not reveal the folder";
+
+/** In place of the lens's usage counts while the project's usage is being read. */
+export const LENS_USAGE_LOADING = "Reading this project's usage…";
+
+/** In place of the lens's usage counts when the project's usage could not be read. */
+export const LENS_USAGE_FAILED = "This project's usage could not be read.";

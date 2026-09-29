@@ -374,6 +374,22 @@ export const Lensed: Story = {
   args: { target: { lens: "/Users/dev/code/prompt-janitor" }, lensData: pjLens },
 };
 
+/** The lens while the project's usage is still being read: a note instead of any usage count. */
+export const LensedUsageLoading: Story = {
+  args: {
+    target: { lens: "/Users/dev/code/prompt-janitor" },
+    lensData: { effective: pjLens.effective, usage: null, loading: true },
+  },
+};
+
+/** The lens after the project's usage read failed: an alert with Retry, and no usage claims. */
+export const LensedUsageFailed: Story = {
+  args: {
+    target: { lens: "/Users/dev/code/prompt-janitor" },
+    lensData: { effective: pjLens.effective, usage: null, failed: true, retry: () => {} },
+  },
+};
+
 /** The lens on a project whose folder is gone: the strip's message, and an empty table under it. */
 export const LensedMissingFolder: Story = {
   args: { target: { lens: "/Users/dev/code/old-experiment" } },

@@ -15,7 +15,7 @@ import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import { LABEL } from "@/lib/vocabulary";
 import { ItemViewer } from "./ItemViewer";
-import { lensRows } from "./lens.util";
+import { lensRows, lensTarget, lensUsageState } from "./lens.util";
 import { ProjectStrip } from "./ProjectStrip";
 import { scopeLabel, type ColumnsCtx } from "./setup.columns";
 import { scopePillsFor } from "./setup.pills";
@@ -26,6 +26,8 @@ import {
   EMPTY_FILTERED,
   EMPTY_HINT,
   LENS_TABLE_STATE_KEY,
+  LENS_USAGE_FAILED,
+  LENS_USAGE_LOADING,
   MISSING_FOLDER_EMPTY,
   NEW_FROM_TEMPLATE,
   NO_HARNESS_TITLE,
@@ -71,7 +73,9 @@ export function Setup({
   const control = useSetupTarget(target, onTargetChange);
   // The lens has one owner: this screen renders the Viewing control, so the table only reads it.
   const { lens, lensProject, choices, onLens } = useSetupLens(control, data, files);
-  const liveLens = useLens(lensProject);
+  const detected = data?.harnesses.filter((h) => h.detected) ?? [];
+  // A graded-only lens reads as the harness the scan found, the same one its rows are decided with.
+  const liveLens = useLens(lensTarget(lens, lensProject, detected[0]?.id ?? null));
   const lensData = lensOverride ?? liveLens;
   const reveal = useRevealProject(lensProject?.path ?? null);
 
@@ -85,8 +89,6 @@ export function Setup({
       setBusy(false);
     }
   };
-
-  const detected = data?.harnesses.filter((h) => h.detected) ?? [];
 
   return (
     <section className="screen">
@@ -239,7 +241,10 @@ function Inventory({
     if (lensProject !== null && !lensProject.exists) return [];
     return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
   }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
-  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, control);
+  // Until the lens has read the project's usage, every usage row is null — which is unknown, not unused.
+  const usageState = lensUsageState(lens !== null, lensData);
+  const usageKnown = usageState === "known";
+  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, control, usageKnown);
   // No Scope under the lens (spec §5): every row already applies to the one project.
   const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
   // `scopeLabel` is the Scope column's own label rule (a graded-only row's
@@ -257,7 +262,18 @@ function Inventory({
   const [picking, setPicking] = useState(false);
   const { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close } = useOpenItem(rows, control, loading, onCloseItem);
   const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
-  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null), ctx);
+  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null, usageKnown), ctx);
+  const usageNote =
+    usageState === "loading" ? (
+      <span className="muted">{LENS_USAGE_LOADING}</span>
+    ) : usageState === "failed" ? (
+      <span className="setup-usage-error" role="alert">
+        {LENS_USAGE_FAILED}
+        <Button size="sm" onClick={() => lensData.retry?.()}>
+          Retry
+        </Button>
+      </span>
+    ) : undefined;
 
   // An empty table is a gone folder, a setup with nothing in it, or a slice the
   // filters emptied — then one Clear filters resets the chip and the summary
@@ -282,7 +298,7 @@ function Inventory({
           </span>
         ))}
       </p>
-      <SummaryLine badge={<GradePopover grade={grade} />} grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
+      <SummaryLine badge={<GradePopover grade={grade} />} grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} usageNote={usageNote} />
       <DataTable
         ariaLabel="Setup"
         // Its own key under the lens: the rows arrive in load order, with no Scope to remember.

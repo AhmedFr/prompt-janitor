@@ -41,3 +41,15 @@ export const NoScanYet: Story = {
     onFilter: () => {},
   },
 };
+
+/** Usage is still being read: the counts give way to a note rather than claiming "never used". */
+export const UsageUnknown: Story = {
+  args: {
+    grade: "C",
+    items: 84,
+    counts: { never: 0, errors: 0, cost: 0 },
+    active: "all",
+    onFilter: () => {},
+    usageNote: <span className="muted">Reading this project's usage…</span>,
+  },
+};

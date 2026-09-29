@@ -42,9 +42,16 @@ vi.mock("./ItemUsage", () => ({
 }));
 // The lens's backend reads (load order and project usage), from the fixture's paths.
 const lensPaths = vi.hoisted(() => ({ global: "", app: "" }));
+// A case can take over the lens's reads (`impl`) and see what the lens asked for (`calls`).
+const lensMock = vi.hoisted(() => ({
+  impl: null as null | ((target: { harness: string; path: string } | null) => unknown),
+  calls: [] as Array<{ harness: string; path: string } | null>,
+}));
 vi.mock("./useLens", () => ({
-  useLens: (project: { path: string } | null) =>
-    project
+  useLens: (project: { harness: string; path: string } | null) => {
+    lensMock.calls.push(project ? { harness: project.harness, path: project.path } : null);
+    if (lensMock.impl) return lensMock.impl(project);
+    return project
       ? {
           effective: [
             { layer: "global", path: lensPaths.global, name: "CLAUDE.md", grade: "B", file_id: null },
@@ -54,7 +61,8 @@ vi.mock("./useLens", () => ({
           loading: false,
           failed: false,
         }
-      : { effective: null, usage: null, loading: false, failed: false },
+      : { effective: null, usage: null, loading: false, failed: false };
+  },
 }));
 // One handler registry per test so a case can emit `scan-done` like the core does.
 const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
@@ -148,6 +156,8 @@ function kindCells(): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  lensMock.impl = null;
+  lensMock.calls = [];
   listeners.clear();
   window.sessionStorage.clear();
   getSetup.mockResolvedValue({ status: "ok", data: populated });
@@ -687,6 +697,55 @@ describe("Setup under the project lens", () => {
     expect(viewing()).toHaveAccessibleName(/as Claude Code sees side/);
     expect(screen.getByText("AGENTS.md")).toBeInTheDocument();
     expect(screen.queryByText(APP_RULE_NAME)).toBeNull();
+  });
+
+  // R54: a graded-only lens decides its rows with the scan's harness, so it
+  // must read that harness's load order for the path too, or its
+  // instructions are never numbered.
+  it("numbers a graded-only project's instructions from the scan's harness load order", () => {
+    const path = "/not/in/the/inventory";
+    const file = `${path}/AGENTS.md`;
+    lensMock.impl = (target) => ({
+      effective: target ? [{ layer: "project", path: file, name: "AGENTS.md", grade: "C", file_id: null }] : null,
+      usage: target ? { ranked: [], sessions_per_day: [] } : null,
+      loading: false,
+      failed: false,
+    });
+    render(<Setup navigate={vi.fn()} data={fixture} files={[graded(file, "side", path)]} target={{ lens: path }} />);
+    expect(lensMock.calls[lensMock.calls.length - 1]).toEqual({ harness: "claude_code", path });
+    const row = bodyRows().find((r) => r.textContent?.includes("AGENTS.md"));
+    // The "#" column leads under the lens.
+    expect(row?.querySelector("td")?.textContent).toBe("1");
+  });
+
+  describe("while the project's usage is unknown", () => {
+    const neverUsed = () => screen.queryByRole("button", { name: /never used/ });
+
+    it("counts never used from the project's usage once it is read", () => {
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).not.toBeNull();
+    });
+
+    it("claims nothing about usage while it loads, and says it is loading", () => {
+      lensMock.impl = () => ({ effective: null, usage: null, loading: true, failed: false, retry: vi.fn() });
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).toBeNull();
+      expect(screen.queryByRole("button", { name: /erroring|costly/ })).toBeNull();
+      expect(screen.queryByRole("columnheader", { name: /Uses|Last used/ })).toBeNull();
+      expect(screen.getByText(/Reading this project's usage/)).toBeInTheDocument();
+    });
+
+    it("says the usage read failed, offers Retry, and claims nothing about usage", () => {
+      const retry = vi.fn();
+      lensMock.impl = () => ({ effective: null, usage: null, loading: false, failed: true, retry });
+      render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+      expect(neverUsed()).toBeNull();
+      expect(screen.queryByRole("columnheader", { name: /Uses|Last used/ })).toBeNull();
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(/could not be read/);
+      fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

@@ -32,6 +32,13 @@ describe("SummaryLine", () => {
     expect(screen.getByRole("button", { name: "0 erroring" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("shows the usage note instead of any usage count while usage is unknown", () => {
+    render(<SummaryLine {...base} active="never" usageNote={<span>Reading usage…</span>} onFilter={vi.fn()} />);
+    expect(screen.getByText("Reading usage…")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("84 items")).toBeInTheDocument();
+  });
+
   it("says 1 item in the singular and shows no badge before the first scan", () => {
     render(<SummaryLine {...base} grade={null} items={1} onFilter={vi.fn()} />);
     expect(screen.getByText("1 item")).toBeInTheDocument();

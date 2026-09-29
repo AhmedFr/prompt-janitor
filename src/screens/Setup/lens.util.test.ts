@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactView, EffectiveRule, FileRow, ProjectSetup, ProjectUsage, SetupView } from "@/lib/ipc";
-import { inLens, lensCounts, lensRows } from "./lens.util";
+import { inLens, lensCounts, lensRows, lensTarget, lensUsageState } from "./lens.util";
 import { setupRows, type SetupRow } from "./setupRows.util";
 
 const row = (over: Partial<SetupRow>): SetupRow => ({
@@ -168,5 +168,40 @@ describe("lensCounts", () => {
   it("includes plugins and excludes another project's items", () => {
     const c = lensCounts(rows, "/code/api", H, usage);
     expect(c.items).toBe(4); // global rule, api rule, adapt, design plugin
+  });
+});
+
+describe("lensTarget", () => {
+  const project = { harness: "cursor", path: "/repo/web" } as ProjectSetup;
+
+  it("reads the inventory's project with its own harness", () => {
+    expect(lensTarget("/repo/web", project, "claude_code")).toEqual({ harness: "cursor", path: "/repo/web" });
+  });
+
+  it("reads a graded-only path under the scan's harness", () => {
+    expect(lensTarget("/side", null, "claude_code")).toEqual({ harness: "claude_code", path: "/side" });
+  });
+
+  it("reads nothing without a lens or a harness", () => {
+    expect(lensTarget(null, null, "claude_code")).toBeNull();
+    expect(lensTarget("/side", null, null)).toBeNull();
+  });
+});
+
+describe("lensUsageState", () => {
+  const usage = { ranked: [], sessions_per_day: [] } as unknown as ProjectUsage;
+
+  it("is known without a lens, or once usage is read", () => {
+    expect(lensUsageState(false, { effective: null, usage: null, loading: true })).toBe("known");
+    expect(lensUsageState(true, { effective: null, usage })).toBe("known");
+    expect(lensUsageState(true, { effective: null, usage, loading: true, failed: true })).toBe("known");
+  });
+
+  it("is loading while the first read is in flight", () => {
+    expect(lensUsageState(true, { effective: null, usage: null, loading: true })).toBe("loading");
+  });
+
+  it("is failed when the read failed and left no usage", () => {
+    expect(lensUsageState(true, { effective: null, usage: null, failed: true })).toBe("failed");
   });
 });

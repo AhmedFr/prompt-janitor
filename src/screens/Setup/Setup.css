@@ -41,6 +41,13 @@
 }
 
 /* A failed Reveal in Finder, under the project strip. */
+.setup-usage-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--red);
+}
+
 .setup-reveal-error {
   margin: 0 0 12px;
   font-size: 12px;

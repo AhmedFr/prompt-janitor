@@ -10,4 +10,6 @@ export interface SummaryLineProps {
   onFilter: (filter: SetupFilter) => void;
   /** Replaces the static grade chip (the popover trigger, Part 3). */
   badge?: ReactNode;
+  /** Shown instead of the usage counts while usage is unknown (still loading, or unreadable). */
+  usageNote?: ReactNode;
 }

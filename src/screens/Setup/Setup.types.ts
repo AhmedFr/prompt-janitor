@@ -37,10 +37,22 @@ export interface SetupTargetControl {
   change: (next: SetupTarget, mode: SetupChangeMode) => void;
 }
 
+/** What the lens reads for: a harness's view of one project folder. */
+export interface LensTarget {
+  harness: string;
+  path: string;
+}
+
 /** The lensed project's load order and usage; both `null` until read, or when it has none. */
 export interface LensData {
   effective: EffectiveRule[] | null;
   usage: ProjectUsage | null;
+  /** A read is in flight. Absent (a fixed override) means settled. */
+  loading?: boolean;
+  /** The last read failed. */
+  failed?: boolean;
+  /** Reads the lens again. */
+  retry?: () => void;
 }
 
 /** What {@link useSetup} hands the screen. */
