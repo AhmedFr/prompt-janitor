@@ -32,7 +32,8 @@ const usage = (over: Partial<NonNullable<ArtifactView["usage"]>> = {}) => ({
   ...over,
 });
 
-const texts = (a: ArtifactView, scope = "web-app") => metaSegments(a, scope).map((s) => s.text);
+const texts = (a: ArtifactView, scope = "web-app", loadedIn?: number) =>
+  metaSegments(a, scope, loadedIn).map((s) => s.text);
 
 afterEach(() => vi.useRealTimers());
 
@@ -73,5 +74,11 @@ describe("metaSegments", () => {
   it("carries the grade when the artifact was graded", () => {
     expect(texts(row({ kind: "rule", grade: "B", score: 82 }))).toContain("Grade B · 82");
     expect(texts(row({ kind: "rule", grade: "B", score: null }))).toContain("Grade B");
+  });
+
+  it("says how many projects load it, when more than one does", () => {
+    expect(texts(row({ kind: "rule" }), "Global", 3)).toEqual(["Instruction file", "Global", "loaded in 3 projects"]);
+    expect(texts(row({ kind: "rule" }), "Global", 1)).toEqual(["Instruction file", "Global"]);
+    expect(texts(row({ kind: "rule" }), "Global")).toEqual(["Instruction file", "Global"]);
   });
 });

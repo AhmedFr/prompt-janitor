@@ -65,3 +65,8 @@ export const NeverUsed: Story = { args: { artifact: { ...agent, kind: "skill", u
 export const Settings: Story = {
   args: { artifact: { ...agent, kind: "settings", name: "settings.json", description: null, usage: null }, scope: "Global" },
 };
+
+/** A global instruction file several projects load every session. */
+export const LoadedInProjects: Story = {
+  args: { artifact: { ...agent, kind: "rule", name: "CLAUDE.md", description: null, usage: null }, scope: "Global", loadedIn: 5 },
+};

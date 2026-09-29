@@ -45,6 +45,11 @@ describe("ArtifactMeta", () => {
     expect(rate.closest("[data-tone]")?.querySelector("svg")).not.toBeNull();
   });
 
+  it("appends how many projects load it to the line", () => {
+    const { container } = render(<ArtifactMeta artifact={mcp} scope="Global" loadedIn={4} />);
+    expect(container.querySelector(".am__line")?.textContent).toMatch(/·loaded in 4 projects$/);
+  });
+
   it("shows the description under the line", () => {
     render(<ArtifactMeta artifact={mcp} scope="Global" />);
     expect(screen.getByText("Product analytics, feature flags and session replay")).toBeInTheDocument();
