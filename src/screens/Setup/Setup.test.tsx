@@ -7,13 +7,30 @@ import type { FileRow } from "@/lib/ipc";
 import { KIND_CHIP_ORDER, KIND_SINGULAR, LABEL } from "@/lib/vocabulary";
 import { artifact, noHarness, populated } from "./setup.fixtures";
 import { NO_ITEMS_TITLE } from "./Setup.constants";
+import type { ArtifactSourceState } from "./Setup.types";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open }));
-// The sheets are stubbed so a row click is observable; `Setup.sheets.test.tsx`
-// mounts the real ones.
-vi.mock("./SkillPanel", () => ({ SkillPanel: () => <div data-testid="skill-panel" /> }));
-vi.mock("./ArtifactPanel", () => ({ ArtifactPanel: () => <div data-testid="artifact-panel" /> }));
+// The viewer's reads and its Findings/Usage tabs are stubbed, so these cases
+// exercise Setup's wiring only; `ItemViewer.test.tsx` mounts the real ones.
+const loadedSource = vi.hoisted(
+  () => (): ArtifactSourceState => ({
+    content: "# Item",
+    path: "/item.md",
+    format: "markdown",
+    editable: false,
+    modified: "1",
+    loading: false,
+    saving: false,
+    error: null,
+    save: async () => null,
+    reload: () => {},
+  }),
+);
+vi.mock("./useArtifactSource", () => ({ useArtifactSource: loadedSource }));
+vi.mock("./ItemViewer/useGradedSource", () => ({ useGradedSource: loadedSource }));
+vi.mock("./Findings", () => ({ Findings: () => <div data-testid="findings" /> }));
+vi.mock("./ItemUsage", () => ({ ItemUsage: () => <div data-testid="item-usage" /> }));
 // One handler registry per test so a case can emit `scan-done` like the core does.
 const listeners = vi.hoisted(() => new Map<string, Set<() => void>>());
 vi.mock("@tauri-apps/api/event", () => ({
@@ -60,6 +77,10 @@ vi.mock("@/lib/ipc", async () => {
 });
 
 const fixture = populated;
+/** The global skill "adapt", and the web project's graded rule. */
+const SKILL_ID = 2;
+const RULE_FILE_ID = "f-web";
+const withoutSkill = { ...fixture, global: fixture.global.filter((a) => a.id !== SKILL_ID) };
 
 const renderSetup = async (navigate = vi.fn()) => {
   const view = render(<Setup navigate={navigate} />);
@@ -260,33 +281,82 @@ describe("Setup", () => {
     expect(within(rowFor("settings.json")).getByText("Global")).toBeInTheDocument();
   });
 
-  it("opens a rule's detail when its row is clicked", async () => {
-    const { navigate } = await renderSetup();
-
-    fireEvent.click(rowFor("web-rules"));
-
-    expect(navigate).toHaveBeenCalledWith("detail", "f-web");
-  });
-
-  it("opens the sheets it opened before the viewer exists (until Task 3.9)", async () => {
+  it("opens a graded instruction in the viewer instead of Detail", () => {
     const navigate = vi.fn();
     render(<Setup navigate={navigate} data={fixture} files={[]} />);
-    fireEvent.click(screen.getByRole("radio", { name: /Skills/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Instructions/ }));
     fireEvent.click(screen.getAllByRole("row")[1]);
-    expect(await screen.findByTestId("skill-panel")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: /Hooks/ }));
-    fireEvent.click(screen.getAllByRole("row")[1]);
-    expect(await screen.findByTestId("artifact-panel")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalledWith("detail", expect.anything());
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
   });
 
-  it("sends a graded instruction row to Detail (until Task 3.9)", () => {
-    const navigate = vi.fn();
-    const graded = { id: "/x/CLAUDE.md", name: "CLAUDE.md", path: "/x/CLAUDE.md", project: "x", project_id: "/x",
-      kind: "CLAUDE.md", grade: "B", score: 80, issue_count: 1, modified: null, worst_severity: "lo" } as FileRow;
-    render(<Setup navigate={navigate} data={fixture} files={[graded]} />);
-    fireEvent.click(screen.getByRole("radio", { name: /Instructions/ }));
-    fireEvent.click(screen.getByText("CLAUDE.md"));
-    expect(navigate).toHaveBeenCalledWith("detail", "/x/CLAUDE.md");
+  it("opens the item a deep link names, on the tab it names", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID }, tab: "usage" }} />);
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("opens a file by its file id (the panel's Fix these next link)", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { fileId: RULE_FILE_ID }, tab: "findings" }} />);
+    expect(screen.getByRole("tab", { name: /Findings/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps a deep link pending until its item's rows arrive, then opens it", () => {
+    const target = { open: { artifactId: SKILL_ID }, tab: "content" as const };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} loading />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+  });
+
+  it("drops a deep link whose item is still missing once the load is done", () => {
+    const target = { open: { artifactId: SKILL_ID } };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} />);
+    // the load had already completed without the item: a later refresh that brings it back must not pop a sheet
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("closes the viewer when a rescan removes the open item", () => {
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ open: { artifactId: SKILL_ID } }} />);
+    rerender(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={{ open: { artifactId: SKILL_ID } }} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("stays closed when the removed item comes back on a later rescan", () => {
+    const target = { open: { artifactId: SKILL_ID } };
+    const { rerender } = render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    rerender(<Setup navigate={vi.fn()} data={withoutSkill} files={[]} target={target} />);
+    rerender(<Setup navigate={vi.fn()} data={fixture} files={[]} target={target} />);
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
+  });
+
+  it("steps through the rows on screen, in their order, and stops at the last", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} />);
+    fireEvent.click(rowFor("deploy"));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^deploy/);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+    fireEvent.click(screen.getByRole("button", { name: "Previous item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^deploy/);
+  });
+
+  it("steps over what the filters hide", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill", filter: "never" }} />);
+    // never used: brainstorming, brainstorming, sunset — adapt and deploy are filtered out.
+    fireEvent.click(bodyRows()[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^sunset/);
+  });
+
+  it("opens a stepped-to item on the tab the viewer was on, with the editor state of a fresh open", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ kind: "skill" }} />);
+    fireEvent.click(rowFor("adapt"));
+    fireEvent.click(screen.getByRole("tab", { name: "Usage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName(/^brainstorming/);
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("lists a graded file the inventory never saw under Instructions", () => {

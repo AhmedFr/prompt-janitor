@@ -10,6 +10,8 @@ export interface SetupProps {
   files?: FileRow[];
   /** Where a deep link lands: kind, filter, lens, open item, tab. */
   target?: SetupTarget;
+  /** Override the load state (tests). */
+  loading?: boolean;
 }
 
 /** What {@link useSetup} hands the screen. */
@@ -28,6 +30,8 @@ export interface InventoryProps {
   detected: HarnessInfo[];
   navigate: Navigate;
   target?: SetupTarget;
+  /** A load or refresh is in flight: a deep link to an item not in the rows yet waits for it. */
+  loading: boolean;
   /** Reloads the inventory — how a saved skill's new size reaches the table. */
   onRefetch: () => Promise<void>;
 }

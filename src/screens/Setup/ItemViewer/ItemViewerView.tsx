@@ -66,6 +66,11 @@ export function ItemViewerView({
 
   // A line link belongs to the item it was clicked on.
   useEffect(() => setFocusLine(null), [item.id]);
+  // …and to the one visit to Content it asked for: Content remounts the file
+  // viewer on every return, and a line still held here would force Source again.
+  useEffect(() => {
+    if (tab !== "content") setFocusLine(null);
+  }, [tab]);
 
   // Not while editing: the textarea keeps its caret moves, and a step would
   // throw the draft away.

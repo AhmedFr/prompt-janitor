@@ -1,4 +1,4 @@
-import type { ArtifactView, FileRow, SetupView } from "@/lib/ipc";
+import type { ArtifactView, FileRow, ProjectSetup, SetupView } from "@/lib/ipc";
 import { KIND_CHIP_ORDER } from "@/lib/vocabulary";
 
 /** Where a row came from: the harness inventory, or a graded file the inventory never saw. */
@@ -90,4 +90,11 @@ export function byKindThenName(rows: SetupRow[]): SetupRow[] {
       (KIND_RANK.get(a.kind) ?? 0) - (KIND_RANK.get(b.kind) ?? 0) ||
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
   );
+}
+
+/** Where an item is loaded: a global or plugin item in every project still on disk, a project item in its own. */
+export function loadedInFor(row: SetupRow, projects: ProjectSetup[]): { path: string; name: string }[] {
+  const live = projects.filter((p) => p.exists);
+  const where = row.layer === "project" ? live.filter((p) => p.path === row.project_path) : live;
+  return where.map((p) => ({ path: p.path, name: p.name }));
 }

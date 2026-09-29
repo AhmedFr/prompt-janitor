@@ -350,7 +350,7 @@ describe("ItemViewer", () => {
   });
 });
 
-/** The cases that used to be `ArtifactPanel`'s: every other kind, read-only. */
+/** Every kind but a skill: read-only. */
 describe("ItemViewer — a non-skill item", () => {
   const MCP_JSON = '{\n  "command": "npx",\n  "env": {\n    "POSTHOG_KEY": "••••••"\n  }\n}';
   const server = (over: Partial<SetupRow> = {}): SetupRow =>
@@ -623,6 +623,25 @@ describe("ItemViewerView — tabs, header and stepping", () => {
       rerender(<ItemViewerView {...props} tab="content" onTab={onTab} item={rule} />);
       expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Rendered" }));
+      expect(screen.getByRole("heading", { name: "Adapt" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("forgets a line jump once Content is left, so coming back does not force Source again", () => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      const onTab = vi.fn();
+      const rule = { ...props.item, kind: "rule" as const, file_id: "/x/CLAUDE.md" };
+      const { rerender } = render(<ItemViewerView {...props} tab="findings" onTab={onTab} item={rule} />);
+      fireEvent.click(screen.getByRole("button", { name: "jump" }));
+      rerender(<ItemViewerView {...props} tab="content" onTab={onTab} item={rule} />);
+      expect(screen.getByRole("region", { name: /source/i })).toBeInTheDocument();
+      rerender(<ItemViewerView {...props} tab="findings" onTab={onTab} item={rule} />);
+      rerender(<ItemViewerView {...props} tab="content" onTab={onTab} item={rule} />);
       expect(screen.getByRole("heading", { name: "Adapt" })).toBeInTheDocument();
       expect(screen.queryByRole("region", { name: /source/i })).toBeNull();
     } finally {

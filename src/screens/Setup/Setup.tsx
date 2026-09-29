@@ -12,14 +12,14 @@ import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { SetupFilter } from "@/lib/setupFilter";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
 import { LABEL, type KindFilter } from "@/lib/vocabulary";
-import { ArtifactPanel } from "./ArtifactPanel";
-import { SkillPanel } from "./SkillPanel";
+import { formatSetupTarget, type ItemRef, type ViewerTab } from "@/App/setupTarget";
+import { ItemViewer, stepTarget } from "./ItemViewer";
 import { scopeLabel, type ColumnsCtx } from "./setup.columns";
 import { scopePillsFor } from "./setup.pills";
 import { unifiedColumns, visibleColumnIds } from "./setup.unified";
 import { costThreshold, harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
 import { applySetupFilter, setupFilterCounts } from "./setupFilter.util";
-import { byKindThenName, setupRows, type SetupRow } from "./setupRows.util";
+import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "./setupRows.util";
 import {
   EMPTY_FILTERED,
   EMPTY_HINT,
@@ -39,11 +39,11 @@ import "./Setup.css";
  * narrowed by kind chips and the summary line's filters, annotated with
  * whether anything ever actually used what is installed.
  */
-export function Setup({ navigate, data: override, files: filesOverride, target }: SetupProps) {
+export function Setup({ navigate, data: override, files: filesOverride, target, loading: loadingOverride }: SetupProps) {
   const state = useSetup();
   const data = override ?? state.data;
   const files = filesOverride ?? (override ? [] : state.files);
-  const loading = state.loading && !override;
+  const refreshing = loadingOverride ?? (state.loading && !override);
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
 
@@ -91,7 +91,8 @@ export function Setup({ navigate, data: override, files: filesOverride, target }
               status={scanStatusLine(scan.phase, scan.progress, harnessName(detected))}
             />
           )}
-          {loading ? (
+          {/* Loading only while there is nothing to show: a refresh renders over the data it replaces. */}
+          {refreshing && !data ? (
             <Card padded>
               <div className="muted">
                 {isTauri ? "Loading…" : "Open the Prompt Janitor desktop app to see your setup."}
@@ -108,6 +109,7 @@ export function Setup({ navigate, data: override, files: filesOverride, target }
               detected={detected}
               navigate={navigate}
               target={target}
+              loading={refreshing}
               onRefetch={state.refetch}
             />
           )}
@@ -166,7 +168,7 @@ const rowId = (row: SetupRow) => String(row.id);
  * line a status filter; both start from a deep link's `target` when there is
  * one. Rows arrive Kind then Name, so every slice starts in that order.
  */
-function Inventory({ data, files, detected, navigate, target, onRefetch }: InventoryProps) {
+function Inventory({ data, files, detected, navigate, target, loading, onRefetch }: InventoryProps) {
   const projectNames = useMemo(() => projectNameMap(data.projects), [data]);
   const rows = useMemo(() => byKindThenName(setupRows(data, files)), [data, files]);
   // Over the whole setup, not the slice: "costly" means the same on every chip.
@@ -181,10 +183,6 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
     if (target?.filter) setFilter(target.filter);
   }, [target?.filter]);
 
-  // Stable so `unifiedColumns`' per-`ctx` cache can hit.
-  const openDetail = useCallback((fileId: string) => navigate("detail", fileId), [navigate]);
-  const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openDetail, projectNames }), [openDetail, projectNames]);
-
   const kindCounts = useMemo(() => {
     const out: Partial<Record<KindFilter, number>> = { all: rows.length };
     for (const r of rows) out[r.kind] = (out[r.kind] ?? 0) + 1;
@@ -193,7 +191,6 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
   const ofKind = useMemo(() => (kind === "all" ? rows : rows.filter((r) => r.kind === kind)), [rows, kind]);
   const counts = useMemo(() => setupFilterCounts(ofKind, costBar), [ofKind, costBar]);
   const visible = useMemo(() => applySetupFilter(ofKind, filter, costBar), [ofKind, filter, costBar]);
-  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, false), ctx);
   const pills = useMemo(() => scopePillsFor(ofKind, projectNames), [ofKind, projectNames]);
   // `scopeLabel` is the Scope column's own label rule (a graded-only row's
   // project label included), so searching a project or plugin name finds
@@ -212,6 +209,45 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
   // through — and a row a rescan removed closes its sheet.
   const [openId, setOpenId] = useState<number | null>(null);
   const open = useMemo(() => (openId === null ? null : (rows.find((r) => r.id === openId) ?? null)), [openId, rows]);
+  // A row a rescan removed closes its sheet for good: the id is dropped, so
+  // the row coming back on a later rescan does not pop the sheet open again.
+  useEffect(() => {
+    if (openId !== null && !open) setOpenId(null);
+  }, [openId, open]);
+  const [tab, setTab] = useState<ViewerTab>(target?.tab ?? "content");
+  // The ids the table shows, in its current sort and filters: what stepping walks.
+  const [visibleIds, setVisibleIds] = useState<string[]>([]);
+  // A deep link names an item by artifact id, or by file id (graded rows and the panel's fixes).
+  // It waits here until the rows hold its item; if the load is done and the item is
+  // still missing, it is dropped rather than left to pop open on a later refresh.
+  // The tab travels with it, so it is the tab of the link that asked.
+  const [pending, setPending] = useState<{ ref: ItemRef; tab: ViewerTab } | null>(null);
+  useEffect(() => {
+    if (target?.open) setPending({ ref: target.open, tab: target.tab ?? "content" });
+  }, [target?.open, target?.tab]);
+  useEffect(() => {
+    if (!pending) return;
+    const { ref } = pending;
+    const row = "artifactId" in ref ? rows.find((r) => r.id === ref.artifactId) : rows.find((r) => r.file_id === ref.fileId);
+    if (row) {
+      setOpenId(row.id);
+      setTab(pending.tab);
+      setPending(null);
+    } else if (!loading) {
+      setPending(null);
+    }
+  }, [pending, rows, loading]);
+  const step = (delta: -1 | 1) => {
+    if (!open) return;
+    const next = stepTarget(visibleIds, rowId(open), delta);
+    if (next) setOpenId(Number(next));
+  };
+
+  // A file link (the Actions column's Open) lands on that file's findings.
+  // Resolved through `pending` so this stays stable — `unifiedColumns`' per-`ctx` cache can hit.
+  const openFindings = useCallback((fileId: string) => setPending({ ref: { fileId }, tab: "findings" }), []);
+  const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
+  const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, false), ctx);
 
   // An empty table is either a setup with nothing in it, or a slice the
   // filters emptied — then one Clear filters resets the chip and the summary
@@ -228,10 +264,10 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
     [rows.length, clearSlice],
   );
 
+  // Every row, graded instructions included, opens in the viewer on Content.
   const onRowClick = (row: SetupRow) => {
-    // Until the viewer gains its Findings tab (Task 3.9), a graded instruction still opens Detail.
-    if (row.kind === "rule" && row.file_id) openDetail(row.file_id);
-    else setOpenId(row.id);
+    setOpenId(row.id);
+    setTab("content");
   };
 
   return (
@@ -254,6 +290,8 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
         pills={pills}
         // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), in every slice.
         onRowClick={onRowClick}
+        // A state setter: identity-stable, as the table's ids-keyed effect expects.
+        onVisibleRowsChange={setVisibleIds}
         density="compact"
         virtualize
         empty={empty}
@@ -280,29 +318,24 @@ function Inventory({ data, files, detected, navigate, target, onRefetch }: Inven
           navigate={navigate}
         />
       )}
-      {/* The sheets as they are before the viewer (Task 3.9 replaces both): a
-          skill opens SkillPanel, every other row ArtifactPanel; a graded
-          instruction never gets here (onRowClick sends it to Detail). Keyed
-          on the row so switching rows remounts them rather than leaving the
-          previous row's draft or read behind. */}
-      {open?.kind === "skill" ? (
-        <SkillPanel
+      {/* Keyed on the row, so stepping or a new link remounts the viewer
+          rather than leaving the previous row's mode, draft or read behind. */}
+      {open && (
+        <ItemViewer
           key={open.id}
-          skill={open}
+          item={open}
           scope={scopeLabel(open, projectNames)}
+          tab={tab}
+          onTab={setTab}
           onClose={() => setOpenId(null)}
-          // The save already updated `artifacts.bytes`; refetching carries
-          // that into the table without waiting for a rescan.
+          onStep={step}
+          // A save or fix already updated the index; refetching carries that
+          // into the table without waiting for a rescan.
           onSaved={() => void onRefetch()}
+          loadedIn={loadedInFor(open, data.projects)}
+          onSelectProject={(path) => navigate("setup", formatSetupTarget({ lens: path }))}
         />
-      ) : open ? (
-        <ArtifactPanel
-          key={open.id}
-          artifact={open}
-          scope={scopeLabel(open, projectNames)}
-          onClose={() => setOpenId(null)}
-        />
-      ) : null}
+      )}
     </>
   );
 }

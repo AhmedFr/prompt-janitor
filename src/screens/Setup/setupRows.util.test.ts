@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ArtifactView, FileRow, SetupView } from "@/lib/ipc";
-import { byKindThenName, setupRows, syntheticId, type SetupRow } from "./setupRows.util";
+import type { ArtifactView, FileRow, ProjectSetup, SetupView } from "@/lib/ipc";
+import { byKindThenName, loadedInFor, setupRows, syntheticId, type SetupRow } from "./setupRows.util";
 
 const artifact = (over: Partial<ArtifactView>): ArtifactView => ({
   id: 1,
@@ -120,5 +120,26 @@ describe("byKindThenName", () => {
     const rows = [row({ id: 1, name: "b" }), row({ id: 2, name: "a" })];
     byKindThenName(rows);
     expect(rows.map((r) => r.id)).toEqual([1, 2]);
+  });
+});
+
+describe("loadedInFor", () => {
+  const projects = [
+    { path: "/code/web", name: "web", exists: true },
+    { path: "/code/api", name: "api", exists: true },
+    { path: "/code/gone", name: "gone", exists: false },
+  ] as ProjectSetup[];
+
+  it("loads a global or plugin row in every project that still exists", () => {
+    expect(loadedInFor(row({ layer: "global" }), projects)).toEqual([
+      { path: "/code/web", name: "web" }, { path: "/code/api", name: "api" },
+    ]);
+    expect(loadedInFor(row({ layer: "plugin" }), projects)).toHaveLength(2);
+  });
+
+  it("loads a project row only in its own project", () => {
+    expect(loadedInFor(row({ layer: "project", project_path: "/code/api" }), projects)).toEqual([
+      { path: "/code/api", name: "api" },
+    ]);
   });
 });

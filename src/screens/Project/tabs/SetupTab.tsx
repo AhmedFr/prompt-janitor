@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ArtifactView } from "@/lib/ipc";
-import { ArtifactPanel } from "@/screens/Setup/ArtifactPanel";
+import type { ViewerTab } from "@/App/setupTarget";
+import { ItemViewer } from "@/screens/Setup/ItemViewer";
 import { scopeLabel } from "@/screens/Setup/setup.columns";
-import { SkillPanel } from "@/screens/Setup/SkillPanel";
+import type { SetupRow } from "@/screens/Setup/setupRows.util";
 import {
   SETUP_EMPTY_HINT,
   SETUP_EMPTY_TITLE,
@@ -15,6 +16,18 @@ import type { SetupTabProps } from "./tabs.types";
 
 /** A row is its artifact: one database id, unique across the whole inventory. */
 const rowId = (row: ArtifactView) => String(row.id);
+
+/**
+ * The viewer takes a Setup row. This screen goes in Part 5; until then its
+ * rows open as plain inventory items, with no project lens to link to.
+ */
+const asItem = (a: ArtifactView): SetupRow => ({
+  ...a,
+  origin: "inventory",
+  project_label: null,
+  project_path: null,
+  load_order: null,
+});
 
 /** Identity-stable, which is what `DataTable`'s memoised filtering asks of it. */
 const SEARCH: DataTableSearch<ArtifactView> = {
@@ -35,11 +48,15 @@ export function SetupTab({ artifacts, ctx, onSaved }: SetupTabProps) {
   const [openId, setOpenId] = useState<number | null>(null);
   const open = openId === null ? null : (artifacts.find((a) => a.id === openId) ?? null);
   const close = () => setOpenId(null);
+  const [tab, setTab] = useState<ViewerTab>("content");
 
   // A graded rule opens its Detail screen; everything else opens its sheet.
   const onRowClick = (row: ArtifactView) => {
     if (row.kind === "rule" && row.file_id) ctx.onOpen(row.file_id);
-    else setOpenId(row.id);
+    else {
+      setOpenId(row.id);
+      setTab("content");
+    }
   };
 
   return (
@@ -57,22 +74,19 @@ export function SetupTab({ artifacts, ctx, onSaved }: SetupTabProps) {
         density="compact"
         empty={{ title: SETUP_EMPTY_TITLE, hint: SETUP_EMPTY_HINT }}
       />
-      {open?.kind === "skill" ? (
-        <SkillPanel
+      {open && (
+        <ItemViewer
           key={open.id}
-          skill={open}
+          item={asItem(open)}
           scope={scopeLabel(open, ctx.projectNames)}
+          tab={tab}
+          onTab={setTab}
           onClose={close}
           onSaved={onSaved}
+          loadedIn={[]}
+          onSelectProject={() => {}}
         />
-      ) : open ? (
-        <ArtifactPanel
-          key={open.id}
-          artifact={open}
-          scope={scopeLabel(open, ctx.projectNames)}
-          onClose={close}
-        />
-      ) : null}
+      )}
     </>
   );
 }

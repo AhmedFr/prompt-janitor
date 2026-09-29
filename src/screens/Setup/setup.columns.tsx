@@ -35,7 +35,7 @@ export const KIND_TABS: { id: ArtifactKind; label: string }[] = (
  * `ctx` instead.
  */
 export interface ColumnsCtx {
-  /** Navigates to the file's Detail screen (rule rows only — the only kind with a `file_id`). */
+  /** Opens a graded file (rule rows only — the only kind with a `file_id`): Setup's viewer on Findings, or Detail from the Project screen. */
   onOpen: (fileId: string) => void;
   /** Project root path -> display name, for resolving a project-layer row's Scope cell. */
   projectNames: Map<string, string>;

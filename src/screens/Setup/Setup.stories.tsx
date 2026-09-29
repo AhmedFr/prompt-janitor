@@ -329,6 +329,14 @@ export const WithGradedOnlyFiles: Story = {
   args: { files: gradedOnly, target: { kind: "rule" } },
 };
 
+/**
+ * A deep link that opens an item on a tab: the viewer over the table. Outside
+ * the desktop app the file itself cannot be read, so Content says so.
+ */
+export const ItemOpen: Story = {
+  args: { target: { kind: "skill", open: { artifactId: 2 }, tab: "usage" } },
+};
+
 /** Nothing installed — the only way forward is to add a folder. */
 export const NoHarness: Story = {
   args: { data: noHarness },
