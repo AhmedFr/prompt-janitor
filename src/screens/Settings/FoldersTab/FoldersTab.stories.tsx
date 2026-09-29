@@ -74,3 +74,10 @@ export const ArmedRemoval: Story = {
     armed: { path: "/Users/dev/code/scratch-prompts", count: 2 },
   },
 };
+
+/** The removal preview failed: the confirmation still shows, with a generic warning. */
+export const ArmedRemovalUnknownCount: Story = {
+  args: {
+    armed: { path: "/Users/dev/code/scratch-prompts", count: null },
+  },
+};

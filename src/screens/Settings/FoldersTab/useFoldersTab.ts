@@ -70,12 +70,16 @@ export function useFoldersTab(): UseFoldersTab {
   // Nothing to lose, nothing to confirm: a removal that deletes no project
   // happens at once. The backend's own rule is the count — asking it here
   // (rather than recomputing client-side) is the only way the confirmation
-  // can never disagree with what the removal actually deletes.
+  // can never disagree with what the removal actually deletes. When the
+  // preview fails (error or rejected invoke) the count is unknown, and the
+  // removal fails closed: it still asks, with a generic warning.
   const askRemove = useCallback(
     async (path: string) => {
       const remaining = extraFolders.filter((x) => x !== path);
-      const preview = await commands.previewFolderRemoval(remaining);
-      const count = preview.status === "ok" ? preview.data.length : 0;
+      const count = await commands
+        .previewFolderRemoval(remaining)
+        .then((preview) => (preview.status === "ok" ? preview.data.length : null))
+        .catch(() => null);
       if (count === 0) await removeFolder(path);
       else setArmed({ path, count });
     },

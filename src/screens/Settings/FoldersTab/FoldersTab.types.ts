@@ -4,8 +4,11 @@ import type { ScanProgressState } from "@/lib/useScanProgress";
 /** An extra folder armed for removal, with the backend's own count of what it would delete. */
 export interface ArmedRemoval {
   path: string;
-  /** How many projects removing `path` would delete — from `previewFolderRemoval`. */
-  count: number;
+  /**
+   * How many projects removing `path` would delete — from `previewFolderRemoval`;
+   * null when the preview failed and the count is unknown.
+   */
+  count: number | null;
 }
 
 /**

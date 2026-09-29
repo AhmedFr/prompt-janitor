@@ -192,6 +192,28 @@ describe("FoldersTab removal", () => {
     expect(setExtraScanFolders).not.toHaveBeenCalled();
   });
 
+  // Fail closed: when the backend can't say what would go, the folder is never
+  // removed straight away — the user still gets a (generic) confirmation.
+  it("still asks, with a generic warning, when the preview errors", async () => {
+    previewFolderRemoval.mockResolvedValue({ status: "error", error: "db locked" });
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    expect(await screen.findByRole("alertdialog", { name: "Remove /code/scratch" })).toHaveTextContent(
+      "Removing this folder deletes its projects and their history from Prompt Janitor. Files on disk are not touched.",
+    );
+    expect(setExtraScanFolders).not.toHaveBeenCalled();
+  });
+
+  it("still asks, with a generic warning, when the preview invoke rejects", async () => {
+    previewFolderRemoval.mockRejectedValue(new Error("ipc down"));
+    render(<FoldersTab />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove /code/scratch" }));
+    expect(await screen.findByRole("alertdialog", { name: "Remove /code/scratch" })).toHaveTextContent(
+      "Removing this folder deletes its projects and their history",
+    );
+    expect(setExtraScanFolders).not.toHaveBeenCalled();
+  });
+
   it("removes at once, with no confirmation, when no project would go", async () => {
     withPreview(0);
     render(<FoldersTab />);
