@@ -728,13 +728,8 @@ pub fn get_analytics(
     query::get_analytics(&conn, range_days).map_err(|e| e.to_string())
 }
 
-/// The weekly Scans digest.
-#[tauri::command]
-#[specta::specta]
-pub fn get_scans_digest(db: tauri::State<'_, AppDb>) -> Result<query::ScansDigest, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
-    query::get_scans_digest(&conn).map_err(|e| e.to_string())
-}
+// No `get_scans_digest` command: no screen shows the digest any more. The
+// weekly digest notification still calls `query::get_scans_digest` directly.
 
 /// Every starter template pack (#75): free to browse and preview — the
 /// one-click write is the paid action, gated in `apply_template`.

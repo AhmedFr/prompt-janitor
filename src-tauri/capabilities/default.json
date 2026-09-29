@@ -45,7 +45,6 @@
     "allow-list-projects",
     "allow-get-file-detail",
     "allow-get-analytics",
-    "allow-get-scans-digest",
     "allow-list-templates",
     "allow-apply-template",
     "allow-get-setup",

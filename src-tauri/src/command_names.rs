@@ -48,7 +48,6 @@ pub const COMMANDS: &[&str] = &[
     "list_projects",
     "get_file_detail",
     "get_analytics",
-    "get_scans_digest",
     "list_templates",
     "apply_template",
     "get_setup",

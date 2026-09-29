@@ -123,8 +123,6 @@ export const commands = {
 	 *  `range_days`.
 	 */
 	getAnalytics: (rangeDays: number) => typedError<Analytics, string>(__TAURI_INVOKE("get_analytics", { rangeDays })),
-	/**  The weekly Scans digest. */
-	getScansDigest: () => typedError<ScansDigest, string>(__TAURI_INVOKE("get_scans_digest")),
 	/**
 	 *  Every starter template pack (#75): free to browse and preview — the
 	 *  one-click write is the paid action, gated in `apply_template`.
@@ -368,15 +366,6 @@ export type CommonIssue = {
 export type DayCount = {
 	day: string,
 	count: number,
-};
-
-/**  An item in the digest's "needs your eyes" list. */
-export type DigestItem = {
-	/**  "regressed" | "improved" | "new". */
-	kind: string,
-	file_id: string,
-	title: string,
-	detail: string,
 };
 
 /**  One dimension's rolled-up score for a file (drives the radar chart, #88). */
@@ -755,24 +744,6 @@ export type ScanSummary = {
 	nits: number,
 	overall_score: number,
 	overall_grade: Grade,
-};
-
-/**  The weekly Scans digest. */
-export type ScansDigest = {
-	has_data: boolean,
-	overall_grade: Grade,
-	net_health: number,
-	improved: number,
-	regressed: number,
-	scan_count: number,
-	trend: number[],
-	needs_attention: DigestItem[],
-	/**
-	 *  Log lines the latest scan's harness pass could not parse, summed over
-	 *  every harness that reported. Zero is the normal case; a non-zero count
-	 *  is the honest caveat on the usage numbers.
-	 */
-	skipped_lines: number,
 };
 
 /**  Everything the Setup screen renders in one round trip. */

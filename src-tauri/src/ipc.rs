@@ -42,7 +42,6 @@ pub fn ipc_builder() -> Builder<tauri::Wry> {
             crate::commands::list_projects,
             crate::commands::get_file_detail,
             crate::commands::get_analytics,
-            crate::commands::get_scans_digest,
             crate::commands::list_templates,
             crate::commands::apply_template,
             crate::commands::get_setup,

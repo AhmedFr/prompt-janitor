@@ -10,8 +10,6 @@ export type {
   FileDetail,
   IssueDetail,
   DimensionScore,
-  ScansDigest,
-  DigestItem,
   RuleInfo,
   AiConfig,
   FixSuggestion,
