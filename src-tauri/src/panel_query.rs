@@ -13,9 +13,10 @@
 //! * sessions are counted top-level only (`parent_session_id IS NULL`) —
 //!   a sub-agent transcript is not a session the user started.
 //!
-//! Every count is filtered down to what the user can actually act on:
-//! plugin-bundled skills and issue-free files are noise in a popover that
-//! has room for three rows.
+//! Every count equals the rows its link opens in the main window: the
+//! never-used skills count is Setup's Skills + Never used slice (plugin
+//! skills included, R66), and issue-free files stay out of the fix list,
+//! which has room for three rows.
 //!
 //! Nothing here writes.
 
@@ -58,10 +59,9 @@ pub struct PanelSnapshot {
     /// At most three files that have issues, worst grade first then most
     /// issues. Empty when there is nothing to fix.
     pub top_fixes: Vec<PanelFix>,
-    /// Skills the user authored — any layer but `plugin` — that no
-    /// invocation has ever resolved to. Plugin-bundled skills are excluded
-    /// on purpose: installing a plugin ships dozens the user never chose,
-    /// and counting them buries the handful they wrote and forgot.
+    /// Skills, of every layer, that no invocation has ever resolved to.
+    /// Plugin-bundled skills count too (R66): the chip opens Setup's Skills +
+    /// Never used slice, which lists them, so its number is the rows it opens.
     pub never_used_skills: u32,
     /// MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`].
     pub mcp_erroring: u32,
@@ -139,13 +139,11 @@ fn top_fixes(conn: &Connection) -> rusqlite::Result<Vec<PanelFix>> {
 pub fn panel_snapshot(conn: &Connection, now_epoch_secs: i64) -> rusqlite::Result<PanelSnapshot> {
     let overview = get_overview(conn)?;
 
-    // `layer <> 'plugin'` is what makes this chip actionable rather than
-    // alarming: a plugin install ships skills wholesale, so on a real setup
-    // they are the overwhelming majority of "never used" and none of them are
-    // something the user can act on.
+    // Every layer, plugins included: the same rows Setup's Never used filter
+    // shows under the Skills chip, which is where this count links (R66).
     let never_used_skills: i64 = conn.query_row(
         "SELECT COUNT(*) FROM artifacts a
-          WHERE a.kind = 'skill' AND a.layer <> 'plugin'
+          WHERE a.kind = 'skill'
             AND NOT EXISTS (SELECT 1 FROM usage_stats u WHERE u.artifact_id = a.id)",
         [],
         |r| r.get(0),
@@ -351,16 +349,16 @@ mod tests {
         artifact(&conn, "skill", "project-skill", "project");
         // A never-invoked agent is not a skill, so it must not be counted.
         artifact(&conn, "agent", "unused-agent", "global");
-        // Plugin-bundled skills arrive by the dozen with an install; the user
-        // never chose them, so they are noise rather than a finding.
+        // The chip opens Setup's Skills + Never used slice, which lists
+        // plugin skills too (R66): the count must be the rows it opens.
         artifact(&conn, "skill", "plugin-skill", "plugin");
         usage(&conn, used, "skill", "adapt", 0.0);
 
         let s = panel_snapshot(&conn, NOW).unwrap();
 
         assert_eq!(
-            s.never_used_skills, 2,
-            "global and project skills only — plugin-bundled ones are excluded"
+            s.never_used_skills, 3,
+            "global, project and plugin skills — the rows Setup's Never used filter opens"
         );
     }
 

@@ -602,10 +602,9 @@ export type PanelSnapshot = {
 	 */
 	top_fixes: PanelFix[],
 	/**
-	 *  Skills the user authored — any layer but `plugin` — that no
-	 *  invocation has ever resolved to. Plugin-bundled skills are excluded
-	 *  on purpose: installing a plugin ships dozens the user never chose,
-	 *  and counting them buries the handful they wrote and forgot.
+	 *  Skills, of every layer, that no invocation has ever resolved to.
+	 *  Plugin-bundled skills count too (R66): the chip opens Setup's Skills +
+	 *  Never used slice, which lists them, so its number is the rows it opens.
 	 */
 	never_used_skills: number,
 	/**  MCP servers whose rollup is at or above [`ERROR_RATE_THRESHOLD`]. */
