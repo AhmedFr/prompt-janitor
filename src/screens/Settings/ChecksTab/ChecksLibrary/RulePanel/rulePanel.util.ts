@@ -17,6 +17,6 @@ export function ruleFacts(rule: RuleInfo): RuleFact[] {
     ["Severity", SEVERITY_LABELS[rule.severity]],
     ["Status", rule.enabled ? "Enabled" : "Disabled"],
     ["Type", ruleType(rule)],
-    ["Open issues", String(rule.hit_count)],
+    ["Open findings", String(rule.hit_count)],
   ];
 }

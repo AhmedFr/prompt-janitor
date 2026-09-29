@@ -11,6 +11,10 @@ vi.mock("@/lib/ipc", async () => ({
 }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(async () => null) }));
+// The menu-bar panel drives its own window: focus refetches, Esc hides, it sizes itself.
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ hide: vi.fn(), setSize: vi.fn(async () => {}), onFocusChanged: vi.fn(async () => () => {}) }),
+}));
 import { Onboarding } from "@/components/Onboarding";
 import { LABEL } from "@/lib/vocabulary";
 import { Settings } from "@/screens/Settings";
@@ -18,9 +22,12 @@ import { Setup } from "@/screens/Setup";
 import { Projects } from "@/screens/Projects";
 import { SETTINGS_TABS } from "@/screens/Settings/Settings.constants";
 import { Findings } from "@/screens/Setup/Findings";
+import { Panel } from "@/screens/Panel";
+import { openFilterGroup } from "@/test/filters";
 
 const PURCHASE = /\$\d|Get Pro|paid feature|License/;
-const OLD_WORDS = /\bRules\b|Rescan|Add a folder|Overview tab|Prompts tab/;
+const OLD_WORDS =
+  /\bRules\b|Rescan|Scan now|Add a folder|Overview tab|Prompts tab|Has issues|Open issues|grades the rules/;
 
 /** Everything a user can read or hear: text, plus title / aria-label / placeholder attributes. */
 function copyOnScreen(): string {
@@ -115,6 +122,33 @@ describe("copy sweep (spec §3.3, §13a) — loaded screens", () => {
     render(<Projects navigate={vi.fn()} />);
     await screen.findByText("web-app");
     sweep("Projects");
+  });
+
+  it("Projects' Status filter, opened", async () => {
+    render(<Projects navigate={vi.fn()} />);
+    await screen.findByText("web-app");
+    openFilterGroup("Status");
+    sweep("Projects · Status filter");
+  });
+
+  it("Settings → Checks with a check's sheet open", async () => {
+    render(<Settings navigate={vi.fn()} initialTab="checks" />);
+    fireEvent.click(await screen.findByText("Wrong package manager"));
+    await screen.findByRole("dialog");
+    sweep("Settings → Checks · check sheet");
+  });
+
+  it("the menu-bar panel, populated", async () => {
+    render(<Panel />);
+    await screen.findByText("acme-api");
+    sweep("Panel");
+  });
+
+  it("Onboarding at the detect step", async () => {
+    render(<Onboarding onDone={vi.fn()} />);
+    const scan = await screen.findByRole("button", { name: LABEL.scan });
+    await waitFor(() => expect(scan).toBeEnabled());
+    sweep("Onboarding · detect");
   });
 
   it("Onboarding at the reveal step", async () => {

@@ -109,7 +109,7 @@ describe("Projects", () => {
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
 
-    pickFilter("Status", "Has issues");
+    pickFilter("Status", "Has findings");
 
     await waitFor(() => expect(rowNames()).not.toContain("web-app"));
     expect(rowNames()).toEqual(expect.arrayContaining(["scripts", "gone"]));

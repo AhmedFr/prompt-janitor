@@ -146,7 +146,7 @@ export function buildPills(rows: ProjectRow[]): PillGroup<ProjectRow>[] {
       label: "Status",
       multi: true,
       options: [
-        { id: "issues", label: "Has issues", predicate: (r: ProjectRow) => r.issue_count > 0 },
+        { id: "issues", label: "Has findings", predicate: (r: ProjectRow) => r.issue_count > 0 },
         { id: "missing", label: "Missing folder", predicate: (r: ProjectRow) => !r.exists },
       ],
     },

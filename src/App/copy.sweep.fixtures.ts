@@ -108,6 +108,11 @@ const results: Record<string, unknown> = {
   getSchedule: "off",
   getAlert: true,
   getAppStatus: { schema_version: 1, db_path: "/db", project_count: 1, file_count: 3 },
+  getPanelSnapshot: {
+    has_data: true, overall_grade: "C", overall_score: 72, delta: 3, last_scan_at: "2026-08-19T10:00:00.000Z",
+    top_fixes: [{ file_id: "/code/acme-api/CLAUDE.md", name: "CLAUDE.md", project_name: "acme-api", grade: "F", issue_count: 6 }],
+    never_used_skills: 3, mcp_erroring: 1, sessions_today: 12,
+  },
   scanNow: { files_scanned: 5, projects: 2, critical: 0, warnings: 0, nits: 0, overall_score: 90, overall_grade: "A" },
 };
 

@@ -92,8 +92,8 @@ export function Onboarding({ onDone, state }: OnboardingProps) {
         </p>
         {found && (
           <p className="faint ob-note">
-            Prompt Janitor grades the rules, skills and agents your coding agent already loads. Add
-            a folder only if you keep prompts somewhere it never opens.
+            Prompt Janitor grades the instructions, skills and agents your coding agent already
+            loads. Point it at another folder only if you keep prompts somewhere it never opens.
           </p>
         )}
         {found && (

@@ -174,7 +174,7 @@ describe("buildPills", () => {
       project({ id: "/gone", issue_count: 0, exists: false }),
     ];
     const status = buildPills(rows).find((g) => g.id === "status");
-    expect(status?.options.map((o) => o.label)).toEqual(["Has issues", "Missing folder"]);
+    expect(status?.options.map((o) => o.label)).toEqual(["Has findings", "Missing folder"]);
     const [issues, missing] = status!.options;
     expect(rows.filter(issues.predicate).map((r) => r.id)).toEqual(["/noisy"]);
     expect(rows.filter(missing.predicate).map((r) => r.id)).toEqual(["/gone"]);

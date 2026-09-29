@@ -36,7 +36,7 @@ describe("RulePanel", () => {
 
   it("lists what the rule is", () => {
     const { container } = render(<RulePanel rule={rule()} onClose={() => {}} />);
-    expect(terms(container)).toEqual(["Source", "Severity", "Status", "Type", "Open issues"]);
+    expect(terms(container)).toEqual(["Source", "Severity", "Status", "Type", "Open findings"]);
     expect(screen.getByText("Warning")).toBeInTheDocument();
     expect(screen.getByText("Enabled")).toBeInTheDocument();
     expect(screen.getByText("Pattern rule")).toBeInTheDocument();

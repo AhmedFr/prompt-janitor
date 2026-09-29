@@ -19,7 +19,7 @@ describe("PanelFooter", () => {
     const handlers = actions();
     render(<PanelFooter scanning={false} scan={idle} {...handlers} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Scan now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan" }));
     fireEvent.click(screen.getByRole("button", { name: "Open app" }));
     fireEvent.click(screen.getByRole("button", { name: "Quit" }));
 
