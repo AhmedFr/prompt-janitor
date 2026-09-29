@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { commands, isTauri, type FileDetail, type Severity } from "@/lib/ipc";
+import { autoFixAll } from "@/lib/autoFixAll";
 import { isUnlocked } from "@/lib/monetization";
 import {
   fixesToReachA,
@@ -153,7 +154,6 @@ export function compute(
 export function useVerdictHero() {
   const [verdict, setVerdict] = useState<VerdictData>(EMPTY);
   const [autoFixBusy, setAutoFixBusy] = useState(false);
-  const detailsRef = useRef<FileDetail[]>([]);
   // Bumped on every refetch() call; a call only commits its results if it's
   // still the most recent one when its async work resolves, so an older
   // in-flight refetch (e.g. from mount) can't clobber a newer one's state
@@ -186,7 +186,6 @@ export function useVerdictHero() {
     // these now-stale results instead of overwriting fresher state.
     if (generation !== generationRef.current) return;
 
-    detailsRef.current = details;
     const rules = rulesRes.status === "ok" ? rulesRes.data.filter((r) => r.enabled) : [];
     setVerdict({
       ...compute(files, details),
@@ -214,13 +213,7 @@ export function useVerdictHero() {
   const runAutoFix = useCallback(async () => {
     setAutoFixBusy(true);
     try {
-      for (const detail of detailsRef.current) {
-        const edits = detail.issues
-          .filter((i) => i.fix_from && i.fix_to)
-          .map((i) => ({ from: i.fix_from as string, to: i.fix_to as string }));
-        if (edits.length > 0) await commands.applyFix(detail.id, edits, false, "auto");
-      }
-      await commands.scanNow();
+      await autoFixAll();
     } finally {
       setAutoFixBusy(false);
     }

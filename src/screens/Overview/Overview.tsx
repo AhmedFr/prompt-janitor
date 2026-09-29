@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { SeverityDot } from "@/components/SeverityDot";
 import { SourceBadge } from "@/components/SourceBadge";
-import { TrendChart, scoreGradeDetail } from "@/components/TrendChart";
+import { TrendChart, formatTrendDelta, scoreGradeDetail } from "@/components/TrendChart";
 import { Heatmap, bucketFiles } from "@/components/Heatmap";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -13,7 +13,6 @@ import { relativeTime } from "@/lib/format";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
 import type { Navigate } from "@/App/App.types";
 import { useOverview } from "./useOverview";
-import { formatTrendDelta } from "./overview.util";
 import "./Overview.css";
 
 interface Progress {

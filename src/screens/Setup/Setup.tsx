@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { GradePopover } from "@/components/GradePopover";
 import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import { KindChips } from "@/components/KindChips";
@@ -279,7 +280,7 @@ function Inventory({ data, files, detected, navigate, target, loading, onRefetch
           </span>
         ))}
       </p>
-      <SummaryLine grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
+      <SummaryLine badge={<GradePopover grade={grade} />} grade={grade} items={ofKind.length} counts={counts} active={filter} onFilter={setFilter} />
       <DataTable
         ariaLabel="Setup"
         stateKey={TABLE_STATE_KEY}
