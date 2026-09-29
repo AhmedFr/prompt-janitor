@@ -11,7 +11,7 @@ export const INSTALLED_PLUGIN = "installed plugin";
 /**
  * Setup "as Claude Code sees <project>" (spec §5): what applies there, instructions
  * first in the harness's load order, then every other kind; usage counted from
- * that project's sessions only. The backend knows no overrides, so nothing is
+ * that project's sessions only. Only `harness`'s own rows are considered. The backend knows no overrides, so nothing is
  * muted — the lens only claims what `effective_rules` actually computes.
  */
 export function lensRows(
@@ -19,9 +19,13 @@ export function lensRows(
   projectPath: string,
   effective: EffectiveRule[] | null,
   usage: ProjectUsage | null,
+  harness: string,
 ): SetupRow[] {
   const here = trim(projectPath);
-  const applies = rows.filter((r) => r.layer !== "project" || (r.project_path !== null && trim(r.project_path) === here));
+  // The load order is per harness: another harness's rows would sit unnumbered beside it.
+  const applies = rows
+    .filter((r) => r.harness === harness)
+    .filter((r) => r.layer !== "project" || (r.project_path !== null && trim(r.project_path) === here));
   const order = new Map((effective ?? []).map((e, i) => [e.path, i + 1]));
   const ranked = new Map(
     (usage?.ranked ?? []).filter((t) => t.artifact_id !== null).map((t) => [t.artifact_id as number, t]),
@@ -31,7 +35,8 @@ export function lensRows(
     // No enablement data (see the Part 4 note): say the plugin is installed, not that it is on.
     const r = row.layer === "plugin" ? { ...row, plugin_name: `${row.plugin_name ?? "Plugin"} · ${INSTALLED_PLUGIN}` } : row;
     const load_order = r.kind === "rule" ? (order.get(r.path) ?? null) : null;
-    if (!USAGE_KINDS.has(r.kind)) return { ...r, load_order };
+    // Machine-wide counts have no place under a project-only lens.
+    if (!USAGE_KINDS.has(r.kind)) return { ...r, load_order, usage: null };
     const t = ranked.get(r.id);
     const stat: UsageStat | null = t
       ? {
@@ -57,6 +62,6 @@ export function lensRows(
       if (a.load_order !== null) return -1;
       if (b.load_order !== null) return 1;
     }
-    return kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name);
+    return kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   });
 }

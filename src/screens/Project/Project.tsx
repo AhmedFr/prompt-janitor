@@ -28,7 +28,8 @@ import {
 import type { ProjectData, ProjectProps } from "./Project.types";
 import { useProject } from "./useProject";
 import { ProjectHeader } from "./ProjectHeader";
-import { MissingFolderBanner, StatePanel } from "./StatePanel";
+import { MissingFolderBanner } from "@/screens/Setup/ProjectStrip/MissingFolderBanner";
+import { StatePanel } from "./StatePanel";
 import { EffectiveRulesTab } from "./tabs/EffectiveRulesTab";
 import { RulesTab } from "./tabs/RulesTab";
 import { SetupTab } from "./tabs/SetupTab";

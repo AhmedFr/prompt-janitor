@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { MissingFolderBanner } from "./MissingFolderBanner";
 import { StatePanel } from "./StatePanel";
 import {
   FAILED_BODY,
@@ -36,6 +35,3 @@ export const Unreadable: Story = {
     retry: { label: FAILED_RETRY, onClick: () => {} },
   },
 };
-
-/** The banner that rides above a loaded project whose folder is gone. */
-export const MissingFolder: StoryObj = { render: () => <MissingFolderBanner /> };

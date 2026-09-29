@@ -1,7 +1,7 @@
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
-import { MISSING_FOLDER_BODY, MISSING_FOLDER_TITLE } from "../Project.constants";
-import "./StatePanel.css";
+import { MISSING_FOLDER_BODY, MISSING_FOLDER_TITLE } from "./MissingFolderBanner.constants";
+import "./MissingFolderBanner.css";
 
 /**
  * The harness remembers this project and the disk has lost it. A live region

@@ -9,6 +9,7 @@ const row = (over: Partial<SetupRow>): SetupRow => ({
   worst_severity: null, origin: "inventory", project_label: null, project_path: null, load_order: null, ...over,
 });
 const WEB = "/code/web";
+const H = "claude_code";
 
 const rows = [
   row({ id: 1, kind: "rule", name: "CLAUDE.md", path: "/h/.claude/CLAUDE.md" }),
@@ -30,43 +31,68 @@ const usage = {
 
 describe("lensRows", () => {
   it("keeps global, plugin and this project's items, and drops other projects'", () => {
-    const ids = lensRows(rows, WEB, effective, usage).map((r) => r.id);
+    const ids = lensRows(rows, WEB, effective, usage, H).map((r) => r.id);
     expect(ids).not.toContain(3);
     expect(ids).toEqual(expect.arrayContaining([1, 2, 4, 5, -7, 6]));
   });
 
   it("numbers instructions in load order and lists them first", () => {
-    const out = lensRows(rows, WEB, effective, usage);
+    const out = lensRows(rows, WEB, effective, usage, H);
     expect(out.slice(0, 3).map((r) => [r.id, r.load_order])).toEqual([[1, 1], [2, 2], [-7, null]]);
   });
 
   it("groups the other kinds after instructions, in kind order then name", () => {
-    const rest = lensRows(rows, WEB, effective, usage).slice(3).map((r) => r.id);
+    const rest = lensRows(rows, WEB, effective, usage, H).slice(3).map((r) => r.id);
     expect(rest).toEqual([4, 6, 5]); // skills (adapt, design) before agents
   });
 
   it("swaps in this project's usage, and none where the item was not used here", () => {
-    const out = lensRows(rows, WEB, effective, usage);
+    const out = lensRows(rows, WEB, effective, usage, H);
     expect(out.find((r) => r.id === 4)?.usage).toMatchObject({ total: 3, sessions: 2, error_rate: 0.5, avg_turn_tokens: 800, last_used: "2026-09-26T10:00:00Z" });
     expect(out.find((r) => r.id === 5)?.usage).toBeNull();
   });
 
   it("still lists everything, unnumbered, for a project no harness has worked in", () => {
-    const out = lensRows(rows, WEB, null, null);
+    const out = lensRows(rows, WEB, null, null, H);
     expect(out.every((r) => r.load_order === null)).toBe(true);
     expect(out.find((r) => r.id === 4)?.usage).toBeNull();
   });
 
   it("matches a project path with or without a trailing slash", () => {
-    expect(lensRows(rows, `${WEB}/`, effective, usage).map((r) => r.id)).toContain(5);
+    expect(lensRows(rows, `${WEB}/`, effective, usage, H).map((r) => r.id)).toContain(5);
+  });
+
+  it("excludes a sibling path that merely shares the prefix", () => {
+    const sibling = row({ id: 40, kind: "agent", layer: "project", name: "x", path: "/code/web2/a.md", project_path: "/code/web2" });
+    expect(lensRows([...rows, sibling], WEB, effective, usage, H).map((r) => r.id)).not.toContain(40);
+  });
+
+  it("matches a row whose project_path has a trailing slash", () => {
+    const slash = row({ id: 41, kind: "agent", layer: "project", name: "y", path: `${WEB}/a.md`, project_path: `${WEB}/` });
+    expect(lensRows([...rows, slash], WEB, effective, usage, H).map((r) => r.id)).toContain(41);
+  });
+
+  it("drops another harness's rows, so its global rules do not appear unnumbered", () => {
+    const other = row({ id: 42, harness: "codex", kind: "rule", name: "AGENTS.md", path: "/h/.codex/AGENTS.md" });
+    expect(lensRows([...rows, other], WEB, effective, usage, H).map((r) => r.id)).not.toContain(42);
+  });
+
+  it("gives kinds without per-project usage no usage at all", () => {
+    const hook = row({ id: 43, kind: "hook", name: "h", usage: { total: 5, sessions: 1, last_used: null, error_rate: 0, avg_turn_tokens: 0, count_30d: 0, count_prev_30d: 0 } });
+    expect(lensRows([...rows, hook], WEB, effective, usage, H).find((r) => r.id === 43)?.usage).toBeNull();
+  });
+
+  it("orders equal names case-insensitively", () => {
+    const a = row({ id: 44, name: "Zeta" }), b = row({ id: 45, name: "alpha" });
+    expect(lensRows([a, b], WEB, null, null, H).map((r) => r.id)).toEqual([45, 44]);
   });
 
   it("labels a plugin's items as coming from an installed plugin", () => {
-    expect(lensRows(rows, WEB, effective, usage).find((r) => r.id === 6)?.plugin_name).toBe("superpowers · installed plugin");
+    expect(lensRows(rows, WEB, effective, usage, H).find((r) => r.id === 6)?.plugin_name).toBe("superpowers · installed plugin");
   });
 
   it("makes no subfolder claim: EffectiveRule carries no subfolder", () => {
-    for (const r of lensRows(rows, WEB, effective, usage)) {
+    for (const r of lensRows(rows, WEB, effective, usage, H)) {
       expect(`${r.description ?? ""} ${r.plugin_name ?? ""}`).not.toMatch(/loaded when working in/);
     }
   });
@@ -100,7 +126,7 @@ describe("lensRows over a SetupView (spec §14: only what loads there)", () => {
     project_id: "/code/api", kind: "AGENTS.md", grade: "C", score: 70, issue_count: 1, modified: null, worst_severity: "lo" } as FileRow;
 
   it("includes global, plugin and this project's items, and excludes every other project's", () => {
-    const ids = lensRows(setupRows(view, [api]), WEB, null, null).map((r) => r.id);
+    const ids = lensRows(setupRows(view, [api]), WEB, null, null, H).map((r) => r.id);
     expect(ids).toEqual(expect.arrayContaining([10, 11, 12, 20, 21]));
     expect(ids).not.toContain(30);
     expect(ids).not.toContain(31);
