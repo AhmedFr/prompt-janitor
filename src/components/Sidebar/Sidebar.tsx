@@ -1,6 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
-import { trim } from "@/screens/Projects/projects.util";
+import { trim } from "@/lib/projectPath";
 import { formatSetupTarget } from "@/App/setupTarget";
 import type { SidebarProps } from "./Sidebar.types";
 import { NAV_ITEMS } from "./Sidebar.constants";

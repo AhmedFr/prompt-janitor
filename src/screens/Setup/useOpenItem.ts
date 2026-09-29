@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ItemRef, ViewerTab } from "@/App/setupTarget";
 import { stepTarget } from "./ItemViewer";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import type { SetupTargetControl } from "./Setup.types";
 
 /** A row is its artifact (or its graded file's synthetic id): unique across the whole table. */

@@ -1,9 +1,7 @@
 import { useCallback, useMemo } from "react";
-import type { SetupFilter } from "@/lib/setupFilter";
+import { applySetupFilter, costThreshold, setupFilterCounts, type SetupFilter } from "@/lib/setupFilter";
 import type { KindFilter } from "@/lib/vocabulary";
-import { costThreshold } from "./setup.util";
-import { applySetupFilter, setupFilterCounts } from "./setupFilter.util";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import type { SetupTargetControl } from "./Setup.types";
 
 /**

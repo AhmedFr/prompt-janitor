@@ -7,7 +7,8 @@ import type { ProjectRow } from "@/lib/ipc";
 // the barrel would pull the whole Setup screen in behind it.
 import { relativeSession } from "@/screens/Setup/setup.util";
 import { GLYPH_SIZE } from "./Projects.constants";
-import { projectCounts, trim } from "./projects.util";
+import { trim } from "@/lib/projectPath";
+import { projectCounts } from "./projects.util";
 import type { ProjectsColumnsCtx } from "./Projects.types";
 
 export type { ProjectsColumnsCtx };

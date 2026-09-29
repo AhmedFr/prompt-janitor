@@ -1,7 +1,7 @@
 import type { ArtifactKind, ArtifactView } from "@/lib/ipc";
 import type { PillGroup } from "@/components/DataTable";
 import { matchProject } from "./setup.util";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
 /** Kinds with a Scope column per spec §4.1 — everything but the plugin manifest row itself. */
 const SCOPED_KINDS: ReadonlySet<ArtifactKind> = new Set([

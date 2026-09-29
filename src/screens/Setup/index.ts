@@ -1,8 +1,6 @@
 export { Setup } from "./Setup";
 export { useSetup } from "./useSetup";
 export {
-  applyFilter,
-  costThreshold,
   harnessSummary,
   lastScanAt,
   projectNameMap,

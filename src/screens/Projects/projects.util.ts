@@ -1,8 +1,7 @@
 import type { ProjectRow, ProjectSessions } from "@/lib/ipc";
-import { lensCounts, trim, type LensCounts } from "@/screens/Setup/lens.util";
+import { trim } from "@/lib/projectPath";
+import { lensCounts, type LensCounts } from "@/screens/Setup/lens.util";
 import type { ProjectsColumnsCtx } from "./Projects.types";
-
-export { trim };
 
 /** Sessions started in the window, per project root (from `get_usage_overview`). */
 export function sessionsByProject(rows: ProjectSessions[]): Map<string, number> {

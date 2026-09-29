@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type { FileDetail } from "@/lib/ipc";
 import type { FindingsState } from "../Findings";
 import type { ArtifactSourceState } from "../Setup.types";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import { ItemViewerView } from "./index";
 
 /**

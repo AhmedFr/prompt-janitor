@@ -21,7 +21,7 @@ import { scopeLabel, type ColumnsCtx } from "./setup.columns";
 import { scopePillsFor } from "./setup.pills";
 import { unifiedColumns, visibleColumnIds } from "./setup.unified";
 import { harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
-import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "./setupRows.util";
+import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "@/lib/setupRows";
 import {
   EMPTY_FILTERED,
   EMPTY_HINT,

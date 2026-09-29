@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactView, EffectiveRule, FileRow, ProjectSetup, ProjectUsage, SetupView } from "@/lib/ipc";
 import { inLens, lensCounts, lensRows, lensTarget, lensUsageState } from "./lens.util";
-import { setupRows, type SetupRow } from "./setupRows.util";
+import { setupRows, type SetupRow } from "@/lib/setupRows";
 
 const row = (over: Partial<SetupRow>): SetupRow => ({
   id: 1, harness: "claude_code", layer: "global", kind: "skill", name: "x", path: "/x", plugin_name: null,

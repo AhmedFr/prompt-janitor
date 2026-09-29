@@ -1,7 +1,6 @@
 import type { ViewingSwitcherProject } from "@/components/ViewingSwitcher";
 import type { FileRow, ProjectSetup } from "@/lib/ipc";
-
-const trim = (p: string) => p.replace(/\/+$/, "");
+import { trim } from "@/lib/projectPath";
 
 /**
  * What the Viewing control offers: every inventory project, plus the lens

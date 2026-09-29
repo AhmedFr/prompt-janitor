@@ -1,65 +1,7 @@
-import type {
-  ArtifactView,
-  HarnessInfo,
-  ProjectSetup,
-} from "@/lib/ipc";
+import type { HarnessInfo, ProjectSetup } from "@/lib/ipc";
 import type { SetupFilter } from "@/lib/setupFilter";
-import {
-  COST_MEDIAN_MULTIPLIER,
-  ERROR_RATE_THRESHOLD,
-  MIN_COST_SAMPLES,
-} from "./Setup.constants";
 
 export type { SetupFilter };
-
-/** Middle value of a sorted-ascending copy; the mean of the middle pair when even. */
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-/**
- * What an artifact has to burn per turn to count as expensive: twice what the
- * typical measured artifact burns. `null` when fewer than
- * {@link MIN_COST_SAMPLES} artifacts have been measured — there is no typical
- * cost yet, and inventing one would flag arbitrary rows.
- *
- * Compute this once over the whole setup. Per-section medians would re-normalise
- * every list to itself, so a section holding only expensive things would report
- * half of them as cheap.
- */
-export function costThreshold(artifacts: ArtifactView[]): number | null {
-  const costs = artifacts
-    .map((a) => a.usage?.avg_turn_tokens)
-    .filter((t): t is number => t != null);
-  if (costs.length < MIN_COST_SAMPLES) return null;
-  return median(costs) * COST_MEDIAN_MULTIPLIER;
-}
-
-/**
- * Narrows the inventory to the slice the user asked for. Pass `threshold` — the
- * {@link costThreshold} of the whole setup — so `cost` means the same thing in
- * every section; omit it and the bar is computed from `artifacts` alone.
- */
-export function applyFilter(
-  artifacts: ArtifactView[],
-  filter: SetupFilter,
-  threshold?: number | null,
-): ArtifactView[] {
-  if (filter === "all") return artifacts;
-  if (filter === "never") return artifacts.filter((a) => a.usage == null);
-  if (filter === "errors") {
-    return artifacts.filter((a) => (a.usage?.error_rate ?? 0) >= ERROR_RATE_THRESHOLD);
-  }
-
-  const bar = threshold === undefined ? costThreshold(artifacts) : threshold;
-  if (bar == null) return [];
-  return artifacts.filter((a) => {
-    const cost = a.usage?.avg_turn_tokens;
-    return cost != null && cost >= bar;
-  });
-}
 
 /**
  * Orders projects the way the user thinks about them: the ones still on disk

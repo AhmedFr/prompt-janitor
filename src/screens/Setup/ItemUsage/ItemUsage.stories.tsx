@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import { ItemUsage } from "./ItemUsage";
 
 const skill = {

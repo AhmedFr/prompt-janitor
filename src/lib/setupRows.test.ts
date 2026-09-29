@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactView, FileRow, ProjectSetup, SetupView } from "@/lib/ipc";
-import { byKindThenName, loadedInFor, setupRows, syntheticId, type SetupRow } from "./setupRows.util";
+import { byKindThenName, loadedInFor, setupRows, syntheticId, type SetupRow } from "@/lib/setupRows";
 
 const artifact = (over: Partial<ArtifactView>): ArtifactView => ({
   id: 1,

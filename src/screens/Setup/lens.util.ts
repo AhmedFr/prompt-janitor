@@ -1,10 +1,9 @@
 import type { EffectiveRule, ProjectSetup, ProjectUsage, UsageStat } from "@/lib/ipc";
-import { ERROR_RATE_THRESHOLD, KIND_ORDER } from "./Setup.constants";
+import { trim } from "@/lib/projectPath";
+import { ERROR_RATE_THRESHOLD, USAGE_KINDS } from "@/lib/setupFilter";
+import { KIND_ORDER } from "./Setup.constants";
 import type { LensData, LensTarget } from "./Setup.types";
-import type { SetupRow } from "./setupRows.util";
-import { USAGE_KINDS } from "./setup.unified";
-
-export const trim = (p: string) => p.replace(/\/+$/, "");
+import type { SetupRow } from "@/lib/setupRows";
 
 /** What a plugin's rows say under the lens: the inventory lists installed plugins, not enabled ones. */
 export const INSTALLED_PLUGIN = "installed plugin";

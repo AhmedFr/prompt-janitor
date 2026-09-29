@@ -3,7 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { PROJECT_EVENTS } from "@/lib/project-events";
 import { commands, isTauri, type ProjectRow, type FileRow, type ProjectUsage, type SetupView } from "@/lib/ipc";
 import type { ProjectsState } from "./Projects.types";
-import { lensHarnessFor, sessionsByProject, trim } from "./projects.util";
+import { trim } from "@/lib/projectPath";
+import { lensHarnessFor, sessionsByProject } from "./projects.util";
 
 const EMPTY_USAGE = { ranked: [], sessions_per_day: [] } satisfies ProjectUsage;
 

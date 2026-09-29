@@ -1,5 +1,5 @@
 import type { ArtifactUsage } from "@/lib/ipc";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
 export interface ItemUsageProps {
   item: SetupRow;

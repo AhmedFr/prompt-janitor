@@ -1,6 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { ArtifactKind } from "@/lib/ipc";
 import { EMPTY_MARK, FindingsCell, ScopeCell, TokensCell } from "@/components/DataTable";
+import { USAGE_KINDS } from "@/lib/setupFilter";
 import { KIND_SINGULAR, type KindFilter } from "@/lib/vocabulary";
 import {
   COLUMN_WIDTH,
@@ -12,10 +13,8 @@ import {
   type ColumnsCtx,
 } from "./setup.columns";
 import { projectNameFor } from "./setup.util";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
-/** Kinds the usage index counts (skills, agents, commands, MCP servers) — hooks are not among them. */
-export const USAGE_KINDS: ReadonlySet<ArtifactKind> = new Set(["skill", "agent", "command", "mcp_server"]);
 
 /** A rough, labelled (≈) estimate: an instruction file is paid for by its size, every session. */
 export const BYTES_PER_TOKEN = 4;

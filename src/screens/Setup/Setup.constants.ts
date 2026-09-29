@@ -1,4 +1,5 @@
 import type { ArtifactKind } from "@/lib/ipc";
+import { ERROR_RATE_THRESHOLD } from "@/lib/setupFilter";
 
 /**
  * The order artifact kinds are presented in — configuration first (rules), then
@@ -16,8 +17,6 @@ export const KIND_ORDER: readonly ArtifactKind[] = [
   "settings",
 ] as const;
 
-/** An artifact whose invocations fail this often is worth a second look. */
-export const ERROR_RATE_THRESHOLD = 0.25;
 
 /**
  * Where the Error % column turns amber: failing one call in ten is not yet a
@@ -29,14 +28,6 @@ export const ERROR_RATE_WATCH = 0.1;
 /** The Error % column's green / amber / red lines. Red is exactly what the "Errors" filter keeps. */
 export const ERROR_RATE_BANDS = { watch: ERROR_RATE_WATCH, bad: ERROR_RATE_THRESHOLD } as const;
 
-/**
- * "High cost" is relative, not absolute: an artifact costs a lot when its
- * average turn burns at least twice what the typical measured artifact burns.
- */
-export const COST_MEDIAN_MULTIPLIER = 2;
-
-/** Fewest measured artifacts a median needs before "high cost" means anything. */
-export const MIN_COST_SAMPLES = 2;
 
 /** `sessionStorage` suffix Setup's one table remembers its search, pills and sort under (`pj.table.setup.unified`). */
 export const TABLE_STATE_KEY = "setup.unified";

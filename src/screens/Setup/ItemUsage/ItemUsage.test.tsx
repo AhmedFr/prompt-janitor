@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import { ItemUsage } from "./ItemUsage";
 
 const skill = { id: 4, kind: "skill", name: "adapt", bytes: 900, origin: "inventory", usage: { total: 3, sessions: 2,

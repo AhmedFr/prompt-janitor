@@ -1,6 +1,6 @@
 import type { ArtifactKind } from "@/lib/ipc";
 import { KIND_SINGULAR } from "@/lib/vocabulary";
-import { USAGE_KINDS } from "../setup.unified";
+import { USAGE_KINDS } from "@/lib/setupFilter";
 
 /** A kind as the header names it — see `@/lib/vocabulary`. */
 export const KIND_NAME = KIND_SINGULAR;

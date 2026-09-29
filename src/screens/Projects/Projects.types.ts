@@ -1,5 +1,5 @@
 import type { FileRow, ProjectRow, ProjectUsage, SetupView } from "@/lib/ipc";
-import type { SetupRow } from "@/screens/Setup/setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import type { Navigate } from "@/App/App.types";
 
 export interface ProjectsProps {

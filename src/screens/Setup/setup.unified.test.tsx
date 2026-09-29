@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import { unifiedColumns, visibleColumnIds } from "./setup.unified";
 
 const row = (over: Partial<SetupRow>): SetupRow => ({

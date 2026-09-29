@@ -1,7 +1,6 @@
 import type { FileRow, SetupView } from "@/lib/ipc";
-import { costThreshold } from "@/screens/Setup/setup.util";
-import { setupFilterCounts } from "@/screens/Setup/setupFilter.util";
-import { setupRows } from "@/screens/Setup/setupRows.util";
+import { costThreshold, setupFilterCounts } from "@/lib/setupFilter";
+import { setupRows } from "@/lib/setupRows";
 
 const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 

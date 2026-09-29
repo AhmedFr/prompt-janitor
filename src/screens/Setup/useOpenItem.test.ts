@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { SetupTarget } from "@/App/setupTarget";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 import { useOpenItem } from "./useOpenItem";
 import { useSetupTarget } from "./useSetupTarget";
 

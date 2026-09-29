@@ -240,7 +240,7 @@ describe("Setup", () => {
     for (const row of screen.getAllByRole("row").slice(1)) expect(row).not.toHaveTextContent(/^adapt/);
   });
 
-  it("orders the All slice by kind in chip order (then name, pinned in setupRows.util.test.ts)", () => {
+  it("orders the All slice by kind in chip order (then name, pinned in src/lib/setupRows.test.ts)", () => {
     render(<Setup navigate={vi.fn()} data={fixture} files={[]} />);
     const kinds = kindCells();
     const rank = (k: string) => KIND_CHIP_ORDER.findIndex((c) => c !== "all" && KIND_SINGULAR[c] === k);

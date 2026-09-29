@@ -2,7 +2,7 @@ import type { ViewerTab } from "@/App/setupTarget";
 import type { ArtifactUsage } from "@/lib/ipc";
 import type { FindingsState } from "../Findings";
 import type { ArtifactSourceState } from "../Setup.types";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
 /** What the viewer is doing right now. */
 export type PanelMode = "read" | "edit";

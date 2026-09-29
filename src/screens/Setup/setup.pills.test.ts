@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ArtifactView } from "@/lib/ipc";
 import { scopePillsFor } from "./setup.pills";
-import type { SetupRow } from "./setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
 const artifact = (o: Partial<ArtifactView> = {}): ArtifactView => ({
   id: 1,

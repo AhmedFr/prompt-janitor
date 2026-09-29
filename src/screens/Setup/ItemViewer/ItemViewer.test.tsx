@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { ArtifactSourceState } from "../Setup.types";
-import type { SetupRow } from "../setupRows.util";
+import type { SetupRow } from "@/lib/setupRows";
 
 const getArtifactSource = vi.hoisted(() => vi.fn());
 const saveArtifactSource = vi.hoisted(() => vi.fn());

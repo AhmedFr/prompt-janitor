@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { SetupTarget } from "@/App/setupTarget";
 import { populated } from "./setup.fixtures";
-import { setupRows } from "./setupRows.util";
+import { setupRows } from "@/lib/setupRows";
 import { useSetupSlice } from "./useSetupSlice";
 import { useSetupTarget } from "./useSetupTarget";
 

@@ -6,9 +6,9 @@ import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ProjectRow } from "@/lib/ipc";
 import { formatSetupTarget } from "@/App/setupTarget";
-import { setupRows } from "@/screens/Setup/setupRows.util";
+import { setupRows } from "@/lib/setupRows";
 import { buildPills, DEFAULT_SORT, projectColumns } from "./projects.columns";
-import { trim } from "./projects.util";
+import { trim } from "@/lib/projectPath";
 import {
   EMPTY_HINT,
   EMPTY_TITLE,
