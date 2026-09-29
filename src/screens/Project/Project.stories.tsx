@@ -130,11 +130,11 @@ const populated: ProjectData = {
   ],
   usage: {
     ranked: [
-      { kind: "skill", target: "pdf-extract", artifact_id: 2, uses: 24, sessions: 9, error_rate: 0, avg_turn_tokens: 900 },
-      { kind: "skill", target: "release-notes", artifact_id: 3, uses: 4, sessions: 2, error_rate: null, avg_turn_tokens: null },
-      { kind: "agent", target: "code-reviewer", artifact_id: 4, uses: 8, sessions: 4, error_rate: 0.25, avg_turn_tokens: 5400 },
-      { kind: "mcp", target: "mcp__github__create_issue", artifact_id: 6, uses: 61, sessions: 18, error_rate: 0.04, avg_turn_tokens: 2100 },
-      { kind: "builtin", target: "Bash", artifact_id: null, uses: 210, sessions: 38, error_rate: 0.02, avg_turn_tokens: 1400 },
+      { kind: "skill", target: "pdf-extract", artifact_id: 2, uses: 24, sessions: 9, error_rate: 0, avg_turn_tokens: 900, last_used: null },
+      { kind: "skill", target: "release-notes", artifact_id: 3, uses: 4, sessions: 2, error_rate: null, avg_turn_tokens: null, last_used: null },
+      { kind: "agent", target: "code-reviewer", artifact_id: 4, uses: 8, sessions: 4, error_rate: 0.25, avg_turn_tokens: 5400, last_used: null },
+      { kind: "mcp", target: "mcp__github__create_issue", artifact_id: 6, uses: 61, sessions: 18, error_rate: 0.04, avg_turn_tokens: 2100, last_used: null },
+      { kind: "builtin", target: "Bash", artifact_id: null, uses: 210, sessions: 38, error_rate: 0.02, avg_turn_tokens: 1400, last_used: null },
     ],
     sessions_per_day: sessionsPerDay,
   },

@@ -16,6 +16,7 @@ const fullData: UsageOverview = {
       sessions: 4,
       error_rate: 0.5,
       avg_turn_tokens: 1840,
+      last_used: null,
     },
     {
       // Same bare name as the skill above: the backend groups by (kind, target),
@@ -27,6 +28,7 @@ const fullData: UsageOverview = {
       sessions: 2,
       error_rate: 0,
       avg_turn_tokens: null,
+      last_used: null,
     },
     {
       kind: "mcp",
@@ -36,6 +38,7 @@ const fullData: UsageOverview = {
       sessions: 1,
       error_rate: 0.25,
       avg_turn_tokens: 620,
+      last_used: null,
     },
     {
       kind: "builtin",
@@ -45,6 +48,7 @@ const fullData: UsageOverview = {
       sessions: 1,
       error_rate: 0,
       avg_turn_tokens: null,
+      last_used: null,
     },
   ],
   by_kind: [
@@ -76,6 +80,7 @@ const noFindings: UsageOverview = {
       sessions: 1,
       error_rate: 0,
       avg_turn_tokens: null,
+      last_used: null,
     },
   ],
 };

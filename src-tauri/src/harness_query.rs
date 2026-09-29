@@ -118,6 +118,8 @@ pub struct RankedTarget {
     pub error_rate: f64,
     /// Mean context tokens per turn, over the turns that recorded any.
     pub avg_turn_tokens: Option<f64>,
+    /// The latest invocation of the target in the window, RFC3339.
+    pub last_used: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, specta::Type)]
@@ -473,7 +475,7 @@ fn ranked_targets(
 ) -> rusqlite::Result<Vec<RankedTarget>> {
     const COLUMNS: &str = "SELECT kind, target,
                 CASE WHEN count(DISTINCT artifact_id) = 1 THEN max(artifact_id) END,
-                count(*), count(DISTINCT session_id), avg(is_error), avg(turn_tokens)
+                count(*), count(DISTINCT session_id), avg(is_error), avg(turn_tokens), max(ts)
            FROM invocations WHERE ts >= ?1";
     const GROUPING: &str = "GROUP BY kind, target ORDER BY count(*) DESC, target";
 
@@ -496,6 +498,7 @@ fn ranked_targets(
             r.get::<_, i64>(4)?,
             r.get::<_, Option<f64>>(5)?,
             r.get::<_, Option<f64>>(6)?,
+            r.get::<_, Option<String>>(7)?,
         ))
     };
     let rows = match scope {
@@ -507,7 +510,8 @@ fn ranked_targets(
 
     let mut ranked = Vec::new();
     for row in rows {
-        let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens) = row?;
+        let (kind, target, artifact_id, uses, sessions, error_rate, avg_turn_tokens, last_used) =
+            row?;
         // A kind outside the model is dropped rather than guessed at.
         let Some(kind) = InvocationKind::parse(&kind) else {
             continue;
@@ -520,6 +524,7 @@ fn ranked_targets(
             sessions: as_u32(sessions),
             error_rate: error_rate.unwrap_or(0.0),
             avg_turn_tokens,
+            last_used,
         });
     }
     Ok(ranked)
@@ -728,6 +733,24 @@ mod tests {
                 _guard: guard,
             },
         )
+    }
+
+    #[test]
+    fn project_usage_reports_when_each_target_was_last_used() {
+        let (conn, home) = seeded();
+        let app = home.root.join("work/app").to_string_lossy().into_owned();
+        // 2026-08-02T00:00:00Z, the fixture's "now" (see `seeded`).
+        let u = project_usage(&conn, "claude_code", &app, 1_785_628_800, 30).unwrap();
+        let expected: Option<String> = conn
+            .query_row(
+                "SELECT max(ts) FROM invocations WHERE harness = 'claude_code' AND project_path = rtrim(?1, '/')
+                   AND kind = ?2 AND target = ?3",
+                rusqlite::params![app, u.ranked[0].kind.as_str(), u.ranked[0].target],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(u.ranked[0].last_used.is_some());
+        assert_eq!(u.ranked[0].last_used, expected);
     }
 
     #[test]

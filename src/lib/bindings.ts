@@ -721,6 +721,8 @@ export type RankedTarget = {
 	error_rate: number | null,
 	/**  Mean context tokens per turn, over the turns that recorded any. */
 	avg_turn_tokens: number | null,
+	/**  The latest invocation of the target in the window, RFC3339. */
+	last_used: string | null,
 };
 
 /**  A rule (built-in or custom) with its current enabled state. */

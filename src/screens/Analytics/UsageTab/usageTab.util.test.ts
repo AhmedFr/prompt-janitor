@@ -18,6 +18,7 @@ const row = (over: Partial<RankedTarget> & Pick<RankedTarget, "kind" | "target">
   sessions: 1,
   error_rate: 0,
   avg_turn_tokens: null,
+  last_used: null,
   ...over,
 });
 

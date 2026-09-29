@@ -120,6 +120,7 @@ const target = (o: Partial<RankedTarget> = {}): RankedTarget => ({
   sessions: 3,
   error_rate: null,
   avg_turn_tokens: null,
+  last_used: null,
   ...o,
 });
 

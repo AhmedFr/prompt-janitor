@@ -16,6 +16,7 @@ const rankedRow = (
   sessions: Math.max(1, Math.round(uses / 4)),
   error_rate: (uses % 5) / 10,
   avg_turn_tokens: uses % 2 === 0 ? null : uses * 210,
+  last_used: null,
   ...over,
 });
 
