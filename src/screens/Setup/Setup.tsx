@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { GradePopover } from "@/components/GradePopover";
@@ -90,6 +91,7 @@ export function Setup({
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Setup</h1>
         {data && <ViewingSwitcher projects={choices} lens={lens} onChange={onLens} />}
         <span className="toolbar-spacer" />

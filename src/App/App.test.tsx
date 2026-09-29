@@ -11,12 +11,15 @@ import { App } from "./App";
  * UI has no button for yet.
  */
 const nav = vi.hoisted(() => ({ current: null as Navigate | null }));
+/** The live props each stub was last rendered with, callbacks included. */
+const live = vi.hoisted(() => new Map<string, Record<string, unknown>>());
 
 const makeStub = vi.hoisted(
   () =>
     (testid: string) =>
     ({ navigate, ...rest }: { navigate: Navigate } & Record<string, unknown>) => {
       nav.current = navigate;
+      live.set(testid, rest);
       return <div data-testid={testid} data-props={JSON.stringify(rest)} />;
     },
 );
@@ -71,6 +74,7 @@ const go = (route: Parameters<Navigate>[0], target?: string) =>
 describe("App", () => {
   beforeEach(() => {
     nav.current = null;
+    live.clear();
     listeners.clear();
     sessionStorage.clear();
     updateCheck.version = null;
@@ -99,19 +103,25 @@ describe("App", () => {
     expect(propsOf("settings").checksTab).toBeUndefined();
   });
 
-  /**
-   * Unlike `detail`, an untargeted `project` clears rather than keeps: the
-   * screen is addressed by path, and carrying the last one forward would
-   * silently open the wrong project.
-   */
-  it("clears the project path when `project` is reached without one", () => {
+  it("lands a panel link to an old Detail route on the file's Findings", async () => {
+    render(<App />);
+    await emitNavigate({ route: "detail", target: "/code/web/CLAUDE.md" });
+    expect(propsOf("setup").target).toEqual({ open: { fileId: "/code/web/CLAUDE.md" }, tab: "findings" });
+  });
+
+  it("opens the project lens for an old project route", async () => {
+    render(<App />);
+    await emitNavigate({ route: "project", target: "/code/web" });
+    expect(propsOf("setup").target).toEqual({ lens: "/code/web" });
+  });
+
+  /** An old project link with no path would otherwise carry the last lens forward. */
+  it("opens the whole setup for an old project route without a path", () => {
     render(<App />);
     go("project", "/code/web-app");
-    expect(propsOf("project").path).toBe("/code/web-app");
-
-    go("overview");
+    go("projects");
     go("project");
-    expect(propsOf("project").path).toBeUndefined();
+    expect(propsOf("setup").target).toEqual({});
   });
 
   it("opens Setup on the kind a deep link names", () => {
@@ -134,7 +144,7 @@ describe("App", () => {
   it("clears the Setup target when `setup` is reached without one", () => {
     render(<App />);
     go("setup", "mcp_server");
-    go("overview");
+    go("projects");
     go("setup");
     expect(propsOf("setup").target).toEqual({});
   });
@@ -149,29 +159,27 @@ describe("App", () => {
     expect(propsOf("setup").target).toEqual({});
   });
 
-  it("keeps the file id when `detail` is reached without one", () => {
-    render(<App />);
-    go("detail", "/code/web-app/CLAUDE.md");
-    go("overview");
-    go("detail");
-    expect(propsOf("detail").fileId).toBe("/code/web-app/CLAUDE.md");
-  });
-
   /**
    * The menu-bar panel is its own window with no router: a row clicked there
    * raises this window and sends the destination over as an event.
    */
   it("follows a `navigate` event from the panel, target and all", async () => {
     render(<App />);
-    await emitNavigate({ route: "detail", target: "/code/acme-api/CLAUDE.md" });
-    expect(screen.getByTestId("detail")).toBeInTheDocument();
-    expect(propsOf("detail").fileId).toBe("/code/acme-api/CLAUDE.md");
+    await emitNavigate({ route: "settings", target: "ai" });
+    expect(propsOf("settings").initialTab).toBe("ai");
   });
 
   it("follows a targetless `navigate` event", async () => {
     render(<App />);
+    await emitNavigate({ route: "projects", target: null });
+    expect(screen.getByTestId("projects")).toBeInTheDocument();
+  });
+
+  it("lands a retired screen's link on Setup", async () => {
+    render(<App />);
+    go("projects");
     await emitNavigate({ route: "analytics", target: null });
-    expect(screen.getByTestId("analytics")).toBeInTheDocument();
+    expect(screen.getByTestId("setup")).toBeInTheDocument();
   });
 
   /** The route crosses a window boundary as a bare string; a typo must not blank the shell. */
@@ -194,12 +202,12 @@ describe("App", () => {
     expect(screen.getByTestId("setup")).toBeInTheDocument();
   });
 
-  it("sends the banner's action to the Settings App tab", () => {
+  it("sends the banner's action to the Settings About tab", () => {
     updateCheck.version = "0.1.1";
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
     expect(screen.getByTestId("settings")).toBeInTheDocument();
-    expect(propsOf("settings").initialTab).toBe("app");
+    expect(propsOf("settings").initialTab).toBe("about");
   });
 
   /** Acting on the news is the strongest acknowledgement of it. */
@@ -222,5 +230,44 @@ describe("App", () => {
     await waitFor(() => expect(listeners.has("navigate")).toBe(true));
     view.unmount();
     await waitFor(() => expect(listeners.has("navigate")).toBe(false));
+  });
+
+  describe("Back", () => {
+    const setupProps = () =>
+      live.get("setup") as { onTargetChange: (t: object, mode: "push" | "replace") => void; onCloseItem: () => void };
+    const cmdBracket = () =>
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "[", metaKey: true }));
+      });
+
+    it("restores Setup's lens and filters on ⌘[, from another destination", () => {
+      render(<App />);
+      act(() => setupProps().onTargetChange({ lens: "/code/web", filter: "never" }, "push"));
+      go("settings", "ai");
+      cmdBracket();
+      expect(propsOf("setup").target).toEqual({ lens: "/code/web", filter: "never" });
+      cmdBracket();
+      expect(propsOf("setup").target).toEqual({});
+    });
+
+    it("closes the viewer as one history step, so Back leaves Setup rather than reopening it", () => {
+      render(<App />);
+      go("projects");
+      go("setup", "kind=skill");
+      act(() => setupProps().onTargetChange({ kind: "skill", open: { artifactId: 2 }, tab: "content" }, "push"));
+      act(() => setupProps().onTargetChange({ kind: "skill", open: { artifactId: 2 }, tab: "usage" }, "replace"));
+      act(() => setupProps().onCloseItem());
+      expect(propsOf("setup").target).toEqual({ kind: "skill" });
+      cmdBracket();
+      expect(screen.getByTestId("projects")).toBeInTheDocument();
+    });
+
+    it("restores the Checks sub-tab of an old Rules link", () => {
+      render(<App />);
+      go("rules", "custom");
+      go("projects");
+      cmdBracket();
+      expect(propsOf("settings")).toMatchObject({ initialTab: "checks", checksTab: "custom" });
+    });
   });
 });

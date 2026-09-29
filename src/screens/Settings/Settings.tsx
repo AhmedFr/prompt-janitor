@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
 import { isTauri } from "@/lib/ipc";
@@ -38,6 +39,7 @@ export function Settings({ navigate: _navigate, initialTab, checksTab }: Setting
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Settings</h1>
       </header>
       <div className="scroll-area">

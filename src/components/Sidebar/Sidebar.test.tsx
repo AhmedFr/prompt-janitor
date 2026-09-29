@@ -49,9 +49,13 @@ describe("Sidebar", () => {
     for (const gone of ["Overview", "Prompts", "Scans", "Analytics", "Rules"]) expect(labels).not.toContain(gone);
   });
 
-  it.each(["overview", "scans", "analytics"] as const)("keeps Setup lit on the legacy %s route", (route) => {
+  it.each([
+    ["setup", "Setup"],
+    ["projects", "Projects"],
+    ["settings", "Settings"],
+  ] as const)("lights %s, the destination it is on", (route, label) => {
     const { getByRole } = render(<Sidebar active={route} onNavigate={() => {}} />);
-    expect(getByRole("button", { current: "page" })).toHaveTextContent("Setup");
+    expect(getByRole("button", { current: "page" })).toHaveTextContent(label);
   });
 
   it("routes the Projects nav item to the projects table", () => {
@@ -59,20 +63,6 @@ describe("Sidebar", () => {
     const { getByRole } = render(<Sidebar active="setup" onNavigate={onNavigate} />);
     getByRole("button", { name: "Projects" }).click();
     expect(onNavigate).toHaveBeenCalledWith("projects");
-  });
-
-  it("keeps Projects lit while one project's own page is open", () => {
-    // `project` is not a sidebar destination of its own (see `NAV_ITEMS`), so
-    // without this the whole nav goes dark the moment a project is opened.
-    const { getByRole } = render(<Sidebar active="project" onNavigate={() => {}} />);
-    expect(getByRole("button", { current: "page" })).toHaveTextContent("Projects");
-  });
-
-  it("keeps Setup lit while one file's detail page is open", () => {
-    // `detail` is not a destination of its own either; it is opened from
-    // Setup's file rows now, so Setup is the destination it belongs to.
-    const { getByRole } = render(<Sidebar active="detail" onNavigate={() => {}} />);
-    expect(getByRole("button", { current: "page" })).toHaveTextContent("Setup");
   });
 
   it("opens a recent project as a lens on Setup", () => {

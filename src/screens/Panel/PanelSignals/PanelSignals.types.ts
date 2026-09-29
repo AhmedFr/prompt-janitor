@@ -1,4 +1,7 @@
-import type { Route } from "@/App/App.types";
+import type { Navigate } from "@/App/App.types";
+
+/** A main-window route of any vintage: the shell resolves old ones (`resolveExternal`). */
+export type MainRoute = Parameters<Navigate>[0];
 
 /** The three counts a snapshot carries, named rather than positional. */
 export interface SignalCounts {
@@ -12,7 +15,7 @@ export interface SignalCounts {
 
 export interface PanelSignalsProps extends SignalCounts {
   /** Raise the main window on the screen where this signal is dealt with. */
-  onOpen: (route: Route, target: string | null) => void;
+  onOpen: (route: MainRoute, target: string | null) => void;
 }
 
 /** One chip: which count it shows, where it is fixed, and how it is painted. */
@@ -23,7 +26,7 @@ export interface SignalSpec {
   /** The visible text for that count, e.g. "3 never-used skills". */
   text: (count: number) => string;
   /** Where the chip goes, and what it opens there. */
-  route: Route;
+  route: MainRoute;
   target: string | null;
   /** Named in the accessible label so the chip says where it leads. */
   destination: string;

@@ -1,11 +1,10 @@
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { commands, isTauri } from "@/lib/ipc";
-import type { Route } from "@/App/App.types";
 import { PanelFixes } from "./PanelFixes";
 import { PanelFooter } from "./PanelFooter";
 import { PanelHeader } from "./PanelHeader";
-import { PanelSignals } from "./PanelSignals";
+import { PanelSignals, type MainRoute } from "./PanelSignals";
 import {
   FAILED_BODY,
   FAILED_RETRY,
@@ -40,7 +39,7 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
   const failed = failedOverride ?? (!loading && data == null);
   const scanning = scanningOverride ?? state.scanning;
 
-  const openMain = (route: Route, target: string | null = null) => {
+  const openMain = (route: MainRoute, target: string | null = null) => {
     // Outside the desktop runtime there is no other window to raise.
     if (!isTauri) return;
     // A bare invoke with no `typedError` wrapper: a rejection here is an

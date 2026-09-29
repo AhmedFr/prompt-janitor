@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { BackButton } from "@/components/BackButton";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Icon } from "@/components/Icon";
@@ -83,6 +84,7 @@ export function Projects({
   return (
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
+        <BackButton />
         <h1 className="screen__title">Projects</h1>
       </header>
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { Sidebar } from "./Sidebar";
+import { isRoute } from "@/App/App.constants";
 import type { Route } from "@/App/App.types";
 import "@/styles/shell.css";
 
@@ -12,7 +13,7 @@ import "@/styles/shell.css";
 const meta = {
   title: "Components/Sidebar",
   component: Sidebar,
-  args: { active: "overview", onNavigate: () => {} },
+  args: { active: "setup", onNavigate: () => {} },
   parameters: { layout: "fullscreen" },
   decorators: [
     (Story) => (
@@ -28,8 +29,9 @@ type Story = StoryObj<typeof meta>;
 
 /** Interactive wrapper so clicking a nav item moves the active highlight. */
 function InteractiveSidebar() {
-  const [active, setActive] = useState<Route>("overview");
-  return <Sidebar active={active} onNavigate={setActive} onReplay={() => {}} />;
+  const [active, setActive] = useState<Route>("setup");
+  // A recent project navigates to Setup with a lens target; only the route lights the nav.
+  return <Sidebar active={active} onNavigate={(route) => setActive(isRoute(route) ? route : "setup")} onReplay={() => {}} />;
 }
 
 export const Default: Story = {
