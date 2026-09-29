@@ -16,7 +16,7 @@ describe("PanelSignals", () => {
       screen.getByRole("button", { name: "1 MCP server erroring — open Setup" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "12 sessions today — open Analytics" }),
+      screen.getByRole("button", { name: "12 sessions today — open Projects" }),
     ).toBeInTheDocument();
   });
 
@@ -25,13 +25,13 @@ describe("PanelSignals", () => {
     render(<PanelSignals {...counts} onOpen={onOpen} />);
 
     fireEvent.click(screen.getByRole("button", { name: "3 never-used skills — open Setup" }));
-    expect(onOpen).toHaveBeenCalledWith("setup", "skill");
+    expect(onOpen).toHaveBeenCalledWith("setup", "kind=skill&filter=never");
 
     fireEvent.click(screen.getByRole("button", { name: "1 MCP server erroring — open Setup" }));
-    expect(onOpen).toHaveBeenCalledWith("setup", "mcp_server");
+    expect(onOpen).toHaveBeenCalledWith("setup", "kind=mcp_server&filter=errors");
 
-    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Analytics" }));
-    expect(onOpen).toHaveBeenCalledWith("analytics", null);
+    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Projects" }));
+    expect(onOpen).toHaveBeenCalledWith("projects", null);
   });
 
   /** Sessions are neither good nor bad; painting them red would invent a verdict. */
@@ -55,6 +55,6 @@ describe("PanelSignals", () => {
     render(<PanelSignals neverUsedSkills={0} mcpErroring={0} sessionsToday={4} onOpen={() => {}} />);
     expect(screen.getByText("Setup looks clean")).toBeInTheDocument();
     // Today's sessions are context, not a problem — they stay either way.
-    expect(screen.getByRole("button", { name: "4 sessions today — open Analytics" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "4 sessions today — open Projects" })).toBeInTheDocument();
   });
 });

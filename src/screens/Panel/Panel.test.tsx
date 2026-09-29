@@ -147,7 +147,7 @@ describe("Panel", () => {
   it("opens the main window on a fix's detail page", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "Open CLAUDE.md in acme-api — grade F, 6 issues" }));
-    expect(openMain).toHaveBeenCalledWith("detail", "/code/acme-api/CLAUDE.md");
+    expect(openMain).toHaveBeenCalledWith("setup", "open=f%3A%2Fcode%2Facme-api%2FCLAUDE.md&tab=findings");
   });
 
   it("says there is nothing to fix rather than showing an empty list", async () => {
@@ -159,13 +159,13 @@ describe("Panel", () => {
   it("counts the usage signals and routes each chip to where it is fixed", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "3 never-used skills — open Setup" }));
-    expect(openMain).toHaveBeenCalledWith("setup", "skill");
+    expect(openMain).toHaveBeenCalledWith("setup", "kind=skill&filter=never");
 
     fireEvent.click(screen.getByRole("button", { name: "1 MCP server erroring — open Setup" }));
-    expect(openMain).toHaveBeenCalledWith("setup", "mcp_server");
+    expect(openMain).toHaveBeenCalledWith("setup", "kind=mcp_server&filter=errors");
 
-    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Analytics" }));
-    expect(openMain).toHaveBeenCalledWith("analytics", null);
+    fireEvent.click(screen.getByRole("button", { name: "12 sessions today — open Projects" }));
+    expect(openMain).toHaveBeenCalledWith("projects", null);
   });
 
   it("runs a scan, narrates it, and refetches when it finishes", async () => {
@@ -221,10 +221,10 @@ describe("Panel", () => {
     expect(await screen.findByRole("button", { name: "Scan now" })).toBeEnabled();
   });
 
-  it("opens the app on the overview", async () => {
+  it("opens the app on Setup", async () => {
     await show();
     fireEvent.click(screen.getByRole("button", { name: "Open app" }));
-    expect(openMain).toHaveBeenCalledWith("overview", null);
+    expect(openMain).toHaveBeenCalledWith("setup", null);
   });
 
   it("quits for real", async () => {

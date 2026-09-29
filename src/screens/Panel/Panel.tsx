@@ -1,5 +1,6 @@
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { formatSetupTarget } from "@/App/setupTarget";
 import { commands, isTauri } from "@/lib/ipc";
 import { PanelFixes } from "./PanelFixes";
 import { PanelFooter } from "./PanelFooter";
@@ -58,7 +59,7 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
           <PanelHeader snapshot={data} />
           {data.has_data && (
             <>
-              <PanelFixes fixes={data.top_fixes} onOpen={(fileId) => openMain("detail", fileId)} />
+              <PanelFixes fixes={data.top_fixes} onOpen={(fileId) => openMain("setup", formatSetupTarget({ open: { fileId }, tab: "findings" }) ?? null)} />
               <PanelSignals
                 neverUsedSkills={data.never_used_skills}
                 mcpErroring={data.mcp_erroring}
@@ -75,7 +76,7 @@ export function Panel({ data: override, failed: failedOverride, scanning: scanni
           scanning={scanning}
           scan={state.scan}
           onScan={() => void state.startScan()}
-          onOpenApp={() => openMain("overview")}
+          onOpenApp={() => openMain("setup")}
           onQuit={() => {
             if (isTauri) commands.quit().catch(() => {});
           }}
