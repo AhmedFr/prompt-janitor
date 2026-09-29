@@ -31,6 +31,21 @@ describe("ProjectStrip", () => {
     expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
   });
 
+  it.each([
+    ["an empty series", []],
+    ["an all-zero series", [{ day: "2026-09-25", count: 0 }, { day: "2026-09-26", count: 0 }]],
+  ])("says No sessions yet for %s, without drawing a chart", (_n, series) => {
+    const { container } = render(<ProjectStrip project={project} sessionsPerDay={series} onReveal={vi.fn()} />);
+    expect(screen.getByText("No sessions yet")).toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("shows only the count for a single day, with no sparkline", () => {
+    const { container } = render(<ProjectStrip project={project} sessionsPerDay={[{ day: "2026-09-26", count: 3 }]} onReveal={vi.fn()} />);
+    expect(screen.getByText("3 sessions · 90 days")).toBeInTheDocument();
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = render(<ProjectStrip project={project} sessionsPerDay={[{ day: "2026-09-26", count: 5 }]} onReveal={vi.fn()} />);
     expect(await axe(container)).toHaveNoViolations();

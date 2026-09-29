@@ -1,6 +1,6 @@
 import { Button } from "@/components/Button";
 import { Sparkline } from "@/components/Sparkline";
-import { LENS_WINDOW_DAYS } from "../useLens";
+import { LENS_WINDOW_DAYS } from "../lens.constants";
 import { relativeSession } from "../setup.util";
 import { MissingFolderBanner } from "./MissingFolderBanner";
 import { NO_SESSIONS, REVEAL_LABEL, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./ProjectStrip.constants";
@@ -9,6 +9,7 @@ import "./ProjectStrip.css";
 
 /** The project the lens looks through: its name, how busy it has been, and the way to its folder. */
 export function ProjectStrip({ project, sessionsPerDay, onReveal }: ProjectStripProps) {
+  const total = (sessionsPerDay ?? []).reduce((sum, d) => sum + d.count, 0);
   return (
     <div className="project-strip">
       <strong className="project-strip__name">{project.name}</strong>
@@ -16,12 +17,14 @@ export function ProjectStrip({ project, sessionsPerDay, onReveal }: ProjectStrip
         <MissingFolderBanner />
       ) : (
         <>
-          {sessionsPerDay ? (
+          {sessionsPerDay && total > 0 ? (
             <>
               <span className="muted">
-                {sessionsPerDay.reduce((sum, d) => sum + d.count, 0)} sessions · {LENS_WINDOW_DAYS} days
+                {total} sessions · {LENS_WINDOW_DAYS} days
               </span>
-              <Sparkline data={sessionsPerDay.map((d) => d.count)} width={SPARKLINE_WIDTH} height={SPARKLINE_HEIGHT} />
+              {sessionsPerDay.length >= 2 && (
+                <Sparkline data={sessionsPerDay.map((d) => d.count)} width={SPARKLINE_WIDTH} height={SPARKLINE_HEIGHT} />
+              )}
             </>
           ) : (
             <span className="muted">{NO_SESSIONS}</span>
