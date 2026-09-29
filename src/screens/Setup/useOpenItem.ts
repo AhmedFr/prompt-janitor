@@ -33,6 +33,8 @@ export function useOpenItem(
   // A link to an item not in the rows waits while a load is in flight. Once
   // it is done, a still-missing item — or a row a rescan or the lens removed —
   // is dropped from the target, so it does not pop open on a later refresh.
+  // The replace lands on the table the item was opened over, which the
+  // history collapses into (navReducer), so no dead Back step is left.
   useEffect(() => {
     if (ref && !open && !loading) change({ ...value, open: undefined, tab: undefined }, "replace");
   }, [ref, open, loading, value, change]);

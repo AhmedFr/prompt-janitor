@@ -43,6 +43,13 @@ export function navReducer(h: NavHistory, a: NavAction): NavHistory {
       return { entries, index: entries.length - 1 };
     }
     case "replace": {
+      // Landing on the place just behind (a missing item dropped from the
+      // target) is that place: collapse into it rather than leave two equal
+      // entries and a Back step that goes nowhere.
+      if (h.index > 0 && same(h.entries[h.index - 1], a.state)) {
+        const entries = [...h.entries.slice(0, h.index), ...h.entries.slice(h.index + 1)];
+        return { entries, index: h.index - 1 };
+      }
       const entries = [...h.entries];
       entries[h.index] = a.state;
       return { entries, index: h.index };
@@ -50,8 +57,8 @@ export function navReducer(h: NavHistory, a: NavAction): NavHistory {
     case "back":
       return h.index > 0 ? { entries: h.entries, index: h.index - 1 } : h;
     case "closeItem": {
-      // Only an open viewer closes: over a replace that left two equal
-      // entries, a stray close would otherwise pop one of them.
+      // Only an open viewer closes: over two equal entries, a stray close
+      // would otherwise pop one of them.
       const now = current(h);
       if (now.route !== "setup" || now.target.open === undefined) return h;
       const closed = withoutItem(now);

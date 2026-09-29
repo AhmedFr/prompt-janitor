@@ -49,6 +49,20 @@ describe("navReducer", () => {
     expect(current(h)).toEqual(setup({ open: { artifactId: 1 }, tab: "usage" }));
   });
 
+  // A dropped missing item (useOpenItem) replaces the viewer's entry with the
+  // table it was opened over: that must not leave two equal entries, a Back
+  // step that goes nowhere.
+  it("a replace that lands on the entry behind it collapses into that entry", () => {
+    let h = initialHistory();
+    h = navReducer(h, { type: "push", state: setup({ kind: "skill" }) });
+    h = navReducer(h, { type: "push", state: setup({ kind: "skill", open: { artifactId: 9 } }) });
+    h = navReducer(h, { type: "replace", state: setup({ kind: "skill", open: undefined, tab: undefined }) });
+    expect(h.entries).toEqual([setup(), setup({ kind: "skill" })]);
+    expect(h.index).toBe(1);
+    h = navReducer(h, { type: "back" });
+    expect(current(h)).toEqual(setup());
+  });
+
   it("closing the viewer pops the entry that opened it", () => {
     let h = initialHistory(setup({ kind: "skill" }));
     h = navReducer(h, { type: "push", state: setup({ kind: "skill", open: { artifactId: 2 } }) });
@@ -88,10 +102,8 @@ describe("navReducer", () => {
   });
 
   it("closing does nothing while no viewer is open, even over two identical entries", () => {
-    // A replace can leave the entry behind the current one equal to it.
-    let h = initialHistory(setup({ kind: "skill" }));
-    h = navReducer(h, { type: "push", state: setup({ kind: "skill", open: { artifactId: 2 } }) });
-    h = navReducer(h, { type: "replace", state: setup({ kind: "skill" }) });
+    // Defensive: a replace no longer leaves such a pair, but a close must not pop one either.
+    const h: NavHistory = { entries: [setup({ kind: "skill" }), setup({ kind: "skill" })], index: 1 };
     expect(navReducer(h, { type: "closeItem" })).toBe(h);
     const onProjects = initialHistory({ route: "projects" });
     expect(navReducer(onProjects, { type: "closeItem" })).toBe(onProjects);
