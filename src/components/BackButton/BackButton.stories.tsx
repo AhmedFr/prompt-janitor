@@ -12,6 +12,7 @@ const nav = (canGoBack: boolean): Navigation => ({
   replace: noop,
   back: noop,
   closeItem: noop,
+  registerBackGuard: () => noop,
 });
 
 const meta = {

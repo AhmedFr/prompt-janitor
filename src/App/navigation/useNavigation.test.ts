@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { useNavigation } from "./useNavigation";
 
@@ -49,5 +49,56 @@ describe("useNavigation", () => {
     expect(result.current.push).toBe(first.push);
     expect(result.current.replace).toBe(first.replace);
     expect(result.current.closeItem).toBe(first.closeItem);
+  });
+
+  it.each([
+    ["⌥", { altKey: true }],
+    ["⌃", { ctrlKey: true }],
+    ["⇧", { shiftKey: true }],
+    ["a repeat", { repeat: true }],
+  ])("ignores ⌘[ with %s", (_label, extra) => {
+    const { result } = renderHook(() => useNavigation());
+    act(() => result.current.navigate("projects"));
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "[", metaKey: true, ...extra }));
+    });
+    expect(result.current.state.route).toBe("projects");
+  });
+
+  it("ignores a ⌘[ something else already handled", () => {
+    const { result } = renderHook(() => useNavigation());
+    act(() => result.current.navigate("projects"));
+    const handled = new KeyboardEvent("keydown", { key: "[", metaKey: true, cancelable: true });
+    handled.preventDefault();
+    act(() => {
+      window.dispatchEvent(handled);
+    });
+    expect(result.current.state.route).toBe("projects");
+  });
+
+  it("asks an active Back guard instead of going back, and goes back once it is gone", () => {
+    const { result } = renderHook(() => useNavigation());
+    act(() => result.current.navigate("projects"));
+    const guard = vi.fn();
+    let release = () => {};
+    act(() => {
+      release = result.current.registerBackGuard(guard);
+    });
+    act(() => result.current.back());
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(result.current.state.route).toBe("projects");
+    act(() => release());
+    act(() => result.current.back());
+    expect(result.current.state.route).toBe("setup");
+  });
+
+  it("does not ask the guard when there is nowhere to go back to", () => {
+    const { result } = renderHook(() => useNavigation());
+    const guard = vi.fn();
+    act(() => {
+      result.current.registerBackGuard(guard);
+    });
+    act(() => result.current.back());
+    expect(guard).not.toHaveBeenCalled();
   });
 });

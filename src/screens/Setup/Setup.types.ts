@@ -58,10 +58,8 @@ export interface InventoryProps {
   /** The harnesses the scan found, for the header line. */
   detected: HarnessInfo[];
   navigate: Navigate;
-  /** Setup's state: the chip, the status filter, the open item and its tab are read from it. */
-  target: SetupTarget;
-  /** Reports a change to `target`; Inventory holds none of it. */
-  onChange: SetupTargetControl["change"];
+  /** Setup's state and how to change it: the chip, the status filter, the open item and its tab. */
+  control: SetupTargetControl;
   /** Closes the viewer through the shell, when there is one. */
   onCloseItem?: () => void;
   /** A load or refresh is in flight: a deep link to an item not in the rows yet waits for it. */

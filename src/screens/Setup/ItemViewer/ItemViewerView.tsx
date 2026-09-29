@@ -3,6 +3,7 @@ import { Button } from "@/components/Button";
 import { FileViewer } from "@/components/FileViewer";
 import { Icon } from "@/components/Icon";
 import { Sheet, SheetPath } from "@/components/Sheet";
+import { useBackGuard } from "@/App/navigation/NavigationContext";
 import { KIND_NAME } from "../ArtifactFacts";
 import { ArtifactMeta } from "../ArtifactMeta";
 import { FileActions } from "../FileActions";
@@ -93,6 +94,10 @@ export function ItemViewerView({
     }
     onClose();
   };
+
+  // Back unmounts the viewer without passing through the sheet, so while a
+  // draft is unsaved it asks here first, like every other way out.
+  useBackGuard(dirty, requestClose);
 
   /** Cancel means "stop editing", not "stop looking at this item". */
   const requestStopEditing = () => {

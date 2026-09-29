@@ -32,4 +32,10 @@ export interface Navigation {
   back: () => void;
   /** Closes the open item: Back when opening it pushed the entry, else a replace. */
   closeItem: () => void;
+  /**
+   * While registered, Back (⌘[ and the toolbar arrow) calls `onBack` instead
+   * of popping — how the viewer asks before dropping an unsaved draft. The
+   * return value unregisters it. Components use `useBackGuard`.
+   */
+  registerBackGuard: (onBack: () => void) => () => void;
 }

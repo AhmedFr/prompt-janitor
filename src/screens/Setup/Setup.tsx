@@ -151,8 +151,7 @@ export function Setup({
                 files={files}
                 detected={detected}
                 navigate={navigate}
-                target={control.value}
-                onChange={control.change}
+                control={control}
                 onCloseItem={onCloseItem}
                 loading={refreshing}
                 onRefetch={state.refetch}
@@ -212,8 +211,8 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
 
 /**
  * The one table over every kind (spec §4). The chips pick a kind, the summary
- * line a status filter, a row opens the viewer — all read from `target` and
- * reported through `onChange`; Inventory holds none of it. Rows arrive Kind
+ * line a status filter, a row opens the viewer — all read from `control` and
+ * reported through it; Inventory holds none of it. Rows arrive Kind
  * then Name, so every slice starts in that order.
  */
 function Inventory({
@@ -221,8 +220,7 @@ function Inventory({
   files,
   detected,
   navigate,
-  target,
-  onChange,
+  control,
   onCloseItem,
   loading,
   onRefetch,
@@ -241,7 +239,6 @@ function Inventory({
     if (lensProject !== null && !lensProject.exists) return [];
     return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
   }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
-  const control = useMemo(() => ({ value: target, change: onChange }), [target, onChange]);
   const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, control);
   // No Scope under the lens (spec §5): every row already applies to the one project.
   const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
