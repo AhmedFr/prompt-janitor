@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from "react";
-import type { Navigation } from "./navigation.types";
+import type { BackGuard, Navigation } from "./navigation.types";
 
 /** The shell's navigation, for anything below it that needs Back. */
 export const NavigationContext = createContext<Navigation | null>(null);
@@ -12,10 +12,11 @@ export function useBack(): { canGoBack: boolean; back: () => void } {
 
 /**
  * While `active`, Back (⌘[ and the toolbar arrow) calls `onBack` instead of
- * leaving — for a screen holding work Back would throw away. The latest
+ * leaving — for a screen holding work Back would throw away. A `navigate`
+ * asks it too, passing `proceed` to call once the work is let go. The latest
  * `onBack` is the one called; outside the shell this does nothing.
  */
-export function useBackGuard(active: boolean, onBack: () => void): void {
+export function useBackGuard(active: boolean, onBack: BackGuard): void {
   const register = useContext(NavigationContext)?.registerBackGuard;
   const latest = useRef(onBack);
   useEffect(() => {
@@ -23,6 +24,6 @@ export function useBackGuard(active: boolean, onBack: () => void): void {
   });
   useEffect(() => {
     if (!active || !register) return;
-    return register(() => latest.current());
+    return register((proceed) => latest.current(proceed));
   }, [active, register]);
 }

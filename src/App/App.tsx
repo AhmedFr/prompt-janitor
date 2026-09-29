@@ -35,7 +35,9 @@ export function App() {
   // The menu-bar panel is a window of its own with no router: a row clicked
   // there raises this window and sends the destination over as an event.
   // Every route resolves (`resolveExternal`), so a stale link or a typo lands
-  // somewhere real rather than blanking the shell. Deliberately not gated on
+  // somewhere real rather than blanking the shell. `navigate` asks the back
+  // guard first, so a link from the panel never drops an unsaved draft in the
+  // viewer: the viewer's discard confirmation decides. Deliberately not gated on
   // `isTauri` — this is the shell's own listener, and outside the desktop
   // runtime `listen` rejects, which the catch absorbs.
   useEffect(() => {

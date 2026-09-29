@@ -5,7 +5,7 @@ import { populated } from "./setup.fixtures";
 import { useCallback } from "react";
 import { NavigationContext, useNavigation } from "@/App/navigation";
 import type { SetupProps } from "./Setup.types";
-import { DISCARD, DISCARD_TITLE } from "./ItemViewer/DiscardConfirm/DiscardConfirm.constants";
+import { DISCARD, DISCARD_TITLE, KEEP_EDITING } from "./ItemViewer/DiscardConfirm/DiscardConfirm.constants";
 
 // Back over the real viewer, in a shell that runs on navigation state as the
 // app's does: ⌘[ and the toolbar arrow must stop at the discard confirm while
@@ -56,6 +56,11 @@ function Shell() {
   );
   return (
     <NavigationContext.Provider value={nav}>
+      <output aria-label="Route">{nav.state.route}</output>
+      {/* How the menu-bar panel's `navigate` event reaches the shell (App.tsx). */}
+      <button type="button" onClick={() => nav.navigate("settings", "ai")}>
+        Panel link
+      </button>
       <Setup navigate={nav.navigate} target={nav.state.route === "setup" ? nav.state.target : {}}
         onTargetChange={onTargetChange} onCloseItem={nav.closeItem} />
     </NavigationContext.Provider>
@@ -144,5 +149,36 @@ describe("Setup — Back over the viewer", () => {
     // Opening pushed one entry and closing popped it: the next Back undoes the chip.
     cmdBracket();
     expect(screen.getByRole("radio", { name: /^All/ })).toBeChecked();
+  });
+
+  describe("an external navigation (a panel link) over a dirty editor", () => {
+    const route = () => screen.getByRole("status", { name: "Route", hidden: true });
+    const panelLink = () => fireEvent.click(screen.getByRole("button", { name: "Panel link", hidden: true }));
+
+    it("asks first and keeps the draft", async () => {
+      const viewer = await openAdapt();
+      makeDirty(viewer);
+      panelLink();
+      expect(screen.getByRole("alertdialog", { name: DISCARD_TITLE })).toBeInTheDocument();
+      expect(route()).toHaveTextContent("setup");
+      expect(within(viewer).getByRole("textbox", { name: "Item source" })).toHaveValue("# Edited");
+    });
+
+    it("goes on to the destination once the draft is discarded", async () => {
+      const viewer = await openAdapt();
+      makeDirty(viewer);
+      panelLink();
+      fireEvent.click(screen.getByRole("button", { name: DISCARD }));
+      await waitFor(() => expect(route()).toHaveTextContent("settings"));
+    });
+
+    it("stays put when the draft is kept", async () => {
+      const viewer = await openAdapt();
+      makeDirty(viewer);
+      panelLink();
+      fireEvent.click(screen.getByRole("button", { name: KEEP_EDITING }));
+      expect(route()).toHaveTextContent("setup");
+      expect(within(viewer).getByRole("textbox", { name: "Item source" })).toHaveValue("# Edited");
+    });
   });
 });

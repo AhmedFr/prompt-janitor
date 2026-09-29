@@ -92,6 +92,23 @@ describe("useNavigation", () => {
     expect(result.current.state.route).toBe("setup");
   });
 
+  // A panel link (or any navigate) must not drop a draft Back would have asked about.
+  it("asks an active guard before navigating, and navigates only once it proceeds", () => {
+    const { result } = renderHook(() => useNavigation());
+    let proceed: (() => void) | undefined;
+    const guard = vi.fn((then?: () => void) => {
+      proceed = then;
+    });
+    act(() => {
+      result.current.registerBackGuard(guard);
+    });
+    act(() => result.current.navigate("settings", "ai"));
+    expect(guard).toHaveBeenCalledTimes(1);
+    expect(result.current.state.route).toBe("setup");
+    act(() => proceed?.());
+    expect(result.current.state).toMatchObject({ route: "settings", tab: "ai" });
+  });
+
   it("does not ask the guard when there is nowhere to go back to", () => {
     const { result } = renderHook(() => useNavigation());
     const guard = vi.fn();

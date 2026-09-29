@@ -34,8 +34,13 @@ export interface Navigation {
   closeItem: () => void;
   /**
    * While registered, Back (⌘[ and the toolbar arrow) calls `onBack` instead
-   * of popping — how the viewer asks before dropping an unsaved draft. The
-   * return value unregisters it. Components use `useBackGuard`.
+   * of popping — how the viewer asks before dropping an unsaved draft. A
+   * `navigate` (a sidebar or panel link) asks it too, handing it `proceed`:
+   * the guard calls that once the user lets the work go. The return value
+   * unregisters it. Components use `useBackGuard`.
    */
-  registerBackGuard: (onBack: () => void) => () => void;
+  registerBackGuard: (onBack: BackGuard) => () => void;
 }
+
+/** A screen's Back guard. `proceed`, when given, is the navigation to carry on with after it lets go. */
+export type BackGuard = (proceed?: () => void) => void;

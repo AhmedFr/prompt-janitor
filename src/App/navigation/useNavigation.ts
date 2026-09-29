@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { Navigate } from "../App.types";
 import { resolveExternal } from "./legacy";
 import { canGoBack, current, initialHistory, navReducer } from "./navigation";
-import type { Navigation, NavState } from "./navigation.types";
+import type { BackGuard, Navigation, NavState } from "./navigation.types";
 
 /** ⌘[ in a field is the field's own shortcut (outdent), not Back. */
 const typing = (el: Element | null) =>
@@ -20,11 +20,13 @@ const isBackKey = (e: KeyboardEvent) =>
  * `useCallback`s of their own, and Setup's column cache keys on it.
  *
  * Back can be guarded: while a screen holds work that Back would throw away
- * (the viewer's unsaved draft), `back()` asks that screen instead of popping.
+ * (the viewer's unsaved draft), `back()` asks that screen instead of popping,
+ * and `navigate` — a sidebar link, or the menu-bar panel's `navigate` event —
+ * asks it too, going on only once the screen lets the work go.
  */
 export function useNavigation(): Navigation {
   const [history, dispatch] = useReducer(navReducer, undefined, () => initialHistory());
-  const guard = useRef<(() => void) | null>(null);
+  const guard = useRef<BackGuard | null>(null);
   // Read by `back`, which stays stable: a guard is only asked when Back would go somewhere.
   const reachable = useRef(false);
   useEffect(() => {
@@ -39,8 +41,15 @@ export function useNavigation(): Navigation {
     else dispatch({ type: "back" });
   }, []);
   const closeItem = useCallback(() => dispatch({ type: "closeItem" }), []);
-  const navigate = useCallback<Navigate>((route, target) => push(resolveExternal(route, target)), [push]);
-  const registerBackGuard = useCallback((onBack: () => void) => {
+  const navigate = useCallback<Navigate>(
+    (route, target) => {
+      const go = () => push(resolveExternal(route, target));
+      if (guard.current) guard.current(go);
+      else go();
+    },
+    [push],
+  );
+  const registerBackGuard = useCallback((onBack: BackGuard) => {
     guard.current = onBack;
     return () => {
       if (guard.current === onBack) guard.current = null;

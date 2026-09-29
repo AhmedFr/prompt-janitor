@@ -87,8 +87,13 @@ export function ItemViewerView({
     setPendingDiscard(null);
   };
 
+  // The navigation a guarded Back/navigate goes on with once the draft is discarded.
+  const afterDiscard = useRef<(() => void) | null>(null);
+
   const requestClose = () => {
     if (dirty) {
+      // The sheet's own close goes nowhere after the discard.
+      afterDiscard.current = null;
       setPendingDiscard("close");
       return;
     }
@@ -96,8 +101,22 @@ export function ItemViewerView({
   };
 
   // Back unmounts the viewer without passing through the sheet, so while a
-  // draft is unsaved it asks here first, like every other way out.
-  useBackGuard(dirty, requestClose);
+  // draft is unsaved it asks here first, like every other way out. A
+  // navigation elsewhere (a panel link) asks too, and goes on after a discard.
+  useBackGuard(dirty, (proceed) => {
+    afterDiscard.current = proceed ?? null;
+    setPendingDiscard("close");
+  });
+  const discardAndClose = () => {
+    const proceed = afterDiscard.current;
+    afterDiscard.current = null;
+    onClose();
+    proceed?.();
+  };
+  const keepEditing = () => {
+    afterDiscard.current = null;
+    setPendingDiscard(null);
+  };
 
   /** Cancel means "stop editing", not "stop looking at this item". */
   const requestStopEditing = () => {
@@ -183,8 +202,8 @@ export function ItemViewerView({
       overlay={
         pendingDiscard && (
           <DiscardConfirm
-            onKeep={() => setPendingDiscard(null)}
-            onDiscard={pendingDiscard === "close" ? onClose : stopEditing}
+            onKeep={keepEditing}
+            onDiscard={pendingDiscard === "close" ? discardAndClose : stopEditing}
           />
         )
       }
