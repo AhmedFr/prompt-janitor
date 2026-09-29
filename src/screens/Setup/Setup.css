@@ -39,3 +39,10 @@
   max-width: 420px;
   margin: 0;
 }
+
+/* A failed Reveal in Finder, under the project strip. */
+.setup-reveal-error {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--red);
+}

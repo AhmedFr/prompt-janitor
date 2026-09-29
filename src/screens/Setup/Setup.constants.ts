@@ -61,3 +61,9 @@ export const NO_HARNESS_TITLE = "No Claude Code setup found";
 
 /** One box searches every column that holds words, so it says so once. */
 export const SEARCH_PLACEHOLDER = "Search name, description, path or scope";
+
+/** The lensed table under the missing-folder banner: nothing loads from a folder that is gone. */
+export const MISSING_FOLDER_EMPTY = "Nothing to show while the folder is missing.";
+
+/** What a failed Reveal in Finder says before the reason. */
+export const REVEAL_FAILED = "Could not reveal the folder";

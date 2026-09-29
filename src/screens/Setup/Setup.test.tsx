@@ -6,7 +6,7 @@ import { Setup } from "./Setup";
 import type { FileRow } from "@/lib/ipc";
 import { KIND_CHIP_ORDER, KIND_SINGULAR, LABEL } from "@/lib/vocabulary";
 import { artifact, noHarness, populated, withOtherProject } from "./setup.fixtures";
-import { NO_ITEMS_TITLE } from "./Setup.constants";
+import { MISSING_FOLDER_EMPTY, NO_ITEMS_TITLE } from "./Setup.constants";
 import type { ArtifactSourceState } from "./Setup.types";
 
 const open = vi.hoisted(() => vi.fn());
@@ -82,6 +82,7 @@ const getEntitlement = vi.hoisted(() => vi.fn());
 const getExtraScanFolders = vi.hoisted(() => vi.fn());
 const setExtraScanFolders = vi.hoisted(() => vi.fn());
 const scanNow = vi.hoisted(() => vi.fn());
+const revealProject = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
@@ -97,6 +98,7 @@ vi.mock("@/lib/ipc", async () => {
       getExtraScanFolders,
       setExtraScanFolders,
       scanNow,
+      revealProject,
     },
   };
 });
@@ -156,6 +158,7 @@ beforeEach(() => {
   getExtraScanFolders.mockResolvedValue({ status: "ok", data: [] });
   setExtraScanFolders.mockResolvedValue({ status: "ok", data: null });
   scanNow.mockResolvedValue({ status: "error", error: "no" });
+  revealProject.mockResolvedValue({ status: "ok", data: null });
   open.mockResolvedValue(null);
   lensPaths.global = GLOBAL_RULE_PATH;
   lensPaths.app = APP_RULE_PATH;
@@ -585,6 +588,62 @@ describe("Setup under the project lens", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/folder/i);
     expect(bodyRows()).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Reveal in Finder" })).toBeNull();
+    // The table says why it is empty, not that the setup has nothing in it.
+    expect(screen.getByText(MISSING_FOLDER_EMPTY)).toBeInTheDocument();
+    expect(screen.queryByText(NO_ITEMS_TITLE)).toBeNull();
+  });
+
+  it("finds the project, its strip and its load order from a deep link with a trailing slash", () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: `${APP_PATH}/` }} />);
+    expect(viewing()).toHaveAccessibleName(new RegExp(`as Claude Code sees ${APP_NAME}`));
+    expect(screen.getByRole("button", { name: "Reveal in Finder" })).toBeInTheDocument();
+    expect(bodyRows().slice(0, 2).map((r) => r.querySelector("td")?.textContent)).toEqual(["1", "2"]);
+    fireEvent.click(viewing());
+    // One option for web, not a second one for the slashed spelling.
+    expect(screen.getAllByRole("option", { name: new RegExp(APP_NAME) })).toHaveLength(1);
+  });
+
+  it("takes the lens's reads from the lensData override (Storybook) over the live ones", () => {
+    const lensData = {
+      effective: [
+        { layer: "project" as const, path: APP_RULE_PATH, name: "CLAUDE.md", grade: "C", file_id: null },
+        { layer: "global" as const, path: GLOBAL_RULE_PATH, name: "CLAUDE.md", grade: "B", file_id: null },
+      ],
+      usage: null,
+    };
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} lensData={lensData} />);
+    expect(bodyRows()[0]).toHaveTextContent(APP_RULE_NAME);
+    expect(bodyRows()[1]).toHaveTextContent(GLOBAL_RULE_NAME);
+  });
+
+  it("reveals the lensed project's folder", async () => {
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal in Finder" }));
+    await waitFor(() => expect(revealProject).toHaveBeenCalledWith(APP_PATH));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says so when revealing the folder fails", async () => {
+    revealProject.mockResolvedValue({ status: "error", error: "Finder is not available" });
+    render(<Setup navigate={vi.fn()} data={fixture} files={[]} target={{ lens: APP_PATH }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Reveal in Finder" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Could not reveal the folder: Finder is not available/);
+  });
+
+  it("keeps the viewer open when the lens still shows its item, and closes it when the lens leaves it out", () => {
+    const { unmount } = render(
+      <Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ open: { artifactId: SKILL_ID } }} />,
+    );
+    pickLens(new RegExp(APP_NAME));
+    // The global skill loads in web too.
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    unmount();
+
+    render(<Setup navigate={vi.fn()} data={withOtherProject} files={[]} target={{ open: { artifactId: 18 } }} />);
+    expect(screen.getByRole("tablist", { name: /viewer/i })).toBeInTheDocument();
+    pickLens(new RegExp(APP_NAME));
+    // The api project's agent does not.
+    expect(screen.queryByRole("tablist", { name: /viewer/i })).toBeNull();
   });
 
   it("keeps one lens: the Viewing control and the table always agree", () => {

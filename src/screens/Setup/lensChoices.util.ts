@@ -10,8 +10,9 @@ const trim = (p: string) => p.replace(/\/+$/, "");
  */
 export function lensChoices(projects: ProjectSetup[], files: FileRow[], lens: string | null): ViewingSwitcherProject[] {
   const choices = projects.map((p) => ({ path: p.path, name: p.name, lastSessionAt: p.last_session_at }));
-  if (lens === null || projects.some((p) => p.path === lens)) return choices;
+  if (lens === null) return choices;
   const here = trim(lens);
+  if (projects.some((p) => trim(p.path) === here)) return choices;
   const name = files.find((f) => trim(f.project_id) === here)?.project ?? here.split("/").pop() ?? here;
   return [...choices, { path: lens, name, lastSessionAt: null }];
 }

@@ -12,6 +12,14 @@ export interface SetupProps {
   target?: SetupTarget;
   /** Override the load state (tests). */
   loading?: boolean;
+  /** Override the lens's backend reads (Storybook), which only the desktop app can make. */
+  lensData?: LensData;
+}
+
+/** The lensed project's load order and usage; both `null` until read, or when it has none. */
+export interface LensData {
+  effective: EffectiveRule[] | null;
+  usage: ProjectUsage | null;
 }
 
 /** What {@link useSetup} hands the screen. */
@@ -38,8 +46,7 @@ export interface InventoryProps {
   lens: string | null;
   /** The lensed project, or `null` without a lens or for a path only the grader knows. */
   lensProject: ProjectSetup | null;
-  /** The lensed project's load order and usage; both `null` until read, or when it has none. */
-  lensData: { effective: EffectiveRule[] | null; usage: ProjectUsage | null };
+  lensData: LensData;
   /** Turns the lens on a project, or off with `null` (the viewer's Usage tab links here). */
   onLens: (path: string | null) => void;
 }

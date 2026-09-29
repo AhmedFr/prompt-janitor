@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Setup } from "./Setup";
 import type { ArtifactView, FileRow, SetupView, UsageStat } from "@/lib/ipc";
+import type { LensData } from "./Setup.types";
 import "@/styles/shell.css";
 
 const usage = (o: Partial<UsageStat> = {}): UsageStat => ({
@@ -347,14 +348,30 @@ export const Unreadable: Story = {
   args: { data: null },
 };
 
+/** What the desktop app would read for prompt-janitor: its load order, and 14 days of its sessions. */
+const pjLens: LensData = {
+  effective: [
+    { layer: "global", path: "/home/u/.claude/artifact.md", name: "CLAUDE.md", grade: "B", file_id: "f-global" },
+    { layer: "project", path: "/Users/dev/code/prompt-janitor/CLAUDE.md", name: "CLAUDE.md", grade: "C", file_id: "f-pj" },
+  ],
+  usage: {
+    ranked: [
+      { kind: "skill", target: "systematic-debugging", artifact_id: 2, uses: 9, sessions: 6, error_rate: 0, avg_turn_tokens: 1300, last_used: "2026-08-19T10:00:00.000Z" },
+    ],
+    sessions_per_day: [3, 1, 0, 4, 2, 5, 0, 1, 3, 2, 6, 1, 0, 2].map((count, i) => ({
+      day: `2026-08-${String(6 + i).padStart(2, "0")}`,
+      count,
+    })),
+  },
+};
+
 /**
- * The lens on a live project: only what loads there, instructions first, with
- * the project strip above the table and no Scope filter. Outside the desktop
- * app the load order and the project's usage cannot be read, so the `#`
- * column stays blank and the strip says there are no sessions yet.
+ * The lens on a live project: only what loads there, instructions first in
+ * load order under `#`, usage from this project's sessions only, the project
+ * strip above the table and no Scope filter.
  */
 export const Lensed: Story = {
-  args: { target: { lens: "/Users/dev/code/prompt-janitor" } },
+  args: { target: { lens: "/Users/dev/code/prompt-janitor" }, lensData: pjLens },
 };
 
 /** The lens on a project whose folder is gone: the strip's message, and an empty table under it. */

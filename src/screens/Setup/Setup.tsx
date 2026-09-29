@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { GradePopover } from "@/components/GradePopover";
@@ -9,36 +9,38 @@ import { ScanBar } from "@/components/ScanBar";
 import { SummaryLine } from "@/components/SummaryLine";
 import { TemplatePicker, useTemplatePicker } from "@/components/TemplatePicker";
 import { ViewingSwitcher } from "@/components/ViewingSwitcher";
-import { commands, isTauri, type HarnessInfo } from "@/lib/ipc";
+import { isTauri, type HarnessInfo } from "@/lib/ipc";
 import { addFolderAndScan, rescan } from "@/lib/scan-actions";
-import type { SetupFilter } from "@/lib/setupFilter";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
-import { LABEL, type KindFilter } from "@/lib/vocabulary";
-import type { ItemRef, ViewerTab } from "@/App/setupTarget";
-import { ItemViewer, stepTarget } from "./ItemViewer";
+import { LABEL } from "@/lib/vocabulary";
+import { ItemViewer } from "./ItemViewer";
 import { lensRows } from "./lens.util";
-import { lensChoices } from "./lensChoices.util";
 import { ProjectStrip } from "./ProjectStrip";
 import { scopeLabel, type ColumnsCtx } from "./setup.columns";
 import { scopePillsFor } from "./setup.pills";
 import { unifiedColumns, visibleColumnIds } from "./setup.unified";
-import { costThreshold, harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
-import { applySetupFilter, setupFilterCounts } from "./setupFilter.util";
+import { harnessSummary, lastScanAt, projectNameMap, relativeSession } from "./setup.util";
 import { byKindThenName, loadedInFor, setupRows, type SetupRow } from "./setupRows.util";
 import {
   EMPTY_FILTERED,
   EMPTY_HINT,
   LENS_TABLE_STATE_KEY,
+  MISSING_FOLDER_EMPTY,
   NEW_FROM_TEMPLATE,
   NO_HARNESS_TITLE,
   NO_ITEMS_TITLE,
+  REVEAL_FAILED,
   SEARCH_PLACEHOLDER,
   TABLE_STATE_KEY,
 } from "./Setup.constants";
 import type { InventoryProps, SetupProps } from "./Setup.types";
 import { useLens } from "./useLens";
+import { rowId, useOpenItem } from "./useOpenItem";
 import { useOverallGrade } from "./useOverallGrade";
+import { useRevealProject } from "./useRevealProject";
 import { useSetup } from "./useSetup";
+import { useSetupLens } from "./useSetupLens";
+import { useSetupSlice } from "./useSetupSlice";
 import "./Setup.css";
 
 /**
@@ -46,7 +48,14 @@ import "./Setup.css";
  * narrowed by kind chips and the summary line's filters, annotated with
  * whether anything ever actually used what is installed.
  */
-export function Setup({ navigate, data: override, files: filesOverride, target, loading: loadingOverride }: SetupProps) {
+export function Setup({
+  navigate,
+  data: override,
+  files: filesOverride,
+  target,
+  loading: loadingOverride,
+  lensData: lensOverride,
+}: SetupProps) {
   const state = useSetup();
   const data = override ?? state.data;
   const files = filesOverride ?? (override ? [] : state.files);
@@ -54,16 +63,10 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
   const [busy, setBusy] = useState(false);
   const scan = useScanProgress();
   // The lens has one owner: this screen renders the Viewing control, so the table only reads it.
-  const [lens, setLens] = useState<string | null>(target?.lens ?? null);
-  useEffect(() => {
-    if (target?.lens !== undefined) setLens(target.lens ?? null);
-  }, [target?.lens]);
-  // `null` for a path only the grader knows: no strip, but the lens still narrows the rows.
-  const lensProject = useMemo(
-    () => (lens && data ? (data.projects.find((p) => p.path === lens) ?? null) : null),
-    [lens, data],
-  );
-  const lensData = useLens(lensProject);
+  const { lens, lensProject, choices, onLens } = useSetupLens(target, data, files);
+  const liveLens = useLens(lensProject);
+  const lensData = lensOverride ?? liveLens;
+  const reveal = useRevealProject(lensProject?.path ?? null);
 
   // A scan refreshes the inventory through the `scan-done` listener in
   // `useSetup`, so nothing here needs to refetch on its own.
@@ -82,7 +85,7 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
     <section className="screen">
       <header className="screen__toolbar" data-tauri-drag-region>
         <h1 className="screen__title">Setup</h1>
-        {data && <ViewingSwitcher projects={lensChoices(data.projects, files, lens)} lens={lens} onChange={setLens} />}
+        {data && <ViewingSwitcher projects={choices} lens={lens} onChange={onLens} />}
         <span className="toolbar-spacer" />
         {/* The one place the main window says when the last scan ran (spec §4.1). */}
         {detected.length > 0 && (
@@ -127,10 +130,13 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
                 <ProjectStrip
                   project={lensProject}
                   sessionsPerDay={lensData.usage?.sessions_per_day ?? null}
-                  onReveal={() => {
-                    if (lensProject) void commands.revealProject(lensProject.path);
-                  }}
+                  onReveal={() => void reveal.reveal()}
                 />
+              )}
+              {lensProject && reveal.error && (
+                <p className="setup-reveal-error" role="alert">
+                  {REVEAL_FAILED}: {reveal.error}
+                </p>
               )}
               <Inventory
                 data={data}
@@ -143,7 +149,7 @@ export function Setup({ navigate, data: override, files: filesOverride, target, 
                 lens={lens}
                 lensProject={lensProject}
                 lensData={lensData}
-                onLens={setLens}
+                onLens={onLens}
               />
             </>
           )}
@@ -194,9 +200,6 @@ function NoHarness({ busy, onAddFolder }: { busy: boolean; onAddFolder: () => vo
   );
 }
 
-/** A row is its artifact (or its graded file's synthetic id): unique across the whole table. */
-const rowId = (row: SetupRow) => String(row.id);
-
 /**
  * The one table over every kind (spec §4). The chips pick a kind, the summary
  * line a status filter; both start from a deep link's `target` when there is
@@ -225,26 +228,7 @@ function Inventory({
     if (lensProject !== null && !lensProject.exists) return [];
     return lensRows(base, lens, lensData.effective, lensData.usage, lensHarness);
   }, [base, lens, lensProject, lensData.effective, lensData.usage, lensHarness]);
-  // Over the whole setup, not the slice: "costly" means the same on every chip.
-  const costBar = useMemo(() => costThreshold(rows), [rows]);
-  const [kind, setKind] = useState<KindFilter>(target?.kind ?? "all");
-  const [filter, setFilter] = useState<SetupFilter>(target?.filter ?? "all");
-  // A deep link names the slice it means, even when Setup is already mounted.
-  useEffect(() => {
-    if (target?.kind) setKind(target.kind);
-  }, [target?.kind]);
-  useEffect(() => {
-    if (target?.filter) setFilter(target.filter);
-  }, [target?.filter]);
-
-  const kindCounts = useMemo(() => {
-    const out: Partial<Record<KindFilter, number>> = { all: rows.length };
-    for (const r of rows) out[r.kind] = (out[r.kind] ?? 0) + 1;
-    return out;
-  }, [rows]);
-  const ofKind = useMemo(() => (kind === "all" ? rows : rows.filter((r) => r.kind === kind)), [rows, kind]);
-  const counts = useMemo(() => setupFilterCounts(ofKind, costBar), [ofKind, costBar]);
-  const visible = useMemo(() => applySetupFilter(ofKind, filter, costBar), [ofKind, filter, costBar]);
+  const { kind, setKind, filter, setFilter, kindCounts, ofKind, counts, visible, clearSlice } = useSetupSlice(rows, target);
   // No Scope under the lens (spec §5): every row already applies to the one project.
   const pills = useMemo(() => (lens === null ? scopePillsFor(ofKind, projectNames) : []), [lens, ofKind, projectNames]);
   // `scopeLabel` is the Scope column's own label rule (a graded-only row's
@@ -260,70 +244,23 @@ function Inventory({
   const { grade } = useOverallGrade();
   const templates = useTemplatePicker();
   const [picking, setPicking] = useState(false);
-  // The *id* of the open row, re-derived below so a rename or a rescan shows
-  // through — and a row a rescan removed closes its sheet.
-  const [openId, setOpenId] = useState<number | null>(null);
-  const open = useMemo(() => (openId === null ? null : (rows.find((r) => r.id === openId) ?? null)), [openId, rows]);
-  // A row a rescan removed closes its sheet for good: the id is dropped, so
-  // the row coming back on a later rescan does not pop the sheet open again.
-  useEffect(() => {
-    if (openId !== null && !open) setOpenId(null);
-  }, [openId, open]);
-  const [tab, setTab] = useState<ViewerTab>(target?.tab ?? "content");
-  // The ids the table shows, in its current sort and filters: what stepping walks.
-  const [visibleIds, setVisibleIds] = useState<string[]>([]);
-  // A deep link names an item by artifact id, or by file id (graded rows and the panel's fixes).
-  // It waits here until the rows hold its item; if the load is done and the item is
-  // still missing, it is dropped rather than left to pop open on a later refresh.
-  // The tab travels with it, so it is the tab of the link that asked.
-  const [pending, setPending] = useState<{ ref: ItemRef; tab: ViewerTab } | null>(null);
-  useEffect(() => {
-    if (target?.open) setPending({ ref: target.open, tab: target.tab ?? "content" });
-  }, [target?.open, target?.tab]);
-  useEffect(() => {
-    if (!pending) return;
-    const { ref } = pending;
-    const row = "artifactId" in ref ? rows.find((r) => r.id === ref.artifactId) : rows.find((r) => r.file_id === ref.fileId);
-    if (row) {
-      setOpenId(row.id);
-      setTab(pending.tab);
-      setPending(null);
-    } else if (!loading) {
-      setPending(null);
-    }
-  }, [pending, rows, loading]);
-  const step = (delta: -1 | 1) => {
-    if (!open) return;
-    const next = stepTarget(visibleIds, rowId(open), delta);
-    if (next) setOpenId(Number(next));
-  };
-
-  // A file link (the Actions column's Open) lands on that file's findings.
-  // Resolved through `pending` so this stays stable — `unifiedColumns`' per-`ctx` cache can hit.
-  const openFindings = useCallback((fileId: string) => setPending({ ref: { fileId }, tab: "findings" }), []);
+  const { open, tab, setTab, setVisibleIds, step, openFindings, openRow, close } = useOpenItem(rows, target, loading);
   const ctx = useMemo<ColumnsCtx>(() => ({ onOpen: openFindings, projectNames }), [openFindings, projectNames]);
   const columns = unifiedColumns(visibleColumnIds(kind, visible.length > 0 ? visible : ofKind, lens !== null), ctx);
 
-  // An empty table is either a setup with nothing in it, or a slice the
+  // An empty table is a gone folder, a setup with nothing in it, or a slice the
   // filters emptied — then one Clear filters resets the chip and the summary
-  // filter here, and the table's own search and Scope with them (spec §4.5).
-  const clearSlice = useCallback(() => {
-    setKind("all");
-    setFilter("all");
-  }, []);
+  // filter, and the table's own search and Scope with them (spec §4.5).
+  const missingFolder = lensProject !== null && !lensProject.exists;
   const empty = useMemo(
     () =>
-      rows.length === 0
-        ? { title: NO_ITEMS_TITLE, hint: EMPTY_HINT }
-        : { title: EMPTY_FILTERED, clear: { title: EMPTY_FILTERED, onClear: clearSlice } },
-    [rows.length, clearSlice],
+      missingFolder
+        ? { title: MISSING_FOLDER_EMPTY }
+        : rows.length === 0
+          ? { title: NO_ITEMS_TITLE, hint: EMPTY_HINT }
+          : { title: EMPTY_FILTERED, clear: { title: EMPTY_FILTERED, onClear: clearSlice } },
+    [missingFolder, rows.length, clearSlice],
   );
-
-  // Every row, graded instructions included, opens in the viewer on Content.
-  const onRowClick = (row: SetupRow) => {
-    setOpenId(row.id);
-    setTab("content");
-  };
 
   return (
     <>
@@ -345,7 +282,7 @@ function Inventory({
         search={search}
         pills={pills}
         // No defaultSort: `rows` already arrive Kind then Name (byKindThenName), or in load order under the lens.
-        onRowClick={onRowClick}
+        onRowClick={openRow}
         // A state setter: identity-stable, as the table's ids-keyed effect expects.
         onVisibleRowsChange={setVisibleIds}
         density="compact"
@@ -383,7 +320,7 @@ function Inventory({
           scope={scopeLabel(open, projectNames)}
           tab={tab}
           onTab={setTab}
-          onClose={() => setOpenId(null)}
+          onClose={close}
           onStep={step}
           // A save or fix already updated the index; refetching carries that
           // into the table without waiting for a rescan.
