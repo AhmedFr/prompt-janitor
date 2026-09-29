@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canGoBack, current, initialHistory, navReducer } from "./navigation";
-import type { NavState } from "./navigation.types";
+import { canGoBack, current, HISTORY_LIMIT, initialHistory, navReducer } from "./navigation";
+import type { NavAction, NavHistory, NavState } from "./navigation.types";
 
 const setup = (target = {}): NavState => ({ route: "setup", target });
 
@@ -79,5 +79,64 @@ describe("navReducer", () => {
   it("going back at the start does nothing", () => {
     const h = initialHistory();
     expect(navReducer(h, { type: "back" })).toBe(h);
+  });
+
+  it("closing a deep-linked viewer at the start of history replaces in place", () => {
+    const h = navReducer(initialHistory(setup({ open: { fileId: "/f" }, tab: "findings" })), { type: "closeItem" });
+    expect(h.entries).toEqual([setup()]);
+    expect(h.index).toBe(0);
+  });
+
+  it("closing does nothing while no viewer is open, even over two identical entries", () => {
+    // A replace can leave the entry behind the current one equal to it.
+    let h = initialHistory(setup({ kind: "skill" }));
+    h = navReducer(h, { type: "push", state: setup({ kind: "skill", open: { artifactId: 2 } }) });
+    h = navReducer(h, { type: "replace", state: setup({ kind: "skill" }) });
+    expect(navReducer(h, { type: "closeItem" })).toBe(h);
+    const onProjects = initialHistory({ route: "projects" });
+    expect(navReducer(onProjects, { type: "closeItem" })).toBe(onProjects);
+  });
+
+  it("compares states regardless of key order", () => {
+    let h = initialHistory({ route: "setup", target: { kind: "skill", lens: "/w" } });
+    h = navReducer(h, { type: "push", state: { route: "setup", target: { lens: "/w", kind: "skill" } } });
+    expect(h.entries).toHaveLength(1);
+    h = navReducer(h, { type: "push", state: { target: { lens: "/w", kind: "skill", open: { artifactId: 3 } }, route: "setup" } });
+    h = navReducer(h, { type: "closeItem" });
+    expect(h.entries).toHaveLength(1);
+  });
+
+  it("treats an absent field and an undefined one as the same state", () => {
+    const h = navReducer(initialHistory(setup({ kind: "skill" })), {
+      type: "push", state: setup({ kind: "skill", open: undefined, tab: undefined }),
+    });
+    expect(h.entries).toHaveLength(1);
+  });
+
+  it("keeps at most HISTORY_LIMIT entries, dropping the oldest", () => {
+    let h = initialHistory(setup({ lens: "/0" }));
+    for (let i = 1; i <= HISTORY_LIMIT + 5; i++) h = navReducer(h, { type: "push", state: setup({ lens: `/${i}` }) });
+    expect(h.entries).toHaveLength(HISTORY_LIMIT);
+    expect(h.index).toBe(HISTORY_LIMIT - 1);
+    expect(current(h)).toEqual(setup({ lens: `/${HISTORY_LIMIT + 5}` }));
+    expect(h.entries[0]).toEqual(setup({ lens: "/6" }));
+  });
+
+  it("never mutates the history it is given", () => {
+    const actions: NavAction[] = [
+      { type: "push", state: setup({ open: { artifactId: 1 } }) },
+      { type: "replace", state: setup({ open: { artifactId: 1 }, tab: "usage" }) },
+      { type: "push", state: { route: "projects" } },
+      { type: "back" },
+      { type: "closeItem" },
+      { type: "back" },
+    ];
+    let h: NavHistory = initialHistory(setup({ kind: "skill" }));
+    for (const a of actions) {
+      const before = structuredClone(h);
+      const next = navReducer(h, a);
+      expect(h).toEqual(before);
+      h = next;
+    }
   });
 });

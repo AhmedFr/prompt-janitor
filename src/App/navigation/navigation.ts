@@ -1,6 +1,25 @@
 import type { NavAction, NavHistory, NavState } from "./navigation.types";
 
-const same = (a: NavState, b: NavState) => JSON.stringify(a) === JSON.stringify(b);
+/** How far Back can reach; a push beyond it drops the oldest entry. */
+export const HISTORY_LIMIT = 100;
+
+/**
+ * A state as a string that ignores key order and `undefined` fields, so
+ * `{ lens, kind }` and `{ kind, lens, open: undefined }` are the same place.
+ */
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const fields = Object.entries(value)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`);
+    return `{${fields.join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+const same = (a: NavState, b: NavState) => canonical(a) === canonical(b);
 
 export const initialHistory = (state: NavState = { route: "setup", target: {} }): NavHistory => ({
   entries: [state],
@@ -20,7 +39,7 @@ export function navReducer(h: NavHistory, a: NavAction): NavHistory {
   switch (a.type) {
     case "push": {
       if (same(current(h), a.state)) return h;
-      const entries = [...h.entries.slice(0, h.index + 1), a.state];
+      const entries = [...h.entries.slice(0, h.index + 1), a.state].slice(-HISTORY_LIMIT);
       return { entries, index: entries.length - 1 };
     }
     case "replace": {
@@ -31,7 +50,11 @@ export function navReducer(h: NavHistory, a: NavAction): NavHistory {
     case "back":
       return h.index > 0 ? { entries: h.entries, index: h.index - 1 } : h;
     case "closeItem": {
-      const closed = withoutItem(current(h));
+      // Only an open viewer closes: over a replace that left two equal
+      // entries, a stray close would otherwise pop one of them.
+      const now = current(h);
+      if (now.route !== "setup" || now.target.open === undefined) return h;
+      const closed = withoutItem(now);
       // Opening the item pushed an entry; closing it is Back (spec §10) — and
       // the forward entry it leaves is dropped, so after open → close there is
       // exactly the one entry and no Forward into a closed viewer. A viewer
