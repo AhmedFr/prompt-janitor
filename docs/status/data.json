@@ -82,6 +82,11 @@
   "actions": {
     "blocking": [
       {
+        "title": "Check Phase 13 on your Mac before merging",
+        "detail": "Build with `pnpm tauri build --debug` and walk the owner checklist in the Phase 13 PR body on your Mac; the ACL and CSP only apply to a bundled build. Then review and merge the PR (closes #200–#204).",
+        "kind": "testing"
+      },
+      {
         "title": "Look at the menu-bar panel once more on your Mac (#171)",
         "detail": "The popover was rebuilt and photographed on this machine: transparent corners over the wallpaper, no dark band, a soft shadow inside a 12 px inset, and a macOS-popover pass on type and spacing. What a screenshot cannot check is the live behaviour — click the tray icon and confirm the panel still lands under it (the window is 376 px wide now, not 360), that it hides on blur and on Esc, and that a tall panel scrolls inside the card rather than the window. If anything looks off, `PJ_PANEL_DEBUG=1 '/Applications/Prompt Janitor.app/Contents/MacOS/prompt-janitor'` parks the panel at (200, 100) on every Space and keeps it open when it loses focus, so you can screenshot it.",
         "kind": "testing"
@@ -411,11 +416,11 @@
     },
     {
       "name": "Vitest",
-      "result": "1480/1480 passing (121 files)"
+      "result": "1510/1510 passing (146 files)"
     },
     {
       "name": "cargo test",
-      "result": "387/387 passing"
+      "result": "408 + 6 passing"
     },
     {
       "name": "clippy -D warnings",
@@ -464,6 +469,7 @@
     }
   ],
   "recent": [
+    "2026-09-29 — Phase 13 Setup-first navigation implemented on one branch (issues #200–#204): Setup is home with kind chips, summary filters and a project lens; Projects and Settings (Folders, Scanning, Notifications, Checks, AI, About); the item viewer has Content / Findings / Usage with editing for markdown kinds; one navigation state with Back (⌘[); Overview, Prompts, Detail, Scans, Analytics, Rules and Project screens removed; all paywall UI hidden, everything free. Awaiting owner review + real-build check.",
     "2026-09-27 — Phase 13 implementation plan written (docs/superpowers/plans/2026-09-27-setup-first-navigation.md): 5 parts / 43 tasks on one branch + one PR, test-first, `pnpm check` green at the end of every part; awaiting owner review before execution.",
     "2026-09-27 — Setup-first navigation spec written (#198, milestone Phase 13): 8 destinations become Setup (home) / Projects / Settings, one vocabulary (Instructions, Checks, Findings), a project lens on Setup instead of project pages, and a viewer with Content / Findings / Usage. 5-step rollout; awaiting owner review.",
     "2026-09-24 — v0.1.5 published from a local build (Release run cancelled): universal DMG + signed updater archive (signature verified; ACL grants for get/save/open_artifact confirmed in the binary) + latest.json; the feed serves 0.1.5.",
