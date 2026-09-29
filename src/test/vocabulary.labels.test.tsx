@@ -54,10 +54,11 @@ function renderFolders() {
 }
 
 describe("glossary in the UI (spec §3.3)", () => {
-  it("renders the sidebar destinations in NAV_ITEMS order, none of them Rules", () => {
+  it("renders exactly Setup, Projects, Settings in the sidebar, and no retired destination", () => {
     const labels = renderSidebar();
+    expect(labels).toEqual(["Setup", "Projects", "Settings"]);
     expect(labels).toEqual(NAV_ITEMS.map((i) => i.label));
-    expect(labels).not.toContain("Rules");
+    for (const gone of ["Overview", "Prompts", "Scans", "Analytics", "Rules"]) expect(labels).not.toContain(gone);
   });
 
   it("renders the Settings tab bar as Folders, Scanning, Notifications, Checks, AI, About", () => {

@@ -4,12 +4,9 @@ import type { NavItem } from "./Sidebar.types";
 /** Primary sidebar destinations. `detail` is intentionally excluded — it opens from Setup. */
 export const NAV_ITEMS: NavItem[] = [
   { route: "setup", label: "Setup", icon: "layers" },
-  { route: "overview", label: "Overview", icon: "dashboard" },
   // The canonical list of projects; the recents underneath are a shortcut
   // into the six most recent, not the inventory (spec §4.2).
   { route: "projects", label: "Projects", icon: "folder" },
-  { route: "scans", label: "Scans", icon: "scans" },
-  { route: "analytics", label: "Analytics", icon: "barChart" },
   { route: "settings", label: "Settings", icon: "settings" },
 ];
 
@@ -29,4 +26,10 @@ export const NAV_OWNER: Partial<Record<Route, Route>> = {
   // Setup is the graded-file list a file belongs to now — and a nav with
   // nothing lit is worse than one lit a level up from where the reader came in.
   detail: "setup",
+  // Retired destinations: their content lives in Setup now. The routes still
+  // render if reached (the menu-bar panel, old links) until Part 5 removes
+  // them, and Setup stays lit so the nav never goes dark.
+  overview: "setup",
+  analytics: "setup",
+  scans: "setup",
 };

@@ -35,7 +35,7 @@ describe("Sidebar", () => {
       ],
     });
     const { getByRole, getByText } = render(
-      <Sidebar active="overview" onNavigate={() => {}} />,
+      <Sidebar active="setup" onNavigate={() => {}} />,
     );
 
     expect(getByRole("button", { name: /web-app.*Grade A/ })).toBeInTheDocument();
@@ -44,23 +44,21 @@ describe("Sidebar", () => {
     expect(getByText("Projects", { selector: ".sidebar__section-label" })).toBeInTheDocument();
   });
 
-  it("leads with Setup and no longer lists Prompts", () => {
+  it("lists exactly Setup, Projects, Settings (spec §3.1)", () => {
     const { getAllByRole } = render(<Sidebar active="setup" onNavigate={vi.fn()} />);
     const labels = getAllByRole("button").map((b) => b.textContent);
-    expect(labels[0]).toBe("Setup");
-    expect(labels).not.toContain("Prompts");
+    expect(labels.slice(0, 3)).toEqual(["Setup", "Projects", "Settings"]);
+    for (const gone of ["Overview", "Prompts", "Scans", "Analytics", "Rules"]) expect(labels).not.toContain(gone);
   });
 
-  it("lists Projects as a destination of its own, right after Overview", () => {
-    const { getAllByRole } = render(<Sidebar active="overview" onNavigate={() => {}} />);
-    const labels = getAllByRole("button").map((b) => b.textContent);
-    expect(labels).toContain("Projects");
-    expect(labels.indexOf("Projects")).toBe(labels.indexOf("Overview") + 1);
+  it.each(["overview", "scans", "analytics"] as const)("keeps Setup lit on the legacy %s route", (route) => {
+    const { getByRole } = render(<Sidebar active={route} onNavigate={() => {}} />);
+    expect(getByRole("button", { current: "page" })).toHaveTextContent("Setup");
   });
 
   it("routes the Projects nav item to the projects table", () => {
     const onNavigate = vi.fn();
-    const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
+    const { getByRole } = render(<Sidebar active="setup" onNavigate={onNavigate} />);
     getByRole("button", { name: "Projects" }).click();
     expect(onNavigate).toHaveBeenCalledWith("projects");
   });
@@ -87,7 +85,7 @@ describe("Sidebar", () => {
       counts: {},
       projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
-    const { getByRole } = render(<Sidebar active="overview" onNavigate={onNavigate} />);
+    const { getByRole } = render(<Sidebar active="setup" onNavigate={onNavigate} />);
     getByRole("button", { name: /web-app/ }).click();
     expect(onNavigate).toHaveBeenCalledWith("project", "/web-app");
   });
@@ -98,7 +96,7 @@ describe("Sidebar", () => {
       projects: [{ id: "/web-app", name: "web-app", grade: "A", logo: null }],
     });
     const { container } = render(
-      <Sidebar active="overview" onNavigate={() => {}} onReplay={() => {}} />,
+      <Sidebar active="setup" onNavigate={() => {}} onReplay={() => {}} />,
     );
     expect(await axe(container)).toHaveNoViolations();
   });
