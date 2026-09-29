@@ -24,7 +24,7 @@ const project = (o: Partial<ProjectRow> = {}): ProjectRow => ({
   ...o,
 });
 
-const ctx: ProjectsColumnsCtx = { setup: null, sessions90: new Map([["/code/web", 7]]) };
+const ctx: ProjectsColumnsCtx = { rows: null, usage: null, fallbackHarness: "", sessions90: new Map([["/code/web", 7]]) };
 
 let mountCount = 0;
 
@@ -90,13 +90,14 @@ describe("projectColumns", () => {
     expect(screen.getByLabelText("Grade D")).toHaveTextContent("D");
   });
 
-  it("renders the rollup counts in their own cells", () => {
-    mount([project({ id: "/code/web", file_count: 7, never_used_count: 2, error_count: 5 })]);
+  it("renders the instruction count, and a dash for counts not known yet", () => {
+    mount([project({ id: "/code/web", file_count: 7 })]);
     const cells = bodyRows()[0];
     expect(cells[2]).toBe("7");
+    expect(cells[3]).toBe("—");
     expect(cells[4]).toBe("7");
-    expect(cells[6]).toBe("2");
-    expect(cells[7]).toBe("5");
+    expect(cells[6]).toBe("—");
+    expect(cells[7]).toBe("—");
   });
 
   it("renders the last session as a relative age, and 'never' when there is none", () => {

@@ -2,12 +2,15 @@ import type { ColumnDef, SortingFn } from "@tanstack/react-table";
 import { GRADE_LETTERS, type GradeLetter } from "@/components/Grade";
 import { GradeCell, type PillGroup } from "@/components/DataTable";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
-import type { ProjectRow, SetupView } from "@/lib/ipc";
+import type { ProjectRow } from "@/lib/ipc";
 // Deep import rather than the Setup barrel: this is one pure formatter, and
 // the barrel would pull the whole Setup screen in behind it.
 import { relativeSession } from "@/screens/Setup/setup.util";
 import { GLYPH_SIZE } from "./Projects.constants";
-import { itemsAvailable } from "./projects.util";
+import { projectCounts, trim } from "./projects.util";
+import type { ProjectsColumnsCtx } from "./Projects.types";
+
+export type { ProjectsColumnsCtx };
 
 /**
  * The grade a project sorts under. `ProjectRow.grade` is non-null today (the
@@ -30,14 +33,18 @@ const byGradeThenIssues: SortingFn<ProjectRow> = (a, b) => {
   return b.original.issue_count - a.original.issue_count;
 };
 
+/** Shown where a count is not known (not loaded yet, or its query failed) — never a false 0. */
+const UNKNOWN = "—";
+
 /** A right-aligned count cell — every rollup number in this table renders the same way. */
-function countColumn(id: string, header: string, value: (r: ProjectRow) => number): ColumnDef<ProjectRow, unknown> {
+function countColumn(id: string, header: string, value: (r: ProjectRow) => number | null): ColumnDef<ProjectRow, unknown> {
   return {
     id,
     header,
-    accessorFn: value,
+    // Unknown sorts below every real count.
+    accessorFn: (r) => value(r) ?? -1,
     meta: { align: "right" },
-    cell: (c) => <span className="dt-num">{value(c.row.original)}</span>,
+    cell: (c) => <span className="dt-num">{value(c.row.original) ?? UNKNOWN}</span>,
   };
 }
 
@@ -80,12 +87,6 @@ const LAST_SESSION_COLUMN: ColumnDef<ProjectRow, unknown> = {
   cell: (c) => <span className="muted">{relativeSession(c.row.original.last_session_at)}</span>,
 };
 
-/** What the columns read besides the row: the setup inventory and the 90-day session counts. */
-export interface ProjectsColumnsCtx {
-  setup: SetupView | null;
-  sessions90: Map<string, number> | null;
-}
-
 const cache = new WeakMap<ProjectsColumnsCtx, ColumnDef<ProjectRow, unknown>[]>();
 
 /**
@@ -99,11 +100,11 @@ export function projectColumns(ctx: ProjectsColumnsCtx): ColumnDef<ProjectRow, u
     NAME_COLUMN,
     GRADE_COLUMN,
     countColumn("files", "Instructions", (r) => r.file_count),
-    countColumn("items", "Items available", (r) => itemsAvailable(r.id, ctx.setup) ?? 0),
-    countColumn("sessions", "Sessions (90 days)", (r) => ctx.sessions90?.get(r.id.replace(/\/+$/, "")) ?? 0),
+    countColumn("items", "Items available", (r) => projectCounts(r, ctx)?.items ?? null),
+    countColumn("sessions", "Sessions (90 days)", (r) => (ctx.sessions90 ? (ctx.sessions90.get(trim(r.id)) ?? 0) : null)),
     LAST_SESSION_COLUMN,
-    countColumn("neverUsed", "Never used", (r) => r.never_used_count),
-    countColumn("errors", "Erroring", (r) => r.error_count),
+    countColumn("neverUsed", "Never used", (r) => projectCounts(r, ctx)?.neverUsed ?? null),
+    countColumn("errors", "Erroring", (r) => projectCounts(r, ctx)?.erroring ?? null),
   ];
   cache.set(ctx, defs);
   return defs;

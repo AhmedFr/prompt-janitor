@@ -21,12 +21,14 @@ const emit = async (event: string) => {
 };
 
 const listProjects = vi.hoisted(() => vi.fn());
+const getProjectUsage = vi.hoisted(() => vi.fn());
+const listFiles = vi.hoisted(() => vi.fn());
 const getSetup = vi.hoisted(() => vi.fn());
 const getUsageOverview = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ipc", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ipc")>("@/lib/ipc");
-  return { ...actual, isTauri: true, commands: { listProjects, getSetup, getUsageOverview } };
+  return { ...actual, isTauri: true, commands: { listProjects, getSetup, getUsageOverview, getProjectUsage, listFiles } };
 });
 
 const project = (o: Partial<ProjectRow> = {}): ProjectRow => ({
@@ -53,6 +55,18 @@ const populated: ProjectRow[] = [
   project({ id: "/code/gone", name: "gone", grade: "C", issue_count: 1, exists: false, harness: null }),
 ];
 
+const artifact = (id: number, kind: string, name: string) => ({
+  id, harness: "claude_code", layer: "global", kind, name, path: `/x/${name}`, plugin_name: null,
+  description: null, bytes: 0, grade: null, score: null, file_id: null, usage: null, issue_count: null, worst_severity: null,
+});
+
+/** Two global skills; the web-app project has its own agent. */
+const SETUP = {
+  harnesses: [{ id: "claude_code", display_name: "Claude Code", detected: true }],
+  global: [artifact(1, "skill", "adapt"), artifact(2, "skill", "polish")],
+  projects: [{ path: "/code/web-app", harness: "claude_code", artifacts: [{ ...artifact(3, "agent", "reviewer"), layer: "project" }] }],
+};
+
 /** The name cell of every rendered body row, in order. */
 function rowNames(): string[] {
   return within(screen.getByRole("table"))
@@ -74,7 +88,11 @@ describe("Projects", () => {
     listProjects.mockReset();
     getSetup.mockReset();
     getUsageOverview.mockReset();
-    getSetup.mockResolvedValue({ status: "ok", data: { harnesses: [], global: [{}, {}], projects: [] } });
+    getProjectUsage.mockReset();
+    listFiles.mockReset();
+    listFiles.mockResolvedValue({ status: "ok", data: [] });
+    getProjectUsage.mockResolvedValue({ status: "ok", data: { ranked: [], sessions_per_day: [] } });
+    getSetup.mockResolvedValue({ status: "ok", data: SETUP });
     getUsageOverview.mockResolvedValue({ status: "ok", data: { sessions_per_project: [{ path: "/code/web-app", name: "web-app", sessions: 4 }] } });
     listProjects.mockResolvedValue({ status: "ok", data: populated });
   });
@@ -141,16 +159,34 @@ describe("Projects", () => {
     expect(screen.getAllByRole("row")[1]).toHaveTextContent("new");
   });
 
-  it("shows items available and 90-day sessions once loaded", async () => {
+  it("shows the numbers the project's lens would show, and the window's sessions", async () => {
+    // Used in web-app: adapt (erroring). Never used there: polish and reviewer.
+    getProjectUsage.mockImplementation(async (_h: string, path: string) => ({
+      status: "ok",
+      data: {
+        sessions_per_day: [],
+        ranked:
+          path === "/code/web-app"
+            ? [{ kind: "skill", target: "adapt", artifact_id: 1, uses: 5, sessions: 2, error_rate: 0.5, avg_turn_tokens: 1, last_used: null }]
+            : [],
+      },
+    }));
+    await renderScreen();
+    await waitFor(() => {
+      const cells = [...screen.getByRole("row", { name: "web-app" }).querySelectorAll("td")].map((td) => td.textContent);
+      expect(cells.slice(3)).toEqual(expect.arrayContaining(["3", "4", "2", "1"]));
+      expect([cells[3], cells[4], cells[6], cells[7]]).toEqual(["3", "4", "2", "1"]);
+    });
+    expect(getProjectUsage).toHaveBeenCalledWith("claude_code", "/code/web-app", 90);
+  });
+
+  it("still renders the table, with dashes, when the setup query fails", async () => {
+    getSetup.mockRejectedValue(new Error("boom"));
     await renderScreen();
     await waitFor(() => expect(rowNames()).toHaveLength(3));
-    // web-app: 2 global items + 0 own; 4 sessions in the window.
-    await waitFor(() => {
-      const row = screen.getByRole("row", { name: "web-app" });
-      const cells = [...row.querySelectorAll("td")].map((td) => td.textContent);
-      expect(cells[3]).toBe("2");
-      expect(cells[4]).toBe("4");
-    });
+    const cells = [...screen.getByRole("row", { name: "web-app" }).querySelectorAll("td")].map((td) => td.textContent);
+    expect([cells[3], cells[6], cells[7]]).toEqual(["—", "—", "—"]);
+    expect(cells[4]).toBe("4");
   });
 
   it("refetches when a scan finishes", async () => {
@@ -180,7 +216,7 @@ describe("Projects", () => {
   it("says so when nothing has been scanned yet", async () => {
     listProjects.mockResolvedValue({ status: "ok", data: [] });
     await renderScreen();
-    await waitFor(() => expect(screen.getByText(/No projects scanned yet/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/No projects yet/)).toBeInTheDocument());
   });
 
   it("says the query failed rather than claiming nothing is scanned", async () => {
@@ -191,7 +227,7 @@ describe("Projects", () => {
       expect(screen.getByText(/The project list query failed/)).toBeInTheDocument(),
     );
     // The one thing this state must never do is read as "you have no projects".
-    expect(screen.queryByText(/No projects scanned yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No projects yet/)).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 

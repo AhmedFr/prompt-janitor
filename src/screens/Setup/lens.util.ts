@@ -1,12 +1,57 @@
 import type { EffectiveRule, ProjectUsage, UsageStat } from "@/lib/ipc";
-import { KIND_ORDER } from "./Setup.constants";
+import { ERROR_RATE_THRESHOLD, KIND_ORDER } from "./Setup.constants";
 import type { SetupRow } from "./setupRows.util";
 import { USAGE_KINDS } from "./setup.unified";
 
-const trim = (p: string) => p.replace(/\/+$/, "");
+export const trim = (p: string) => p.replace(/\/+$/, "");
 
 /** What a plugin's rows say under the lens: the inventory lists installed plugins, not enabled ones. */
 export const INSTALLED_PLUGIN = "installed plugin";
+
+/**
+ * Whether a row applies under the lens: `harness`'s own rows and graded-only
+ * files, with project rows kept only for the lensed project. The load order is
+ * per harness, so another harness's rows would sit unnumbered beside it; a
+ * graded-only file belongs to no harness (`harness: ""`) and is kept by its
+ * project alone.
+ */
+export function inLens(row: SetupRow, projectPath: string, harness: string): boolean {
+  const here = trim(projectPath);
+  return (
+    (row.origin === "graded" || row.harness === harness) &&
+    (row.layer !== "project" || (row.project_path !== null && trim(row.project_path) === here))
+  );
+}
+
+/** What the lens's summary line counts for a project: items, never used, erroring. */
+export interface LensCounts {
+  items: number;
+  neverUsed: number;
+  erroring: number;
+}
+
+/**
+ * The lens's own numbers, with the Setup summary line's rules: never used is a
+ * usage-counted row the project's sessions never invoked; erroring is an error
+ * rate at or above {@link ERROR_RATE_THRESHOLD}.
+ */
+export function lensCounts(
+  rows: SetupRow[],
+  projectPath: string,
+  harness: string,
+  usage: ProjectUsage | null,
+): LensCounts {
+  const ranked = new Map(
+    (usage?.ranked ?? []).filter((t) => t.artifact_id !== null).map((t) => [t.artifact_id as number, t]),
+  );
+  const applies = rows.filter((r) => inLens(r, projectPath, harness));
+  const counted = applies.filter((r) => USAGE_KINDS.has(r.kind));
+  return {
+    items: applies.length,
+    neverUsed: counted.filter((r) => !ranked.has(r.id)).length,
+    erroring: counted.filter((r) => (ranked.get(r.id)?.error_rate ?? 0) >= ERROR_RATE_THRESHOLD).length,
+  };
+}
 
 /**
  * Setup "as Claude Code sees <project>" (spec §5): what applies there, instructions
@@ -21,12 +66,7 @@ export function lensRows(
   usage: ProjectUsage | null,
   harness: string,
 ): SetupRow[] {
-  const here = trim(projectPath);
-  // The load order is per harness: another harness's rows would sit unnumbered beside it.
-  // A graded-only file belongs to no harness (`harness: ""`) and is kept by its project alone.
-  const applies = rows
-    .filter((r) => r.origin === "graded" || r.harness === harness)
-    .filter((r) => r.layer !== "project" || (r.project_path !== null && trim(r.project_path) === here));
+  const applies = rows.filter((r) => inLens(r, projectPath, harness));
   const order = new Map((effective ?? []).map((e, i) => [e.path, i + 1]));
   const ranked = new Map(
     (usage?.ranked ?? []).filter((t) => t.artifact_id !== null).map((t) => [t.artifact_id as number, t]),

@@ -1,5 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { ProjectGlyph } from "@/components/ProjectGlyph";
+import { trim } from "@/screens/Projects/projects.util";
 import { formatSetupTarget } from "@/App/setupTarget";
 import type { SidebarProps } from "./Sidebar.types";
 import { NAV_ITEMS, NAV_OWNER } from "./Sidebar.constants";
@@ -50,7 +51,7 @@ export function Sidebar({ active, onNavigate, onReplay }: SidebarProps) {
                 type="button"
                 className="sidebar__item sidebar__item--project"
                 // Setup as Claude Code sees this project (spec §7).
-                onClick={() => onNavigate("setup", formatSetupTarget({ lens: project.id.replace(/\/+$/, "") }))}
+                onClick={() => onNavigate("setup", formatSetupTarget({ lens: trim(project.id) }))}
               >
                 <ProjectGlyph name={project.name} grade={project.grade} logo={project.logo} size={18} />
                 <span className="sidebar__item-label">{project.name}</span>

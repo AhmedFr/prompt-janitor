@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactView, EffectiveRule, FileRow, ProjectSetup, ProjectUsage, SetupView } from "@/lib/ipc";
-import { lensRows } from "./lens.util";
+import { inLens, lensCounts, lensRows } from "./lens.util";
 import { setupRows, type SetupRow } from "./setupRows.util";
 
 const row = (over: Partial<SetupRow>): SetupRow => ({
@@ -136,5 +136,37 @@ describe("lensRows over a SetupView (spec §14: only what loads there)", () => {
     expect(ids).not.toContain(30);
     expect(ids).not.toContain(31);
     expect(ids).toHaveLength(5); // the api project's graded-only AGENTS.md is excluded too
+  });
+});
+
+describe("inLens", () => {
+  it("is the filter lensRows applies", () => {
+    const kept = rows.filter((r) => inLens(r, WEB, H)).map((r) => r.id);
+    expect(kept).toEqual(lensRows(rows, WEB, effective, usage, H).map((r) => r.id).sort((a, b) => rows.findIndex((r) => r.id === a) - rows.findIndex((r) => r.id === b)));
+    expect(inLens(row({ harness: "codex" }), WEB, H)).toBe(false);
+  });
+});
+
+describe("lensCounts", () => {
+  it("counts what the lens lists, with the summary line's rules", () => {
+    // Items: 1, 2, 4, 5, -7, 6. Usage-counted: 4 (used, erroring), 5 and 6 (never used here).
+    expect(lensCounts(rows, WEB, H, usage)).toEqual({ items: 6, neverUsed: 2, erroring: 1 });
+  });
+
+  it("counts a global unused skill as never used in every project", () => {
+    const none = { ranked: [], sessions_per_day: [] } as ProjectUsage;
+    expect(lensCounts(rows, WEB, H, none).neverUsed).toBe(3);
+    expect(lensCounts(rows, "/code/api", H, none).neverUsed).toBe(2); // adapt + design; api has no agent
+  });
+
+  it("counts a skill used only in another project as never used here", () => {
+    const elsewhere = { ranked: [], sessions_per_day: [] } as ProjectUsage;
+    expect(lensCounts([rows[3]], WEB, H, usage).neverUsed).toBe(0);
+    expect(lensCounts([rows[3]], WEB, H, elsewhere).neverUsed).toBe(1);
+  });
+
+  it("includes plugins and excludes another project's items", () => {
+    const c = lensCounts(rows, "/code/api", H, usage);
+    expect(c.items).toBe(4); // global rule, api rule, adapt, design plugin
   });
 });

@@ -5,7 +5,9 @@ import { Icon } from "@/components/Icon";
 import { DataTable, type DataTableSearch } from "@/components/DataTable";
 import type { ProjectRow } from "@/lib/ipc";
 import { formatSetupTarget } from "@/App/setupTarget";
-import { buildPills, DEFAULT_SORT, projectColumns, type ProjectsColumnsCtx } from "./projects.columns";
+import { setupRows } from "@/screens/Setup/setupRows.util";
+import { buildPills, DEFAULT_SORT, projectColumns } from "./projects.columns";
+import { trim } from "./projects.util";
 import {
   EMPTY_HINT,
   EMPTY_TITLE,
@@ -15,7 +17,7 @@ import {
   SEARCH_PLACEHOLDER,
   TABLE_STATE_KEY,
 } from "./Projects.constants";
-import type { ProjectsProps } from "./Projects.types";
+import type { ProjectsColumnsCtx, ProjectsProps } from "./Projects.types";
 import { useProjects } from "./useProjects";
 import "./Projects.css";
 
@@ -46,11 +48,26 @@ const SEARCH: DataTableSearch<ProjectRow> = {
  * nothing ever invokes, and which folders are gone from disk. A row opens
  * Setup as Claude Code sees that project.
  */
-export function Projects({ navigate, data: override, setup: setupOverride, sessions90: sessionsOverride }: ProjectsProps) {
+export function Projects({
+  navigate,
+  data: override,
+  setup: setupOverride,
+  usage: usageOverride,
+  sessions90: sessionsOverride,
+}: ProjectsProps) {
   const state = useProjects();
   const setup = setupOverride !== undefined ? setupOverride : state.setup;
   const sessions90 = sessionsOverride !== undefined ? sessionsOverride : state.sessions90;
-  const ctx = useMemo<ProjectsColumnsCtx>(() => ({ setup, sessions90 }), [setup, sessions90]);
+  const usage = usageOverride !== undefined ? usageOverride : state.usage;
+  const ctx = useMemo<ProjectsColumnsCtx>(
+    () => ({
+      rows: setup ? setupRows(setup, state.files) : null,
+      usage,
+      sessions90,
+      fallbackHarness: setup?.harnesses.find((h) => h.detected)?.id ?? "",
+    }),
+    [setup, state.files, usage, sessions90],
+  );
   const data = override ?? state.data;
   const loading = state.loading && !override;
   const rows = data ?? NO_ROWS;
@@ -83,7 +100,7 @@ export function Projects({ navigate, data: override, setup: setupOverride, sessi
               search={SEARCH}
               pills={pills}
               defaultSort={DEFAULT_SORT}
-              onRowClick={(row) => navigate("setup", formatSetupTarget({ lens: row.id.replace(/\/+$/, "") }))}
+              onRowClick={(row) => navigate("setup", formatSetupTarget({ lens: trim(row.id) }))}
               loading={loading}
               density="compact"
               empty={{ title: EMPTY_TITLE, hint: EMPTY_HINT }}
