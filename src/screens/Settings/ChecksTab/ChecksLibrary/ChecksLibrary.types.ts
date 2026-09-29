@@ -2,7 +2,7 @@ import type { RuleInfo } from "@/lib/ipc";
 
 /**
  * Which table a rule belongs to. Disjoint and exhaustive over `RuleInfo`
- * (see `tabOf`): a natural-language rule is an AI standard whether or not
+ * (see `tabOf`): a natural-language rule is an AI check whether or not
  * the user wrote it, so `nl` is checked before `custom`.
  */
 export type RuleTabId = "builtin" | "custom" | "ai";

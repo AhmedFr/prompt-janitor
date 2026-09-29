@@ -49,10 +49,10 @@ describe("RulePanel", () => {
     expect(container.querySelector("pre")).toHaveTextContent("slack.com");
   });
 
-  it("calls an AI standard's text its instruction", () => {
+  it("calls an AI check's text its instruction", () => {
     render(<RulePanel rule={rule({ nl: true, pattern: "State the output shape." })} onClose={() => {}} />);
     expect(screen.getByRole("heading", { name: "Instruction" })).toBeInTheDocument();
-    expect(screen.getByText("AI standard")).toBeInTheDocument();
+    expect(screen.getByText("AI check")).toBeInTheDocument();
   });
 
   it("says a built-in rule with no pattern is built in, and draws no empty block", () => {

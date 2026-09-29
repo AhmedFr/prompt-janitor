@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { commands, type HarnessInfo } from "@/lib/ipc";
 import { addExtraFolder } from "@/lib/scan-actions";
 import { scanStatusLine, useScanProgress } from "@/lib/useScanProgress";
-import { revealLine, setupRevealLine } from "./reveal.util";
+import { scanTotalsLine, setupRevealLine } from "./reveal.util";
 import type { OnboardingState, OnboardingStep } from "./Onboarding.types";
 
 /**
@@ -57,7 +57,7 @@ export function useOnboarding(): OnboardingState {
       setSetupLine(
         setup?.status === "ok"
           ? setupRevealLine(setup.data, files?.status === "ok" ? files.data : [])
-          : revealLine(files_scanned, projects, 0, 0),
+          : scanTotalsLine(files_scanned, projects),
       );
       setStep("reveal");
       return;

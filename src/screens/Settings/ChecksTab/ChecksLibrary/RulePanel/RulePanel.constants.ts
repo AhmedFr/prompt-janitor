@@ -1,6 +1,6 @@
 /** What kind of rule a row is, as the sheet names it. */
 export const RULE_TYPE = {
-  nl: "AI standard",
+  nl: "AI check",
   pattern: "Pattern rule",
   builtin: "Built-in",
 } as const;

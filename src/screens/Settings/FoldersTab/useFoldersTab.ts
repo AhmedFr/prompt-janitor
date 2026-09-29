@@ -42,7 +42,7 @@ export function useFoldersTab(): UseFoldersTab {
   }, [refetch]);
 
   // Wraps a scan action with the busy flag and a fresh progress bar — the
-  // same shape Setup's Rescan button uses, so the two never drift apart.
+  // same shape Setup's Scan button uses, so the two never drift apart.
   const run = useCallback(
     async (action: () => Promise<unknown>) => {
       scanProgress.reset();

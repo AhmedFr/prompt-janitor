@@ -13,6 +13,11 @@ export function revealLine(items: number, projects: number, never: number, error
   return parts.join(" · ");
 }
 
+/** The fallback when the setup cannot be read: only the scan's own totals are true, and they count files, not items. */
+export function scanTotalsLine(files: number, projects: number): string {
+  return `Scanned ${n(files, "file", "files")} across ${n(projects, "project", "projects")}`;
+}
+
 /** The reveal line for a freshly scanned setup, counted by the rules Setup's summary line uses. */
 export function setupRevealLine(setup: SetupView, files: FileRow[]): string {
   const rows = setupRows(setup, files);

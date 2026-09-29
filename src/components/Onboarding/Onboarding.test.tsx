@@ -219,6 +219,22 @@ describe("Onboarding", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to the scan's own file totals when the setup cannot be read", async () => {
+    scanNow.mockResolvedValue({
+      status: "ok",
+      data: { files_scanned: 5, projects: 2, overall_score: 90, overall_grade: "A" },
+    });
+    getSetup.mockResolvedValue({ status: "error", error: "no" });
+    listFiles.mockResolvedValue({ status: "ok", data: [] });
+    render(<Onboarding onDone={vi.fn()} />);
+    await waitFor(() => expect(scanButton()).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(scanButton());
+    });
+    expect(await screen.findByText("Scanned 5 files across 2 projects")).toBeInTheDocument();
+    expect(screen.queryByText(/items/)).toBeNull();
+  });
+
   it("hands back to the app when the scan fails", async () => {
     const onDone = vi.fn();
     render(<Onboarding onDone={onDone} />);

@@ -46,8 +46,8 @@ export function severityRank(severity: Severity): number {
 
 /**
  * Which tab a rule belongs to. `nl` is checked first: a natural-language rule
- * is an AI standard whether the user wrote it or it shipped, and putting a
- * custom NL rule on the Custom tab would split the AI standards in two.
+ * is an AI check whether the user wrote it or it shipped, and putting a
+ * custom NL rule on the Custom tab would split the AI checks in two.
  */
 export function tabOf(rule: RuleInfo): RuleTabId {
   if (rule.nl) return "ai";

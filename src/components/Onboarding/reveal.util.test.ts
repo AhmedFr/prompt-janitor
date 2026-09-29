@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { revealLine, setupRevealLine } from "./reveal.util";
+import { revealLine, scanTotalsLine, setupRevealLine } from "./reveal.util";
 import type { SetupView } from "@/lib/ipc";
 
 describe("revealLine", () => {
@@ -15,6 +15,13 @@ const artifact = (name: string, kind: string, errorRate: number | null = null) =
   name,
   kind,
   usage: errorRate == null ? null : { error_rate: errorRate, avg_turn_tokens: null },
+});
+
+describe("scanTotalsLine", () => {
+  it("says files, not items, since the scan counted files", () => {
+    expect(scanTotalsLine(5, 2)).toBe("Scanned 5 files across 2 projects");
+    expect(scanTotalsLine(1, 1)).toBe("Scanned 1 file across 1 project");
+  });
 });
 
 describe("setupRevealLine", () => {

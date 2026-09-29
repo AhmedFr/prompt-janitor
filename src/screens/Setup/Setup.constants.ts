@@ -45,7 +45,7 @@ export const TABLE_STATE_KEY = "setup.unified";
 export const LENS_TABLE_STATE_KEY = "setup.lens";
 
 /** What an empty slice suggests doing about it — the only lever from this screen. */
-export const EMPTY_HINT = "Rescan to pick up anything added since the last scan.";
+export const EMPTY_HINT = "Scan to pick up anything added since the last scan.";
 
 /** What the table says when the chips, filters or search leave nothing (spec §4.5). */
 export const EMPTY_FILTERED = "No items match";

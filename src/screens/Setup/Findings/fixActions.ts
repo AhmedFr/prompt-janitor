@@ -2,7 +2,7 @@ import { commands, type FixEdit } from "@/lib/ipc";
 
 export type ApplyOutcome = { ok: boolean; message: string };
 
-/** Rescan everything so grades reflect the file's new content. */
+/** Scan everything so grades reflect the file's new content. */
 async function rescanConfigured(): Promise<void> {
   await commands.scanNow();
 }
